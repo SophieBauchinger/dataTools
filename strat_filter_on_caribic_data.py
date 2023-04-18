@@ -4,23 +4,22 @@ Created on Tue Apr 11 09:28:22 2023
 
 @author: sophie_bauchinger
 """
-
+#%% Imports
 import numpy as np
 import sys
 import pandas as pd
 from pathlib import Path
 import datetime as dt
 
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
-from matplotlib.cm import ScalarMappable as sm
 
 sys.path.insert(0, r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial')
 from toolpac_tutorial import Mauna_Loa, Mace_Head, Caribic, Mozart
 
 from toolpac.calc import bin_1d_2d
-from toolpac.outliers import outliers, ol_fit_functions
+from toolpac.outliers import outliers
+from toolpac.outliers import ol_fit_functions as fct
+from toolpac.outliers.outliers import get_no_nan, fit_data
 from toolpac.age import calculate_lag as cl
 from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
 
@@ -30,6 +29,7 @@ import C_read
 import C_SF6_age
 import C_tools
 
+#%% Get data
 # sf6_path = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\mlo_SF6_MM.dat'
 sf6_df = Mauna_Loa(range(2008, 2020), substance = 'sf6').df
 
@@ -60,7 +60,6 @@ def cal_time_lags(c_data, ref_data, ref_subs = 'SF6catsMLOm'):
     # print('length of lags and mean for ', c_year, ': ', len(lags),  np.nanmean(np.array(lags)))
     return lags
 
-
 def plot_time_lags(c_data, lags, ref_lims):
     """ Plot calculated time lags of a single year of caribic data """
     print(f'Plotting lags for {c_year}')
@@ -76,42 +75,53 @@ def plot_time_lags(c_data, lags, ref_lims):
     fig.autofmt_xdate()
     return True
 
-mlo_time_lims = (2000, 2020)
-mlo_MM = Mauna_Loa(years = np.arange(*mlo_time_lims)).df_MM
-mlo_MM.resample('1M') # add rows for missing months, filled with NaN 
-mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
-
-for c_year in range(2016, 2020):
-    c_data = caribic_data.select_year(c_year)
-    lags = cal_time_lags(c_data, mlo_MM)
-    if all(np.isnan(np.array(lags))): 
-        print(f'no lags calculated for {c_year}'); continue
-    plot_time_lags(c_data, lags, mlo_time_lims)
+if __name__=='__main__':
+    # Prep reference data 
+    mlo_time_lims = (2000, 2020)
+    mlo_MM = Mauna_Loa(years = np.arange(*mlo_time_lims)).df_MM
+    mlo_MM.resample('1M') # add rows for missing months, filled with NaN 
+    mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
+    
+    # loop through years of caribic data
+    for c_year in range(2016, 2020):
+        c_data = caribic_data.select_year(c_year)
+        lags = cal_time_lags(c_data, mlo_MM)
+        if all(np.isnan(np.array(lags))): 
+            print(f'no lags calculated for {c_year}'); continue
+        plot_time_lags(c_data, lags, mlo_time_lims)
 
 #%% n2o strat trop filter
-from toolpac.outliers import ol_fit_functions as fct
-
-# for y in range(2008, 2010):
-# data_ref = Caribic([2008, 2009, 2010]).df
-
 def get_mlo_fit(mlo_df, substance='N2OcatsMLOm'):
     """ Given one year of reference data, find the fit parameters for n2o """
     df = mlo_df.dropna(how='any', subset=substance)
-    year = df.index.year
-    month = df.index.month
+    year, month = df.index.year, df.index.month
     mlo_t_ref = year + (month - 0.5) / 12 # obtain fractional year for middle of the month
     mlo_mxr_ref = df[substance].values
     mlo_fit = np.poly1d(np.polyfit(mlo_t_ref, mlo_mxr_ref, 2))
     print(f'MLO fit parameters obtained: {mlo_fit}')
     return mlo_fit
 
-mlo_fit = get_mlo_fit(n2o_df)
 
-ref_data = n2o_df
-pv_lim=2.
-mlo_lim = 0.97
+def pre_flag(data, n2o_col, t_obs_tot, mlo_fit):
+    """ 
+    everything with lower n2o than mlo_lim*mlo_fit(frac_year) is flagged 
+    as 'strato' in an initial filtering step 
+    """ 
+    mlo_lim = 0.97
 
-def filter_strat_trop(data, ref_data, crit):
+    data = data.assign(strato = np.nan)
+    data = data.assign(tropo = np.nan)
+
+    data.loc[data[n2o_col] < mlo_lim * mlo_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
+
+    # create new dataframe to hold preflagging data
+    pre_flagged = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo'])
+    pre_flagged['n2o_pre_flag'] = 0 # initialise flag with zeros
+    pre_flagged.loc[data['strato'] == True, 'n2o_pre_flag'] = 1 # set flag indicator for pre-flagged measurements
+    print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
+    return data, pre_flagged
+
+def filter_strat_trop(data, ref_data, crit, mlo_fit):
     """ 
     Sort data into stratosphere or troposphere based on reference data
     
@@ -126,93 +136,106 @@ def filter_strat_trop(data, ref_data, crit):
 
     # choose only rows where sf6 and n2o data exists
     data = data.dropna(how='any', subset=[n2o_col])
+    data = data.dropna(how='any', subset=[sf6_col])
 
     # find total observation time as fractional year
     t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))
 
-    # initialise columns to hold strat and trop flags
-    data = data.assign(strato = np.nan)
-    data = data.assign(tropo = np.nan)
-    
+    # initialise columns to hold strat and trop flags (needs to be done on two lines)
 
 
-    # PRE FLAGGING
-    # alles das kleinere n20 daten hat als mlo_lim * mlo_fit(frac_year) wird als stratospheric eingestuft
-    data.loc[data[n2o_col] < mlo_lim * mlo_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
-
-    # create new dataframe to hold preflagging data
-    pre_flagged = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo'])
-
-    pre_flagged.loc[pre_flagged['strato'] == True, 'n2o_flag'] = -1 # set flag indicator for pre-flagged measurements
-    print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
-
+    data, pre_flagged = pre_flag(data, n2o_col, t_obs_tot, mlo_fit) # pre-flagging
 
     # OUTLIER 
     if crit == 'n2o':
         dir_val = 'n'
-        # n2o_mxr = data[n2o_col] # measured n2o mixing ratios
+        n2o_mxr = data[n2o_col] # measured n2o mixing ratios
+        n2o_d_mxr = data['d_N2O [ppb]']
+        # print(data.index, data[n2o_col],  pre_flagged.n2o_flag)
 
-        data.loc['d_n2o [ppb]'] = 0
-
-        print(data.index, data[n2o_col],  pre_flagged.n2o_flag)
-
-        ol_n2o = outliers.find_ol(fct.simple, t_obs_tot, data[n2o_col], data['d_n2o [ppb]'], flag = pre_flagged.n2o_flag, 
+        ol_n2o = outliers.find_ol(fct.simple, t_obs_tot, n2o_mxr, n2o_d_mxr, flag = pre_flagged.n2o_pre_flag, 
                               plot=True, limit=0.1, direction = dir_val)
-        return ol_n2o
-        
+        # ^ 4er tuple, 1st ist liste von OL=1, !OL=0
+        data.loc[(ol_n2o[0] != 0), ('strato', 'tropo')] = (True, False)
+        data.loc[(ol_n2o[0] == 0), ('strato', 'tropo')] = (False, True)
 
-    # Caribic SF6
-    sf6_mxr = data[sf6_col]
-    ol_sf6 = outliers.find_ol(fct.simple, data.index, sf6_mxr, None, None, 
-                          plot=True, limit=0.1, direction = dir_val)
-    # ^ 4er tuple, 1st ist liste von OL=1, !OL=0
+    if crit == 'sf6':
+        dir_val = 'n'
+        sf6_mxr = data[sf6_col] # measured n2o mixing ratios
+        sf6_d_mxr = data['d_SF6 [ppt]']
 
-    data_filtered = data[ol_sf6]
+        ol_sf6 = outliers.find_ol(fct.simple, t_obs_tot, sf6_mxr, sf6_d_mxr, flag = pre_flagged.n2o_pre_flag, 
+                              plot=True, limit=0.1, direction = dir_val)
+        data.loc[(ol_sf6[0] != 0), ('strato', 'tropo')] = (True, False)
+        data.loc[(ol_sf6[0] == 0), ('strato', 'tropo')] = (False, True)
 
-    # Caribic N2O
+    return data
 
+def filtered_caribic(c_year):
+    print(f'{c_year}')
+    c_data = caribic_data.select_year(c_year)
+    
+    for crit in ['n2o', 'sf6']:
+        if crit=='n2o' and len(get_no_nan(c_data.index, c_data['N2O [ppb]'], c_data['d_N2O [ppb]'])[0]) < 1: # check for valid data
+            print('! no n2o data'); continue
+        try: print(c_data['N2O [ppb]'], '\n cols:', c_data.columns)
+        except: pass
 
-#%% OLD
-# =============================================================================
-# from C_filter import filter_strat_trop, filter_outliers
-# from toolpac.outliers import ol_fit_functions as fct
-# from toolpac.outliers.outliers import get_no_nan, fit_data
-# 
+        if crit=='sf6' and len(get_no_nan(c_data.index, c_data['SF6 [ppt]'], c_data['d_SF6 [ppt]'])[0]) < 1: # check for valid data
+                print('! no sf6 data'); continue
+        try: print(c_data['SF6 [ppt]'], '\n cols:', c_data.columns)
+        except: pass
+
+        return filter_strat_trop(c_data, ref_data, crit, mlo_fit)
+
+if __name__=='__main__':
+    mlo_fit = get_mlo_fit(n2o_df)
+    ref_data = n2o_df
+    pv_lim=2.
+
+    # loop through years of caribic data
+    data_filtered = pd.DataFrame()
+    for c_year in range(2017, 2022): 
+        single_year = filtered_caribic(c_year)
+        data_filtered = pd.concat([data_filtered, single_year])
+
+    data_stratosphere = data_filtered.loc[data_filtered['strato'] == True]
+    data_troposphere = data_filtered.loc[data_filtered['tropo'] == True]
+
+#%% new ? 
 # if __name__=='__main__':
-#     crit = 'n2o'
-#     for year in [2015]:
-#         c_data = caribic_data.select_year(year)
-#         # filtered_data = filter_strat_trop(c_data, ref_data, crit)
-# 
-#     data = c_data
-# 
-#     n2o_col = caribic_data.get_col_name('n2o')
-#     sf6_col = caribic_data.get_col_name('sf6')
-# 
-#     # choose only rows where sf6 and n2o data exists
-#     data = data.dropna(how='any', subset=[n2o_col])
-# 
-#     # find total observation time as fractional year
-#     t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-# 
-#     # initialise columns to hold strat and trop flags
-#     data = data.assign(strato = np.nan)
-#     data = data.assign(tropo = np.nan)
-#     
-# 
-# 
-#     # PRE FLAGGING
-#     # alles das kleinere n20 daten hat als mlo_lim * mlo_fit(frac_year) wird als stratospheric eingestuft
-#     data.loc[data[n2o_col] < mlo_lim * mlo_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
-# 
-#     # create new dataframe to hold preflagging data
-#     pre_flagged = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo'])
-# 
-#     pre_flagged['n2o_flag'] = 0
-#     pre_flagged.loc[pre_flagged['strato'] == True, 'n2o_flag'] = -1 # set flag indicator for pre-flagged measurements
-#     print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
-# 
-# =============================================================================
+    # crit = 'n2o'
+    # for year in [2015]:
+    #     c_data = caribic_data.select_year(year)
+    #     # filtered_data = filter_strat_trop(c_data, ref_data, crit)
+
+    # data = c_data
+
+    # n2o_col = caribic_data.get_col_name('n2o')
+    # sf6_col = caribic_data.get_col_name('sf6')
+
+    # choose only rows where sf6 and n2o data exists
+    # data = data.dropna(how='any', subset=[n2o_col])
+
+    # find total observation time as fractional year
+    # t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))
+
+    # # initialise columns to hold strat and trop flags
+    # data = data.assign(strato = np.nan)
+    # data = data.assign(tropo = np.nan)
+
+    # PRE FLAGGING
+    # alles das kleinere n20 daten hat als mlo_lim * mlo_fit(frac_year) wird als stratospheric eingestuft
+    # mlo_lim = 0.97
+    # data.loc[data[n2o_col] < mlo_lim * mlo_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
+
+    # create new dataframe to hold preflagging data
+    # pre_flagged = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo'])
+
+    # pre_flagged['n2o_flag'] = 0
+    # pre_flagged.loc[pre_flagged['strato'] == True, 'n2o_flag'] = -1 # set flag indicator for pre-flagged measurements
+    # print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
+
 
 #!! The preflagging is not done in the way the function below wants it to be apparently.
 
@@ -303,4 +326,3 @@ def filter_strat_trop(data, ref_data, crit):
 #         ol = outliers.find_ol(ol_fit_functions.simple, data.index, sf6_mxr, None, None, 
 #                               plot=True, limit=0.1, direction = dir_val)
 # =============================================================================
-
