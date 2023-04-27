@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Apr 27 15:59:11 2023
-@author: sophie_bauchinger
+@Author: Sophie Bauchimger, IAU
+@Date: Thu Apr 27 15:59:11 2023
 
 Time Lag calculations
 """
@@ -43,8 +43,6 @@ def plot_time_lags(c_data, lags, ref_min, ref_max, ref_subs = 'SF6catsMLOm'):
     plt.xlabel('CARIBIC Measurement time')
     fig.autofmt_xdate()
     return True
-
-
 
 #%% Fct calls 
 if __name__=='__main__':

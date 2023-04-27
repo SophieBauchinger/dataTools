@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Apr 11 09:28:22 2023
+@Author: Sophie Bauchimger, IAU
+@Date: Tue Apr 11 09:28:22 2023
 
-@author: sophie_bauchinger
+Filtering data into tropospheric and stratospheric air
+Getting outlier statistics for the tropospheric part
+Removing linear trends from measurements using ground-based reference data
+
 """
 import numpy as np
 import sys
@@ -33,51 +37,7 @@ sys.path.insert(0, r'C:\Users\sophie_bauchinger\sophie_bauchinger\Caribic_data_h
 # import C_SF6_age
 import C_tools
 
-#%% Time Lag calculations
-
-def calc_time_lags(c_data, ref_data, subs='SF6 [ppt]', ref_subs = 'SF6catsMLOm'):
-    """ Calculate and plot time lag for caribic data wrt mauna loa msmts"""
-    t_ref = np.array(datetime_to_fractionalyear(ref_data.index, method='exact'))
-    c_ref = np.array(ref_data[ref_subs])
-    
-    c_obs_tot = np.array(c_data[ref_subs])
-    t_obs_tot = np.array(datetime_to_fractionalyear(c_data.index, method='exact'))
-
-    print(f'Calculating lags for {c_data.index.year[0]}')
-
-    lags = []
-    for t_obs, c_obs in zip(t_obs_tot, c_obs_tot):
-        lag = cl.calculate_lag(t_ref, c_ref, t_obs, c_obs, plot=True)
-        lags.append((lag))
-    # print('length of lags and mean for ', c_year, ': ', len(lags),  np.nanmean(np.array(lags)))
-    return lags
-
-def plot_time_lags(c_data, lags, ref_min, ref_max, ref_subs = 'SF6catsMLOm'):
-    """ Plot calculated time lags of a single year of caribic data """
-    print(f'Plotting lags for {c_year}')
-    fig, ax = plt.subplots(dpi=300)
-    plt.scatter(c_data.index, lags, marker='+')
-    ax.hlines(np.nanmean(np.array(lags)), 
-              dt.datetime(c_data.index.year[0], 1, 1), 
-              dt.datetime(c_data.index.year[0], 12, 31), 'r', ls='dashed')
-    plt.title('CARIBIC {} time lag {} wrt. MLO {} - {}'.format(
-        ref_subs, c_data.index.year[0], ref_min, ref_max))
-    plt.ylabel('Time lag [yr]')
-    plt.xlabel('CARIBIC Measurement time')
-    fig.autofmt_xdate()
-    return True
-
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
-def get_mlo_fit(mlo_df, substance='N2OcatsMLOm'):
-    """ Given one year of reference data, find the fit parameters for n2o """
-    df = mlo_df.dropna(how='any', subset=substance)
-    year, month = df.index.year, df.index.month
-    mlo_t_ref = year + (month - 0.5) / 12 # obtain fractional year for middle of the month
-    mlo_mxr_ref = df[substance].values
-    mlo_fit = np.poly1d(np.polyfit(mlo_t_ref, mlo_mxr_ref, 2))
-    # print(f'MLO fit parameters obtained: {mlo_fit}')
-    return mlo_fit
-
 def get_fct_substance(substance):
     """ Assign fct from toolpac.outliers.ol_fit_functions to a substance """
     df_func_dict = {'co2': fct.higher,
@@ -92,7 +52,7 @@ def get_fct_substance(substance):
                     'cfc_12': fct.simple, 
                     'hcfc_22': fct.simple, 
                     'int_co': fct.quadratic}
-    return df_func_dict[substance]
+    return df_func_dict[substance.lower()]
 
 def get_lin_fit(df, substance='N2OcatsMLOm', degree=2):
     """ Given one year of reference data, find the fit parameters for the substance """
@@ -407,23 +367,24 @@ if __name__=='__main__':
     plot_gradient_by_season(c_df, 'SF6 [ppt]')
 
 #%% Sth
-mlo_fit = get_lin_fit(n2o_df)
-ref_data = n2o_df
-data = caribic_data.select_year(2019)
-
-crit = 'n2o'
-n2o_col = caribic_data.get_col_name('n2o') # get column name
-data = data.dropna(how='any', subset=[n2o_col]) # choose only rows where n2o data exists
-t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))  # find total observation time as fractional year for fctn calls below
-data, pre_flagged = pre_flag(data, n2o_col, t_obs_tot, mlo_fit) # pre-flagging
-
-n2o_mxr = data[n2o_col] # measured n2o mixing ratios
-n2o_d_mxr = data['d_N2O [ppb]']
-# print(data.index, data[n2o_col],  pre_flagged.n2o_flag)
-
-ol_n2o = outliers.find_ol(fct.simple, t_obs_tot, n2o_mxr, n2o_d_mxr, flag = pre_flagged.n2o_pre_flag, 
-                      plot=True, limit=0.1, direction = 'n')
-# ^ 4er tuple, 1st ist liste von OL=1, !OL=0
-
-data.loc[(ol_n2o[0] != 0), ('strato', 'tropo')] = (True, False)
-data.loc[(ol_n2o[0] == 0), ('strato', 'tropo')] = (False, True)
+if __name__=='__main__':
+    mlo_fit = get_lin_fit(n2o_df)
+    ref_data = n2o_df
+    data = caribic_data.select_year(2019)
+    
+    crit = 'n2o'
+    n2o_col = caribic_data.get_col_name('n2o') # get column name
+    data = data.dropna(how='any', subset=[n2o_col]) # choose only rows where n2o data exists
+    t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))  # find total observation time as fractional year for fctn calls below
+    data, pre_flagged = pre_flag(data, n2o_col, t_obs_tot, mlo_fit) # pre-flagging
+    
+    n2o_mxr = data[n2o_col] # measured n2o mixing ratios
+    n2o_d_mxr = data['d_N2O [ppb]']
+    # print(data.index, data[n2o_col],  pre_flagged.n2o_flag)
+    
+    ol_n2o = outliers.find_ol(fct.simple, t_obs_tot, n2o_mxr, n2o_d_mxr, flag = pre_flagged.n2o_pre_flag, 
+                          plot=True, limit=0.1, direction = 'n')
+    # ^ 4er tuple, 1st ist liste von OL=1, !OL=0
+    
+    data.loc[(ol_n2o[0] != 0), ('strato', 'tropo')] = (True, False)
+    data.loc[(ol_n2o[0] == 0), ('strato', 'tropo')] = (False, True)

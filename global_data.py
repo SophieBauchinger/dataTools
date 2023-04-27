@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Mon Feb 27 13:10:50 2023
 
-Toolpac Tutorial
+Defines functions handling data extraction and plotting for the global
+data sets from Caribic and model output from Mozart
+Can both plot in 1D and 2D
 
 """
 import datetime as dt
