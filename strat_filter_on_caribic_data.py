@@ -4,55 +4,43 @@ Created on Tue Apr 11 09:28:22 2023
 
 @author: sophie_bauchinger
 """
-#%% Imports
 import numpy as np
 import sys
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn' - otherwise df[j] = val gives a warning (outliers.outliers)
-from pathlib import Path
+# from pathlib import Path
 import datetime as dt
 
 import matplotlib.pyplot as plt
 
-import warnings # using this to suppress a gui backend userwarning, not really advisible
-warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
+# supress a gui backend userwarning, not really advisible
+import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
 sys.path.insert(0, r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial')
-from toolpac_tutorial import Mauna_Loa, Mace_Head, Caribic, Mozart
+from local_data import Mauna_Loa# , Mace_Head
+from global_data import Caribic# , Mozart
+from time_lag import calc_time_lags, plot_time_lags
 
 from toolpac.calc import bin_1d_2d
 from toolpac.outliers import outliers
 from toolpac.outliers import ol_fit_functions as fct
-from toolpac.outliers.outliers import get_no_nan, fit_data
+from toolpac.outliers.outliers import get_no_nan# , fit_data
 from toolpac.age import calculate_lag as cl
-from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
+from toolpac.conv.times import datetime_to_fractionalyear #, fractionalyear_to_datetime
 
 sys.path.insert(0, r'C:\Users\sophie_bauchinger\sophie_bauchinger\Caribic_data_handling')
-from C_filter import filter_outliers
-import C_read
-import C_SF6_age
+# from C_filter import filter_outliers
+# import C_SF6_age
 import C_tools
-
-#%% Get data
-# sf6_path = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\mlo_SF6_MM.dat'
-sf6_df = Mauna_Loa(range(2008, 2020), substance = 'sf6').df
-
-n2o_path = r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data'
-n2o_fname = 'mlo_N2O_MM.dat'
-
-n2o_df = Mauna_Loa(range(2008, 2020), substance = 'n2o').df
-
-caribic_data = Caribic(range(2016, 2020))
-c_df = caribic_data.df
 
 #%% Time Lag calculations
 
-def cal_time_lags(c_data, ref_data, ref_subs = 'SF6catsMLOm'):
+def calc_time_lags(c_data, ref_data, subs='SF6 [ppt]', ref_subs = 'SF6catsMLOm'):
     """ Calculate and plot time lag for caribic data wrt mauna loa msmts"""
     t_ref = np.array(datetime_to_fractionalyear(ref_data.index, method='exact'))
     c_ref = np.array(ref_data[ref_subs])
     
-    c_obs_tot = np.array(c_data[caribic_data.substance])
+    c_obs_tot = np.array(c_data[ref_subs])
     t_obs_tot = np.array(datetime_to_fractionalyear(c_data.index, method='exact'))
 
     print(f'Calculating lags for {c_data.index.year[0]}')
@@ -64,7 +52,7 @@ def cal_time_lags(c_data, ref_data, ref_subs = 'SF6catsMLOm'):
     # print('length of lags and mean for ', c_year, ': ', len(lags),  np.nanmean(np.array(lags)))
     return lags
 
-def plot_time_lags(c_data, lags, ref_lims):
+def plot_time_lags(c_data, lags, ref_min, ref_max, ref_subs = 'SF6catsMLOm'):
     """ Plot calculated time lags of a single year of caribic data """
     print(f'Plotting lags for {c_year}')
     fig, ax = plt.subplots(dpi=300)
@@ -73,29 +61,11 @@ def plot_time_lags(c_data, lags, ref_lims):
               dt.datetime(c_data.index.year[0], 1, 1), 
               dt.datetime(c_data.index.year[0], 12, 31), 'r', ls='dashed')
     plt.title('CARIBIC {} time lag {} wrt. MLO {} - {}'.format(
-        caribic_data.substance_short, c_data.index.year[0], *ref_lims))
+        ref_subs, c_data.index.year[0], ref_min, ref_max))
     plt.ylabel('Time lag [yr]')
     plt.xlabel('CARIBIC Measurement time')
     fig.autofmt_xdate()
     return True
-
-if __name__=='__main__':
-    # Prep reference data 
-    mlo_time_lims = (2000, 2020)
-    mlo_MM = Mauna_Loa(years = np.arange(*mlo_time_lims)).df_MM
-    mlo_MM.resample('1M') # add rows for missing months, filled with NaN 
-    mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
-    
-    # loop through years of caribic data
-    for c_year in range(2005, 2022):
-        c_data = caribic_data.select_year(c_year)
-        if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
-            continue
-        else:
-            lags = cal_time_lags(c_data, mlo_MM)
-            if all(np.isnan(np.array(lags))): 
-                print(f'no lags calculated for {c_year}'); continue
-            plot_time_lags(c_data, lags, mlo_time_lims)
 
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
 def get_mlo_fit(mlo_df, substance='N2OcatsMLOm'):
@@ -105,10 +75,36 @@ def get_mlo_fit(mlo_df, substance='N2OcatsMLOm'):
     mlo_t_ref = year + (month - 0.5) / 12 # obtain fractional year for middle of the month
     mlo_mxr_ref = df[substance].values
     mlo_fit = np.poly1d(np.polyfit(mlo_t_ref, mlo_mxr_ref, 2))
-    print(f'MLO fit parameters obtained: {mlo_fit}')
+    # print(f'MLO fit parameters obtained: {mlo_fit}')
     return mlo_fit
 
-def pre_flag(data, n2o_col, t_obs_tot, mlo_fit):
+def get_fct_substance(substance):
+    """ Assign fct from toolpac.outliers.ol_fit_functions to a substance """
+    df_func_dict = {'co2': fct.higher,
+                    'ch4': fct.higher,
+                    'n2o': fct.simple, 
+                    'sf6': fct.quadratic, 
+                    'trop_sf6_lag': fct.quadratic, 
+                    'sulfuryl_fluoride': fct.simple, 
+                    'hfc_125': fct.simple, 
+                    'hfc_134a': fct.simple, 
+                    'halon_1211': fct.simple, 
+                    'cfc_12': fct.simple, 
+                    'hcfc_22': fct.simple, 
+                    'int_co': fct.quadratic}
+    return df_func_dict[substance]
+
+def get_lin_fit(df, substance='N2OcatsMLOm', degree=2):
+    """ Given one year of reference data, find the fit parameters for the substance """
+    df.dropna(how='any', subset=substance, inplace=True)
+    year, month = df.index.year, df.index.month
+    t_ref = year + (month - 0.5) / 12 # obtain fractional year for middle of the month
+    mxr_ref = df[substance].values
+    fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
+    print(f'Fit parameters obtained: {fit}')
+    return fit
+
+def pre_flag(data, n2o_col, t_obs_tot, ref_fit):
     """ 
     everything with lower n2o than mlo_lim*mlo_fit(frac_year) is flagged (3% cut-off)
     as 'strato' in an initial filtering step 
@@ -119,16 +115,16 @@ def pre_flag(data, n2o_col, t_obs_tot, mlo_fit):
     data = data.assign(strato = np.nan)
     data = data.assign(tropo = np.nan)
 
-    data.loc[data[n2o_col] < mlo_lim * mlo_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
+    data.loc[data[n2o_col] < mlo_lim * ref_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
 
     # create new dataframe to hold preflagging data
     pre_flagged = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo'])
     pre_flagged['n2o_pre_flag'] = 0 # initialise flag with zeros
     pre_flagged.loc[data['strato'] == True, 'n2o_pre_flag'] = 1 # set flag indicator for pre-flagged measurements
-    print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
+    # print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
     return data, pre_flagged
 
-def filter_strat_trop(data, crit):
+def filter_strat_trop(data, crit, ref_data):
     """ 
     Reconstruction of filter_strat_trop from C_tools (T. Schuck)
 
@@ -143,8 +139,8 @@ def filter_strat_trop(data, crit):
     """
     # OUTLIER: Trop / Strat identification using outlier statistics
     if crit == 'n2o':
-        mlo_fit = get_mlo_fit(n2o_df)
-        ref_data = n2o_df
+        n2o_df = Mauna_Loa(range(2008, 2020), substance = 'n2o').df
+        mlo_fit = get_lin_fit(n2o_df)
 
         n2o_col = caribic_data.get_col_name('n2o') # get column name
         data = data.dropna(how='any', subset=[n2o_col]) # choose only rows where n2o data exists
@@ -164,8 +160,8 @@ def filter_strat_trop(data, crit):
         data.loc[(ol_n2o[0] == 0), ('strato', 'tropo')] = (False, True)
 
     if crit == 'sf6':
-        mlo_fit = get_mlo_fit(sf6_df, substance='SF6catsMLOm')
-        ref_data = sf6_df
+        sf6_df = Mauna_Loa(range(2008, 2020), substance = 'sf6').df
+        mlo_fit = get_lin_fit(sf6_df, substance='SF6catsMLOm')
 
         sf6_col = caribic_data.get_col_name('sf6')
         data = data.dropna(how='any', subset=[sf6_col]) # choose only rows where sf6 data exists
@@ -180,13 +176,6 @@ def filter_strat_trop(data, crit):
         data.loc[(ol_sf6[0] == 0), ('strato', 'tropo_ol')] = (False, True)
 
     return data
-
-def get_fct_substance(substance):
-    df_func_dict = {
-        'sf6': fct.simple,
-        'n2o' : fct.simple
-        }
-    return df_func_dict[substance]
 
 def filter_trop_outliers(data, substance_list):
     """ 
@@ -242,14 +231,149 @@ def filter_trop_outliers(data, substance_list):
 
     return data_flag
 
+#%% Detrend data for a specific substance wrt free troposphere ? reference data 
 
+def detrend_substance(data, substance, ref_data, ref_subs, degree=2, plot=True):
+    """ (redefined from C_tools.detrend_subs)
+    Remove trend of in measurements of substances such as SF6 using reference data 
+    Parameters:
+        data: pandas (geo)dataframe of observations to detrend, index=datetime
+        substance: str, column name of data (e.g. 'SF6 [ppt]')
+        ref_data: pandas (geo)dataframe of reference data to detrend on, index=datetime
+        ref_subs: str, column name of reference data
+    """
+    c_obs = data[substance].values
+    t_obs =  np.array(datetime_to_fractionalyear(data.index, method='exact'))
+
+    ref_data.dropna(how='any', subset=ref_subs) 
+    # ignore reference data earlier and later than two years before/after msmts
+    two_yrs = dt.timedelta(356*2)
+    ref_data = ref_data[min(data.index)-two_yrs : max(data.index)+two_yrs]
+    ref_data.dropna(how='any', subset=ref_subs, inplace=True) # remove NaN rows
+    c_ref = ref_data[ref_subs].values
+    t_ref = np.array(datetime_to_fractionalyear(ref_data.index, method='exact'))
+
+    c_fit = np.poly1d(np.polyfit(t_ref, c_ref, 2)) # get popt, then make into fct
+
+    detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+    c_obs_detr = c_obs - detrend_correction
+
+    if plot:
+        plt.figure(dpi=200)
+        plt.scatter(t_obs, c_obs, color='orange', label='Flight data')
+        plt.scatter(t_ref, c_ref, color='gray', label='MLO data')
+        plt.scatter(t_obs, c_obs_detr, color='green', label='detrended')
+        plt.plot(t_obs, np.nanmin(c_obs) + detrend_correction, color='black', ls='dashed', label='trendline')
+        plt.legend()
+        plt.show()
+
+    data[f'detr_{substance}'] = c_obs_detr
+    return data
+
+#%% Plotting Gradient by season
+
+""" What data needs to be put in here? """
+# select_var=['fl_ch4','fl_sf6', 'fl_n2o']
+# select_value=[0,0,0]
+# select_cf=['GT','GT', 'GT']
+
+def plot_gradient_by_season(data, substance, tropopause='therm', errorbars=False, 
+                          min_y=-50, max_y=80, bsize=10, ptsmin=5):
+    """ 
+    Plotting gradient by season using 1D binned data 
+    Parameters:
+        data: pandas (geo)dataframe
+        substance: str, eg. 'SF6 [ppt]'
+        tropopause: str, which tropopause definition to use 
+        min_y, max_y: int, defines longitude range to plot
+        bsize: int, bin size for 1D binning
+        ptsmin: int, minimum number of pts for a bin to be considered 
+    """
+    # c_obs = data[substance].values
+    # t_obs =  np.array(datetime_to_fractionalyear(data.index, method='exact'))
+
+    nbins = (max_y - min_y) / bsize
+    y_array = min_y + np.arange(nbins) * bsize + bsize * 0.5
+
+    data['season'] = C_tools.make_season(data.index.month) # 1 = spring etc
+    dict_season = {'name_1': 'spring-MAM', 'name_2': 'summer-JJA', 'name_3': 'autumn-SON', 'name_4': 'winter-DJF',
+                   'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
+
+    for s in set(data['season'].tolist()):
+        df = data.loc[data['season'] == s]
+
+        y_values = df.geometry.y # df[f'int_pt_rel_thermtp_k'].values # equivalent latitude
+        x_values = df[f'detr_{substance}'].values
+        dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
+
+    plt.figure(dpi=200)
+
+    x_min = np.nan
+    x_max = np.nan
+    for s in set(data['season'].tolist()): # using the set to order the seasons 
+        vmean = (dict_season[f'bin1d_{s}']).vmean
+        vcount = (dict_season[f'bin1d_{s}']).vcount
+        vmean = np.array([vmean[i] if vcount[i] >= 5 else np.nan for i in range(len(vmean))])
+        
+        # find value range for axis limits
+        all_vmin = np.nanmin((dict_season[f'bin1d_{s}']).vmin)
+        all_vmax = np.nanmax((dict_season[f'bin1d_{s}']).vmax)
+        x_min = np.nanmin((x_min, all_vmin))
+        x_max = np.nanmax((x_min, all_vmax))
+
+        plt.plot(vmean, y_array, '-',
+                 marker='o', c=dict_season[f'color_{s}'], label=dict_season[f'name_{s}'])
+
+        # add error bars
+        if errorbars:
+            vstdv = (dict_season[f'bin1d_{s}']).vstdv
+            plt.errorbar(vmean, y_array, None, vstdv, c=dict_season[f'color_{s}'], elinewidth=0.5)
+
+    plt.tick_params(direction='in', top=True, right=True)
+
+    plt.ylim([min_y, max_y])
+
+    x_min = np.floor(x_min)
+    x_max = np.ceil(x_max)
+    plt.xlim([x_min, x_max])
+    plt.legend()
+    plt.show()
+
+#%% Get data
+if __name__=='__main__':
+    mlo_df = Mauna_Loa(range(2008, 2020)).df
+    n2o_df = Mauna_Loa(range(2008, 2020), substance = 'n2o').df
+    
+    caribic_data = Caribic(range(2005, 2020))
+    c_df = caribic_data.df
+
+#%% Time lags
+if __name__=='__main__':
+    # Get and prep reference data 
+    ref_min, ref_max = 2003, 2020
+    mlo_MM = Mauna_Loa(range(ref_min, ref_max)).df
+    mlo_MM.resample('1M') # add rows for missing months, filled with NaN 
+    mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
+
+    # loop through years of caribic data
+    for c_year in range(2005, 2022):
+        c_data = caribic_data.select_year(c_year)
+        if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
+            continue
+        else:
+            lags = calc_time_lags(c_data, mlo_MM)
+            if all(np.isnan(np.array(lags))): 
+                print(f'no lags calculated for {c_year}'); continue
+            plot_time_lags(c_data, lags, ref_min, ref_max)
+
+#%% Filter tropospheric and stratospheric data
 if __name__=='__main__':
     # loop through years of caribic data
     data_filtered = pd.DataFrame() # initialise full dataframe
     for c_year in range(2005, 2022): 
         print(f'{c_year}')
         c_data = caribic_data.select_year(c_year)
-        print('cols:', c_data.columns)
+        # print('cols:', c_data.columns)
 
         crit = 'n2o'; n2o_filtered = pd.DataFrame()
         if len(get_no_nan(c_data.index, c_data['N2O [ppb]'], c_data['d_N2O [ppb]'])[0]) < 1: # check for valid data
@@ -267,77 +391,23 @@ if __name__=='__main__':
             data_filtered = pd.concat([data_filtered, sf6_filtered])
 
     data_stratosphere = data_filtered.loc[data_filtered['strato'] == True]
-    print(data_stratosphere.value_counts)
+    # print(data_stratosphere.value_counts)
     data_troposphere = data_filtered.loc[data_filtered['tropo'] == True]
 
     data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'])
 
-#%% Detrend data for a specific substance wrt free troposphere ? reference data 
-def detrend_substance(data, substance, ref_data, ref_subs, degree=2):
-    """ (redefined from C_tools.detrend_subs)
-    Remove linear trend of viable substances eg. SF6 using reference data 
-    Parameters:
-        data: pandas (geo)dataframe of observations to detrend, index=datetime
-        substance: str, column name of data (e.g. 'SF6 [ppt]')
-        ref_data: pandas (geo)dataframe of reference data to detrend on, index=datetime
-        ref_subs: str, column name of reference data
-    """
-    # ignore reference data earlier and later than two years before/after msmts
-    two_yrs = dt.timedelta(356*2)
-    ref_data_sliced = ref_data[min(data.index)-two_yrs : max(data.index)+two_yrs]
 
-    c_obs = data[substance].values()
-    t_obs =  np.array(datetime_to_fractionalyear(data.index, method='exact'))
+#%% Detrend
+if __name__=='__main__':
+    mlo_detrend_ref = Mauna_Loa(range(2006, 2020)).df
+    data_detr = detrend_substance(c_df, 'SF6 [ppt]', mlo_detrend_ref, 'SF6catsMLOm')
 
-    c_ref = ref_data_sliced[ref_subs].values()
-    t_ref = np.array(datetime_to_fractionalyear(ref_data_sliced.index, method='exact'))
+#%% Plot gradient by Season
+if __name__=='__main__':
+    plot_gradient_by_season(c_df, 'SF6 [ppt]')
 
-    ts_fit = np.polyfit(t_ref, c_ref, degree)
-    c_fit = np.poly1d(ts_fit)
-
-    detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
-    c_obs_detr = c_obs - detrend_correction
-
-    return c_obs_detr
-
-#%% Plotting Gradient by season
-
-
-def pl_gradient_by_season(data, substance, tropopause='therm', 
-                          min_y=-50, max_y=80, bsize=10, ptsmin=5):
-    """ 
-    Plotting gradient by season using 1D binned data 
-    Parameters:
-        data: pandas (geo)dataframe
-        substance: str, eg. 'SF6 [ppt]'
-        tropopause: str, which tropopause definition to use 
-        min_y, max_y: int, defines longitude range to plot
-        bsize: int, bin size for 1D binning
-        ptsmin: int, minimum number of pts for a bin to be considered 
-    """
-    var = 1 # select_var_list
-    value = 1
-    cf = C_tools.get_op('lt')
-
-    c_obs = data[substance].values()
-    t_obs =  np.array(datetime_to_fractionalyear(data.index, method='exact'))
-
-    nbins = (max_y - min_y) / bsize
-    y_array = min_y + np.arange(nbins) * bsize + bsize * 0.5
-
-    dict_season = {'name_1': 'spring', 'name_2': 'summer', 'name_3': 'autumn', 'name_4': 'winter',
-                   'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
-
-    for s in set(data['season'].tolist()):
-        df_sub = data.loc[data['season'] == s]
-        y_values = df_sub[yvar].values
-        x_values = df_sub[f'detr_{substance}'].values
-        dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
-
-
-
-#%% 
-mlo_fit = get_mlo_fit(n2o_df)
+#%% Sth
+mlo_fit = get_lin_fit(n2o_df)
 ref_data = n2o_df
 data = caribic_data.select_year(2019)
 
