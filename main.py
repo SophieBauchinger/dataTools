@@ -51,7 +51,7 @@ for c_year in range(2005, 2022):
             print(f'no lags calculated for {c_year}'); continue
         plot_time_lags(c_data, lags, ref_min, ref_max)
 
-#%% Filter tropospheric and stratospheric data
+#%% Get stratosphere / troposphere flags based on n2o mixing ratio
 # loop through years of caribic data
 data_filtered = pd.DataFrame() # initialise full dataframe
 for c_year in range(2005, 2022): 
@@ -63,7 +63,6 @@ for c_year in range(2005, 2022):
     if len(get_no_nan(c_data.index, c_data['N2O [ppb]'], c_data['d_N2O [ppb]'])[0]) < 1: # check for valid data
         print('! no n2o data')
     else:
-
         n2o_filtered =  filter_strat_trop(c_data, crit)
         data_filtered = pd.concat([data_filtered, n2o_filtered])
 

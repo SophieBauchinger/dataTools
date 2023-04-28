@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchinger, IAU
-@Date: Mon Feb 27 13:10:50 2023
+@Author: Sophie Bauchimger, IAU
+@Date: Fri Apr 28 14:13:28 2023
 
-Defines functions handling data extraction and plotting for the global
-data sets from Caribic and model output from Mozart
-Can both plot in 1D and 2D
-
+Defines classes used as basis for data structures
 """
 import datetime as dt
 import geopandas
@@ -24,6 +21,8 @@ from matplotlib.cm import ScalarMappable as sm
 from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
+from toolpac.outliers import outliers, ol_fit_functions
+from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
 
 from aux_fctns import monthly_mean, ds_to_gdf, get_col_name
 
@@ -43,7 +42,6 @@ class global_data(object):
         self.v_limits = v_limits
 
         self.substance = None
-        self.substance_short = None
         self.source = None
 
     def select_year(self, yr):
@@ -183,20 +181,76 @@ class global_data(object):
 
         return out_list
 
-#%% CARIBIC
+    def get_data(self):
+        """ 
+        Create geopandas dataframe from data file for all available substances
+            lon / lat data is put into a geometry column
+            Index is set to datetime of the sampling / modelled times 
+            (CARIBIC only) a column with flight number is created 
+        """ 
+        gdf = geopandas.GeoDataFrame() # initialise GeoDataFrame
+        if self.source=='Caribic':
+            parent_dir = r'E:\CARIBIC\Caribic2data'
+
+            for yr in self.years:
+                if not any(find.find_dir("*_{}*".format(yr), parent_dir)): 
+                    print(f'No data found for {yr}'); continue
+                df = pd.DataFrame()
+                print(f'Reading in Caribic data for {yr}')
+
+                # First collect data from individual flights 
+                for current_dir in find.find_dir("*_{}*".format(yr), parent_dir)[1:]:
+                    flight_nr = int(str(current_dir)[-12:-9])
+                    for pfx in ['GHG']: # can include different prefixes here too
+                        f = find.find_file(f'{pfx}_*', current_dir)
+                        if not f: # show error msg and go directly to next loop
+                            print(f'No {pfx} File found for Flight {flight_nr} in {yr}'); continue
+                        elif len(f) > 1: f.sort() # sort list of files, then take latest
+        
+                        f_data = FFI1001DataReader(f[0], df=True, xtype = 'secofday')
+                        df_temp = f_data.df # index = Datetime
+                        df_temp.insert(0, 'Flight number',
+                                       [flight_nr for i in range(df_temp.shape[0])])
+                        df = pd.concat([df, df_temp])
+
+                # Convert longitude and latitude into geometry objects -> GeoDataFrame
+                geodata = [Point(lat, lon) for lon, lat in zip(
+                    df['lon; longitude (mean value); [deg]\n'],
+                    df['lat; latitude (mean value); [deg]\n'])]
+                gdf_temp = geopandas.GeoDataFrame(df, geometry=geodata)
+        
+                # Drop all unnecessary columns [info is saved within datetime, geometry]
+                if not gdf_temp['geometry'].empty:
+                    columns = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
+                    column_names = [df.filter(regex='^'+c).columns[0] for c in columns]
+                    gdf_temp.drop(column_names, axis=1, inplace=True)
+                    # drop_cols = [test_df.filter(like='d_').columns
+                    # gdf_temp = gdf_temp.drop(['TimeCRef; CARIBIC_reference_time_since_0_hours_UTC_on_first_date_in_line_7; [s]',
+                    #             'year; date of sampling: year; [yyyy]\n',
+                    #             'month; date of sampling: month; [mm]\n',
+                    #             'day; date of sampling: day; [dd]\n',
+                    #             'hour; time of sampling (mean value): hour; [HH]\n',
+                    #             'min; time of sampling (mean value): minutes; [MM]\n',
+                    #             'sec; time of sampling (mean value): seconds; [SS]\n',
+                    #             'lon; longitude (mean value); [deg]\n',
+                    #             'lat; latitude (mean value); [deg]\n',
+                    #             'type; type of sample collector: 0 glass flask from TRAC, 1 metal flask from HIRES; [0-1]\n'],
+                    #            axis=1)
+                else: print('Geodata creation was unsuccessful. Please check your input.')
+
+test = global_data([2019])
+
 class Caribic(global_data):
     """ CARIBIC data, plotting, averaging """
 
     def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None,
                subst='sf6', pfxs=['GHG']):
-
         super().__init__(years, grid_size, v_limits)
         self.source = 'Caribic'
         self.substance_short = subst
         self.substance = get_col_name(self.substance_short, 'car')
 
-        # self.df, self.column_dict = self.caribic_data(pfxs)
-        self.df = self.caribic_data(pfxs)
+        self.df, self.column_dict = self.caribic_data(pfxs)
 
         if flight_nr: self.df = self.df[self.df.values == flight_nr]
         self.df_monthly_mean = monthly_mean(self.df)
@@ -306,147 +360,3 @@ class Caribic(global_data):
         plt.ylim(ymin-0.15, ymax+0.15)
         fig.autofmt_xdate()
         plt.show()
-
-#%% MOZART
-class Mozart(global_data):
-    """
-    Class attributes:
-        years: arr
-        source: str
-        substance: str
-        ds: xarray DataFrame
-        df: Pandas GeoDataFrame
-        x: arr, latitude
-        y: arr, longitude (remapped to +-180 deg)
-        SF6: Pandas DataSeries of SF6 mixing ratios
-    """
-
-    def __init__(self, years, grid_size=5, v_limits=None):
-        """ Initialise MOZART object """
-        super().__init__( years, grid_size, v_limits)
-        self.years = years
-        self.source = 'Mozart'
-        self.substance = 'sf6'
-
-        self.ds = xr.concat([self.mozart_data(year = y) for y in self.years], dim='time')
-        self.df = ds_to_gdf(self.ds)
-        self.SF6 = self.df['SF6']
-
-    def mozart_data(self, year, level = 27, remap = True, 
-                    file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
-        """ 
-        Returns xarray Dataset of MOZART model data
-        If remap is set True, longitude values are remapped for pos / neg symmetry
-
-        Data variables:
-            hyam     Hybrid A coordinate
-            hybm     Hybrid B coordinate
-            P0       Reference pressure [Pa
-            PS       Surface Pressure [Pa]
-            SF6      Annual mean SF6 dry air mole fraction [pmol/mol]
-
-        Coordinates
-            time        39  [year]                  1970 to 2008
-            level       28  [hybrid sigma level]    2.7 to 995.0
-            latitude    36  [degrees_north]         -90 to 90
-            longitude   72  [degrees_east]          0 to 355
-        """
-        with xr.open_dataset(file) as ds:
-            ds = ds.isel(level=27)
-            ds = ds.sel(time = year)
-
-        if remap: # set longitudes between 180 and 360 to start at -180 towards 0
-            ds_remap = ds
-            ds_remap['longitude'] = np.array([i for i in ds.longitude if i<=180] +
-                                       [i - 360 for i in ds.longitude if i>180])
-            ds = ds_remap.sortby(ds_remap.longitude) # reorganise values             
-        return ds
-
-    def plot_scatter(self, total=False):
-        """ Plot 1D averaged data over latitude or longitude for each years.
-        If total is set True, plot the average mixing ratio for all years """
-        if total: 
-            x = np.array([self.df.geometry[i].x for i in range(len(self.df.index))]) # lat
-            y = np.array([self.df.geometry[i].y for i in range(len(self.df.index))]) # lon
-            
-            xbmin, xbmax = min(x), max(x)
-            ybmin, ybmax = min(y), max(y)
-    
-            out_x = bin_1d_2d.bin_1d(self.SF6, x, xbmin, xbmax, self.grid_size)
-            out_y = bin_1d_2d.bin_1d(self.SF6, y, ybmin, ybmax, self.grid_size)
-
-            fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-            fig.suptitle('{} {} - {} modeled SF$_6$ concentration. Gridsize={}'.format(
-                self.source, self.years[0], self.years[-1], self.grid_size))
-    
-            ax[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
-            ax[0].scatter(out_x.xintm, out_x.vmean)#,
-                          #c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
-            ax[0].set_xlabel('Latitude [degrees north]'); plt.xlim(xbmin, xbmax)
-            ax[0].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-    
-            ax[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
-            ax[1].scatter(out_y.xintm, out_y.vmean)#,
-                          #c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
-            ax[1].set_xlabel('Longitude [degrees east]'); plt.xlim(ybmin, ybmax)
-            ax[1].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-            plt.show()
-
-        else: 
-            for y in self.years:
-                ds = self.mozart_data(year = y)
-                df = ds_to_gdf(ds)
-        
-                x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
-                y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
-                y = np.array([i for i in y if i<=180] +
-                                  [i - 360 for i in y if i>180])                
-
-                out_x = bin_1d_2d.bin_1d(df['SF6'], x, min(x), max(x), self.grid_size)
-                out_y = bin_1d_2d.bin_1d(df['SF6'], y, min(y), max(y), self.grid_size)
-
-                fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-                fig.suptitle('{} {} modeled SF$_6$ concentration. Gridsize={}'.format(
-                    self.source, y, self.grid_size))
-        
-                ax[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
-                ax[0].scatter(out_x.xintm, out_x.vmean)#,
-                              #c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
-                ax[0].set_xlabel('Latitude [degrees north]'); plt.xlim(min(x), max(x))
-                ax[0].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-        
-                ax[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
-                ax[1].scatter(out_y.xintm, out_y.vmean)#,
-                              #c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
-                ax[1].set_xlabel('Longitude [degrees east]'); plt.xlim(min(y), max(y))
-                ax[1].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-                plt.show()
-
-    def plot_1d_LonLat(self, lon_values = [10, 60, 120, 180], lat_values = [70, 30, 0, -30, -70]):
-        """ plot change over lat, lon with fixed lon / lat """
-        for year in self.years:
-            fig, (ax1, ax2) = plt.subplots(dpi=250, ncols=2, figsize=(9,5), sharey=True)
-            fig.suptitle(f'MOZART {year} SF$_6$ at fixed longitudes / latitudes', size=17)
-            self.ds.SF6.sel(time = year, longitude=lon_values, method='nearest').plot.line(x = 'latitude', ax=ax1)
-            self.ds.SF6.sel(time = year, latitude=lat_values, method="nearest").plot.line(x = 'longitude', ax=ax2) # ax = ax
-            ax1.set_title(''); ax2.set_title('')
-            ax2.set_ylabel('')
-            plt.show()
-
-#%% Function calls
-if __name__=='__main__':
-    v_limits = (6,9)
-    grid_size = 5
-
-    c_years = np.arange(2008, 2014)
-    caribic = Caribic(c_years, v_limits = v_limits, grid_size=grid_size)
-    caribic.plot_scatter()
-    caribic.plot_1d()
-    caribic.plot_2d()
-    
-    m_years = np.arange(2000, 2008)
-    mozart = Mozart(years=m_years, v_limits = v_limits)
-    mozart.plot_scatter()
-    mozart.plot_1d()
-    mozart.plot_2d()
-
