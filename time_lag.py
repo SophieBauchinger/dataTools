@@ -18,7 +18,7 @@ def calc_time_lags(c_data, ref_data, subs='SF6 [ppt]', ref_subs = 'SF6catsMLOm')
     t_ref = np.array(datetime_to_fractionalyear(ref_data.index, method='exact'))
     c_ref = np.array(ref_data[ref_subs])
     
-    c_obs_tot = np.array(c_data[ref_subs])
+    c_obs_tot = np.array(c_data[subs])
     t_obs_tot = np.array(datetime_to_fractionalyear(c_data.index, method='exact'))
 
     print(f'Calculating lags for {c_data.index.year[0]}')

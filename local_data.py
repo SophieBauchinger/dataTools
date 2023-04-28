@@ -16,21 +16,8 @@ import matplotlib.pyplot as plt
 from toolpac.outliers import outliers, ol_fit_functions
 from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
 
-# monthly_mean
-def monthly_mean(df, first_of_month=True):
-    """
-    df: Pandas DataFrame with datetime index
-    first_of_month: bool, if True sets monthly mean timestamp to first of that month
+from aux_fctns import monthly_mean
 
-    Returns dataframe with monthly averages of all values
-    """
-    # group by month then calculate mean
-    df_MM = df.groupby(pd.PeriodIndex(df.index, freq="M")).mean(numeric_only=True)
-
-    if first_of_month: # reset index to first of month
-        df_MM['Date_Time'] = [dt.datetime(y, m, 1) for y, m in zip(df_MM.index.year, df_MM.index.month)]
-        df_MM.set_index('Date_Time', inplace=True)
-    return df_MM
 
 #%% Mauna Loa
 class Mauna_Loa():
@@ -116,8 +103,8 @@ class Mace_Head():
     """ Mace Head data, plotting, averaging """
 
     def __init__(self, path = None):
-        self.years = 2012
         if not path: path = r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data\MHD-medusa_2012.dat'
+        self.years = int(path[-8:-4])
         self.df = self.mhd_data(path)
         self.df_monthly_mean = monthly_mean(self.df)
 

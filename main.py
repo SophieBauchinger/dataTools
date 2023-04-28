@@ -4,21 +4,10 @@ Created on Thu Apr 27 15:56:59 2023
 
 @author: sophie_bauchinger
 """
-import sys
 import numpy as np
 import pandas as pd
 
-from toolpac.calc import bin_1d_2d
-from toolpac.outliers import outliers
-from toolpac.outliers import ol_fit_functions as fct
-from toolpac.outliers.outliers import get_no_nan, fit_data
-from toolpac.age import calculate_lag as cl
-from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
-
-sys.path.insert(0, r'C:\Users\sophie_bauchinger\sophie_bauchinger\Caribic_data_handling')
-from C_filter import filter_outliers
-import C_SF6_age
-import C_tools
+from toolpac.outliers.outliers import get_no_nan
 
 from local_data import Mauna_Loa, Mace_Head
 from global_data import Caribic, Mozart
@@ -27,11 +16,22 @@ from time_lag import calc_time_lags, plot_time_lags
 from strat_filter_on_caribic_data import get_fct_substance, get_lin_fit, pre_flag, filter_strat_trop, filter_trop_outliers, detrend_substance, plot_gradient_by_season
 
 #%% Get data
-mlo_df = Mauna_Loa(range(2008, 2020)).df
-n2o_df = Mauna_Loa(range(2008, 2020), substance = 'n2o').df
+mlo_sf6 = Mauna_Loa(range(2008, 2020))
+mlo_n2o = Mauna_Loa(range(2008, 2020), substance='n2o')
 
-caribic_data = Caribic(range(2005, 2020))
-c_df = caribic_data.df
+mlo_sf6_df = mlo_sf6.df
+mlo_n2o_df = mlo_n2o.df
+
+caribic = Caribic(range(2005, 2020))
+c_df = caribic.df
+
+#%% Plot data
+mlo_sf6.plot()
+mlo_n2o.plot()
+
+caribic.plot_scatter()
+caribic.plot_1d()
+caribic.plot_2d()
 
 #%% Time lags
 # Get and prep reference data 
@@ -42,7 +42,7 @@ mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
 
 # loop through years of caribic data
 for c_year in range(2005, 2022):
-    c_data = caribic_data.select_year(c_year)
+    c_data = caribic.select_year(c_year)
     if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
         continue
     else:
@@ -56,7 +56,7 @@ for c_year in range(2005, 2022):
 data_filtered = pd.DataFrame() # initialise full dataframe
 for c_year in range(2005, 2022): 
     print(f'{c_year}')
-    c_data = caribic_data.select_year(c_year)
+    c_data = caribic.select_year(c_year)
     # print('cols:', c_data.columns)
 
     crit = 'n2o'; n2o_filtered = pd.DataFrame()
@@ -78,7 +78,7 @@ data_stratosphere = data_filtered.loc[data_filtered['strato'] == True]
 # print(data_stratosphere.value_counts)
 data_troposphere = data_filtered.loc[data_filtered['tropo'] == True]
 
-data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'])
+data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'], source='car')
 
 
 #%% Detrend

@@ -24,39 +24,8 @@ from matplotlib.cm import ScalarMappable as sm
 from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
-from toolpac.outliers import outliers, ol_fit_functions
-from toolpac.age import calculate_lag as cl
-from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
 
-from local_data import Mauna_Loa, Mace_Head
-
-# monthly_mean
-def monthly_mean(df, first_of_month=True):
-    """
-    df: Pandas DataFrame with datetime index
-    first_of_month: bool, if True sets monthly mean timestamp to first of that month
-
-    Returns dataframe with monthly averages of all values
-    """
-    # group by month then calculate mean
-    df_MM = df.groupby(pd.PeriodIndex(df.index, freq="M")).mean(numeric_only=True)
-
-    if first_of_month: # reset index to first of month
-        df_MM['Date_Time'] = [dt.datetime(y, m, 1) for y, m in zip(df_MM.index.year, df_MM.index.month)]
-        df_MM.set_index('Date_Time', inplace=True)
-    return df_MM
-
-def ds_to_gdf(ds):
-    """ Convert xarray Dataset to GeoPandas GeoDataFrame """ 
-    df = ds.to_dataframe()
-    geodata = [Point(lat, lon) for lon, lat in zip(
-        df.index.to_frame()['longitude'], df.index.to_frame()['latitude'])]
-
-    # create geodataframe using lat and lon data from indices
-    gdf = geopandas.GeoDataFrame(
-        df.reset_index().drop(['longitude', 'latitude', 'scalar', 'P0'], axis=1),
-        geometry=geodata)
-    return gdf
+from aux_fctns import monthly_mean, ds_to_gdf, get_col_name
 
 class global_data(object):
     """ 
@@ -171,7 +140,7 @@ class global_data(object):
 
     def plot_2d(self):
         """ 
-        Create a 2D plot of binned mixing ratios. 
+        Create a 2D plot of binned mixing ratios for each available year. 
         Returns binned dataframes for each year as list 
         """
         out_list = []
@@ -224,7 +193,7 @@ class Caribic(global_data):
         super().__init__(years, grid_size, v_limits)
         self.source = 'Caribic'
         self.substance_short = subst
-        self.substance = self.get_col_name(self.substance_short)
+        self.substance = get_col_name(self.substance_short, 'car')
 
         self.df, self.column_dict = self.caribic_data(pfxs)
 
@@ -302,26 +271,6 @@ class Caribic(global_data):
 
         return gdf, col_names_dict
 
-    # def get_col_name_original(self, substance):
-    #     """ Returns name of original column name - obsolete? """
-    #     column_names = {
-    #         'sf6': 'SF6; SF6 mixing ratio; [ppt]\n',
-    #         'n2o': 'N2O; N2O mixing ratio; [ppt]\n',
-    #         'co2': 'CO2; CO2 mixing ratio; [ppm]\n',
-    #         'ch4': 'CH4; CH4 mixing ratio; [ppb]\n',
-    #         }
-    #     return column_names[substance]
-
-    def get_col_name(self, substance):
-        """ Returns column name for substance as saved in dataframe """
-        new_names = {
-            'sf6': 'SF6 [ppt]',
-            'n2o': 'N2O [ppb]',
-            'co2': 'CO2 [ppm]',
-            'ch4': 'CH4 [ppb]',
-            }
-        return new_names[substance]
-
     def plot_scatter(self):
         """ Plot msmts and monthly mean for specified years [list] """
 
@@ -356,61 +305,6 @@ class Caribic(global_data):
         plt.ylim(ymin-0.15, ymax+0.15)
         fig.autofmt_xdate()
         plt.show()
-
-    def try_plot_2d(self):
-        out_list = []
-        for year in self.years:
-            try: df = self.df[self.df.index.year == year]
-            except: df = self.df
-            if df.empty: continue
-
-            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
-            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
-
-            xbmin, xbmax, xbsize = min(x), max(x), self.grid_size
-            ybmin, ybmax, ybsize = min(y), max(y), self.grid_size
-
-            out = bin_1d_2d.bin_2d(np.array(df[self.substance]), x, y,
-                                   xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
-            out_list.append(out)
-
-            # cmap, normalisation, geopandas world
-            if self.v_limits: vmin, vmax = self.v_limits
-            else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
-            norm = Normalize(vmin, vmax)
-            cmap = plt.cm.viridis_r
-            world = geopandas.read_file(
-                geopandas.datasets.get_path('naturalearth_lowres'))
-
-            # plot mixing ratio, colorbar, world map
-            plt.figure(dpi=300, figsize=(8,3.5))
-            plt.gca().set_aspect('equal')
-            world.boundary.plot(ax = plt.gca(), color='black', linewidth=0.3)
-            plt.imshow(out.vmean, cmap = cmap, norm=norm, #interpolation='nearest', 
-                             origin='lower', extent=[ybmin, ybmax, xbmin, xbmax])
-
-            cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical')
-            cbar.ax.set_xlabel(f'Mean {self.substance_short} [ppt]')
-
-            plt.xlabel('Longitude  [deg]'); plt.xlim(-180,180)
-            plt.ylabel('Latitude [deg]'); plt.ylim(-60,100)
-            plt.title('{} {} {} concentration measurements. Gridsize={}'.format(
-                self.source, year, self.substance_short, self.grid_size))
-            plt.show()
-
-        return out_list
-
-if __name__=='__main__':
-    years = np.arange(2016, 2023)
-    v_limits = (6,9)
-    grid_size = 5
-    pfxs=['GHG', 'INT']
-
-    caribic = Caribic(years, v_limits = v_limits, grid_size=grid_size, pfxs = pfxs)
-    caribic.plot_scatter()
-    caribic.plot_1d()
-    caribic.plot_2d()
-    caribic.try_plot_2d()
 
 #%% MOZART
 class Mozart(global_data):
@@ -538,18 +432,6 @@ class Mozart(global_data):
             ax2.set_ylabel('')
             plt.show()
 
-if __name__=='__main__':
-    years = np.arange(2000, 2008)
-    v_limits = (6,9)
-    grid_size = 10
-
-    mozart = Mozart(years=years, v_limits = v_limits, grid_size = grid_size)
-    mozart.plot_scatter()
-    mozart.plot_scatter(total=True)
-    mozart.plot_1d_LonLat()
-    mozart.plot_1d()
-    mozart.plot_2d()
-
 #%% Function calls
 if __name__=='__main__':
     v_limits = (6,9)
@@ -560,7 +442,6 @@ if __name__=='__main__':
     caribic.plot_scatter()
     caribic.plot_1d()
     caribic.plot_2d()
-    caribic.try_plot_2d()
     
     m_years = np.arange(2000, 2008)
     mozart = Mozart(years=m_years, v_limits = v_limits)
@@ -568,11 +449,3 @@ if __name__=='__main__':
     mozart.plot_1d()
     mozart.plot_2d()
 
-#%% Outliers
-if __name__=='__main__':
-    for y in range(2008, 2010): # Caribic
-        for dir_val in ['np', 'p', 'n']:
-            data = Caribic([y]).df
-            sf6_mxr = data['SF6; SF6 mixing ratio; [ppt]\n']
-            ol = outliers.find_ol(ol_fit_functions.simple, data.index, sf6_mxr, None, None, 
-                                  plot=True, limit=0.1, direction = dir_val)
