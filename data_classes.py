@@ -8,6 +8,7 @@ Defines classes used as basis for data structures
 import datetime as dt
 import geopandas
 import numpy as np
+from os.path import exists
 import pandas as pd
 from shapely.geometry import Point
 from calendar import monthrange
@@ -21,192 +22,71 @@ from matplotlib.cm import ScalarMappable as sm
 from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
-from toolpac.outliers import outliers, ol_fit_functions
-from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
+from toolpac.conv.times import fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean, ds_to_gdf, get_col_name
+from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, get_col_name
 
+# supress a gui backend userwarning, not really advisible
+import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
+
+#%% GLobal data
 class global_data(object):
-    """ 
-    Global data that can be averaged on longitude / latitude grid 
-    Choose years, size of the grid and adjust the colormap settings 
     """
-    def __init__(self, years, grid_size, v_limits):
-        """ 
+    Global data that can be averaged on longitude / latitude grid
+    Choose years, size of the grid and adjust the colormap settings
+    """
+    def __init__(self, years, grid_size=5, v_limits=None):
+        """
         years: array or list of integers
         grid_size: int
         v_limits: tuple
         """
         self.years = years
         self.grid_size = grid_size
-        self.v_limits = v_limits
+        self.v_limits = v_limits # colorbar normalisation limits
 
         self.substance = None
+        self.substances = None # list of substances to use for plotting etc
         self.source = None
 
     def select_year(self, yr):
         """ Returns dataframe of selected year only """
         try: df = self.df[self.df.index.year == yr]; return df
-        except: print(f'No data found for {yr}')
+        except: print(f'No data found for {yr}'); return
 
-    def select_flight(self, nr):
-        """ Returns dataframe for selected flight only """
-        try: df = self.df[self.df["Flight_nr"] == nr]; return df
-        except: 
-            if self.source == 'Caribic': print('No data found for Flight {nr}')
-            else: print('Invalid operation')
-
-    def plot_1d(self):
-        """ 
-        Plot 1D averaged values over latitude / longitude including 
-        colormap for all years separately.
-        Returns 1D binned objects for each year as lists (lat / lon) 
+    def get_data(self, c_pfxs=['GHG'], remap_lon=True,
+                 mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
+                 verbose=True):
         """
-        out_x_list, out_y_list = [], []
-        for year in self.years: # loop through available years if possible
-            try: df = self.df[self.df.index.year == year]
-            except: df = self.df
-
-            if not any(self.df[self.df.index.year == year][self.substance].notna()): continue # check for "empty" data array
-            if df.empty: continue # go on to next year
-            print(df[self.substance])
-
-            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
-            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
-
-            xbmin, xbmax = min(x), max(x)
-            ybmin, ybmax = min(y), max(y)
-
-            # average over lon / lat 
-            out_x = bin_1d_2d.bin_1d(df[self.substance], x,
-                                     xbmin, xbmax, self.grid_size)
-            out_y = bin_1d_2d.bin_1d(df[self.substance], y,
-                                     ybmin, ybmax, self.grid_size)
-
-            fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-            fig.suptitle('{} {} modeled SF$_6$ concentration. Gridsize={}'.format(
-                self.source, year, self.grid_size))
-
-            cmap = plt.cm.viridis_r
-            if self.v_limits: vmin, vmax = self.v_limits
-            else:
-                vmin = min([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
-                vmax = max([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
-            norm = Normalize(vmin, vmax) # allows mapping colormap onto available values  
-
-            ax[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
-            ax[0].scatter(out_x.xintm, out_x.vmean, # plot across latitude
-                          c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
-            ax[0].set_xlabel('Latitude [deg]'); plt.xlim(xbmin, xbmax)
-            ax[0].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-
-            ax[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
-            ax[1].scatter(out_y.xintm, out_y.vmean, # plot across longitude
-                          c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
-            ax[1].set_xlabel('Longitude [deg]'); plt.xlim(ybmin, ybmax)
-            ax[1].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-
-            fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax[1])
-            plt.show()
-
-            # add current year to 1D binned list 
-            out_x_list.append(out_x); out_y_list.append(out_y) 
-
-        # Plot all averaged mixing ratios on one graph
-        fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-        fig.suptitle(f'{self.source} {self.years[0]} - {self.years[-1]} modeled {self.substance} mixing ratio. Gridsize={self.grid_size}')
-
-        cmap = cm.get_cmap('viridis_r')
-        vmin, vmax = self.years[0], self.years[-1]
-        norm = Normalize(vmin, vmax)
-
-        for out_x, out_y, year in zip(out_x_list, out_y_list, self.years): # add to plot
-            ax[0].plot(out_x.xintm, out_x.vmean, label=year, c = cmap(norm(year)))
-            ax[0].set_xlabel('Latitude [deg]'); plt.xlim(xbmin, xbmax)
-            ax[0].set_ylabel(f'Mean {self.substance} mixing ratio [ppt]')
-
-            ax[1].plot(out_y.xintm, out_y.vmean, label=year, c = cmap(norm(year)))
-            ax[1].set_xlabel('Longitude [deg]'); plt.xlim(ybmin, ybmax)
-            ax[1].set_ylabel(f'Mean {self.substance} mixing ratio [ppt]')
-
-        handles, labels = ax[0].get_legend_handles_labels()
-        plt.legend(reversed(handles), reversed(labels), 
-                   bbox_to_anchor=(1,1), loc='upper left')
-        plt.show()
-
-        return out_x_list, out_y_list
-
-    def plot_2d(self):
-        """ 
-        Create a 2D plot of binned mixing ratios for each available year. 
-        Returns binned dataframes for each year as list 
-        """
-        out_list = []
-        for year in self.years:
-            try: df = self.df[self.df.index.year == year]
-            except: df = self.df
-            if df[self.substance].empty: continue
-
-            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
-            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
-
-            xbmin, xbmax, xbsize = min(x), max(x), self.grid_size
-            ybmin, ybmax, ybsize = min(y), max(y), self.grid_size
-
-            out = bin_1d_2d.bin_2d(np.array(df[self.substance]), x, y,
-                                   xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
-            out_list.append(out)
-
-            plt.figure(dpi=300, figsize=(8,3.5))
-            plt.gca().set_aspect('equal')
-
-            cmap = plt.cm.viridis_r # create colormap
-            if self.v_limits: vmin, vmax = self.v_limits # set colormap limits
-            else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
-            norm = Normalize(vmin, vmax) # normalise color map to set limits
-
-            world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-            world.boundary.plot(ax=plt.gca(), color='black', linewidth=0.3)
-
-            plt.imshow(out.vmean, cmap = cmap, norm=norm, # plot values 
-                             origin='lower', extent=[ybmin, ybmax, xbmin, xbmax])
-            cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical') # colorbar
-            cbar.ax.set_xlabel('Mean $SF_6$ [ppt]')
-
-            plt.title('{} {} SF$_6$ concentration measurements. Gridsize={}'.format(
-                self.source, year, self.grid_size))
-            plt.xlabel('Longitude  [degrees east]'); plt.xlim(-180,180)
-            plt.ylabel('Latitude [degrees north]'); plt.ylim(-60,100)
-            plt.show()
-
-        return out_list
-
-    def get_data(self):
-        """ 
-        Create geopandas dataframe from data file for all available substances
+        If Caribic: Create geopandas dataframe from data file for all available substances
+            get all files starting with prefixes in c_pfxs
             lon / lat data is put into a geometry column
-            Index is set to datetime of the sampling / modelled times 
-            (CARIBIC only) a column with flight number is created 
-        """ 
+            Index is set to datetime of the sampling / modelled times
+            a column with flight number is created
+        If Mozart: Create dataset from given file
+            if remap_lon, longiture is remapped to ±180 degrees
+        """
         gdf = geopandas.GeoDataFrame() # initialise GeoDataFrame
         if self.source=='Caribic':
             parent_dir = r'E:\CARIBIC\Caribic2data'
-
             for yr in self.years:
-                if not any(find.find_dir("*_{}*".format(yr), parent_dir)): 
-                    print(f'No data found for {yr}'); continue
+                if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
+                    self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year if there's no data
+                    if verbose: print(f'No data found for {yr}. Removing {yr} from list of years')
+                    continue
                 df = pd.DataFrame()
                 print(f'Reading in Caribic data for {yr}')
 
-                # First collect data from individual flights 
+                # First collect data from individual flights
                 for current_dir in find.find_dir("*_{}*".format(yr), parent_dir)[1:]:
                     flight_nr = int(str(current_dir)[-12:-9])
-                    for pfx in ['GHG']: # can include different prefixes here too
+                    for pfx in c_pfxs: # can include different prefixes here too
                         f = find.find_file(f'{pfx}_*', current_dir)
-                        if not f: # show error msg and go directly to next loop
-                            print(f'No {pfx} File found for Flight {flight_nr} in {yr}'); continue
+                        if not f or len(f)==0: # show error msg and go directly to next loop
+                            if verbose: print(f'No {pfx} File found for Flight {flight_nr} in {yr}')
+                            continue
                         elif len(f) > 1: f.sort() # sort list of files, then take latest
-        
+
                         f_data = FFI1001DataReader(f[0], df=True, xtype = 'secofday')
                         df_temp = f_data.df # index = Datetime
                         df_temp.insert(0, 'Flight number',
@@ -218,145 +98,664 @@ class global_data(object):
                     df['lon; longitude (mean value); [deg]\n'],
                     df['lat; latitude (mean value); [deg]\n'])]
                 gdf_temp = geopandas.GeoDataFrame(df, geometry=geodata)
-        
-                # Drop all unnecessary columns [info is saved within datetime, geometry]
-                if not gdf_temp['geometry'].empty:
-                    columns = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
-                    column_names = [df.filter(regex='^'+c).columns[0] for c in columns]
+
+                if not gdf_temp['geometry'].empty: # check that geometry column was filled
+                    # Drop all unnecessary columns [info is saved within datetime, geometry]
+                    filter_cols = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
+                    column_names = [df.filter(regex='^'+c).columns[0] for c in filter_cols]
                     gdf_temp.drop(column_names, axis=1, inplace=True)
-                    # drop_cols = [test_df.filter(like='d_').columns
-                    # gdf_temp = gdf_temp.drop(['TimeCRef; CARIBIC_reference_time_since_0_hours_UTC_on_first_date_in_line_7; [s]',
-                    #             'year; date of sampling: year; [yyyy]\n',
-                    #             'month; date of sampling: month; [mm]\n',
-                    #             'day; date of sampling: day; [dd]\n',
-                    #             'hour; time of sampling (mean value): hour; [HH]\n',
-                    #             'min; time of sampling (mean value): minutes; [MM]\n',
-                    #             'sec; time of sampling (mean value): seconds; [SS]\n',
-                    #             'lon; longitude (mean value); [deg]\n',
-                    #             'lat; latitude (mean value); [deg]\n',
-                    #             'type; type of sample collector: 0 glass flask from TRAC, 1 metal flask from HIRES; [0-1]\n'],
-                    #            axis=1)
+
                 else: print('Geodata creation was unsuccessful. Please check your input.')
 
-test = global_data([2019])
+                gdf = pd.concat([gdf, gdf_temp])
+
+            if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return
+
+            # Create a dictionary for translating short column names to description & set col names to the short ones
+            new_names = [x.split(";")[0] + x.split(";")[-1][:-1] for x in gdf.columns if len(x.split(";")) == 3] # remove \n with [-1]
+            description = [x.split(";")[1] for x in gdf.columns if len(x.split(";")) == 3]
+            gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
+            col_names_dict = dict(zip(new_names, description))
+
+            return gdf, col_names_dict
+
+        elif self.source=='Mozart':
+            with xr.open_dataset(mozart_file) as ds:
+                ds = ds.isel(level=27)
+            try: ds = ds.sel(time = self.years)
+            except: # keep only data for specified years
+                ds = xr.concat([ds.sel(time=y) for y in self.years if y in ds.time], dim='time')
+                if verbose: print(f'No data found for {[y for y in self.years if y not in ds.time]}')
+                self.years = [y for y in ds.time.values] # only include available years
+
+            if remap_lon: # set longitudes between 180 and 360 to start at -180 towards 0
+                new_lon = (((ds.longitude.data + 180) % 360) - 180)
+                ds = ds.assign_coords({'longitude':('longitude', new_lon, ds.longitude.attrs)})
+                ds = ds.sortby(ds.longitude) # reorganise values
+
+            return ds # xr.concat(datasets, dim = 'time')
+
+    def binned_1d(self, substance=None, single_yr=None):
+        """ 
+        Returns 1D binned objects for each year as lists (lat / lon) 
+        Parameters:
+            substance (str): if None, use default substance for the object
+            single_yr (int): if specified, use only data for that year [default=None]
+        """
+        out_x_list, out_y_list = [], []
+        if substance is None: substance = self.substance
+        if single_yr is not None: years = [int(single_yr)]
+        else: years = self.years
+
+        for yr in years: # loop through available years if possible
+            try: df = self.df[self.df.index.year == yr]
+            except: df = self.df
+
+            if not any(self.df[self.df.index.year == yr][substance].notna()): continue # check for "empty" data array
+            if df.empty: continue # go on to next year
+
+            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
+            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
+
+            xbmin, xbmax = min(x), max(x)
+            ybmin, ybmax = min(y), max(y)
+
+            # average over lon / lat
+            out_x = bin_1d_2d.bin_1d(df[substance], x,
+                                     xbmin, xbmax, self.grid_size)
+            out_y = bin_1d_2d.bin_1d(df[substance], y,
+                                     ybmin, ybmax, self.grid_size)
+
+            out_x_list.append(out_x); out_y_list.append(out_y)
+
+        return out_x_list, out_y_list
+
+    def binned_2d(self, substance=None, single_yr=None):
+        """ 
+        Returns 2D binned object for each year as a list 
+        Parameters:
+            substance (str): if None, uses default substance for the object
+            single_yr (int): if specified, uses only data for that year [default=None]
+        """
+        out_list = []
+        if substance is None: substance = self.substance
+        if single_yr is not None: years = [int(single_yr)]
+        else: years = self.years
+
+        for yr in years: # loop through available years if possible
+            try: df = self.df[self.df.index.year == yr]
+            except: df = self.df
+
+            if not any(self.df[self.df.index.year == yr][substance].notna()): continue
+            if df[substance].empty: continue
+
+            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
+            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
+
+            xbmin, xbmax, xbsize = min(x), max(x), self.grid_size
+            ybmin, ybmax, ybsize = min(y), max(y), self.grid_size
+
+            out = bin_1d_2d.bin_2d(np.array(df[substance]), x, y,
+                                   xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
+            out_list.append(out)
+        return out_list
+
+    def plot_scatter(self, substance=None, single_yr=None):
+        if self.source=='Caribic':
+            if substance is None: substance = self.substance
+            if single_yr is not None: 
+                df = self.select_year(single_yr)
+                df_mm = monthly_mean(df).notna()
+            else: df = self.df; df_mm = self.df_monthly_mean
+
+            # Plot mixing ratio msmts and monthly mean
+            fig, ax = plt.subplots(dpi=250)
+            plt.title(f'CARIBIC {self.substance_short.upper()} measurements')
+            ymin = np.nanmin(df[substance])
+            ymax = np.nanmax(df[substance])
+
+            cmap = plt.cm.viridis_r
+            extend = 'neither'
+            if self.v_limits: vmin, vmax = self.v_limits# ; extend = 'both'
+            else: vmin = ymin; vmax = ymax
+            norm = Normalize(vmin, vmax)
+
+            plt.scatter(df.index, df[substance],
+                        label=f'{self.substance_short.upper()} {self.years}', marker='x', zorder=1,
+                        c = df[substance],
+                        cmap = cmap, norm = norm)
+            for i, mean in enumerate(df_mm[substance]):
+                y,m = df_mm.index[i].year, df_mm.index[i].month
+                xmin, xmax = dt.datetime(y, m, 1), dt.datetime(y, m, monthrange(y, m)[1])
+                ax.hlines(mean, xmin, xmax, color='black',
+                          linestyle='dashed', zorder=2)
+            plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
+            plt.ylabel(f'{self.substance_short.upper()} mixing ratio [ppt]')
+            plt.ylim(ymin-0.15, ymax+0.15)
+            fig.autofmt_xdate()
+            plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+        elif self.source=='Mozart':
+            self.plot_1d(substance, single_yr)
+
+    def plot_1d(self, substance=None, single_yr=None, plot_mean=False, single_graph=False):
+        """
+        Plots 1D averaged values over latitude / longitude including colormap 
+        Parameters:
+            substance (str): if None, plots default substance for the object
+            single_yr (int): if specified, plots only data for that year [default=None]
+            plot_mean (bool): choose whether to plot the overall average over all years
+            single_graph (bool): choose whether to plot all years on one graph
+        """
+        if substance is None: substance = self.substance
+        if single_yr is not None: years = [int(single_yr)]
+        else: years = self.years
+
+        out_x_list, out_y_list = self.binned_1d(substance, single_yr)
+
+        if not single_graph:
+            # Plot mixing ratios averages over lats / lons for each year separately
+            for out_x, out_y, year in zip(out_x_list, out_y_list, years):
+                fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
+                fig.suptitle('{} {} modeled SF$_6$ concentration. Gridsize={}'.format(
+                    self.source, year, self.grid_size))
+    
+                cmap = plt.cm.viridis_r
+                if self.v_limits: vmin, vmax = self.v_limits
+                else:
+                    vmin = min([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
+                    vmax = max([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
+                norm = Normalize(vmin, vmax) # allows mapping colormap onto available values
+    
+                ax[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
+                ax[0].scatter(out_x.xintm, out_x.vmean, # plot across latitude
+                              c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
+                ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
+                ax[0].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
+    
+                ax[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
+                ax[1].scatter(out_y.xintm, out_y.vmean, # plot across longitude
+                              c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
+                ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
+                ax[1].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
+    
+                fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax[1])
+                plt.show()
+
+        if single_graph:
+            # Plot averaged mixing ratios for all years on one graph
+            fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
+            fig.suptitle(f'{self.source} {self.years[0]} - {self.years[-1]} modeled {substance} mixing ratio. Gridsize={self.grid_size}')
+    
+            cmap = cm.get_cmap('plasma_r')
+            vmin, vmax = self.years[0], self.years[-1]
+            norm = Normalize(vmin, vmax)
+    
+            for out_x, out_y, year in zip(out_x_list, out_y_list, self.years): # add each year to plot
+                ax[0].plot(out_x.xintm, out_x.vmean, label=year)#, c = cmap(norm(year)))
+                ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
+                ax[0].set_ylabel(f'Mean {substance} mixing ratio [ppt]')
+    
+                ax[1].plot(out_y.xintm, out_y.vmean, label=year)# , c = cmap(norm(year)))
+                ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
+                ax[1].set_ylabel(f'Mean {substance} mixing ratio [ppt]')
+    
+            if plot_mean: # add average over available years to plot
+                total_x_vmean = np.mean([i.vmean for i in out_x_list], axis=0)
+                total_y_vmean = np.mean([i.vmean for i in out_y_list], axis=0)
+                ax[0].plot(out_x.xintm, total_x_vmean, label='Mean', c = 'k', ls ='dashed')
+                ax[1].plot(out_y.xintm, total_y_vmean, label='Mean', c = 'k', ls ='dashed')
+    
+            handles, labels = ax[0].get_legend_handles_labels()
+            plt.legend(reversed(handles), reversed(labels), # reversed so that legend aligns with graph
+                       bbox_to_anchor=(1,1), loc='upper left')
+            plt.show()
+        return
+
+    def plot_2d(self, substance=None, single_yr=None):
+        """
+        Create a 2D plot of binned mixing ratios for each available year.
+        Parameters:
+            substance (str): if None, plots default substance for the object
+            single_yr (int): if specified, plots only data for that year [default=None]
+        """
+        if substance is None: substance = self.substance
+        if single_yr is not None: years = [int(single_yr)]
+        else: years = self.years
+        out_list = self.binned_2d(substance, single_yr)
+
+        for out, yr in zip(out_list, years):
+            plt.figure(dpi=300, figsize=(8,3.5))
+            plt.gca().set_aspect('equal')
+
+            cmap = plt.cm.viridis_r # create colormap
+            if self.v_limits: vmin, vmax = self.v_limits # set colormap limits
+            else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
+            norm = Normalize(vmin, vmax) # normalise color map to set limits
+
+            world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+            world.boundary.plot(ax=plt.gca(), color='black', linewidth=0.3)
+
+            plt.imshow(out.vmean, cmap = cmap, norm=norm, origin='lower',  # plot values
+                       extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
+            cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical') # colorbar
+            cbar.ax.set_xlabel('Mean SF$_6$ [ppt]')
+
+            plt.title('{} {} SF$_6$ concentration measurements. Gridsize={}'.format(
+                self.source, yr, self.grid_size))
+            plt.xlabel('Longitude  [degrees east]'); plt.xlim(-180,180)
+            plt.ylabel('Latitude [degrees north]'); plt.ylim(-60,100)
+            plt.show()
+        return
 
 class Caribic(global_data):
     """ CARIBIC data, plotting, averaging """
 
     def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None,
-               subst='sf6', pfxs=['GHG']):
+               subst='sf6', pfxs=['GHG'], verbose=False):
         super().__init__(years, grid_size, v_limits)
-        self.source = 'Caribic'
+        self.source = 'Caribic'; self.source_print = 'CAR'
         self.substance_short = subst
         self.substance = get_col_name(self.substance_short, 'car')
 
-        self.df, self.column_dict = self.caribic_data(pfxs)
+        self.df, self.column_dict = self.get_data(pfxs, verbose=verbose) # self.caribic_data(pfxs)
 
         if flight_nr: self.df = self.df[self.df.values == flight_nr]
         self.df_monthly_mean = monthly_mean(self.df)
 
-        self.x = np.array([self.df.geometry[i].x for i in range(len(self.df.index))]) # lat
-        self.y = np.array([self.df.geometry[i].y for i in range(len(self.df.index))]) # lon
+    def select_flight(self, nr):
+        """ Returns dataframe for selected flight only """
+        try: 
+            df = self.df[self.df["Flight_nr"] == nr]
+            return df
+        except: print('No data found for Flight {nr}'); return
 
-    def caribic_data(self, pfxs):
+class Mozart(global_data):
+    """
+    Class attributes:
+        years: arr
+        source: str
+        substance: str
+        ds: xarray DataFrame
+        df: Pandas GeoDataFrame
+        x: arr, latitude
+        y: arr, longitude (remapped to +-180 deg)
+        SF6: Pandas DataSeries of SF6 mixing ratios
+    """
+
+    def __init__(self, years, grid_size=5, v_limits=None):
+        """ Initialise MOZART object """
+        super().__init__( years, grid_size, v_limits)
+        self.years = years
+        self.source = 'Mozart'; self.source_print = 'MZT'
+        self.substance = 'SF6'
+
+        self.ds = self.get_data() # xr.concat([self.get_data(year = y) for y in self.years], dim='time')
+        self.df = ds_to_gdf(self.ds)
+        try: self.SF6 = self.df['SF6']
+        except: pass
+
+    def plot_1d_LonLat(self, lon_values = [10, 60, 120, 180],
+                       lat_values = [70, 30, 0, -30, -70],
+                       single_yr=None, substance=None):
         """ 
-        Create geopandas dataframe with caribic data for given year and file prefixes
-        Automatically adds flight number as column and sets index to 
-        datetime object of the sampling time
+        Plots mixing ratio with fixed lon/lat over lats/lons side-by-side 
+        Parameters:
+            lon_values (list of ints): longitude values to average over
+            lat_values (list of ints): latitude values to average over
+            substance (str): if None, plots default substance for the object
+            single_yr (int): if specified, plots only data for that year [default=None]
+        """
+        if substance is None: substance = self.substance
+        if single_yr is not None: years = [int(single_yr)]
+        else: years = self.years
 
-        Returns tuple of geodataframe and dictionary of short and long column names
-        """ 
-        gdf = geopandas.GeoDataFrame() # initialise GeoDataFrame
-        parent_dir = r'E:\CARIBIC\Caribic2data'
+        out_x_list, out_y_list = self.binned_1d(substance, single_yr)
 
-        for yr in self.years:
-            if not any(find.find_dir("*_{}*".format(yr), parent_dir)): 
-                print(f'No data found for {yr}'); continue
-            df = pd.DataFrame()
-            print(f'Reading in Caribic data for {yr}')
+        for out_x, out_y, year in zip(out_x_list, out_y_list, years):
+            fig, (ax1, ax2) = plt.subplots(dpi=250, ncols=2, figsize=(9,5), sharey=True)
+            fig.suptitle(f'MOZART {year} SF$_6$ at fixed longitudes / latitudes', size=17)
+            self.ds.SF6.sel(time = year, longitude=lon_values,
+                            method='nearest').plot.line(x = 'latitude', ax=ax1)
+            ax1.plot(out_x.xintm, out_x.vmean, c='k', ls='dashed', label='average')
+            self.ds.SF6.sel(time = year, latitude=lat_values,
+                            method="nearest").plot.line(x = 'longitude', ax=ax2)
+            ax2.plot(out_y.xintm, out_y.vmean, c='k', ls='dashed', label='average')
+            
+            ax1.set_title(''); ax2.set_title('')
+            ax2.set_ylabel('')
+            handles, labels = ax1.get_legend_handles_labels()
+            ax1.legend(['{:.2}'.format(handles)], labels, # reversed so that legend aligns with graph
+                       bbox_to_anchor=(1,1), loc='upper left')
+            plt.show()
+        
+        return
 
-            # First collect data from individual flights 
-            for current_dir in find.find_dir("*_{}*".format(yr), parent_dir)[1:]:
-                flight_nr = int(str(current_dir)[-12:-9])
-                for pfx in pfxs:
-                    f = find.find_file(f'{pfx}_*', current_dir)
-                    if not f: # show error msg and go directly to next loop
-                        print(f'No {pfx} File found for Flight {flight_nr} in {yr}'); continue
-                    elif len(f) > 1: f.sort() # sort list of files, then take latest
-    
-                    f_data = FFI1001DataReader(f[0], df=True, xtype = 'secofday')
-                    df_temp = f_data.df # index = Datetime
-                    df_temp.insert(0, 'Flight number',
-                                   [flight_nr for i in range(df_temp.shape[0])])
-                    df = pd.concat([df, df_temp])
+#%% Local data
+class local_data(object):
+    """ Defines structure for ground-based station data """
+    def __init__(self, years, data_Day=False, substance='sf6'):
+        self.years = years
+        self.substance = substance.upper()
+        self.source = None
 
-            # Convert longitude and latitude into geometry objects -> GeoDataFrame
-            geodata = [Point(lat, lon) for lon, lat in zip(
-                df['lon; longitude (mean value); [deg]\n'],
-                df['lat; latitude (mean value); [deg]\n'])]
-            gdf_temp = geopandas.GeoDataFrame(df, geometry=geodata)
-    
-            # Drop all unnecessary columns [info is saved within datetime, geometry]
-            if not gdf_temp['geometry'].empty:
-                gdf_temp = gdf_temp.drop(['TimeCRef; CARIBIC_reference_time_since_0_hours_UTC_on_first_date_in_line_7; [s]',
-                            'year; date of sampling: year; [yyyy]\n',
-                            'month; date of sampling: month; [mm]\n',
-                            'day; date of sampling: day; [dd]\n',
-                            'hour; time of sampling (mean value): hour; [HH]\n',
-                            'min; time of sampling (mean value): minutes; [MM]\n',
-                            'sec; time of sampling (mean value): seconds; [SS]\n',
-                            'lon; longitude (mean value); [deg]\n',
-                            'lat; latitude (mean value); [deg]\n',
-                            'type; type of sample collector: 0 glass flask from TRAC, 1 metal flask from HIRES; [0-1]\n'],
-                           axis=1)
-            else: print('Geodata creation was unsuccessful. Please check your input.')
-            # try: gdf_temp = gdf_temp[gdf_temp[self.get_new_column_name(self.substance_short)].notna()]
-            # except: print(f'{self.substance_short} data not available in {pfxs} in {yr}')
+    def get_data(self, path):
+        """ Create dataframe from file """
+        if not exists(path): print(f'File {path} does not exists.'); return pd.DataFrame() # empty dataframe
 
-            # Add current year to final dataframe
-            gdf = pd.concat([gdf, gdf_temp])
+        if self.source=='Mauna_Loa':
+            header_lines = 0 # counter for lines in header
+            with open(path) as f:
+                for line in f: 
+                    if line.startswith('#'): header_lines += 1
+                    else: title = line.split(); break # first non-header line has column names
 
-        if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return 
+            with open(path) as f: # get units from 2nd to last line of header
+                self.description = f.readlines()[header_lines-2]
 
-        # Create a dictionary for translating short column names to description
-        new_names = [x.split(";")[0] + x.split(";")[-1][:-1] for x in gdf.columns if len(x.split(";")) == 3] # remove \n with [-1]
-        description = [x.split(";")[1] for x in gdf.columns if len(x.split(";")) == 3]
-        gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True)
-        col_names_dict = dict(zip(new_names, description))
+            mlo_data = np.genfromtxt(path, skip_header=header_lines)
+            df = pd.DataFrame(mlo_data, columns=title, dtype=float)
 
-        return gdf, col_names_dict
+            # get names of year and month column (depends on substance)
+            yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
+            mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
 
-    def plot_scatter(self):
-        """ Plot msmts and monthly mean for specified years [list] """
+            # keep only specified years
+            df = df.loc[df[yr_col] > min(self.years)-1].loc[df[yr_col] < max(self.years)+1].reset_index() 
 
-        # Plot mixing ratio msmts and monthly mean
+            if any('catsMLOday' in s for s in df.columns): # check if data has day column
+                day_col = [x for x in df.columns if 'catsMLOday' in x][0]
+                time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
+                df = df.drop(day_col, axis=1) # get rid of day column
+            else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])]
+            df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
+            df.astype(float)
+            df['Date_Time'] = time
+            df.set_index('Date_Time', inplace=True) # make the datetime object the new index
+            return df
+        
+        elif self.source == 'Mace_Head': # make col names with space (like caribic)
+            header_lines = 0
+            with open(path) as f:
+                for i, line in enumerate(f):
+                    if line.split()[0] == 'unit:': 
+                        units = line.split()
+                        title = list(f)[0].split() # takes next row for some reason
+                        header_lines = i+2; break
+            column_headers = [name + " [" + unit + "]" for name, unit in zip(title, units)] # eg. 'SF6 [ppt]'
+
+            mhd_data = np.genfromtxt(path, skip_header=header_lines)
+
+            df = pd.DataFrame(mhd_data, columns=column_headers, dtype=float)
+            df = df.replace(0, np.nan) # replace 0 with nan for statistics
+            df = df.drop(df.iloc[:, :7], axis=1) # drop unnecessary time columns
+            df = df.astype(float) 
+
+            df['Date_Time'] = fractionalyear_to_datetime(mhd_data[:,0]) 
+            df.set_index('Date_Time', inplace=True) # new index is datetime
+            return df
+
+    def plot(self, substance=None, greyscale=True):
         fig, ax = plt.subplots(dpi=250)
-        plt.title(f'CARIBIC {self.substance_short} measurements')
-        ymin = self.df[self.substance].min()
-        ymax = self.df[self.substance].max()
+        if greyscale: colors = {'day':'silver', 'month': 'black', 'msmts': 'grey'}
+        else: colors = {'day':'silver', 'month': 'black', 'msmts': 'grey'} # make this into colormaps somehow? 
 
-        cmap = plt.cm.viridis_r
-        extend = 'neither'
-        if self.v_limits: vmin, vmax = self.v_limits# ; extend = 'both'
-        else: vmin = ymin; vmax = ymax
-        norm = Normalize(vmin, vmax)
+        if not substance: col_name = get_col_name(self.substance, self.source)
+        else: col_name = get_col_name(substance, self.source)
+        print(col_name)
 
-        plt.scatter(self.df.index, self.df[self.substance],
-                    label=f'{self.substance_short} {self.years}', marker='x', zorder=1,
-                    c = self.df[self.substance],
-                    cmap = cmap, norm = norm)
+        if not self.df_Day.empty: # check if there is data in the daily df
+            plt.scatter(self.df_Day.index, self.df_Day.loc[:, self.df_Day.columns.str.endswith(col_name)],
+                        color=colors['day'], label=f'{self.source_print} D {self.substance.upper()}', marker='+', zorder=2)
 
-        for i, mean in enumerate(self.df_monthly_mean[self.substance]):
-            y = self.df_monthly_mean.index[i].year
-            m = self.df_monthly_mean.index[i].month
-            xmin = dt.datetime(y, m, 1)
-            xmax = dt.datetime(y, m, monthrange(y, m)[1])
-            ax.hlines(mean, xmin, xmax, color='black',
-                      linestyle='dashed', zorder=2)
+        if not self.df_monthly_mean.empty: # check for data in the monthly df
+            # for i, mean in enumerate(np.array( # make array, otherwise 'enumerate' gives calc MM = name of the column
+            #         self.df_monthly_mean.loc[:, self.df_monthly_mean.columns.str.endswith(col_name)])): # plot MLO mean
+            #     y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
+            #     xmin = dt.datetime(y, m, 1)
+            #     xmax = dt.datetime(y, m, monthrange(y, m)[1])
+            #     ax.hlines(mean, xmin, xmax, color='black', ls='dashed', zorder=3)
 
-        plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
+            # 
 
-        plt.ylabel(f'{self.substance_short} mixing ratio [ppt]')
-        plt.ylim(ymin-0.15, ymax+0.15)
+            for i, mean in enumerate(self.df_monthly_mean[col_name]): # plot MHD mean
+                y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
+                xmin = dt.datetime(y, m, 1)
+                xmax = dt.datetime(y, m, monthrange(y, m)[1])
+                ax.hlines(mean, xmin, xmax, color=colors['month'], linestyle='dashed', zorder=2)
+            ax.hlines(mean, xmin, xmax, color=colors['month'], ls='dashed', label=f'{self.source_print} M {self.substance.upper()}') # needed for legend, nothing else
+
+        # if self.source =='mlo':
+        #     plt.plot(self.df.index, self.df.loc[:, self.df.columns.str.endswith(col_name)],
+        #              'orange', zorder=2, ls='dashed', label=f'MLO {self.substance.upper()} MM')
+
+        # if self.source =='mhd':
+        plt.scatter(self.df.index, self.df[col_name],
+                        color=colors['msmts'], label=f'{self.source_print} {self.substance.upper()}', marker='+')
+
+# =============================================================================
+#         # Mauna Loa
+# =============================================================================
+        # plt.title(f'Ground-based {self.substance.upper()} measurements {self.years[0]} - {self.years[-1]}')
+        plt.ylabel(f'Measured {self.substance.upper()} mixing ratio [ppt]')
+        plt.xlim(min(self.df.index), max(self.df.index))
+        plt.xlabel('Measurement time')
+        plt.legend()
         fig.autofmt_xdate()
         plt.show()
+        
+# =============================================================================
+#         # Mace Head
+# =============================================================================
+        # fig, ax = plt.subplots(dpi=250)
+
+        # plt.title('Ground-based SF$_6$ measurements 2012')
+        # plt.ylabel('Measured SF$_6$ mixing ratio [ppt]')
+        # plt.xlabel('Measurement time')
+        # plt.legend()
+        # plt.show()
+
+class Mauna_Loa(local_data):
+    """ Mauna Loa data, plotting, averaging """
+    def __init__(self, years, substance='sf6', data_Day = False, 
+                 path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
+        """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
+        super().__init__(years, data_Day, substance)
+        self.years = years
+        self.source = 'Mauna_Loa'; self.source_print = 'MLO'
+        self.substance = substance
+
+        fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
+        self.df = self.get_data(path_dir+fname_MM)
+
+
+        self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
+        print(self.df_Day)
+        if data_Day: # user input saying if daily data should exist
+            fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
+            self.df_Day = self.get_data(path_dir + fname_Day)
+            print(path_dir + fname_Day)
+            print(self.df_Day)
+            try: self.df_monthly_mean = monthly_mean(self.df_Day)
+            except: pass
+
+class Mace_Head(local_data):
+    """ Mauna Loa data, plotting, averaging """
+    def __init__(self, years, substance='sf6', data_Day = False, 
+                 path =  r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data\MHD-medusa_2012.dat'):
+        """ Initialise Mace Head with (daily and) monthly data in dataframes """
+        super().__init__(years, data_Day, substance)
+        self.years = years
+        self.source = 'Mace_Head'; self.source_print = 'MHD'
+        self.substance = substance
+
+        self.df = self.get_data(path)
+        self.df_Day = daily_mean(self.df) 
+        self.df_monthly_mean = monthly_mean(self.df)
+
+        # fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
+        # self.df = self.get_data(path_dir+fname_MM)
+
+
+        # self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
+        # if data_Day: # user input saying if daily data should exist
+        #     fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
+        #     self.df_Day = self.get_data(path_dir + fname_Day)
+        #     try: self.df_monthly_mean = monthly_mean(self.df_Day)
+        #     except: pass
+
+
+# Function calls 
+mlo = Mauna_Loa(years = [2016, 2017], data_Day = True)
+mlo_df = mlo.df
+mlo.plot()
+
+Mace_Head([2012]).plot()
+
+#%% 
+if __name__=='__main__':
+    v_limits = (6,9)
+    grid_size = 5
+
+    c_years = np.arange(2014, 2017)
+    caribic = Caribic(c_years, v_limits = v_limits, grid_size=grid_size)
+    caribic.plot_scatter()
+    caribic.plot_scatter(single_yr=2014)
+    caribic.plot_1d()
+    caribic.plot_2d()
+
+    m_years = np.arange(2000, 2020)
+    mozart = Mozart(years=m_years, v_limits = v_limits)
+    mozart.plot_1d()
+    mozart.plot_2d()
+    lon_values = [0, 10, 50, 120, 150]
+    lat_values = [70, 30, 0, -30, -70]
+    mozart.plot_1d_LonLat(lon_values, lat_values)
+
+#%% old Mauna Loa
+# class Mauna_Loa():
+#     """ Mauna Loa data, plotting, averaging """
+
+#     def __init__(self, years, data_Day = False, substance='sf6', 
+#                  path = r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
+#         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
+#         self.source = 'mlo'
+#         self.years = years
+#         self.substance = substance
+#         fname = r'\mlo_{}_MM.dat'.format(substance.upper())
+#         self.df = pd.concat([self.mlo_data(y, path+fname) for y in years])
+
+#         if data_Day: 
+#             try: # try finding daily msmt data for the substance 
+#                 fname = r'\mlo_{}_Day.dat'.format(substance.upper())
+#                 self.df_Day = pd.concat([self.mlo_data(y, path+fname) for y in years])
+#                 self.df_monthly_mean = monthly_mean(self.df_Day)
+#             except: 
+#                 self.df_Day = self.df_monthly_mean = False # set both to False
+#                 print(f'No daily data found for {substance}. Please check your files')
+            
+#         else: self.df_Day = self.df_monthly_mean = False # set both to False
+
+#     def mlo_data(self, yr, path):
+#         """ Create dataframe for given mlo data (.dat) for a speficied year """
+#         header_lines = 0 # counter for lines in header
+#         with open(path) as f:
+#             for line in f: 
+#                 if line.startswith('#'): header_lines += 1
+#                 else: title = line.split(); break
+
+#         mlo_data = np.genfromtxt(path, skip_header=header_lines)
+#         df = pd.DataFrame(mlo_data, columns=title, dtype=float)
+
+#         # get names of year and month column (depends on substance)
+#         yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
+#         mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
+
+#         df = df.loc[df[yr_col] < yr+1].loc[df[yr_col] > yr-1].reset_index() #  select only chosen year, then let index start from 0
+#         if any('catsMLOday' in s for s in df.columns): # check if data has day column
+#             day_col = [x for x in df.columns if 'catsMLOday' in x][0]
+#             time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
+#             df = df.drop(day_col, axis=1) # get rid of day column
+#         else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])]
+#         df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
+#         df.astype(float)
+#         df['Date_Time'] = time
+#         df.set_index('Date_Time', inplace=True) # make the datetime object the new index
+#         if df.empty: return None
+#         else: return df
+
+#     def plot(self):
+#         fig, ax = plt.subplots(dpi=250)
+#         if self.df_Day is not False: # if cond is fulfilled, the data exists 
+#             plt.scatter(self.df_Day.index, self.df_Day.loc[:, self.df_Day.columns.str.endswith('catsMLOm')],
+#                         color='silver', label=f'MLO daily {self.substance.upper()}', marker='+', zorder=2)
+
+#             for i, mean in enumerate(np.array( # make array, otherwise 'enumerate' gives calc MM = name of the column
+#                     self.df_monthly_mean.loc[:, self.df_monthly_mean.columns.str.endswith('catsMLOm')])): # plot MLO mean
+#                 y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
+#                 xmin = dt.datetime(y, m, 1)
+#                 xmax = dt.datetime(y, m, monthrange(y, m)[1])
+#                 ax.hlines(mean, xmin, xmax, color='black', ls='dashed', zorder=3)
+#             ax.hlines(mean, xmin, xmax, color='black', ls='dashed', label=f'MLO calc MM {self.substance.upper()}') # needed for legend, nothing else
+
+#         plt.plot(self.df.index, self.df.loc[:, self.df.columns.str.endswith('catsMLOm')],
+#                  'orange', zorder=2, ls='dashed', label=f'MLO {self.substance.upper()} MM')
+
+#         # plt.title(f'Ground-based {self.substance.upper()} measurements {self.years[0]} - {self.years[-1]}')
+#         plt.ylabel(f'Measured {self.substance.upper()} mixing ratio [ppt]')
+#         plt.xlim(min(self.df.index), max(self.df.index))
+#         plt.xlabel('Measurement time')
+#         plt.legend()
+#         fig.autofmt_xdate()
+#         plt.show()
+
+#%% old Mace Head
+
+# class Mace_Head():
+#     """ Mace Head data, plotting, averaging """
+
+#     def __init__(self, path = None):
+#         if not path: path = r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data\MHD-medusa_2012.dat'
+#         self.years = int(path[-8:-4])
+#         self.df = self.mhd_data(path)
+#         self.df_monthly_mean = monthly_mean(self.df)
+
+#     def mhd_data(self, path):
+#         """ Create dataframe from Mace Head data in .dat file"""
+#         # extract and stitch together names and units for column headers
+#         header_lines = 0
+#         with open(path) as f:
+#             for i, line in enumerate(f):
+#                 if line.split()[0] == 'unit:': 
+#                     units = line.split()
+#                     title = list(f)[0].split() # takes next row for some reason
+#                     header_lines = i+2; break
+#         column_headers = [name + "[" + unit + "]" for name, unit in zip(title, units)]
+
+#         mhd_data = np.genfromtxt(path, skip_header=header_lines)
+
+#         df = pd.DataFrame(mhd_data, columns=column_headers, dtype=float)
+#         df = df.replace(0, np.nan) # replace 0 with nan for statistics
+#         df = df.drop(df.iloc[:, :7], axis=1) # drop unnecessary time columns
+#         df = df.astype(float) 
+
+#         df['Date_Time'] = fractionalyear_to_datetime(mhd_data[:,0]) 
+#         df.set_index('Date_Time', inplace=True) # new index is datetime
+#         return df
+
+#     def plot(self):
+#         """ Plot Mace Head meausurements and monthly means over time """ 
+#         fig, ax = plt.subplots(dpi=250)
+#         plt.scatter(self.df.index, self.df['SF6[ppt]'],
+#                     color='grey', label='Mace Head', marker='+')
+
+#         for i, mean in enumerate(self.df_monthly_mean['SF6[ppt]']): # plot MHD mean
+#             y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
+#             xmin = dt.datetime(y, m, 1)
+#             xmax = dt.datetime(y, m, monthrange(y, m)[1])
+#             ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
+
+#         plt.title('Ground-based SF$_6$ measurements 2012')
+#         plt.ylabel('Measured SF$_6$ mixing ratio [ppt]')
+#         plt.xlabel('Measurement time')
+#         plt.legend()
+#         plt.show()

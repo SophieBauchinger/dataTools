@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-
-OUTDATED. NEW VERSION SEE filter_outliers
-
 @Author: Sophie Bauchimger, IAU
 @Date: Tue Apr 11 09:28:22 2023
 
@@ -24,7 +21,7 @@ import matplotlib.pyplot as plt
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
 from local_data import Mauna_Loa# , Mace_Head
-from global_data import Caribic# , Mozart
+from data_classes import Caribic# , Mozart
 from time_lag import calc_time_lags, plot_time_lags
 from aux_fctns import get_fct_substance, get_col_name, get_lin_fit
 from detrend import detrend_substance
@@ -42,34 +39,35 @@ import C_tools
 
 #%% Outliers
 if __name__=='__main__':
-    for y in range(2008, 2010): # Caribic
+    years = range(2008, 2010)
+    c_data = Caribic(years)
+    for y in years: # Caribic
         for dir_val in ['np', 'p', 'n']:
-            data = Caribic([y]).df
-            sf6_mxr = data['SF6; SF6 mixing ratio; [ppt]\n']
+            data = c_data.select_year(y)
+            sf6_mxr = data['SF6 [ppt]']
             ol = outliers.find_ol(fct.simple, data.index, sf6_mxr, None, None, 
                                   plot=True, limit=0.1, direction = dir_val)
 
-
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
 
-def pre_flag(data, n2o_col, t_obs_tot, ref_fit):
+def pre_flag(data, data_col, t_obs_tot, ref_fit, limit = 0.97, crit='n2o', verbose=False):
     """ 
-    everything with lower n2o than mlo_lim*mlo_fit(frac_year) is flagged (3% cut-off)
-    as 'strato' in an initial filtering step 
+    Flags everything with lower n2o than limir * mlo_fit(frac_year) 
+    as 'strato' in an initial filtering step (default: 3% cut-off)
+    Returns dataframe with new strato / tropo columns as well as new dataframe
+    with flagging results
     """ 
-    mlo_lim = 0.97
-
     # initialise columns to hold strat and trop flags (needs to be done on two lines)
     data = data.assign(strato = np.nan)
     data = data.assign(tropo = np.nan)
 
-    data.loc[data[n2o_col] < mlo_lim * ref_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
+    data.loc[data[data_col] < limit * ref_fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
 
     # create new dataframe to hold preflagging data
     pre_flagged = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo'])
-    pre_flagged['n2o_pre_flag'] = 0 # initialise flag with zeros
-    pre_flagged.loc[data['strato'] == True, 'n2o_pre_flag'] = 1 # set flag indicator for pre-flagged measurements
-    # print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
+    pre_flagged[f'{crit}_pre_flag'] = 0 # initialise flag with zeros
+    pre_flagged.loc[data['strato'] == True, f'{crit}_pre_flag'] = 1 # set flag indicator for pre-flagged measurements
+    if verbose: print('Result of pre-flagging: \n', pre_flagged.value_counts()) # show results of preflagging
     return data, pre_flagged
 
 def filter_strat_trop(data, crit):
@@ -100,8 +98,9 @@ def filter_strat_trop(data, crit):
         n2o_d_mxr = data['d_N2O [ppb]']
         # print(data.index, data[n2o_col],  pre_flagged.n2o_flag)
 
-        ol_n2o = outliers.find_ol(fct.simple, t_obs_tot, n2o_mxr, n2o_d_mxr, flag = pre_flagged.n2o_pre_flag, 
-                              plot=True, limit=0.1, direction = 'n')
+        ol_n2o = outliers.find_ol(fct.simple, t_obs_tot, n2o_mxr, n2o_d_mxr, 
+                                  flag = pre_flagged.n2o_pre_flag, 
+                                  plot=True, limit=0.1, direction = 'n')
         print('\n OL N2O\n', ol_n2o[0].values)
         # ^ 4er tuple, 1st ist liste von OL == 1 / 2 / 3, wenn not outlier dann == 0
         data.loc[(ol_n2o[0] != 0), ('strato', 'tropo')] = (True, False)
@@ -114,12 +113,14 @@ def filter_strat_trop(data, crit):
         sf6_col = 'SF6 [ppt]'
         data = data.dropna(how='any', subset=['SF6 [ppt]']) # choose only rows where sf6 data exists
         t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-        data, pre_flagged = pre_flag(data, sf6_col, t_obs_tot, mlo_fit) # pre-flagging
+        data, pre_flagged = pre_flag(data, sf6_col, t_obs_tot, mlo_fit, crit='sf6') # pre-flagging
         sf6_mxr = data[sf6_col] # measured n2o mixing ratios
         sf6_d_mxr = data['d_SF6 [ppt]']
 
-        ol_sf6 = outliers.find_ol(fct.simple, t_obs_tot, sf6_mxr, sf6_d_mxr, flag = pre_flagged.n2o_pre_flag, 
-                              plot=True, limit=0.1, direction = 'n')
+        ol_sf6 = outliers.find_ol(fct.simple, t_obs_tot, sf6_mxr, sf6_d_mxr, 
+                                  flag = pre_flagged.sf6_pre_flag, 
+                                  plot=True, limit=0.1, direction = 'n')
+        print('\n OL SF6\n', ol_sf6[0].values)
         data.loc[(ol_sf6[0] != 0), ('strato', 'tropo_ol')] = (True, False)
         data.loc[(ol_sf6[0] == 0), ('strato', 'tropo_ol')] = (False, True)
 
@@ -131,7 +132,7 @@ def filter_trop_outliers(data, substance_list, source):
     tropospheric data into outliers and non-outliers 
     Parameters:
         data: pandas (geo)dataframe
-        substance_list: list of strings, substances to be receive a flag 
+        substance_list: list of strings, substances to receive flags
     """
     # take only tropospheric data 
     for subs in substance_list:

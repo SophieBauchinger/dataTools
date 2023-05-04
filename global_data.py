@@ -242,19 +242,23 @@ class Caribic(global_data):
                 df['lat; latitude (mean value); [deg]\n'])]
             gdf_temp = geopandas.GeoDataFrame(df, geometry=geodata)
     
-            # Drop all unnecessary columns [info is saved within datetime, geometry]
             if not gdf_temp['geometry'].empty:
-                gdf_temp = gdf_temp.drop(['TimeCRef; CARIBIC_reference_time_since_0_hours_UTC_on_first_date_in_line_7; [s]',
-                            'year; date of sampling: year; [yyyy]\n',
-                            'month; date of sampling: month; [mm]\n',
-                            'day; date of sampling: day; [dd]\n',
-                            'hour; time of sampling (mean value): hour; [HH]\n',
-                            'min; time of sampling (mean value): minutes; [MM]\n',
-                            'sec; time of sampling (mean value): seconds; [SS]\n',
-                            'lon; longitude (mean value); [deg]\n',
-                            'lat; latitude (mean value); [deg]\n',
-                            'type; type of sample collector: 0 glass flask from TRAC, 1 metal flask from HIRES; [0-1]\n'],
-                           axis=1)
+                # Drop all unnecessary columns [info is saved within datetime, geometry]
+                filter_cols = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
+                column_names = [df.filter(regex='^'+c).filter_cols[0] for c in filter_cols]
+                gdf_temp.drop(column_names, axis=1, inplace=True)
+                # drop_cols = [test_df.filter(like='d_').columns
+                # gdf_temp = gdf_temp.drop(['TimeCRef; CARIBIC_reference_time_since_0_hours_UTC_on_first_date_in_line_7; [s]',
+                #             'year; date of sampling: year; [yyyy]\n',
+                #             'month; date of sampling: month; [mm]\n',
+                #             'day; date of sampling: day; [dd]\n',
+                #             'hour; time of sampling (mean value): hour; [HH]\n',
+                #             'min; time of sampling (mean value): minutes; [MM]\n',
+                #             'sec; time of sampling (mean value): seconds; [SS]\n',
+                #             'lon; longitude (mean value); [deg]\n',
+                #             'lat; latitude (mean value); [deg]\n',
+                #             'type; type of sample collector: 0 glass flask from TRAC, 1 metal flask from HIRES; [0-1]\n'],
+                #            axis=1)
             else: print('Geodata creation was unsuccessful. Please check your input.')
             # try: gdf_temp = gdf_temp[gdf_temp[self.get_new_column_name(self.substance_short)].notna()]
             # except: print(f'{self.substance_short} data not available in {pfxs} in {yr}')
@@ -264,10 +268,10 @@ class Caribic(global_data):
 
         if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return 
 
-        # Create a dictionary for translating short column names to description
+        # Create a dictionary for translating short column names to description & set col names to the short ones
         new_names = [x.split(";")[0] + x.split(";")[-1][:-1] for x in gdf.columns if len(x.split(";")) == 3] # remove \n with [-1]
         description = [x.split(";")[1] for x in gdf.columns if len(x.split(";")) == 3]
-        gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True)
+        gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
         col_names_dict = dict(zip(new_names, description))
 
         return gdf, col_names_dict
@@ -359,7 +363,7 @@ class Mozart(global_data):
             ds_remap = ds
             ds_remap['longitude'] = np.array([i for i in ds.longitude if i<=180] +
                                        [i - 360 for i in ds.longitude if i>180])
-            ds = ds_remap.sortby(ds_remap.longitude) # reorganise values             
+            ds = ds_remap.sortby(ds_remap.longitude) # reorganise values
         return ds
 
     def plot_scatter(self, total=False):

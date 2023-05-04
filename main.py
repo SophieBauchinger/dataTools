@@ -10,20 +10,25 @@ import pandas as pd
 from toolpac.outliers.outliers import get_no_nan
 
 from local_data import Mauna_Loa, Mace_Head
-from global_data import Caribic, Mozart
+from data_classes import Caribic, Mozart
 from time_lag import calc_time_lags, plot_time_lags
 
-from strat_filter_on_caribic_data import get_fct_substance, get_lin_fit, pre_flag, filter_strat_trop, filter_trop_outliers, detrend_substance, plot_gradient_by_season
+from gradients import plot_gradient_by_season
+from filter_outliers import get_fct_substance, get_lin_fit, pre_flag, filter_strat_trop, filter_trop_outliers, detrend_substance
 
 #%% Get data
-mlo_sf6 = Mauna_Loa(range(2008, 2020))
-mlo_n2o = Mauna_Loa(range(2008, 2020), substance='n2o')
+mlo_sf6 = Mauna_Loa(range(2000, 2020))
+mlo_n2o = Mauna_Loa(range(2000, 2020), substance='n2o')
 
 mlo_sf6_df = mlo_sf6.df
 mlo_n2o_df = mlo_n2o.df
 
 caribic = Caribic(range(2005, 2020))
 c_df = caribic.df
+
+mhd = Mace_Head() # only 2012 data available
+
+mzt = Mozart(range(2005, 2020))
 
 #%% Plot data
 mlo_sf6.plot()
@@ -32,6 +37,12 @@ mlo_n2o.plot()
 caribic.plot_scatter()
 caribic.plot_1d()
 caribic.plot_2d()
+
+mhd.plot()
+
+mzt.plot_1d()
+mzt.plot_2d()
+mzt.plot_1d_LonLat()
 
 #%% Time lags
 # Get and prep reference data 

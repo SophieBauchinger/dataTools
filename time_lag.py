@@ -47,7 +47,7 @@ def plot_time_lags(c_data, lags, ref_min, ref_max, ref_subs = 'SF6catsMLOm'):
 #%% Fct calls 
 if __name__=='__main__':
     from local_data import Mauna_Loa
-    from global_data import Caribic
+    from data_classes import Caribic
 
     mlo_time_lims = (2000, 2020)
     mlo_MM = Mauna_Loa(years = np.arange(*mlo_time_lims)).df #.df_monthly_mean
@@ -68,6 +68,7 @@ if __name__=='__main__':
             lags.append((lag))
     
         fig, ax = plt.subplots(dpi=300)
+        plt.hlines(0, np.nanmin(c_data.index), np.nanmax(c_data.index), color='k', ls='dashed')
         plt.scatter(c_data.index, lags, marker='+')
         plt.title('CARIBIC SF$_6$ time lag {} wrt. MLO {} - {}'.format(c_year, *mlo_time_lims))
         plt.ylabel('Time lag [yr]')
