@@ -107,6 +107,15 @@ def get_col_name(substance, source):
     except: print(f'Column name not found for {substance} in {source}')
     return cname
 
+def get_vlims(substance):
+    """ Get default limits for colormaps per substance """
+    v_limits = {
+        'sf6': (6,9),
+        'n2o': (0,10),
+        'co2': (0,10),
+        'ch4': (0,10)}
+    return v_limits[substance.lower()]
+
 def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for the substance (col name) """
     df.dropna(how='any', subset=substance, inplace=True)
@@ -116,3 +125,11 @@ def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
     print(f'Fit parameters obtained: {fit}')
     return fit
+
+def get_default_unit(substance):
+    unit = {
+        'sf6': 'ppt',
+        'n2o': 'ppb',
+        'co2': 'ppm',
+        'ch4': 'ppb'}
+    return unit[substance.lower()]

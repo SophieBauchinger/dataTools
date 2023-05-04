@@ -18,13 +18,14 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable as sm
+from matplotlib.colors import ListedColormap as lcm
 
 from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, get_col_name
+from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, get_col_name, get_vlims, get_default_unit
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
@@ -424,7 +425,7 @@ class Mozart(global_data):
             ax1.set_title(''); ax2.set_title('')
             ax2.set_ylabel('')
             handles, labels = ax1.get_legend_handles_labels()
-            ax1.legend(['{:.2}'.format(handles)], labels, # reversed so that legend aligns with graph
+            ax1.legend(['{:.2}'.format(handles)], labels, # change precision to 0.2 degrees
                        bbox_to_anchor=(1,1), loc='upper left')
             plt.show()
         
@@ -494,65 +495,70 @@ class local_data(object):
             df.set_index('Date_Time', inplace=True) # new index is datetime
             return df
 
-    def plot(self, substance=None, greyscale=True):
-        fig, ax = plt.subplots(dpi=250)
-        if greyscale: colors = {'day':'silver', 'month': 'black', 'msmts': 'grey'}
-        else: colors = {'day':'silver', 'month': 'black', 'msmts': 'grey'} # make this into colormaps somehow? 
+    def plot(self, substance=None, greyscale=True, v_limits = (6,9)):
+        """ 
+        Plot all available data as timeseries 
+        Parameters:
+            substance (str): specify substance (optional)
+            greyscale (bool): toggle plotting in greyscale or viridis colormap
+            v_limits (tuple(int, int)): change limits for colormap
+        """
+        if greyscale: colors = {'day':lcm(['grey']), 'msmts': lcm(['silver'])} # defining monoscale colormap for greyscale plots
+        else: colors = {'msmts':plt.cm.viridis_r, 'day': plt.cm.viridis_r} 
 
-        if not substance: col_name = get_col_name(self.substance, self.source)
-        else: col_name = get_col_name(substance, self.source)
-        print(col_name)
+        if not substance: substance = self.substance
+        col_name = get_col_name(substance, self.source)
+        vmin, vmax = get_vlims(substance)
+        norm = Normalize(vmin, vmax)
+        dflt_unit = get_default_unit(substance)
 
+        # Plot all available info on one graph
+        fig, ax = plt.subplots(figsize = (5,3.5), dpi=250)
+        # Measurement data
+        plt.scatter(self.df.index, self.df[col_name], c=self.df[col_name], zorder=0,
+                        cmap=colors['msmts'], norm=norm, marker='+',
+                        label=f'{self.source_print} {substance.upper()}')
+        
+        # Daily mean
         if not self.df_Day.empty: # check if there is data in the daily df
-            plt.scatter(self.df_Day.index, self.df_Day.loc[:, self.df_Day.columns.str.endswith(col_name)],
-                        color=colors['day'], label=f'{self.source_print} D {self.substance.upper()}', marker='+', zorder=2)
+            plt.scatter(self.df_Day.index, self.df_Day[col_name], c = self.df_Day[col_name], 
+                        cmap=colors['day'], norm=norm, marker='+', zorder=2,
+                        label=f'{self.source_print} {substance.upper()} (D)')
 
+        # Monthly mean
         if not self.df_monthly_mean.empty: # check for data in the monthly df
-            # for i, mean in enumerate(np.array( # make array, otherwise 'enumerate' gives calc MM = name of the column
-            #         self.df_monthly_mean.loc[:, self.df_monthly_mean.columns.str.endswith(col_name)])): # plot MLO mean
-            #     y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
-            #     xmin = dt.datetime(y, m, 1)
-            #     xmax = dt.datetime(y, m, monthrange(y, m)[1])
-            #     ax.hlines(mean, xmin, xmax, color='black', ls='dashed', zorder=3)
-
-            # 
-
-            for i, mean in enumerate(self.df_monthly_mean[col_name]): # plot MHD mean
+            for i, mean in enumerate(self.df_monthly_mean[col_name]): # plot monthly mean
                 y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
                 xmin = dt.datetime(y, m, 1)
                 xmax = dt.datetime(y, m, monthrange(y, m)[1])
-                ax.hlines(mean, xmin, xmax, color=colors['month'], linestyle='dashed', zorder=2)
-            ax.hlines(mean, xmin, xmax, color=colors['month'], ls='dashed', label=f'{self.source_print} M {self.substance.upper()}') # needed for legend, nothing else
+                ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
+            ax.hlines(mean, xmin, xmax, color='black', ls='dashed', 
+                      label=f'{self.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
 
-        # if self.source =='mlo':
-        #     plt.plot(self.df.index, self.df.loc[:, self.df.columns.str.endswith(col_name)],
-        #              'orange', zorder=2, ls='dashed', label=f'MLO {self.substance.upper()} MM')
-
-        # if self.source =='mhd':
-        plt.scatter(self.df.index, self.df[col_name],
-                        color=colors['msmts'], label=f'{self.source_print} {self.substance.upper()}', marker='+')
-
-# =============================================================================
-#         # Mauna Loa
-# =============================================================================
-        # plt.title(f'Ground-based {self.substance.upper()} measurements {self.years[0]} - {self.years[-1]}')
-        plt.ylabel(f'Measured {self.substance.upper()} mixing ratio [ppt]')
+        plt.ylabel(f'{self.substance.upper()} mixing ratio [{dflt_unit}]')
         plt.xlim(min(self.df.index), max(self.df.index))
-        plt.xlabel('Measurement time')
-        plt.legend()
+        plt.xlabel('Time')
+        
+        from matplotlib.patches import Patch
+        
+        if not greyscale: 
+            plt.colorbar(sm(norm=norm, cmap=colors['day']), aspect=50, ax=ax, extend='neither')
+        
+        # Slightly weird code to create a legend showing the range of the colormap)
+        handles, labels = ax.get_legend_handles_labels()
+        step = 0.2
+        pa = [ Patch(fc=colors['msmts'](norm(v))) for v in np.arange(vmin, vmax, step)]
+        pb = [ Patch(fc=colors['day'](norm(v))) for v in np.arange(vmin, vmax, step)]
+        pc = [ Patch(fc='black') for v in np.arange(vmin, vmax, step)]
+        
+        h = [] # list of handles
+        for a, b, c in zip(pa, pb, pc): # need to do this to have them in the right order
+            h.append(a); h.append(b); h.append(c)            
+        l = [''] * (len(h) - len(labels)) + labels # needed to have multiple color patches for one proper label 
+        ax.legend(handles=h, labels=l, ncol=len(h)/3, handletextpad=1/(len(h)/2)+0.2, handlelength=0.15, columnspacing=-0.3)
+
         fig.autofmt_xdate()
         plt.show()
-        
-# =============================================================================
-#         # Mace Head
-# =============================================================================
-        # fig, ax = plt.subplots(dpi=250)
-
-        # plt.title('Ground-based SF$_6$ measurements 2012')
-        # plt.ylabel('Measured SF$_6$ mixing ratio [ppt]')
-        # plt.xlabel('Measurement time')
-        # plt.legend()
-        # plt.show()
 
 class Mauna_Loa(local_data):
     """ Mauna Loa data, plotting, averaging """
@@ -569,12 +575,9 @@ class Mauna_Loa(local_data):
 
 
         self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
-        print(self.df_Day)
         if data_Day: # user input saying if daily data should exist
             fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
             self.df_Day = self.get_data(path_dir + fname_Day)
-            print(path_dir + fname_Day)
-            print(self.df_Day)
             try: self.df_monthly_mean = monthly_mean(self.df_Day)
             except: pass
 
@@ -592,24 +595,12 @@ class Mace_Head(local_data):
         self.df_Day = daily_mean(self.df) 
         self.df_monthly_mean = monthly_mean(self.df)
 
-        # fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
-        # self.df = self.get_data(path_dir+fname_MM)
-
-
-        # self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
-        # if data_Day: # user input saying if daily data should exist
-        #     fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
-        #     self.df_Day = self.get_data(path_dir + fname_Day)
-        #     try: self.df_monthly_mean = monthly_mean(self.df_Day)
-        #     except: pass
-
-
 # Function calls 
-mlo = Mauna_Loa(years = [2016, 2017], data_Day = True)
-mlo_df = mlo.df
+mlo = Mauna_Loa(years = [2010, 2017], data_Day = True)
 mlo.plot()
 
-Mace_Head([2012]).plot()
+mhd = Mace_Head([2012])
+mhd.plot()
 
 #%% 
 if __name__=='__main__':
@@ -630,132 +621,3 @@ if __name__=='__main__':
     lon_values = [0, 10, 50, 120, 150]
     lat_values = [70, 30, 0, -30, -70]
     mozart.plot_1d_LonLat(lon_values, lat_values)
-
-#%% old Mauna Loa
-# class Mauna_Loa():
-#     """ Mauna Loa data, plotting, averaging """
-
-#     def __init__(self, years, data_Day = False, substance='sf6', 
-#                  path = r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
-#         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
-#         self.source = 'mlo'
-#         self.years = years
-#         self.substance = substance
-#         fname = r'\mlo_{}_MM.dat'.format(substance.upper())
-#         self.df = pd.concat([self.mlo_data(y, path+fname) for y in years])
-
-#         if data_Day: 
-#             try: # try finding daily msmt data for the substance 
-#                 fname = r'\mlo_{}_Day.dat'.format(substance.upper())
-#                 self.df_Day = pd.concat([self.mlo_data(y, path+fname) for y in years])
-#                 self.df_monthly_mean = monthly_mean(self.df_Day)
-#             except: 
-#                 self.df_Day = self.df_monthly_mean = False # set both to False
-#                 print(f'No daily data found for {substance}. Please check your files')
-            
-#         else: self.df_Day = self.df_monthly_mean = False # set both to False
-
-#     def mlo_data(self, yr, path):
-#         """ Create dataframe for given mlo data (.dat) for a speficied year """
-#         header_lines = 0 # counter for lines in header
-#         with open(path) as f:
-#             for line in f: 
-#                 if line.startswith('#'): header_lines += 1
-#                 else: title = line.split(); break
-
-#         mlo_data = np.genfromtxt(path, skip_header=header_lines)
-#         df = pd.DataFrame(mlo_data, columns=title, dtype=float)
-
-#         # get names of year and month column (depends on substance)
-#         yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
-#         mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
-
-#         df = df.loc[df[yr_col] < yr+1].loc[df[yr_col] > yr-1].reset_index() #  select only chosen year, then let index start from 0
-#         if any('catsMLOday' in s for s in df.columns): # check if data has day column
-#             day_col = [x for x in df.columns if 'catsMLOday' in x][0]
-#             time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
-#             df = df.drop(day_col, axis=1) # get rid of day column
-#         else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])]
-#         df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
-#         df.astype(float)
-#         df['Date_Time'] = time
-#         df.set_index('Date_Time', inplace=True) # make the datetime object the new index
-#         if df.empty: return None
-#         else: return df
-
-#     def plot(self):
-#         fig, ax = plt.subplots(dpi=250)
-#         if self.df_Day is not False: # if cond is fulfilled, the data exists 
-#             plt.scatter(self.df_Day.index, self.df_Day.loc[:, self.df_Day.columns.str.endswith('catsMLOm')],
-#                         color='silver', label=f'MLO daily {self.substance.upper()}', marker='+', zorder=2)
-
-#             for i, mean in enumerate(np.array( # make array, otherwise 'enumerate' gives calc MM = name of the column
-#                     self.df_monthly_mean.loc[:, self.df_monthly_mean.columns.str.endswith('catsMLOm')])): # plot MLO mean
-#                 y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
-#                 xmin = dt.datetime(y, m, 1)
-#                 xmax = dt.datetime(y, m, monthrange(y, m)[1])
-#                 ax.hlines(mean, xmin, xmax, color='black', ls='dashed', zorder=3)
-#             ax.hlines(mean, xmin, xmax, color='black', ls='dashed', label=f'MLO calc MM {self.substance.upper()}') # needed for legend, nothing else
-
-#         plt.plot(self.df.index, self.df.loc[:, self.df.columns.str.endswith('catsMLOm')],
-#                  'orange', zorder=2, ls='dashed', label=f'MLO {self.substance.upper()} MM')
-
-#         # plt.title(f'Ground-based {self.substance.upper()} measurements {self.years[0]} - {self.years[-1]}')
-#         plt.ylabel(f'Measured {self.substance.upper()} mixing ratio [ppt]')
-#         plt.xlim(min(self.df.index), max(self.df.index))
-#         plt.xlabel('Measurement time')
-#         plt.legend()
-#         fig.autofmt_xdate()
-#         plt.show()
-
-#%% old Mace Head
-
-# class Mace_Head():
-#     """ Mace Head data, plotting, averaging """
-
-#     def __init__(self, path = None):
-#         if not path: path = r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data\MHD-medusa_2012.dat'
-#         self.years = int(path[-8:-4])
-#         self.df = self.mhd_data(path)
-#         self.df_monthly_mean = monthly_mean(self.df)
-
-#     def mhd_data(self, path):
-#         """ Create dataframe from Mace Head data in .dat file"""
-#         # extract and stitch together names and units for column headers
-#         header_lines = 0
-#         with open(path) as f:
-#             for i, line in enumerate(f):
-#                 if line.split()[0] == 'unit:': 
-#                     units = line.split()
-#                     title = list(f)[0].split() # takes next row for some reason
-#                     header_lines = i+2; break
-#         column_headers = [name + "[" + unit + "]" for name, unit in zip(title, units)]
-
-#         mhd_data = np.genfromtxt(path, skip_header=header_lines)
-
-#         df = pd.DataFrame(mhd_data, columns=column_headers, dtype=float)
-#         df = df.replace(0, np.nan) # replace 0 with nan for statistics
-#         df = df.drop(df.iloc[:, :7], axis=1) # drop unnecessary time columns
-#         df = df.astype(float) 
-
-#         df['Date_Time'] = fractionalyear_to_datetime(mhd_data[:,0]) 
-#         df.set_index('Date_Time', inplace=True) # new index is datetime
-#         return df
-
-#     def plot(self):
-#         """ Plot Mace Head meausurements and monthly means over time """ 
-#         fig, ax = plt.subplots(dpi=250)
-#         plt.scatter(self.df.index, self.df['SF6[ppt]'],
-#                     color='grey', label='Mace Head', marker='+')
-
-#         for i, mean in enumerate(self.df_monthly_mean['SF6[ppt]']): # plot MHD mean
-#             y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
-#             xmin = dt.datetime(y, m, 1)
-#             xmax = dt.datetime(y, m, monthrange(y, m)[1])
-#             ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
-
-#         plt.title('Ground-based SF$_6$ measurements 2012')
-#         plt.ylabel('Measured SF$_6$ mixing ratio [ppt]')
-#         plt.xlabel('Measurement time')
-#         plt.legend()
-#         plt.show()
