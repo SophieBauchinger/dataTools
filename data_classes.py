@@ -583,7 +583,7 @@ class Mauna_Loa(local_data):
 
 class Mace_Head(local_data):
     """ Mauna Loa data, plotting, averaging """
-    def __init__(self, years, substance='sf6', data_Day = False, 
+    def __init__(self, years=[2012], substance='sf6', data_Day = False, 
                  path =  r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data\MHD-medusa_2012.dat'):
         """ Initialise Mace Head with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, substance)
@@ -595,14 +595,7 @@ class Mace_Head(local_data):
         self.df_Day = daily_mean(self.df) 
         self.df_monthly_mean = monthly_mean(self.df)
 
-# Function calls 
-mlo = Mauna_Loa(years = [2010, 2017], data_Day = True)
-mlo.plot()
-
-mhd = Mace_Head([2012])
-mhd.plot()
-
-#%% 
+#%% Fctn calls
 if __name__=='__main__':
     v_limits = (6,9)
     grid_size = 5
@@ -621,3 +614,13 @@ if __name__=='__main__':
     lon_values = [0, 10, 50, 120, 150]
     lat_values = [70, 30, 0, -30, -70]
     mozart.plot_1d_LonLat(lon_values, lat_values)
+
+    mlo_years = np.arange(2011, 2012)
+    mlo = Mauna_Loa(years = [2010, 2017], data_Day = True)
+    mlo.plot()
+
+    mlo_n2o = Mauna_Loa(mlo_years, substance='n2o')
+    mlo_n2o.plot()
+
+    mhd = Mace_Head()
+    mhd.plot()
