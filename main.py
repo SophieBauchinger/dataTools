@@ -9,8 +9,7 @@ import pandas as pd
 
 from toolpac.outliers.outliers import get_no_nan
 
-from local_data import Mauna_Loa, Mace_Head
-from data_classes import Caribic, Mozart
+from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
 from time_lag import calc_time_lags, plot_time_lags
 
 from gradients import plot_gradient_by_season

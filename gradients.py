@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 
 from toolpac.calc import bin_1d_2d
 
-from global_data import Caribic
-from local_data import Mauna_Loa
+from data_classes import Caribic, Mauna_Loa
 from detrend import detrend_substance
 
 import C_tools
@@ -34,6 +33,8 @@ def plot_gradient_by_season(data, substance, tropopause='therm', errorbars=False
         min_y, max_y: int, defines longitude range to plot
         bsize: int, bin size for 1D binning
         ptsmin: int, minimum number of pts for a bin to be considered 
+    
+    Re-implementation of C_plot.pl_gradient_by_season
     """
     # c_obs = data[substance].values
     # t_obs =  np.array(datetime_to_fractionalyear(data.index, method='exact'))
@@ -89,5 +90,8 @@ def plot_gradient_by_season(data, substance, tropopause='therm', errorbars=False
 if __name__=='__main__':
     c_df = Caribic(range(2005, 2021)).df
     ref_data = Mauna_Loa(range(2005, 2020)).df
+    plot_gradient_by_season(c_df, 'SF6 [ppt]')
+
+    # same result for detrend bc we're looking at the gradient
     c_df_detr = detrend_substance(c_df, 'SF6 [ppt]', ref_data, 'SF6catsMLOm')
     plot_gradient_by_season(c_df_detr, 'SF6 [ppt]')
