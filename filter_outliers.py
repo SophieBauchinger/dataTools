@@ -185,6 +185,15 @@ if __name__=='__main__':
             plot_time_lags(c_data, lags, ref_min, ref_max)
 
 #%% Filter tropospheric and stratospheric data
+
+# test pre_flag with sf6 data
+# if __name__=='__main__': 
+#     c_pref = Caribic([2008]).df
+#     ref_pref = Mauna_Loa(range(2008, 2020), substance = 'sf6').df
+#     pref = pre_flag(c_pref, 'SF6 [ppt]', 
+#                     np.array(datetime_to_fractionalyear(c_pref.index, method='exact')), 
+#                     get_lin_fit(ref_pref, get_col_name('sf6', 'Mauna_Loa')))
+
 if __name__=='__main__':
     # loop through years of caribic data
     data_filtered = pd.DataFrame() # initialise full dataframe
