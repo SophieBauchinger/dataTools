@@ -356,7 +356,7 @@ class Caribic(global_data):
         super().__init__(years, grid_size, v_limits)
         self.source = 'Caribic'; self.source_print = 'CAR'
         self.substance_short = subst
-        self.substance = get_col_name(self.substance_short, 'car')
+        self.substance = get_col_name(self.substance_short, self.source)
 
         self.df, self.column_dict = self.get_data(pfxs, verbose=verbose) # self.caribic_data(pfxs)
 

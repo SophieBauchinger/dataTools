@@ -58,7 +58,18 @@ def ds_to_gdf(ds):
     gdf.set_index('time', inplace=True) 
     return gdf
 
-#%% Working with data
+#%%  Data Handling
+def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
+    """ Given one year of reference data, find the fit parameters for the substance (col name) """
+    df.dropna(how='any', subset=substance, inplace=True)
+    year, month = df.index.year, df.index.month
+    t_ref = year + (month - 0.5) / 12 # obtain fractional year for middle of the month
+    mxr_ref = df[substance].values
+    fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
+    print(f'Fit parameters obtained: {fit}')
+    return fit
+
+#%% Dictionaries for finding fctnbs, col names, v lims, default unit
 def get_fct_substance(substance):
     """ Returns appropriate fct from toolpac.outliers.ol_fit_functions to a substance """
     df_func_dict = {'co2': fct.higher,
@@ -115,16 +126,6 @@ def get_vlims(substance):
         'co2': (0,10),
         'ch4': (0,10)}
     return v_limits[substance.lower()]
-
-def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
-    """ Given one year of reference data, find the fit parameters for the substance (col name) """
-    df.dropna(how='any', subset=substance, inplace=True)
-    year, month = df.index.year, df.index.month
-    t_ref = year + (month - 0.5) / 12 # obtain fractional year for middle of the month
-    mxr_ref = df[substance].values
-    fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
-    print(f'Fit parameters obtained: {fit}')
-    return fit
 
 def get_default_unit(substance):
     unit = {
