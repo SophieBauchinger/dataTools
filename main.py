@@ -13,21 +13,24 @@ from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
 from time_lag import calc_time_lags, plot_time_lags
 
 from gradients import plot_gradient_by_season
-from filter_outliers import get_fct_substance, get_lin_fit, pre_flag, filter_strat_trop, filter_trop_outliers, detrend_substance
+from filter_outliers import get_fct_substance, get_lin_fit, pre_flag, filter_strat_trop, filter_trop_outliers
+from detrend import detrend_substance
 
 #%% Get data
-mlo_sf6 = Mauna_Loa(range(2000, 2020))
-mlo_n2o = Mauna_Loa(range(2000, 2020), substance='n2o')
+year_range = range(1980, 2021)
+
+mlo_sf6 = Mauna_Loa(year_range)
+mlo_n2o = Mauna_Loa(year_range, substance='n2o')
 
 mlo_sf6_df = mlo_sf6.df
 mlo_n2o_df = mlo_n2o.df
 
-caribic = Caribic(range(2005, 2020))
+caribic = Caribic(year_range, verbose=True)
 c_df = caribic.df
 
 mhd = Mace_Head() # only 2012 data available
 
-mzt = Mozart(range(2005, 2020))
+mzt = Mozart(year_range) # only available up to 2008
 
 #%% Plot data
 mlo_sf6.plot()
@@ -87,9 +90,13 @@ data_stratosphere = data_filtered.loc[data_filtered['strato'] == True]
 # print(data_stratosphere.value_counts)
 data_troposphere = data_filtered.loc[data_filtered['tropo'] == True]
 
-data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'], source='car')
+data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'], source='Caribic')
 
 
 #%% Detrend
-mlo_detrend_ref = Mauna_Loa(range(2006, 2020)).df
-data_detr = detrend_substance(c_df, 'SF6 [ppt]', mlo_detrend_ref, 'SF6catsMLOm')
+data_detr = detrend_substance(c_df, 'SF6 [ppt]', mlo_sf6_df, 'SF6catsMLOm')
+
+#%% Plot gradients 
+plot_gradient_by_season(c_df, 'SF6 [ppt]')
+# same result for detrend bc we're looking at the gradient
+plot_gradient_by_season(data_detr, 'SF6 [ppt]')

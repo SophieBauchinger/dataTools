@@ -18,9 +18,9 @@ import C_tools
 
 #%% Plotting Gradient by season
 """ What data needs to be put in here? """
-# select_var=['fl_ch4','fl_sf6', 'fl_n2o']
+# select_var=['fl_ch4','fl_sf6', 'fl_n2o'] # flagged data
 # select_value=[0,0,0]
-# select_cf=['GT','GT', 'GT']
+# select_cf=['GT','GT', 'GT'] # operators 
 
 def plot_gradient_by_season(data, substance, tropopause='therm', errorbars=False, 
                           min_y=-50, max_y=80, bsize=10, ptsmin=5):

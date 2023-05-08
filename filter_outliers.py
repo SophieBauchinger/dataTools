@@ -9,11 +9,8 @@ Removing linear trends from measurements using ground-based reference data
 
 """
 import numpy as np
-import sys
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn' - otherwise df[j] = val gives a warning (outliers.outliers)
-
-import matplotlib.pyplot as plt
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
@@ -21,17 +18,11 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning, module=
 from data_classes import Caribic, Mauna_Loa# , Mozart, Mace_Head
 from time_lag import calc_time_lags, plot_time_lags
 from aux_fctns import get_fct_substance, get_col_name, get_lin_fit
-from detrend import detrend_substance
 
-from toolpac.calc import bin_1d_2d
 from toolpac.outliers import outliers
 from toolpac.outliers import ol_fit_functions as fct
 from toolpac.outliers.outliers import get_no_nan# , fit_data
 from toolpac.conv.times import datetime_to_fractionalyear #, fractionalyear_to_datetime
-
-sys.path.insert(0, r'C:\Users\sophie_bauchinger\sophie_bauchinger\Caribic_data_handling')
-# import C_SF6_age
-import C_tools
 
 #%% Outliers
 if __name__=='__main__':
@@ -110,10 +101,12 @@ def filter_trop_outliers(data, substance_list, source='Caribic'):
     Parameters:
         data: pandas (geo)dataframe
         substance_list: list of strings, substances to receive flags
+        source (str): source of msmt data, needed to get column name from substances
     """
     # take only tropospheric data 
     for subs in substance_list:
-        subs = get_col_name(subs, source)
+        
+        subs = get_col_name(subs, source) # get column name, default is from caribic
         if len(get_no_nan(data.index, data[subs], data[subs])[0]) < 1: # check for valid data
             print(f'no {subs} data'); continue
 
