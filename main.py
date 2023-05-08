@@ -25,8 +25,10 @@ mlo_n2o = Mauna_Loa(year_range, substance='n2o')
 mlo_sf6_df = mlo_sf6.df
 mlo_n2o_df = mlo_n2o.df
 
-caribic = Caribic(year_range, verbose=True)
-c_df = caribic.df
+caribic_ghg = Caribic(year_range)
+c_ghg_df = caribic_ghg.df
+
+caribic_int = Caribic(year_range, pfxs = ['INT', 'INT2'])
 
 mhd = Mace_Head() # only 2012 data available
 
@@ -36,9 +38,9 @@ mzt = Mozart(year_range) # only available up to 2008
 mlo_sf6.plot()
 mlo_n2o.plot()
 
-caribic.plot_scatter()
-caribic.plot_1d()
-caribic.plot_2d()
+caribic_ghg.plot_scatter()
+caribic_ghg.plot_1d()
+caribic_ghg.plot_2d()
 
 mhd.plot()
 
@@ -55,7 +57,7 @@ mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
 
 # loop through years of caribic data
 for c_year in range(2005, 2022):
-    c_data = caribic.select_year(c_year)
+    c_data = caribic_ghg.select_year(c_year)
     if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
         continue
     else:
@@ -69,7 +71,7 @@ for c_year in range(2005, 2022):
 data_filtered = pd.DataFrame() # initialise full dataframe
 for c_year in range(2005, 2022): 
     print(f'{c_year}')
-    c_data = caribic.select_year(c_year)
+    c_data = caribic_ghg.select_year(c_year)
     # print('cols:', c_data.columns)
 
     crit = 'n2o'; n2o_filtered = pd.DataFrame()
@@ -94,9 +96,9 @@ data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'], source='Caribic
 
 
 #%% Detrend
-data_detr = detrend_substance(c_df, 'SF6 [ppt]', mlo_sf6_df, 'SF6catsMLOm')
+data_detr = detrend_substance(c_ghg_df, 'SF6 [ppt]', mlo_sf6_df, 'SF6catsMLOm')
 
 #%% Plot gradients 
-plot_gradient_by_season(c_df, 'SF6 [ppt]')
+plot_gradient_by_season(c_ghg_df, 'SF6 [ppt]')
 # same result for detrend bc we're looking at the gradient
 plot_gradient_by_season(data_detr, 'SF6 [ppt]')
