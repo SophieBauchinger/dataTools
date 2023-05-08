@@ -25,7 +25,7 @@ from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, get_col_name, get_vlims, get_default_unit
+from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, get_col_name, get_vlims, get_default_unit, same_col_merge, rename_columns
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
@@ -52,8 +52,8 @@ class global_data(object):
 
     def select_year(self, yr):
         """ Returns dataframe of selected year only """
-        try: df = self.df[self.df.index.year == yr]; return df
-        except: print(f'No data found for {yr}'); return
+        try: return self.df[self.df.index.year == yr]
+        except: print(f'No data found for {yr} in {self.source}'); return
 
     def get_data(self, c_pfxs=['GHG'], remap_lon=True,
                  mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
@@ -73,7 +73,7 @@ class global_data(object):
             for yr in self.years:
                 if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
                     self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year if there's no data
-                    if verbose: print(f'No data found for {yr}. Removing {yr} from list of years')
+                    if verbose: print(f'No data found for {yr} in {self.source}. Removing {yr} from list of years')
                     continue
                 df = pd.DataFrame()
                 print(f'Reading in Caribic data for {yr}')
@@ -92,33 +92,47 @@ class global_data(object):
                         df_temp = f_data.df # index = Datetime
                         df_temp.insert(0, 'Flight number',
                                        [flight_nr for i in range(df_temp.shape[0])])
+
+                        #!!! for some years, substances are in lower case rather than upper. need to adjust to combine them
+                        unit, new_names, dictionary = rename_columns(df_temp.columns)
+                        df_temp.rename(columns = dictionary, inplace=True) # set names to the short version
                         df = pd.concat([df, df_temp])
 
                 # Convert longitude and latitude into geometry objects -> GeoDataFrame
                 geodata = [Point(lat, lon) for lon, lat in zip(
-                    df['lon; longitude (mean value); [deg]\n'],
-                    df['lat; latitude (mean value); [deg]\n'])]
+                    df['LON [deg]'],
+                    df['LAT [deg]'])]
                 gdf_temp = geopandas.GeoDataFrame(df, geometry=geodata)
 
+                # Drop all unnecessary columns [info is saved within datetime, geometry]
                 if not gdf_temp['geometry'].empty: # check that geometry column was filled
-                    # Drop all unnecessary columns [info is saved within datetime, geometry]
                     filter_cols = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
-                    column_names = [df.filter(regex='^'+c).columns[0] for c in filter_cols]
-                    gdf_temp.drop(column_names, axis=1, inplace=True)
+                    del_column_names = [df.filter(regex='^'+c.upper()).columns[0] for c in filter_cols] # upper bc renamed those columns
+                    gdf_temp.drop(del_column_names, axis=1, inplace=True)
 
-                else: print('Geodata creation was unsuccessful. Please check your input.')
-
-                gdf = pd.concat([gdf, gdf_temp])
+                gdf = pd.concat([gdf, gdf_temp]) # hopefully also merges names....
 
             if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return
 
             # Create a dictionary for translating short column names to description & set col names to the short ones
-            new_names = [x.split(";")[0] + x.split(";")[-1][:-1] for x in gdf.columns if len(x.split(";")) == 3] # remove \n with [-1]
-            description = [x.split(";")[1] for x in gdf.columns if len(x.split(";")) == 3]
-            gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
-            col_names_dict = dict(zip(new_names, description))
+            # val_names = [x.split(";")[0] for x in gdf.columns if len(x.split(";")) == 3]
+            # # Need to make column names of the same substance the same even though some are upper / lower case
+            # for i, x in enumerate(val_names): 
+            #     if x.startswith('d_'): val_names[i] = x[:-3] + x[-3:].upper()
+            #     elif not x=='p': val_names[i] = x.upper() # not making p uppercase, only subst names
 
-            return gdf, col_names_dict
+            # units = [x.split(";")[-1][:-1] for x in gdf.columns if len(x.split(";")) == 3] # remove \n with [-1]
+            # new_names = [v+u for v,u in zip(val_names, units)] # coloumn names with corrected case, in correct order
+            # description = [x.split(";")[1] for x in gdf.columns if len(x.split(";")) == 3] # middle part is the lenghtier description
+            # col_names_dict = dict(zip(new_names, description))
+
+            # gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
+            # # gdf = same_col_merge(gdf) # merge columns with the same name
+
+            # unit, new_names, dictionary = rename_columns(gdf.columns)
+            # gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
+
+            return gdf, dictionary
 
         elif self.source=='Mozart':
             with xr.open_dataset(mozart_file) as ds:
@@ -126,7 +140,7 @@ class global_data(object):
             try: ds = ds.sel(time = self.years)
             except: # keep only data for specified years
                 ds = xr.concat([ds.sel(time=y) for y in self.years if y in ds.time], dim='time')
-                if verbose: print(f'No data found for {[y for y in self.years if y not in ds.time]}')
+                if verbose: print(f'No data found for {[y for y in self.years if y not in ds.time]} in {self.source}')
                 self.years = [y for y in ds.time.values] # only include available years
 
             if remap_lon: # set longitudes between 180 and 360 to start at -180 towards 0
@@ -353,7 +367,7 @@ class Caribic(global_data):
 
     def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None,
                subst='sf6', pfxs=['GHG'], verbose=False):
-        super().__init__(years, grid_size, v_limits)
+        super().__init__([yr for yr in years if yr > 2004], grid_size, v_limits) # no caribic data before 2005, takes too long to check 
         self.source = 'Caribic'; self.source_print = 'CAR'
         self.substance_short = subst
         self.substance = get_col_name(self.substance_short, self.source)
@@ -418,15 +432,13 @@ class Mozart(global_data):
             self.ds.SF6.sel(time = year, longitude=lon_values,
                             method='nearest').plot.line(x = 'latitude', ax=ax1)
             ax1.plot(out_x.xintm, out_x.vmean, c='k', ls='dashed', label='average')
+
             self.ds.SF6.sel(time = year, latitude=lat_values,
                             method="nearest").plot.line(x = 'longitude', ax=ax2)
             ax2.plot(out_y.xintm, out_y.vmean, c='k', ls='dashed', label='average')
             
             ax1.set_title(''); ax2.set_title('')
             ax2.set_ylabel('')
-            handles, labels = ax1.get_legend_handles_labels()
-            ax1.legend(['{:.2}'.format(handles)], labels, # change precision to 0.2 degrees
-                       bbox_to_anchor=(1,1), loc='upper left')
             plt.show()
         
         return
@@ -472,6 +484,9 @@ class local_data(object):
             df.astype(float)
             df['Date_Time'] = time
             df.set_index('Date_Time', inplace=True) # make the datetime object the new index
+            
+            try: df.dropna(how='any', subset=str(self.substance.upper()+'catsMLOm'), inplace=True) 
+            except: print('didnt drop na. ', str(self.substance.upper()+'catsMLOm'))
             return df
         
         elif self.source == 'Mace_Head': # make col names with space (like caribic)
@@ -624,3 +639,6 @@ if __name__=='__main__':
 
     mhd = Mace_Head()
     mhd.plot()
+    
+#%% 
+# caribic_int = Caribic(c_years, grid_size, v_limits, pfxs=['INT'])    

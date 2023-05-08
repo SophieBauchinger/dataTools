@@ -58,6 +58,26 @@ def ds_to_gdf(ds):
     gdf.set_index('time', inplace=True) 
     return gdf
 
+def rename_columns(columns):
+    """ Get new column names and col_name_dict for AMES data structure """
+    val_names = [x.split(";")[0] for x in columns if len(x.split(";")) == 3]
+    # Need to make column names of the same substance the same even though some are upper / lower case
+    for i, x in enumerate(val_names): 
+        if x.startswith('d_'): val_names[i] = x[:-3] + x[-3:].upper()
+        elif not x=='p': val_names[i] = x.upper() # not making p uppercase, only subst names
+
+    units = [x.split(";")[-1][:-1] for x in columns if len(x.split(";")) == 3] # remove \n with [-1]
+    new_names = [v+u for v,u in zip(val_names, units)] # coloumn names with corrected case, in correct order
+    dictionary = dict(zip([x for x in columns if len(x.split(";")) == 3], new_names))
+
+    return units, new_names, dictionary
+    
+
+def same_merge(x): return ','.join(x[x.notnull()].astype(str))
+def same_col_merge(df):
+    """ Merge all columns with the same name when given a dataframe """
+    return df.groupby(level=0, axis=1).apply(lambda x: x.apply(same_merge, axis=1))
+
 #%%  Data Handling
 def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for the substance (col name) """
