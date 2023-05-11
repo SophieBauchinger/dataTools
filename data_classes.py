@@ -25,10 +25,13 @@ from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, get_col_name, get_vlims, get_default_unit, same_col_merge, rename_columns
+from aux_fctns import monthly_mean, daily_mean, ds_to_gdf,  same_col_merge, rename_columns
+from dictionaries import get_col_name, get_vlims, get_default_unit
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
+
+# Note: Flights [340, 344, 346, 360, 364, 400, 422, 424, 440, 442, 444, 446, 467] have the wrong day saved
 
 #%% GLobal data
 class global_data(object):
@@ -70,18 +73,23 @@ class global_data(object):
         gdf = geopandas.GeoDataFrame() # initialise GeoDataFrame
         if self.source=='Caribic':
             parent_dir = r'E:\CARIBIC\Caribic2data'
-            for yr in self.years:
-                if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
-                    self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year if there's no data
-                    if verbose: print(f'No data found for {yr} in {self.source}. Removing {yr} from list of years')
-                    continue
-                df = pd.DataFrame()
-                print(f'Reading in Caribic data for {yr}')
 
-                # First collect data from individual flights
-                for current_dir in find.find_dir("*_{}*".format(yr), parent_dir)[1:]:
-                    flight_nr = int(str(current_dir)[-12:-9])
-                    for pfx in c_pfxs: # can include different prefixes here too
+            all_dfs = {}
+            for pfx in c_pfxs: # can include different prefixes here too
+
+                for yr in self.years:
+                    if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
+                        self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year if there's no data
+                        if verbose: print(f'No data found for {yr} in {self.source}. Removing {yr} from list of years')
+                        continue
+
+                    print(f'Reading in Caribic data for {yr}')
+
+                    # First collect data from individual flights
+                    df_yr = pd.DataFrame()
+                    for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir)[1:]:
+                        flight_nr = int(str(current_dir)[-12:-9])
+
                         f = find.find_file(f'{pfx}_*', current_dir)
                         if not f or len(f)==0: # show error msg and go directly to next loop
                             if verbose: print(f'No {pfx} File found for Flight {flight_nr} in {yr}')
@@ -89,50 +97,42 @@ class global_data(object):
                         elif len(f) > 1: f.sort() # sort list of files, then take latest
 
                         f_data = FFI1001DataReader(f[0], df=True, xtype = 'secofday')
-                        df_temp = f_data.df # index = Datetime
-                        df_temp.insert(0, 'Flight number',
-                                       [flight_nr for i in range(df_temp.shape[0])])
+                        df_flight = f_data.df # index = Datetime
+                        df_flight.insert(0, 'Flight number',
+                                       [flight_nr for i in range(df_flight.shape[0])])
+                        if len(c_pfxs)>1: df_flight.insert(1, 'Prefix', [pfx for i in range(df_flight.shape[0])]) # add pfx column if more than one prefix given 
 
-                        #!!! for some years, substances are in lower case rather than upper. need to adjust to combine them
-                        unit, new_names, dictionary = rename_columns(df_temp.columns)
-                        df_temp.rename(columns = dictionary, inplace=True) # set names to the short version
-                        df = pd.concat([df, df_temp])
+                        # for some years, substances are in lower case rather than upper. need to adjust to combine them
+                        new_names, col_dict = rename_columns(df_flight.columns)
+                        df_flight.rename(columns = col_dict, inplace=True) # set names to the short version
+                        df_yr = pd.concat([df_yr, df_flight])
 
-                # Convert longitude and latitude into geometry objects -> GeoDataFrame
-                geodata = [Point(lat, lon) for lon, lat in zip(
-                    df['LON [deg]'],
-                    df['LAT [deg]'])]
-                gdf_temp = geopandas.GeoDataFrame(df, geometry=geodata)
+                    # Convert longitude and latitude into geometry objects -> GeoDataFrame
+                    geodata = [Point(lat, lon) for lon, lat in zip(
+                        df_yr['LON [deg]'],
+                        df_yr['LAT [deg]'])]
+                    gdf_yr = geopandas.GeoDataFrame(df_yr, geometry=geodata)
+    
+                    # Drop all unnecessary columns [info is saved within datetime, geometry]
+                    if not gdf_yr['geometry'].empty: # check that geometry column was filled
+                        filter_cols = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
+                        del_column_names = [gdf_yr.filter(regex='^'+c.upper()).columns[0] for c in filter_cols] # upper bc renamed those columns
+                        gdf_yr.drop(del_column_names, axis=1, inplace=True)
 
-                # Drop all unnecessary columns [info is saved within datetime, geometry]
-                if not gdf_temp['geometry'].empty: # check that geometry column was filled
-                    filter_cols = ['TimeCRef', 'year', 'month', 'day', 'hour', 'min', 'sec', 'lon', 'lat', 'type']
-                    del_column_names = [df.filter(regex='^'+c.upper()).columns[0] for c in filter_cols] # upper bc renamed those columns
-                    gdf_temp.drop(del_column_names, axis=1, inplace=True)
+                    gdf = pd.concat([gdf, gdf_yr]) # hopefully also merges names....
+                
+                if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return
 
-                gdf = pd.concat([gdf, gdf_temp]) # hopefully also merges names....
+                self.column_dict = col_dict
+                all_dfs[pfx] = gdf
 
-            if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return
+                if pfx == 'GHG': self.df_GHG = gdf
+                elif pfx == 'INT': self.df_INT = gdf
+                elif pfx == 'INT2': self.df_INT2 = gdf
 
-            # Create a dictionary for translating short column names to description & set col names to the short ones
-            # val_names = [x.split(";")[0] for x in gdf.columns if len(x.split(";")) == 3]
-            # # Need to make column names of the same substance the same even though some are upper / lower case
-            # for i, x in enumerate(val_names): 
-            #     if x.startswith('d_'): val_names[i] = x[:-3] + x[-3:].upper()
-            #     elif not x=='p': val_names[i] = x.upper() # not making p uppercase, only subst names
-
-            # units = [x.split(";")[-1][:-1] for x in gdf.columns if len(x.split(";")) == 3] # remove \n with [-1]
-            # new_names = [v+u for v,u in zip(val_names, units)] # coloumn names with corrected case, in correct order
-            # description = [x.split(";")[1] for x in gdf.columns if len(x.split(";")) == 3] # middle part is the lenghtier description
-            # col_names_dict = dict(zip(new_names, description))
-
-            # gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
-            # # gdf = same_col_merge(gdf) # merge columns with the same name
-
-            # unit, new_names, dictionary = rename_columns(gdf.columns)
-            # gdf.rename(columns = dict(zip([x for x in gdf.columns if len(x.split(";")) == 3], new_names)), inplace=True) # set names to the short version
-
-            return gdf, dictionary
+            if len(c_pfxs) == 1: self.df = gdf #!!! Need to change my code to reflect the other prefix things 
+            else: print('df is ambiguous. Not set. ')
+            return all_dfs, col_dict
 
         elif self.source=='Mozart':
             with xr.open_dataset(mozart_file) as ds:
@@ -147,6 +147,11 @@ class global_data(object):
                 new_lon = (((ds.longitude.data + 180) % 360) - 180)
                 ds = ds.assign_coords({'longitude':('longitude', new_lon, ds.longitude.attrs)})
                 ds = ds.sortby(ds.longitude) # reorganise values
+
+            self.ds = ds
+            self.df = ds_to_gdf(self.ds)
+            try: self.SF6 = self.df['SF6']
+            except: pass
 
             return ds # xr.concat(datasets, dim = 'time')
 
@@ -225,7 +230,7 @@ class global_data(object):
 
             # Plot mixing ratio msmts and monthly mean
             fig, ax = plt.subplots(dpi=250)
-            plt.title(f'CARIBIC {self.substance_short.upper()} measurements')
+            plt.title(f'{self.source} {self.substance_short.upper()} measurements')
             ymin = np.nanmin(df[substance])
             ymax = np.nanmax(df[substance])
 
@@ -248,7 +253,9 @@ class global_data(object):
             plt.ylabel(f'{self.substance_short.upper()} mixing ratio [ppt]')
             plt.ylim(ymin-0.15, ymax+0.15)
             fig.autofmt_xdate()
+            if hasattr(self, 'pfxs'): ax.text(0,0, f'{self.pfxs}', verticalalignment='top')
             plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+
         elif self.source=='Mozart':
             self.plot_1d(substance, single_yr)
 
@@ -370,9 +377,11 @@ class Caribic(global_data):
         super().__init__([yr for yr in years if yr > 2004], grid_size, v_limits) # no caribic data before 2005, takes too long to check 
         self.source = 'Caribic'; self.source_print = 'CAR'
         self.substance_short = subst
-        self.substance = get_col_name(self.substance_short, self.source)
+        self.pfxs = pfxs
+        self.substance = get_col_name(self.substance_short, self.source, self.pfxs[0]) # default substance
 
-        self.df, self.column_dict = self.get_data(pfxs, verbose=verbose) # self.caribic_data(pfxs)
+        self.get_data(pfxs, verbose=verbose)
+        # self.df, self.column_dict = self.get_data(pfxs, verbose=verbose)
 
         if flight_nr: self.df = self.df[self.df.values == flight_nr]
         self.df_monthly_mean = monthly_mean(self.df)
@@ -403,11 +412,12 @@ class Mozart(global_data):
         self.years = years
         self.source = 'Mozart'; self.source_print = 'MZT'
         self.substance = 'SF6'
-
-        self.ds = self.get_data() # xr.concat([self.get_data(year = y) for y in self.years], dim='time')
-        self.df = ds_to_gdf(self.ds)
-        try: self.SF6 = self.df['SF6']
-        except: pass
+        self.get_data()
+        
+        # self.ds = # xr.concat([self.get_data(year = y) for y in self.years], dim='time')
+        # self.df = ds_to_gdf(self.ds)
+        # try: self.SF6 = self.df['SF6']
+        # except: pass
 
     def plot_1d_LonLat(self, lon_values = [10, 60, 120, 180],
                        lat_values = [70, 30, 0, -30, -70],
