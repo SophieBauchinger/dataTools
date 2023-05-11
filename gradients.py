@@ -13,6 +13,7 @@ from toolpac.calc import bin_1d_2d
 
 from data_classes import Caribic, Mauna_Loa
 from detrend import detrend_substance
+from dictionaries import get_col_name, choose_column, get_coord_name
 
 import C_tools
 
@@ -22,38 +23,54 @@ import C_tools
 # select_value=[0,0,0]
 # select_cf=['GT','GT', 'GT'] # operators 
 
-def plot_gradient_by_season(data, substance, tropopause='therm', errorbars=False, 
-                          min_y=-50, max_y=80, bsize=10, ptsmin=5):
+def plot_gradient_by_season(data, substance, c_pfx = 'INT2',
+                            tp='therm', errorbars=False, ycoord='pt', 
+                            bsize=0.5, ptsmin=5):
     """ 
     Plotting gradient by season using 1D binned data 
     Parameters:
         data: pandas (geo)dataframe, detrended
         substance: str, eg. 'SF6 [ppt]'
         tropopause: str, which tropopause definition to use 
-        min_y, max_y: int, defines longitude range to plot
+        min_y, max_y: int, defines y range to plot
         bsize: int, bin size for 1D binning
         ptsmin: int, minimum number of pts for a bin to be considered 
     
     Re-implementation of C_plot.pl_gradient_by_season
     """
-    # c_obs = data[substance].values
-    # t_obs =  np.array(datetime_to_fractionalyear(data.index, method='exact'))
+    int_subs = get_col_name(substance,'Caribic', c_pfx)
+    if not get_col_name(substance, 'Caribic', c_pfx) or int_subs not in data.columns:
+        int_subs = choose_column(data, substance)
+
+    detr = False
+    if 'detr_'+ int_subs  in data.columns: 
+        int_subs = 'detr_' + int_subs
+        print(int_subs)
+        detr = True
+
+    # height relative to tropopauses
+    if 'int_pt_rel_dTP_K [K]' in data.columns: H_rel_TP = 'int_pt_rel_dTP_K [K]'
+    elif 'int_CARIBIC2_H_rel_TP [km]' in data.columns: H_rel_TP = 'int_CARIBIC2_H_rel_TP [km]'
+    else: 
+        try: H_rel_TP = get_coord_name('h_rel_tp', 'Caribic', c_pfx)
+        except: H_rel_TP = choose_column(data, 'h_rel_tp')
+
+    min_y, max_y = np.nanmin(data[H_rel_TP].values), np.nanmax(data[H_rel_TP].values)
 
     nbins = (max_y - min_y) / bsize
     y_array = min_y + np.arange(nbins) * bsize + bsize * 0.5
 
     data['season'] = C_tools.make_season(data.index.month) # 1 = spring etc
-    dict_season = {'name_1': 'spring-MAM', 'name_2': 'summer-JJA', 'name_3': 'autumn-SON', 'name_4': 'winter-DJF',
+    dict_season = {'name_1': 'MAM, spring', 'name_2': 'JJA, summer', 'name_3': 'SON, autumn', 'name_4': 'DJF, winter',
                    'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
 
     for s in set(data['season'].tolist()):
         df = data.loc[data['season'] == s]
-
-        y_values = df.geometry.y # df[f'int_pt_rel_thermtp_k'].values # equivalent latitude
-        x_values = df[f'detr_{substance}'].values
+        y_values = df[H_rel_TP].values # df[eq_lat_col].values # 
+        x_values = df[int_subs].values
         dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
 
-    plt.figure(dpi=200)
+    fig, ax = plt.subplots(dpi=200)
 
     x_min = np.nan
     x_max = np.nan
@@ -79,19 +96,23 @@ def plot_gradient_by_season(data, substance, tropopause='therm', errorbars=False
     plt.tick_params(direction='in', top=True, right=True)
 
     plt.ylim([min_y, max_y])
+    plt.ylabel('$\Delta \Theta$) [K]')
+    plt.xlabel(f'{int_subs[4:]}')
+    if detr: plt.xlabel('$\Delta$' + int_subs.split("_")[-1])
 
-    x_min = np.floor(x_min)
-    x_max = np.ceil(x_max)
+    x_min, x_max = np.floor(x_min), np.ceil(x_max)
     plt.xlim([x_min, x_max])
+    # ax.hlines(0, x_min, x_max, color='gray', ls='dashed', label = 'Thermal tropopause', zorder=2, lw=0.5) 
     plt.legend()
     plt.show()
 
-#%% Plot gradient by Season
+#%% Fct calls 
 if __name__=='__main__':
-    c_df = Caribic(range(2005, 2021)).df
-    ref_data = Mauna_Loa(range(2005, 2020)).df
-    plot_gradient_by_season(c_df, 'SF6 [ppt]')
+    caribic_int2 = Caribic(range(2005, 2021), pfxs=['INT2'], subst = 'n2o')
+    c_n2o_col = get_col_name('n2o', source='Caribic', c_pfx = 'INT2')
 
-    # same result for detrend bc we're looking at the gradient
-    c_df_detr = detrend_substance(c_df, 'SF6 [ppt]', ref_data, 'SF6catsMLOm')
-    plot_gradient_by_season(c_df_detr, 'SF6 [ppt]')
+    ref_data = Mauna_Loa(range(2005, 2020), 'n2o').df
+    c_df_detr = detrend_substance(caribic_int2.df, c_n2o_col, ref_data, 'N2OcatsMLOm')
+
+    for subs in ['o3', 'noy', 'co2', 'ch4', 'no', 'co', 'n2o']:
+        plot_gradient_by_season(c_df_detr, subs)
