@@ -13,7 +13,9 @@ from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
 from time_lag import calc_time_lags, plot_time_lags
 
 from gradients import plot_gradient_by_season
-from filter_outliers import get_fct_substance, get_lin_fit, pre_flag, filter_strat_trop, filter_trop_outliers
+from aux_fctns import get_lin_fit
+from filter_outliers import pre_flag, filter_strat_trop, filter_trop_outliers
+from dictionaries import get_fct_substance, get_col_name
 from detrend import detrend_substance
 
 #%% Get data
@@ -29,6 +31,7 @@ caribic_ghg = Caribic(year_range)
 c_ghg_df = caribic_ghg.df
 
 caribic_int = Caribic(year_range, pfxs = ['INT', 'INT2'])
+c_int_df = caribic_int.df
 
 mhd = Mace_Head() # only 2012 data available
 
@@ -41,6 +44,12 @@ mlo_n2o.plot()
 caribic_ghg.plot_scatter()
 caribic_ghg.plot_1d()
 caribic_ghg.plot_2d()
+
+c_int_subst = get_col_name('co', source='Caribic', c_pfx='INT')
+caribic_int.plot_scatter(c_int_subst)
+caribic_int.plot_1d(c_int_subst)
+caribic_int.plot_2d(c_int_subst)
+plot_gradient_by_season(c_int_df, c_int_subst)
 
 mhd.plot()
 
@@ -100,5 +109,4 @@ data_detr = detrend_substance(c_ghg_df, 'SF6 [ppt]', mlo_sf6_df, 'SF6catsMLOm')
 
 #%% Plot gradients 
 plot_gradient_by_season(c_ghg_df, 'SF6 [ppt]')
-# same result for detrend bc we're looking at the gradient
 plot_gradient_by_season(data_detr, 'SF6 [ppt]')

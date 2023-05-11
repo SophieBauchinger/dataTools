@@ -15,9 +15,10 @@ pd.options.mode.chained_assignment = None  # default='warn' - otherwise df[j] = 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
+from aux_fctns import get_lin_fit
 from data_classes import Caribic, Mauna_Loa# , Mozart, Mace_Head
 from time_lag import calc_time_lags, plot_time_lags
-from aux_fctns import get_fct_substance, get_col_name, get_lin_fit
+from dictionaries import get_fct_substance, get_col_name
 
 from toolpac.outliers import outliers
 from toolpac.outliers import ol_fit_functions as fct
