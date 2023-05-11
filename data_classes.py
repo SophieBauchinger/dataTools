@@ -34,7 +34,7 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning, module=
 # Note: Flights [340, 344, 346, 360, 364, 400, 422, 424, 440, 442, 444, 446, 467] have the wrong day saved
 
 #%% GLobal data
-class global_data(object):
+class GlobalData(object):
     """
     Global data that can be averaged on longitude / latitude grid
     Choose years, size of the grid and adjust the colormap settings
@@ -369,7 +369,7 @@ class global_data(object):
             plt.show()
         return
 
-class Caribic(global_data):
+class Caribic(GlobalData):
     """ CARIBIC data, plotting, averaging """
 
     def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None,
@@ -393,7 +393,7 @@ class Caribic(global_data):
             return df
         except: print('No data found for Flight {nr}'); return
 
-class Mozart(global_data):
+class Mozart(GlobalData):
     """
     Class attributes:
         years: arr
@@ -454,7 +454,7 @@ class Mozart(global_data):
         return
 
 #%% Local data
-class local_data(object):
+class LocalData(object):
     """ Defines structure for ground-based station data """
     def __init__(self, years, data_Day=False, substance='sf6'):
         self.years = years
@@ -585,7 +585,7 @@ class local_data(object):
         fig.autofmt_xdate()
         plt.show()
 
-class Mauna_Loa(local_data):
+class Mauna_Loa(LocalData):
     """ Mauna Loa data, plotting, averaging """
     def __init__(self, years, substance='sf6', data_Day = False, 
                  path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
@@ -606,7 +606,7 @@ class Mauna_Loa(local_data):
             try: self.df_monthly_mean = monthly_mean(self.df_Day)
             except: pass
 
-class Mace_Head(local_data):
+class Mace_Head(LocalData):
     """ Mauna Loa data, plotting, averaging """
     def __init__(self, years=[2012], substance='sf6', data_Day = False, 
                  path =  r'C:\Users\sophie_bauchinger\sophie_bauchinger\misc_data\MHD-medusa_2012.dat'):
