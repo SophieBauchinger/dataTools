@@ -21,7 +21,7 @@ from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch
 
 from aux_fctns import monthly_mean
-from dictionaries import get_col_name, get_vlims, get_default_unit
+from dictionaries import get_col_name, get_vlims, get_default_unit, choose_column
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
@@ -29,39 +29,49 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning, module=
 #%% GlobalData
 def plot_scatter_global(global_data, substance=None, single_yr=None):
     if global_data.source=='Caribic':
-        if substance is None: substance = global_data.substance
-        if single_yr is not None: 
-            df = global_data.select_year(single_yr)
+        for pfx in global_data.pfxs:
+            df = global_data.data[pfx]
+
+            if single_yr is not None: 
+                df = df[df.index.year == single_yr]
+    
             df_mm = monthly_mean(df).notna()
-        else: df = global_data.df; df_mm = global_data.df_monthly_mean
 
-        # Plot mixing ratio msmts and monthly mean
-        fig, ax = plt.subplots(dpi=250)
-        plt.title(f'{global_data.source} {global_data.substance_short.upper()} measurements')
-        ymin = np.nanmin(df[substance])
-        ymax = np.nanmax(df[substance])
+            if substance is None: # LOOP THROUGH ALL SUBSTANCES
+                subs_list = [subs for subs in global_data.data[f'{pfx}_dict'].keys()]
+                substance = global_data.substance
+            if substance not in df.columns:
+                substance = choose_column(df, substance)
+            print(pfx, substance)
+    
+            # Plot mixing ratio msmts and monthly mean
+            fig, ax = plt.subplots(dpi=250)
+            plt.title(f'{global_data.source} {pfx} {substance} measurements')
+            ymin = np.nanmin(df[substance])
+            ymax = np.nanmax(df[substance])
+    
+            cmap = plt.cm.viridis_r
+            extend = 'neither'
+            if global_data.v_limits: vmin, vmax = global_data.v_limits# ; extend = 'both'
+            else: vmin = ymin; vmax = ymax
+            norm = Normalize(vmin, vmax)
+    
+            plt.scatter(df.index, df[substance],
+                        label=f'{global_data.substance_short.upper()} {global_data.years}', marker='x', zorder=1,
+                        c = df[substance],
+                        cmap = cmap, norm = norm)
 
-        cmap = plt.cm.viridis_r
-        extend = 'neither'
-        if global_data.v_limits: vmin, vmax = global_data.v_limits# ; extend = 'both'
-        else: vmin = ymin; vmax = ymax
-        norm = Normalize(vmin, vmax)
+            for i, mean in enumerate(df_mm[substance]):
+                y,m = df_mm.index[i].year, df_mm.index[i].month
+                xmin, xmax = dt.datetime(y, m, 1), dt.datetime(y, m, monthrange(y, m)[1])
+                ax.hlines(mean, xmin, xmax, color='black',
+                          linestyle='dashed', zorder=2)
 
-        plt.scatter(df.index, df[substance],
-                    label=f'{global_data.substance_short.upper()} {global_data.years}', marker='x', zorder=1,
-                    c = df[substance],
-                    cmap = cmap, norm = norm)
-        for i, mean in enumerate(df_mm[substance]):
-            y,m = df_mm.index[i].year, df_mm.index[i].month
-            xmin, xmax = dt.datetime(y, m, 1), dt.datetime(y, m, monthrange(y, m)[1])
-            ax.hlines(mean, xmin, xmax, color='black',
-                      linestyle='dashed', zorder=2)
-        plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
-        plt.ylabel(f'{global_data.substance_short.upper()} mixing ratio [ppt]')
-        plt.ylim(ymin-0.15, ymax+0.15)
-        fig.autofmt_xdate()
-        if hasattr(global_data, 'pfxs'): ax.text(0,0, f'{global_data.pfxs}', verticalalignment='top')
-        plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+            plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
+            plt.ylabel(f'{substance}')
+            plt.ylim(ymin-0.15, ymax+0.15)
+            fig.autofmt_xdate()
+            plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
 
     elif global_data.source=='Mozart':
         global_data.plot_1d(substance, single_yr)
@@ -277,9 +287,9 @@ def plot_local(local_data_obj, substance=None, greyscale=True, v_limits = (6,9))
     plt.show()
 
 #%% 
-if __name__=='__main__':
-    from data_classes import Caribic
-    caribic = Caribic([2005])
-    plot_scatter_global(caribic)
-    plot_global_binned_1d(caribic)
-    plot_global_binned_2d(caribic)
+# if __name__=='__main__':
+#     from data_classes import Caribic
+#     caribic = Caribic([2005])
+#     plot_scatter_global(caribic)
+#     plot_global_binned_1d(caribic)
+#     plot_global_binned_2d(caribic)

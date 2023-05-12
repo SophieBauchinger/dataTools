@@ -61,21 +61,19 @@ class GlobalData(object):
         If Mozart: Create dataset from given file
             if remap_lon, longiture is remapped to ±180 degrees
         """
-        gdf = geopandas.GeoDataFrame() # initialise GeoDataFrame
         if self.source=='Caribic':
-            self.data = {}
+            self.data = {} # easiest way of keeping info which file the data comes from
             parent_dir = r'E:\CARIBIC\Caribic2data'
 
-            # all_dfs = {}
             for pfx in c_pfxs: # can include different prefixes here too
-
+                gdf_pfx = geopandas.GeoDataFrame()
                 for yr in self.years:
                     if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
                         self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year if there's no data
                         if verbose: print(f'No data found for {yr} in {self.source}. Removing {yr} from list of years')
                         continue
 
-                    print(f'Reading in Caribic data for {yr}. Prefix: {pfx}')
+                    print(f'Reading Caribic - {pfx} - {yr}')
 
                     # Collect data from individual flights for current year
                     df_yr = pd.DataFrame()
@@ -92,13 +90,13 @@ class GlobalData(object):
                         df_flight = f_data.df # index = Datetime
                         df_flight.insert(0, 'Flight number',
                                        [flight_nr for i in range(df_flight.shape[0])])
-                        if len(c_pfxs)>1: df_flight.insert(1, 'Prefix', [pfx for i in range(df_flight.shape[0])]) # add pfx column if more than one prefix given
 
                         # for some years, substances are in lower case rather than upper. need to adjust to combine them
                         new_names, col_dict = rename_columns(df_flight.columns)
                         df_flight.rename(columns = col_dict, inplace=True) # set names to the short version
                         df_yr = pd.concat([df_yr, df_flight])
 
+                    print(df_yr.columns())
                     # Convert longitude and latitude into geometry objects -> GeoDataFrame
                     geodata = [Point(lat, lon) for lon, lat in zip(
                         df_yr['LON [deg]'],
@@ -111,22 +109,20 @@ class GlobalData(object):
                         del_column_names = [gdf_yr.filter(regex='^'+c.upper()).columns[0] for c in filter_cols] # upper bc renamed those columns
                         gdf_yr.drop(del_column_names, axis=1, inplace=True)
 
-                    gdf = pd.concat([gdf, gdf_yr]) # hopefully also merges names....
+                    gdf_pfx = pd.concat([gdf_pfx, gdf_yr]) # hopefully also merges names....
 
-                if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return
+                if gdf_pfx.empty: print("Data extraction unsuccessful. Please check your input data"); return
 
-                # self.column_dict = col_dict
-                self.data[pfx] = gdf
+                # Remove dropped columns from dictionary 
+                print(col_dict.keys())
+                pop_cols = [i for i in col_dict.keys() if i not in gdf_pfx.columns]
+                print(pop_cols)
+                for key in pop_cols: col_dict.pop(key)
+
+                self.data[pfx] = gdf_pfx
                 self.data[f'{pfx}_dict'] = col_dict
 
-                # if pfx == 'GHG': self.df_GHG = gdf
-                # elif pfx == 'INT': self.df_INT = gdf
-                # elif pfx == 'INT2': self.df_INT2 = gdf
-                # elif pfx not in ['GHG', 'INT', 'INT2'] and len(c_pfxs)>1 : self.df = gdf; print(f'Setting df to {pfx}')
-
-            # if len(c_pfxs) == 1: self.df = gdf #!!! Need to change my code to reflect the other prefix things
-            # else: print(f'df is ambiguous. Set to {self.pfxs[0]}'); self.df = gdf
-            return # all_dfs, col_dict
+            return self.data
 
         elif self.source=='Mozart':
             with xr.open_dataset(mozart_file) as ds:
@@ -149,7 +145,7 @@ class GlobalData(object):
 
             return ds # xr.concat(datasets, dim = 'time')
 
-    def binned_1d(self, substance=None, single_yr=None):
+    def binned_1d(self, substance=None, single_yr=None, c_pfx=None):
         """
         Returns 1D binned objects for each year as lists (lat / lon)
         Parameters:
@@ -161,11 +157,14 @@ class GlobalData(object):
         if single_yr is not None: years = [int(single_yr)]
         else: years = self.years
 
-        for yr in years: # loop through available years if possible
-            try: df = self.df[self.df.index.year == yr]
-            except: df = self.df
+        if c_pfx is not None: df = self.data[c_pfx] # for Caribic, need to choose the df
+        else: df = self.df 
 
-            if not any(self.df[self.df.index.year == yr][substance].notna()): continue # check for "empty" data array
+        for yr in years: # loop through available years if possible
+            try: df = df[df.index.year == yr]
+            except: df = df
+
+            if not any(df[df.index.year == yr][substance].notna()): continue # check for "empty" data array
             if df.empty: continue # go on to next year
 
             x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
@@ -184,7 +183,7 @@ class GlobalData(object):
 
         return out_x_list, out_y_list
 
-    def binned_2d(self, substance=None, single_yr=None):
+    def binned_2d(self, substance=None, single_yr=None, c_pfx=None):
         """
         Returns 2D binned object for each year as a list
         Parameters:
@@ -196,11 +195,14 @@ class GlobalData(object):
         if single_yr is not None: years = [int(single_yr)]
         else: years = self.years
 
-        for yr in years: # loop through available years if possible
-            try: df = self.df[self.df.index.year == yr]
-            except: df = self.df
+        if c_pfx is not None: df = self.data[c_pfx] # for Caribic, need to choose the df
+        else: df = self.df 
 
-            if not any(self.df[self.df.index.year == yr][substance].notna()): continue
+        for yr in years: # loop through available years if possible
+            try: df = df[df.index.year == yr]
+            except: df = df
+
+            if not any(df[df.index.year == yr][substance].notna()): continue
             if df[substance].empty: continue
 
             x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
@@ -218,26 +220,23 @@ class GlobalData(object):
 class Caribic(GlobalData):
     """ CARIBIC data, plotting, averaging """
 
-    def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None,
-               subst='sf6', pfxs=['GHG'], verbose=False):
-        super().__init__([yr for yr in years if yr > 2004], grid_size, v_limits) # no caribic data before 2005, takes too long to check
+    def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None, # subst='sf6', 
+               pfxs=['GHG'], verbose=False):
+        super().__init__([yr for yr in years if yr > 2004], grid_size, v_limits) # no caribic data before 2005, takes too long to actually check so cheesing it
         self.source = 'Caribic'; self.source_print = 'CAR'
-        self.substance_short = subst
         self.pfxs = pfxs
-        self.substance = get_col_name(self.substance_short, self.source, self.pfxs[0]) # default substance
+
+        # self.substance_short = subst
+        # self.substance = get_col_name(self.substance_short, self.source, self.pfxs[0]) # default substance
 
         self.get_data(pfxs, verbose=verbose)
-        # self.df, self.column_dict = self.get_data(pfxs, verbose=verbose)
+        if flight_nr: self.select_flight()
 
-        if flight_nr: self.df = self.df[self.df.values == flight_nr]
-        if hasattr(self, 'df') : self.df_monthly_mean = monthly_mean(self.df)
-
-    def select_flight(self, nr):
+    def select_flight(self, flight_nr):
         """ Returns dataframe for selected flight only """
-        try:
-            df = self.df[self.df["Flight_nr"] == nr]
-            return df
-        except: print('No data found for Flight {nr}'); return
+        for pfx, df in self.data.items():
+            try: self.data[pfx] = df[df.values == flight_nr]
+            except: print('No {pfx} data found for Flight {flight_nr}')
 
 class Mozart(GlobalData):
     """
@@ -249,7 +248,6 @@ class Mozart(GlobalData):
         df: Pandas GeoDataFrame
         x: arr, latitude
         y: arr, longitude (remapped to +-180 deg)
-        SF6: Pandas DataSeries of SF6 mixing ratios
     """
 
     def __init__(self, years, grid_size=5, v_limits=None):
@@ -366,9 +364,9 @@ class Mace_Head(LocalData):
 if __name__=='__main__':
     c_years = np.arange(2005, 2020)
     # caribic = Caribic(c_years)
-    caribic = Caribic(c_years, subst='co2', pfxs = ['GHG', 'INT', 'INT2'])
-    # caribic_int2 = Caribic(c_years, subst='n2o', pfxs = ['INT2'])
+    caribic = Caribic(c_years, pfxs = ['GHG', 'INT', 'INT2'])
     # caribic_int = Caribic(c_years, subst='co2', pfxs = ['INT'])
+    # caribic_int2 = Caribic(c_years, subst='n2o', pfxs = ['INT2'])
 
     mzt_years = np.arange(2000, 2020)
     mozart = Mozart(years=mzt_years)

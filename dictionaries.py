@@ -40,11 +40,18 @@ def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
             'no2': 'NO2 [ppb]',
             'co' : 'CO [ppm]',
             'co2': 'CO2 [ppb]',
-            'ch4': 'CH4 [ppb]',
-            }
+            'ch4': 'CH4 [ppb]'}
 
     elif source=='Caribic' and c_pfx=='INT': # caribic / int
         col_names = {
+            # CH4 [ppb]
+            # d_CH4 [ppb]
+            # CO2 [ppm]
+            # d_CO2 [ppm]
+            # N2O [ppb]
+            # d_N2O [ppb]
+            # SF6 [ppt]
+            # d_SF6 [ppt]
             'co' : 'int_CO [ppb]',
             'o3' : 'int_O3 [ppb]',
             'h2o': 'int_H2O_gas [ppm]',
@@ -64,6 +71,14 @@ def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
 
     elif source=='Caribic' and c_pfx=='INT2': # caribic / int2
         col_names = {
+            # CH4 [ppb]
+            # d_CH4 [ppb]
+            # CO2 [ppm]
+            # d_CO2 [ppm]
+            # N2O [ppb]
+            # d_N2O [ppb]
+            # SF6 [ppt]
+            # d_SF6 [ppt]
             'noy': 'int_CARIBIC2_NOy [ppbv]',
             'no' : 'int_CARIBIC2_NO [ppbv]',
             'ch4': 'int_CLaMS_CH4 [ppb]',

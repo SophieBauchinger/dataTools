@@ -71,7 +71,7 @@ def rename_columns(columns):
         elif not x=='p': val_names[i] = x.upper() # not making p uppercase, only subst names
     
     new_names = [v+u for v,u in zip(val_names, units)] # coloumn names with corrected case, in correct order
-    dictionary = dict(zip([x for x in columns if len(x.split(";")) >= 3], new_names))
+    dictionary = dict(zip(new_names, [x for x in columns if len(x.split(";")) >= 3])) # eg. 'CH4 [ppb]' : 'CH4; CH4 mixing ratio; [ppb]\n', 'd_CH4; absolute precision of CH4; [ppb]\n'
 
     return new_names, dictionary
     
