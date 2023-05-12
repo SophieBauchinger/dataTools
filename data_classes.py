@@ -63,9 +63,10 @@ class GlobalData(object):
         """
         gdf = geopandas.GeoDataFrame() # initialise GeoDataFrame
         if self.source=='Caribic':
+            self.data = {}
             parent_dir = r'E:\CARIBIC\Caribic2data'
 
-            all_dfs = {}
+            # all_dfs = {}
             for pfx in c_pfxs: # can include different prefixes here too
 
                 for yr in self.years:
@@ -114,16 +115,18 @@ class GlobalData(object):
 
                 if gdf.empty: print("Data extraction unsuccessful. Please check your input data"); return
 
-                self.column_dict = col_dict
-                all_dfs[pfx] = gdf
+                # self.column_dict = col_dict
+                self.data[pfx] = gdf
+                self.data[f'{pfx}_dict'] = col_dict
 
-                if pfx == 'GHG': self.df_GHG = gdf
-                elif pfx == 'INT': self.df_INT = gdf
-                elif pfx == 'INT2': self.df_INT2 = gdf
+                # if pfx == 'GHG': self.df_GHG = gdf
+                # elif pfx == 'INT': self.df_INT = gdf
+                # elif pfx == 'INT2': self.df_INT2 = gdf
+                # elif pfx not in ['GHG', 'INT', 'INT2'] and len(c_pfxs)>1 : self.df = gdf; print(f'Setting df to {pfx}')
 
-            if len(c_pfxs) == 1: self.df = gdf #!!! Need to change my code to reflect the other prefix things
-            else: print(f'df is ambiguous. Set to {self.pfxs[0]}'); self.df = gdf
-            return all_dfs, col_dict
+            # if len(c_pfxs) == 1: self.df = gdf #!!! Need to change my code to reflect the other prefix things
+            # else: print(f'df is ambiguous. Set to {self.pfxs[0]}'); self.df = gdf
+            return # all_dfs, col_dict
 
         elif self.source=='Mozart':
             with xr.open_dataset(mozart_file) as ds:
@@ -362,10 +365,10 @@ class Mace_Head(LocalData):
 #%% Fctn calls
 if __name__=='__main__':
     c_years = np.arange(2005, 2020)
-    caribic = Caribic(c_years)
+    # caribic = Caribic(c_years)
     caribic = Caribic(c_years, subst='co2', pfxs = ['GHG', 'INT', 'INT2'])
-    caribic_int2 = Caribic(c_years, subst='n2o', pfxs = ['INT2'])
-    caribic_int = Caribic(c_years, subst='co2', pfxs = ['INT'])
+    # caribic_int2 = Caribic(c_years, subst='n2o', pfxs = ['INT2'])
+    # caribic_int = Caribic(c_years, subst='co2', pfxs = ['INT'])
 
     mzt_years = np.arange(2000, 2020)
     mozart = Mozart(years=mzt_years)
@@ -375,7 +378,6 @@ if __name__=='__main__':
     mlo_n2o = Mauna_Loa(mlo_years, substance='n2o')
 
     mhd = Mace_Head() # 2012
-
 
 #%%
     # def plot_scatter(self, substance=None, single_yr=None):
