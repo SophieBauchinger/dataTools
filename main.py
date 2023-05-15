@@ -57,7 +57,7 @@ mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
 
 # loop through years of caribic data
 for c_year in range(2005, 2022):
-    c_data = caribic_ghg.select_year(c_year)
+    c_data = caribic.data['GHG'].select_year(c_year)
     if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
         continue
     else:
@@ -71,7 +71,7 @@ for c_year in range(2005, 2022):
 data_filtered = pd.DataFrame() # initialise full dataframe
 for c_year in range(2005, 2022): 
     print(f'{c_year}')
-    c_data = caribic_ghg.select_year(c_year)
+    c_data = caribic.data['GHG'].select_year(c_year)
     # print('cols:', c_data.columns)
 
     crit = 'n2o'; n2o_filtered = pd.DataFrame()
