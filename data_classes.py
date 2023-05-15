@@ -43,10 +43,14 @@ class GlobalData(object):
         self.substances = None # list of substances to use for plotting etc
         self.source = None
 
-    def select_year(self, yr):
+    def select_year(self, yr, df=None):
         """ Returns dataframe of selected year only """
-        try: return self.df[self.df.index.year == yr]
+        if hasattr(self, df): df = self.df
+        elif df == 'None': print('Invalid operation. Cannot find a valid dataframe'); return
+
+        try: return df[df.index.year == yr]
         except: print(f'No data found for {yr} in {self.source}'); return
+        
 
     def get_data(self, c_pfxs=['GHG'], remap_lon=True,
                  mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
@@ -92,11 +96,10 @@ class GlobalData(object):
                                        [flight_nr for i in range(df_flight.shape[0])])
 
                         # for some years, substances are in lower case rather than upper. need to adjust to combine them
-                        new_names, col_dict = rename_columns(df_flight.columns)
-                        df_flight.rename(columns = col_dict, inplace=True) # set names to the short version
+                        new_names, col_dict, col_dict_rev = rename_columns(df_flight.columns)
+                        df_flight.rename(columns = col_dict_rev, inplace=True) # set names to the short version
                         df_yr = pd.concat([df_yr, df_flight])
 
-                    print(df_yr.columns())
                     # Convert longitude and latitude into geometry objects -> GeoDataFrame
                     geodata = [Point(lat, lon) for lon, lat in zip(
                         df_yr['LON [deg]'],
@@ -114,9 +117,7 @@ class GlobalData(object):
                 if gdf_pfx.empty: print("Data extraction unsuccessful. Please check your input data"); return
 
                 # Remove dropped columns from dictionary 
-                print(col_dict.keys())
                 pop_cols = [i for i in col_dict.keys() if i not in gdf_pfx.columns]
-                print(pop_cols)
                 for key in pop_cols: col_dict.pop(key)
 
                 self.data[pfx] = gdf_pfx
