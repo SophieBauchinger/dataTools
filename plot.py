@@ -27,23 +27,19 @@ from dictionaries import get_col_name, get_vlims, get_default_unit, choose_colum
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
 #%% GlobalData
-def plot_scatter_global(global_data, substance=None, single_yr=None):
+def plot_scatter_global(global_data, subs, single_yr=None, verbose=False):
+    substance = get_col_name(subs, global_data.source)
+
     if global_data.source=='Caribic':
         for pfx in global_data.pfxs:
             df = global_data.data[pfx]
+            if substance not in df.columns: 
+                if verbose: print(f'No {substance} values to plot in {pfx}')
+                continue
 
-            if single_yr is not None: 
-                df = df[df.index.year == single_yr]
-    
+            if single_yr is not None: df = df[df.index.year == single_yr]
             df_mm = monthly_mean(df).notna()
 
-            if substance is None: # LOOP THROUGH ALL SUBSTANCES
-                subs_list = [subs for subs in global_data.data[f'{pfx}_dict'].keys()]
-                substance = global_data.substance
-            if substance not in df.columns:
-                substance = choose_column(df, substance)
-            print(pfx, substance)
-    
             # Plot mixing ratio msmts and monthly mean
             fig, ax = plt.subplots(dpi=250)
             plt.title(f'{global_data.source} {pfx} {substance} measurements')
@@ -57,7 +53,7 @@ def plot_scatter_global(global_data, substance=None, single_yr=None):
             norm = Normalize(vmin, vmax)
     
             plt.scatter(df.index, df[substance],
-                        label=f'{global_data.substance_short.upper()} {global_data.years}', marker='x', zorder=1,
+                        label=f'{substance.upper()} {min(df.index.year), max(df.index.year)}', marker='x', zorder=1,
                         c = df[substance],
                         cmap = cmap, norm = norm)
 
@@ -76,7 +72,7 @@ def plot_scatter_global(global_data, substance=None, single_yr=None):
     elif global_data.source=='Mozart':
         global_data.plot_1d(substance, single_yr)
 
-def plot_global_binned_1d(global_data, substance=None, single_yr=None, plot_mean=False, single_graph=False):
+def plot_global_binned_1d(global_data, subs, single_yr=None, plot_mean=False, single_graph=False, c_pfx=None):
     """
     Plots 1D averaged values over latitude / longitude including colormap 
     Parameters:
@@ -85,11 +81,12 @@ def plot_global_binned_1d(global_data, substance=None, single_yr=None, plot_mean
         plot_mean (bool): choose whether to plot the overall average over all years
         single_graph (bool): choose whether to plot all years on one graph
     """
-    if substance is None: substance = global_data.substance
+    substance = get_col_name(subs, global_data.source)
+
     if single_yr is not None: years = [int(single_yr)]
     else: years = global_data.years
 
-    out_x_list, out_y_list = global_data.binned_1d(substance, single_yr)
+    out_x_list, out_y_list = global_data.binned_1d(substance, single_yr, c_pfx)
 
     if not single_graph:
         # Plot mixing ratios averages over lats / lons for each year separately
@@ -150,14 +147,15 @@ def plot_global_binned_1d(global_data, substance=None, single_yr=None, plot_mean
         plt.show()
     return
 
-def plot_global_binned_2d(global_data, substance=None, single_yr=None):
+def plot_global_binned_2d(global_data, subs, single_yr=None):
     """
     Create a 2D plot of binned mixing ratios for each available year.
     Parameters:
         substance (str): if None, plots default substance for the object
         single_yr (int): if specified, plots only data for that year [default=None]
     """
-    if substance is None: substance = global_data.substance
+    substance = get_col_name(subs, global_data.source)
+
     if single_yr is not None: years = [int(single_yr)]
     else: years = global_data.years
     out_list = global_data.binned_2d(substance, single_yr)
@@ -187,18 +185,19 @@ def plot_global_binned_2d(global_data, substance=None, single_yr=None):
     return
 
 # Mozart
-def plot_1d_LonLat(mzt_obj, lon_values = [10, 60, 120, 180],
+def plot_1d_LonLat(mzt_obj, subs='sf6',
+                   lon_values = [10, 60, 120, 180],
                    lat_values = [70, 30, 0, -30, -70],
-                   single_yr=None, substance=None):
+                   single_yr=None):
     """ 
     Plots mixing ratio with fixed lon/lat over lats/lons side-by-side 
     Parameters:
         lon_values (list of ints): longitude values to average over
         lat_values (list of ints): latitude values to average over
-        substance (str): if None, plots default substance for the object
+        substance (str): e.g. 'sf6'
         single_yr (int): if specified, plots only data for that year [default=None]
     """
-    if substance is None: substance = mzt_obj.substance
+    substance = get_col_name(subs, mzt_obj.source)
     if single_yr is not None: years = [int(single_yr)]
     else: years = mzt_obj.years
 

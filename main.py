@@ -25,28 +25,25 @@ year_range = range(1980, 2021)
 mlo_sf6 = Mauna_Loa(year_range)
 mlo_n2o = Mauna_Loa(year_range, substance='n2o')
 
-caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
 
 mhd = Mace_Head() # only 2012 data available
 
 mzt = Mozart(year_range) # only available up to 2008
 
 #%% Plot data
-mlo_sf6.plot()
-mlo_n2o.plot()
+plot_scatter_global(caribic, subs='sf6')
+plot_global_binned_1d(caribic, subs='sf6', c_pfx='GHG')
+plot_global_binned_2d(caribic, subs='sf6', c_pfx='GHG')
 
-plot_scatter_global(caribic)
-plot_global_binned_1d(caribic)
-plot_global_binned_2d(caribic)
+plot_scatter_global(mzt, subs='sf6')
+plot_global_binned_1d(mzt, 'sf6')
+plot_global_binned_2d(mzt, 'sf6')
+plot_1d_LonLat(mzt, 'sf6')
 
-plot_scatter_global(mzt)
-plot_global_binned_1d(mzt)
-plot_global_binned_2d(mzt)
-plot_1d_LonLat(mzt)
-
-plot_local(mlo_sf6)
-plot_local(mlo_n2o)
-plot_local(mhd)
+plot_local(mlo_sf6, 'sf6')
+plot_local(mlo_n2o, 'n2o')
+plot_local(mhd, 'sf6')
 
 #%% Time lags
 # Get and prep reference data 
@@ -97,7 +94,6 @@ data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'], source='Caribic
 
 #%% Detrend
 # for now only have mlo data for n2o and sf6, so can only detrend those 
-
 sf6_detr = detrend_substance(caribic, 'sf6', mlo_sf6.df)
 n2o_detr = detrend_substance(caribic, 'n2o', mlo_n2o.df)
 

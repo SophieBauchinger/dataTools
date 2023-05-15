@@ -39,10 +39,6 @@ class GlobalData(object):
         self.grid_size = grid_size
         self.v_limits = v_limits # colorbar normalisation limits
 
-        self.substance = None
-        self.substances = None # list of substances to use for plotting etc
-        self.source = None
-
     def select_year(self, yr, df=None):
         """ Returns dataframe of selected year only """
         if hasattr(self, df): df = self.df
@@ -51,7 +47,6 @@ class GlobalData(object):
         try: return df[df.index.year == yr]
         except: print(f'No data found for {yr} in {self.source}'); return
         
-
     def get_data(self, c_pfxs=['GHG'], remap_lon=True,
                  mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
                  verbose=False):
@@ -146,19 +141,20 @@ class GlobalData(object):
 
             return ds # xr.concat(datasets, dim = 'time')
 
-    def binned_1d(self, substance=None, single_yr=None, c_pfx=None):
+    def binned_1d(self, subs, single_yr=None, c_pfx=None):
         """
         Returns 1D binned objects for each year as lists (lat / lon)
         Parameters:
-            substance (str): if None, use default substance for the object
+            substance (str): e.g. 'sf6'
             single_yr (int): if specified, use only data for that year [default=None]
         """
+        substance = get_col_name(subs, self.source)
+
         out_x_list, out_y_list = [], []
-        if substance is None: substance = self.substance
         if single_yr is not None: years = [int(single_yr)]
         else: years = self.years
 
-        if c_pfx is not None: df = self.data[c_pfx] # for Caribic, need to choose the df
+        if self.source == 'Caribic': df = self.data[c_pfx] # for Caribic, need to choose the df
         else: df = self.df 
 
         for yr in years: # loop through available years if possible
@@ -184,19 +180,20 @@ class GlobalData(object):
 
         return out_x_list, out_y_list
 
-    def binned_2d(self, substance=None, single_yr=None, c_pfx=None):
+    def binned_2d(self, subs, single_yr=None, c_pfx=None):
         """
         Returns 2D binned object for each year as a list
         Parameters:
             substance (str): if None, uses default substance for the object
             single_yr (int): if specified, uses only data for that year [default=None]
         """
+        substance = get_col_name(subs, self.source)
+
         out_list = []
-        if substance is None: substance = self.substance
         if single_yr is not None: years = [int(single_yr)]
         else: years = self.years
 
-        if c_pfx is not None: df = self.data[c_pfx] # for Caribic, need to choose the df
+        if self.source == 'Caribic': df = self.data[c_pfx] # for Caribic, need to choose the df
         else: df = self.df 
 
         for yr in years: # loop through available years if possible
@@ -364,16 +361,13 @@ class Mace_Head(LocalData):
 #%% Fctn calls
 if __name__=='__main__':
     c_years = np.arange(2005, 2020)
-    # caribic = Caribic(c_years)
     caribic = Caribic(c_years, pfxs = ['GHG', 'INT', 'INT2'])
-    # caribic_int = Caribic(c_years, subst='co2', pfxs = ['INT'])
-    # caribic_int2 = Caribic(c_years, subst='n2o', pfxs = ['INT2'])
 
     mzt_years = np.arange(2000, 2020)
     mozart = Mozart(years=mzt_years)
 
     mlo_years = np.arange(2000, 2020)
-    mlo = Mauna_Loa(mlo_years, data_Day = True)
+    mlo_sf6 = Mauna_Loa(mlo_years, data_Day = True)
     mlo_n2o = Mauna_Loa(mlo_years, substance='n2o')
 
     mhd = Mace_Head() # 2012
