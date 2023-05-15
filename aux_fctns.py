@@ -57,9 +57,7 @@ def ds_to_gdf(ds):
     return gdf
 
 def rename_columns(columns):
-    """ Get new column names and col_name_dict for AMES data structure 
-    #!!! int_CARIBIC2_CO; CO; Carbon monoxide mixing ratio; [ppbv]; [ppbv]
-    """
+    """ Get new column names and col_name_dict for AMES data structure """
     # get val_name from start of the line, then unit from last part
     val_names = [x.split(";")[0] for x in columns if len(x.split(";")) >= 3] # columns with short; long; unit
     units = [x.split(";")[-1][:-1] for x in columns if len(x.split(";")) >= 3] # get last part [unit] with [-1], then remove \n with [:-1]
@@ -72,9 +70,9 @@ def rename_columns(columns):
     
     new_names = [v+u for v,u in zip(val_names, units)] # coloumn names with corrected case, in correct order
     dictionary = dict(zip(new_names, [x for x in columns if len(x.split(";")) >= 3])) # eg. 'CH4 [ppb]' : 'CH4; CH4 mixing ratio; [ppb]\n', 'd_CH4; absolute precision of CH4; [ppb]\n'
+    dictionary_reversed = dict(zip([x for x in columns if len(x.split(";")) >= 3], new_names))
 
-    return new_names, dictionary
-    
+    return new_names, dictionary, dictionary_reversed
 
 def same_merge(x): return ','.join(x[x.notnull()].astype(str))
 def same_col_merge(df):
