@@ -25,19 +25,6 @@ from toolpac.outliers import ol_fit_functions as fct
 from toolpac.outliers.outliers import get_no_nan# , fit_data
 from toolpac.conv.times import datetime_to_fractionalyear #, fractionalyear_to_datetime
 
-#%% Outliers
-if __name__=='__main__':
-    ol_data = {}
-    years = range(2008, 2010)
-    c_data = Caribic(years)
-    for y in years: # Caribic
-        for dir_val in ['np', 'p', 'n']:
-            data = c_data.select_year(y)
-            sf6_mxr = data['SF6 [ppt]']
-            ol = outliers.find_ol(fct.simple, data.index, sf6_mxr, None, None, 
-                                  plot=True, limit=0.1, direction = dir_val)
-            ol_data.update({f'{y}_{dir_val}' : ol})
-
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
 
 def pre_flag(data, data_col, t_obs_tot, ref_fit, limit = 0.97, crit='n2o', verbose=False):
@@ -153,12 +140,25 @@ def filter_trop_outliers(data, substance_list, source='Caribic'):
 
 #%% Get data
 if __name__=='__main__':
+    calc_caribic = False
+    if calc_caribic: 
+        caribic = Caribic(range(2005, 2021), pfxs = ['GHG', 'INT', 'INT2'])
+
     mlo_df = Mauna_Loa(range(2008, 2020)).df
     n2o_df = Mauna_Loa(range(2008, 2020), substance = 'n2o').df
     
-    caribic_data = Caribic(range(2005, 2020))
-    c_df = caribic_data.df
-
+#%% Test outlier identification
+if __name__=='__main__':
+    ol_data = {}
+    df = caribic.data['GHG']
+    for yr in range(2008, 2019):
+        df[df.index.year == yr]
+        for dir_val in ['np', 'p', 'n']:
+            sf6_mxr = df[get_col_name()]
+            ol = outliers.find_ol(fct.simple, df.index, sf6_mxr, None, None,
+                                  plot=True, limit=0.1, direction = dir_val)
+            ol_data.update({f'{yr}_{dir_val}' : ol})
+    
 #%% Time lags
 if __name__=='__main__':
     # Get and prep reference data 

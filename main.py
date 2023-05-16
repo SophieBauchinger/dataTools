@@ -4,18 +4,15 @@ Created on Thu Apr 27 15:56:59 2023
 
 @author: sophie_bauchinger
 """
-import numpy as np
 import pandas as pd
 
 from toolpac.outliers.outliers import get_no_nan
 
 from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
-from time_lag import calc_time_lags, plot_time_lags
+from time_lag import calc_time_lags
 
 from gradients import plot_gradient_by_season
-from aux_fctns import get_lin_fit
-from filter_outliers import pre_flag, filter_strat_trop, filter_trop_outliers
-from dictionaries import get_fct_substance, get_col_name
+from filter_outliers import filter_strat_trop, filter_trop_outliers
 from detrend import detrend_substance
 from plot import plot_scatter_global, plot_global_binned_1d, plot_global_binned_2d, plot_1d_LonLat, plot_local
 
@@ -24,6 +21,7 @@ year_range = range(1980, 2021)
 
 mlo_sf6 = Mauna_Loa(year_range)
 mlo_n2o = Mauna_Loa(year_range, substance='n2o')
+mlo_co2 = Mauna_Loa(year_range, substance='co2')
 
 caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
 
@@ -45,27 +43,19 @@ plot_local(mlo_sf6, 'sf6')
 plot_local(mlo_n2o, 'n2o')
 plot_local(mhd, 'sf6')
 
-#%% Time lags
-# Get and prep reference data 
-ref_min, ref_max = 2003, 2020
-mlo_MM = Mauna_Loa(range(ref_min, ref_max)).df
-mlo_MM.resample('1M') # add rows for missing months, filled with NaN 
-mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
+#%% Time lags - lags are added to dictionary caribic.lags as lags_pfx : dataframe
+calc_time_lags(caribic, mlo_sf6, range(2005, 2020), substance = 'sf6', plot=False)
+calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', pfx='INT2', plot=False)
 
-# loop through years of caribic data
-for c_year in range(2005, 2022):
-    c_data = caribic.data['GHG'].select_year(c_year)
-    if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
-        continue
-    else:
-        lags = calc_time_lags(c_data, mlo_MM)
-        if all(np.isnan(np.array(lags))): 
-            print(f'no lags calculated for {c_year}'); continue
-        plot_time_lags(c_data, lags, ref_min, ref_max)
+calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', plot=False)
+calc_time_lags(caribic, mlo_co2, range(2005, 2020), substance = 'co2', pfx='INT2', plot=False)
 
 #%% Get stratosphere / troposphere flags based on n2o mixing ratio
+
+
+
 # loop through years of caribic data
-data_filtered = pd.DataFrame() # initialise full dataframe
+data_filtered = pd.DataFrame() # initialise new dataframe
 for c_year in range(2005, 2022): 
     print(f'{c_year}')
     c_data = caribic.data['GHG'].select_year(c_year)
