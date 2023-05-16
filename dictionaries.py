@@ -92,8 +92,8 @@ def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
         col_names = {
             'sf6': 'SF6catsMLOm',
             'n2o': 'N2OcatsMLOm',
-            'co2': 'CO2catsMLOm',
-            'ch4': 'CH4catsMLOm'}
+            'co2': 'co2 [ppm]',
+            'ch4': 'ch4 [ppb]'}
 
     elif source=='Mace_Head': # mace head
         col_names={'sf6': 'SF6 [ppt]',

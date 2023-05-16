@@ -46,7 +46,7 @@ class GlobalData(object):
 
         try: return df[df.index.year == yr]
         except: print(f'No data found for {yr} in {self.source}'); return
-        
+
     def get_data(self, c_pfxs=['GHG'], remap_lon=True,
                  mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
                  verbose=False):
@@ -282,8 +282,10 @@ class LocalData(object):
             df = pd.DataFrame(mlo_data, columns=title, dtype=float)
 
             # get names of year and month column (depends on substance)
-            yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
-            mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
+            if self.data_format == 'CATS': 
+                yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
+                mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
+            elif self.data_format == 'ccgg': yr_col = 'year'; mon_col = 'month'
 
             # keep only specified years
             df = df.loc[df[yr_col] > min(self.years)-1].loc[df[yr_col] < max(self.years)+1].reset_index()
@@ -293,13 +295,20 @@ class LocalData(object):
                 time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
                 df = df.drop(day_col, axis=1) # get rid of day column
             else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])]
-            df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
+            if self.data_format == 'CATS': df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
+            elif self.data_format == 'ccgg': 
+                filter_cols = ['index', 'site_code', 'year', 'month', 'day', 'hour', 'minute', 'second', 'time_decimal', 'latitude', 'longitude', 'altitude', 'elevation', 'intake_height', 'qcflag']
+                df.drop(filter_cols, axis=1, inplace=True)
+                df.dropna(how='any', subset='value', inplace=True)
+                unit_dic = {'co2':'[ppm]', 'ch4' : '[ppb]'}
+                df.rename(columns = {'value' : f'{self.substance} {unit_dic[self.substance]}', 'value_std_dev' : f'{self.substance}_std_dev {unit_dic[self.substance]}'}, inplace=True)
+
             df.astype(float)
             df['Date_Time'] = time
             df.set_index('Date_Time', inplace=True) # make the datetime object the new index
-
-            try: df.dropna(how='any', subset=str(self.substance.upper()+'catsMLOm'), inplace=True)
-            except: print('didnt drop na. ', str(self.substance.upper()+'catsMLOm'))
+            if self.data_format == 'CATS':
+                try: df.dropna(how='any', subset=str(self.substance.upper()+'catsMLOm'), inplace=True)
+                except: print('didnt drop NA. ', str(self.substance.upper()+'catsMLOm'))
             return df
 
         elif self.source == 'Mace_Head': # make col names with space (like caribic)
@@ -329,20 +338,25 @@ class Mauna_Loa(LocalData):
                  path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, substance)
-        self.years = years
         self.source = 'Mauna_Loa'; self.source_print = 'MLO'
         self.substance = substance
 
-        fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
-        self.df = self.get_data(path_dir+fname_MM)
+        if substance in ['sf6', 'n2o']:
+            self.data_format = 'CATS'
+            fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
+            self.df = self.get_data(path_dir+fname_MM)
+    
+            self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
+            if data_Day: # user input saying if daily data should exist
+                fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
+                self.df_Day = self.get_data(path_dir + fname_Day)
+                try: self.df_monthly_mean = monthly_mean(self.df_Day)
+                except: pass
 
-
-        self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
-        if data_Day: # user input saying if daily data should exist
-            fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
-            self.df_Day = self.get_data(path_dir + fname_Day)
-            try: self.df_monthly_mean = monthly_mean(self.df_Day)
-            except: pass
+        if substance in ['co2', 'ch4']:
+            self.data_format = 'ccgg'
+            fname = r'\{}_mlo_surface-insitu_1_ccgg_MonthlyData.txt'.format(self.substance)
+            self.df = self.get_data(path_dir+fname)
 
 class Mace_Head(LocalData):
     """ Mauna Loa data, plotting, averaging """
@@ -369,283 +383,6 @@ if __name__=='__main__':
     mlo_years = np.arange(2000, 2020)
     mlo_sf6 = Mauna_Loa(mlo_years, data_Day = True)
     mlo_n2o = Mauna_Loa(mlo_years, substance='n2o')
+    mlo_co2 = Mauna_Loa(range(2000, 2010), 'co2')
 
     mhd = Mace_Head() # 2012
-
-#%%
-    # def plot_scatter(self, substance=None, single_yr=None):
-    #     if self.source=='Caribic':
-    #         if substance is None: substance = self.substance
-    #         if single_yr is not None:
-    #             df = self.select_year(single_yr)
-    #             df_mm = monthly_mean(df).notna()
-    #         else: df = self.df; df_mm = self.df_monthly_mean
-
-    #         # Plot mixing ratio msmts and monthly mean
-    #         fig, ax = plt.subplots(dpi=250)
-    #         plt.title(f'{self.source} {self.substance_short.upper()} measurements')
-    #         if hasattr(self, 'pfxs'): plt.title(f'{self.source} {self.substance_short.upper()} measurements {self.pfxs}')
-    #         ymin = np.nanmin(df[substance])
-    #         ymax = np.nanmax(df[substance])
-
-    #         cmap = plt.cm.viridis_r
-    #         extend = 'neither'
-    #         if self.v_limits: vmin, vmax = self.v_limits# ; extend = 'both'
-    #         else: vmin = ymin; vmax = ymax
-    #         norm = Normalize(vmin, vmax)
-
-    #         plt.scatter(df.index, df[substance],
-    #                     # label=f'{self.substance_short.upper()} {self.years}',
-    #                     marker='x', zorder=1,
-    #                     c = df[substance],
-    #                     cmap = cmap, norm = norm)
-    #         for i, mean in enumerate(df_mm[substance]):
-    #             y,m = df_mm.index[i].year, df_mm.index[i].month
-    #             xmin, xmax = dt.datetime(y, m, 1), dt.datetime(y, m, monthrange(y, m)[1])
-    #             ax.hlines(mean, xmin, xmax, color='black',
-    #                       linestyle='dashed', zorder=2)
-    #         plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
-    #         plt.ylabel(f'{substance}')
-    #         plt.ylim(ymin-0.15, ymax+0.15)
-    #         fig.autofmt_xdate()
-
-    #         plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
-
-    #     elif self.source=='Mozart':
-    #         self.plot_1d(substance, single_yr)
-
-    # def plot_1d(self, substance=None, single_yr=None, plot_mean=False, single_graph=False):
-    #     """
-    #     Plots 1D averaged values over latitude / longitude including colormap
-    #     Parameters:
-    #         substance (str): if None, plots default substance for the object
-    #         single_yr (int): if specified, plots only data for that year [default=None]
-    #         plot_mean (bool): choose whether to plot the overall average over all years
-    #         single_graph (bool): choose whether to plot all years on one graph
-    #     """
-    #     if substance is None: substance = self.substance
-    #     if single_yr is not None: years = [int(single_yr)]
-    #     else: years = self.years
-
-    #     out_x_list, out_y_list = self.binned_1d(substance, single_yr)
-
-    #     if not single_graph:
-    #         # Plot mixing ratios averages over lats / lons for each year separately
-    #         for out_x, out_y, year in zip(out_x_list, out_y_list, years):
-    #             fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-    #             fig.suptitle('{} {} modeled SF$_6$ concentration. Gridsize={}'.format(
-    #                 self.source, year, self.grid_size))
-
-    #             cmap = plt.cm.viridis_r
-    #             if self.v_limits: vmin, vmax = self.v_limits
-    #             else:
-    #                 vmin = min([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
-    #                 vmax = max([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
-    #             norm = Normalize(vmin, vmax) # allows mapping colormap onto available values
-
-    #             ax[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
-    #             ax[0].scatter(out_x.xintm, out_x.vmean, # plot across latitude
-    #                           c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
-    #             ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-    #             ax[0].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-
-    #             ax[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
-    #             ax[1].scatter(out_y.xintm, out_y.vmean, # plot across longitude
-    #                           c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
-    #             ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
-    #             ax[1].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
-
-    #             fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax[1])
-    #             plt.show()
-
-    #     if single_graph:
-    #         # Plot averaged mixing ratios for all years on one graph
-    #         fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-    #         fig.suptitle(f'{self.source} {self.years[0]} - {self.years[-1]} modeled {substance} mixing ratio. Gridsize={self.grid_size}')
-
-    #         cmap = cm.get_cmap('plasma_r')
-    #         vmin, vmax = self.years[0], self.years[-1]
-    #         norm = Normalize(vmin, vmax)
-
-    #         for out_x, out_y, year in zip(out_x_list, out_y_list, self.years): # add each year to plot
-    #             ax[0].plot(out_x.xintm, out_x.vmean, label=year)#, c = cmap(norm(year)))
-    #             ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-    #             ax[0].set_ylabel(f'Mean {substance} mixing ratio [ppt]')
-
-    #             ax[1].plot(out_y.xintm, out_y.vmean, label=year)# , c = cmap(norm(year)))
-    #             ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
-    #             ax[1].set_ylabel(f'Mean {substance} mixing ratio [ppt]')
-
-    #         if plot_mean: # add average over available years to plot
-    #             total_x_vmean = np.mean([i.vmean for i in out_x_list], axis=0)
-    #             total_y_vmean = np.mean([i.vmean for i in out_y_list], axis=0)
-    #             ax[0].plot(out_x.xintm, total_x_vmean, label='Mean', c = 'k', ls ='dashed')
-    #             ax[1].plot(out_y.xintm, total_y_vmean, label='Mean', c = 'k', ls ='dashed')
-
-    #         handles, labels = ax[0].get_legend_handles_labels()
-    #         plt.legend(reversed(handles), reversed(labels), # reversed so that legend aligns with graph
-    #                    bbox_to_anchor=(1,1), loc='upper left')
-    #         plt.show()
-    #     return
-
-    # def plot_2d(self, substance=None, single_yr=None):
-    #     """
-    #     Create a 2D plot of binned mixing ratios for each available year.
-    #     Parameters:
-    #         substance (str): if None, plots default substance for the object
-    #         single_yr (int): if specified, plots only data for that year [default=None]
-    #     """
-    #     if substance is None: substance = self.substance
-    #     if single_yr is not None: years = [int(single_yr)]
-    #     else: years = self.years
-    #     out_list = self.binned_2d(substance, single_yr)
-
-    #     for out, yr in zip(out_list, years):
-    #         plt.figure(dpi=300, figsize=(8,3.5))
-    #         plt.gca().set_aspect('equal')
-
-    #         cmap = plt.cm.viridis_r # create colormap
-    #         if self.v_limits: vmin, vmax = self.v_limits # set colormap limits
-    #         else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
-    #         norm = Normalize(vmin, vmax) # normalise color map to set limits
-
-    #         world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-    #         world.boundary.plot(ax=plt.gca(), color='black', linewidth=0.3)
-
-    #         plt.imshow(out.vmean, cmap = cmap, norm=norm, origin='lower',  # plot values
-    #                    extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
-    #         cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical') # colorbar
-    #         cbar.ax.set_xlabel('Mean SF$_6$ [ppt]')
-
-    #         plt.title('{} {} SF$_6$ concentration measurements. Gridsize={}'.format(
-    #             self.source, yr, self.grid_size))
-    #         plt.xlabel('Longitude  [degrees east]'); plt.xlim(-180,180)
-    #         plt.ylabel('Latitude [degrees north]'); plt.ylim(-60,100)
-    #         plt.show()
-    #     return
-
-
-    # def plot_1d_LonLat(self, lon_values = [10, 60, 120, 180],
-    #                    lat_values = [70, 30, 0, -30, -70],
-    #                    single_yr=None, substance=None):
-    #     """
-    #     Plots mixing ratio with fixed lon/lat over lats/lons side-by-side
-    #     Parameters:
-    #         lon_values (list of ints): longitude values to average over
-    #         lat_values (list of ints): latitude values to average over
-    #         substance (str): if None, plots default substance for the object
-    #         single_yr (int): if specified, plots only data for that year [default=None]
-    #     """
-    #     if substance is None: substance = self.substance
-    #     if single_yr is not None: years = [int(single_yr)]
-    #     else: years = self.years
-
-    #     out_x_list, out_y_list = self.binned_1d(substance, single_yr)
-
-    #     for out_x, out_y, year in zip(out_x_list, out_y_list, years):
-    #         fig, (ax1, ax2) = plt.subplots(dpi=250, ncols=2, figsize=(9,5), sharey=True)
-    #         fig.suptitle(f'MOZART {year} SF$_6$ at fixed longitudes / latitudes', size=17)
-    #         self.ds.SF6.sel(time = year, longitude=lon_values,
-    #                         method='nearest').plot.line(x = 'latitude', ax=ax1)
-    #         ax1.plot(out_x.xintm, out_x.vmean, c='k', ls='dashed', label='average')
-
-    #         self.ds.SF6.sel(time = year, latitude=lat_values,
-    #                         method="nearest").plot.line(x = 'longitude', ax=ax2)
-    #         ax2.plot(out_y.xintm, out_y.vmean, c='k', ls='dashed', label='average')
-
-    #         ax1.set_title(''); ax2.set_title('')
-    #         ax2.set_ylabel('')
-    #         plt.show()
-
-    #     return
-
-
-    # def plot(self, substance=None, greyscale=True, v_limits = (6,9)):
-    #     """
-    #     Plot all available data as timeseries
-    #     Parameters:
-    #         substance (str): specify substance (optional)
-    #         greyscale (bool): toggle plotting in greyscale or viridis colormap
-    #         v_limits (tuple(int, int)): change limits for colormap
-    #     """
-    #     if greyscale: colors = {'day':lcm(['grey']), 'msmts': lcm(['silver'])} # defining monoscale colormap for greyscale plots
-    #     else: colors = {'msmts':plt.cm.viridis_r, 'day': plt.cm.viridis_r}
-
-    #     if not substance: substance = self.substance
-    #     col_name = get_col_name(substance, self.source)
-    #     vmin, vmax = get_vlims(substance)
-    #     norm = Normalize(vmin, vmax)
-    #     dflt_unit = get_default_unit(substance)
-
-    #     # Plot all available info on one graph
-    #     fig, ax = plt.subplots(figsize = (5,3.5), dpi=250)
-    #     # Measurement data
-    #     plt.scatter(self.df.index, self.df[col_name], c=self.df[col_name], zorder=0,
-    #                     cmap=colors['msmts'], norm=norm, marker='+',
-    #                     label=f'{self.source_print} {substance.upper()}')
-
-    #     # Daily mean
-    #     if not self.df_Day.empty: # check if there is data in the daily df
-    #         plt.scatter(self.df_Day.index, self.df_Day[col_name], c = self.df_Day[col_name],
-    #                     cmap=colors['day'], norm=norm, marker='+', zorder=2,
-    #                     label=f'{self.source_print} {substance.upper()} (D)')
-
-    #     # Monthly mean
-    #     if not self.df_monthly_mean.empty: # check for data in the monthly df
-    #         for i, mean in enumerate(self.df_monthly_mean[col_name]): # plot monthly mean
-    #             y, m = self.df_monthly_mean.index[i].year, self.df_monthly_mean.index[i].month
-    #             xmin = dt.datetime(y, m, 1)
-    #             xmax = dt.datetime(y, m, monthrange(y, m)[1])
-    #             ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
-    #         ax.hlines(mean, xmin, xmax, color='black', ls='dashed',
-    #                   label=f'{self.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
-
-    #     plt.ylabel(f'{self.substance.upper()} mixing ratio [{dflt_unit}]')
-    #     plt.xlim(min(self.df.index), max(self.df.index))
-    #     plt.xlabel('Time')
-
-    #     from matplotlib.patches import Patch
-
-    #     if not greyscale:
-    #         plt.colorbar(sm(norm=norm, cmap=colors['day']), aspect=50, ax=ax, extend='neither')
-
-    #     # Slightly weird code to create a legend showing the range of the colormap)
-    #     handles, labels = ax.get_legend_handles_labels()
-    #     step = 0.2
-    #     pa = [ Patch(fc=colors['msmts'](norm(v))) for v in np.arange(vmin, vmax, step)]
-    #     pb = [ Patch(fc=colors['day'](norm(v))) for v in np.arange(vmin, vmax, step)]
-    #     pc = [ Patch(fc='black') for v in np.arange(vmin, vmax, step)]
-
-    #     h = [] # list of handles
-    #     for a, b, c in zip(pa, pb, pc): # need to do this to have them in the right order
-    #         h.append(a); h.append(b); h.append(c)
-    #     l = [''] * (len(h) - len(labels)) + labels # needed to have multiple color patches for one proper label
-    #     ax.legend(handles=h, labels=l, ncol=len(h)/3, handletextpad=1/(len(h)/2)+0.2, handlelength=0.15, columnspacing=-0.3)
-
-    #     fig.autofmt_xdate()
-    #     plt.show()
-
-
-# from calendar import monthrange
-# import matplotlib.cm as cm
-# import matplotlib.pyplot as plt
-# from matplotlib.colors import Normalize
-# from matplotlib.cm import ScalarMappable as sm
-# from matplotlib.colors import ListedColormap as lcm
-# supress a gui backend userwarning, not really advisible
-# import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
-
-# caribic_int = Caribic(c_years, grid_size, v_limits, pfxs=['INT'])
-
-    # caribic.plot_scatter()
-    # caribic.plot_scatter(single_yr=2014)
-    # caribic.plot_1d()
-    # caribic.plot_2d()
-    # mozart.plot_1d()
-    # mozart.plot_2d()
-    # lon_values = [0, 10, 50, 120, 150]
-    # lat_values = [70, 30, 0, -30, -70]
-    # mozart.plot_1d_LonLat(lon_values, lat_values)
-    # mlo.plot()
-    # mlo_n2o.plot()
-    # mhd.plot()
