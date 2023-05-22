@@ -103,7 +103,7 @@ def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
         col_names = {'sf6': 'SF6'}
 
     try: cname = col_names[substance.lower()]
-    except: print(f'Column name not found for {substance} in {source}'); return None
+    except: print(f'Column name not found for {substance} in {source} ({c_pfx})'); return None
     return cname
 
 def get_coord_name(coord, source, c_pfx='INT', CLaMS=True):
