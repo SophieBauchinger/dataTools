@@ -148,7 +148,7 @@ class GlobalData(object):
             substance (str): e.g. 'sf6'
             single_yr (int): if specified, use only data for that year [default=None]
         """
-        substance = get_col_name(subs, self.source)
+        substance = get_col_name(subs, self.source, c_pfx)
 
         out_x_list, out_y_list = [], []
         if single_yr is not None: years = [int(single_yr)]
@@ -187,7 +187,7 @@ class GlobalData(object):
             substance (str): if None, uses default substance for the object
             single_yr (int): if specified, uses only data for that year [default=None]
         """
-        substance = get_col_name(subs, self.source)
+        substance = get_col_name(subs, self.source, c_pfx)
 
         out_list = []
         if single_yr is not None: years = [int(single_yr)]

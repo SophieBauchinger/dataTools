@@ -27,12 +27,14 @@ from dictionaries import get_col_name, get_vlims, get_default_unit, choose_colum
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
 #%% GlobalData
-def plot_scatter_global(global_data, subs, single_yr=None, verbose=False):
-    substance = get_col_name(subs, global_data.source)
+def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False):
+    substance = get_col_name(subs, glob_obj.source)
 
-    if global_data.source=='Caribic':
-        for pfx in global_data.pfxs:
-            df = global_data.data[pfx]
+    if glob_obj.source=='Caribic':
+        for pfx in glob_obj.pfxs:
+            substance = get_col_name(subs, glob_obj.source, pfx)
+
+            df = glob_obj.data[pfx]
             if substance not in df.columns: 
                 if verbose: print(f'No {substance} values to plot in {pfx}')
                 continue
@@ -42,13 +44,13 @@ def plot_scatter_global(global_data, subs, single_yr=None, verbose=False):
 
             # Plot mixing ratio msmts and monthly mean
             fig, ax = plt.subplots(dpi=250)
-            plt.title(f'{global_data.source} {pfx} {substance} measurements')
+            plt.title(f'{glob_obj.source} {pfx} {substance} measurements')
             ymin = np.nanmin(df[substance])
             ymax = np.nanmax(df[substance])
     
             cmap = plt.cm.viridis_r
             extend = 'neither'
-            if global_data.v_limits: vmin, vmax = global_data.v_limits# ; extend = 'both'
+            if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits# ; extend = 'both'
             else: vmin = ymin; vmax = ymax
             norm = Normalize(vmin, vmax)
     
@@ -69,10 +71,13 @@ def plot_scatter_global(global_data, subs, single_yr=None, verbose=False):
             fig.autofmt_xdate()
             plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
 
-    elif global_data.source=='Mozart':
-        global_data.plot_1d(substance, single_yr)
+    elif glob_obj.source=='Mozart':
+        #!!! ugly implementation but using the grid size setting to plot all data points individually
+        glob_obj.grid_size=1
+        plot_global_binned_1d(glob_obj, subs)
+        glob_obj.grid_size=1
 
-def plot_global_binned_1d(global_data, subs, single_yr=None, plot_mean=False, single_graph=False, c_pfx=None):
+def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, single_graph=False, c_pfx=None):
     """
     Plots 1D averaged values over latitude / longitude including colormap 
     Parameters:
@@ -81,22 +86,22 @@ def plot_global_binned_1d(global_data, subs, single_yr=None, plot_mean=False, si
         plot_mean (bool): choose whether to plot the overall average over all years
         single_graph (bool): choose whether to plot all years on one graph
     """
-    substance = get_col_name(subs, global_data.source)
+    # substance = subs # get_col_name(subs, global_data.source, c_pfx)
 
     if single_yr is not None: years = [int(single_yr)]
-    else: years = global_data.years
+    else: years = glob_obj.years
 
-    out_x_list, out_y_list = global_data.binned_1d(substance, single_yr, c_pfx)
+    out_x_list, out_y_list = glob_obj.binned_1d(subs, single_yr, c_pfx)
 
     if not single_graph:
         # Plot mixing ratios averages over lats / lons for each year separately
         for out_x, out_y, year in zip(out_x_list, out_y_list, years):
             fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
             fig.suptitle('{} {} modeled SF$_6$ concentration. Gridsize={}'.format(
-                global_data.source, year, global_data.grid_size))
+                glob_obj.source, year, glob_obj.grid_size))
 
             cmap = plt.cm.viridis_r
-            if global_data.v_limits: vmin, vmax = global_data.v_limits
+            if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits
             else:
                 vmin = min([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
                 vmax = max([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
@@ -120,20 +125,20 @@ def plot_global_binned_1d(global_data, subs, single_yr=None, plot_mean=False, si
     if single_graph:
         # Plot averaged mixing ratios for all years on one graph
         fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-        fig.suptitle(f'{global_data.source} {global_data.years[0]} - {global_data.years[-1]} modeled {substance} mixing ratio. Gridsize={global_data.grid_size}')
+        fig.suptitle(f'{glob_obj.source} {glob_obj.years[0]} - {glob_obj.years[-1]} modeled {subs.upper()} mixing ratio. Gridsize={glob_obj.grid_size}')
 
         cmap = cm.get_cmap('plasma_r')
-        vmin, vmax = global_data.years[0], global_data.years[-1]
+        vmin, vmax = glob_obj.years[0], glob_obj.years[-1]
         norm = Normalize(vmin, vmax)
 
-        for out_x, out_y, year in zip(out_x_list, out_y_list, global_data.years): # add each year to plot
+        for out_x, out_y, year in zip(out_x_list, out_y_list, glob_obj.years): # add each year to plot
             ax[0].plot(out_x.xintm, out_x.vmean, label=year)#, c = cmap(norm(year)))
             ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-            ax[0].set_ylabel(f'Mean {substance} mixing ratio [ppt]')
+            ax[0].set_ylabel(f'Mean {subs.upper()} mixing ratio [ppt]')
 
             ax[1].plot(out_y.xintm, out_y.vmean, label=year)# , c = cmap(norm(year)))
             ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
-            ax[1].set_ylabel(f'Mean {substance} mixing ratio [ppt]')
+            ax[1].set_ylabel(f'Mean {subs.upper()} mixing ratio [ppt]')
 
         if plot_mean: # add average over available years to plot
             total_x_vmean = np.mean([i.vmean for i in out_x_list], axis=0)
@@ -147,25 +152,25 @@ def plot_global_binned_1d(global_data, subs, single_yr=None, plot_mean=False, si
         plt.show()
     return
 
-def plot_global_binned_2d(global_data, subs, single_yr=None):
+def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None):
     """
     Create a 2D plot of binned mixing ratios for each available year.
     Parameters:
         substance (str): if None, plots default substance for the object
         single_yr (int): if specified, plots only data for that year [default=None]
     """
-    substance = get_col_name(subs, global_data.source)
+    # substance = subs # get_col_name(subs, global_data.source, c_pfx)
 
     if single_yr is not None: years = [int(single_yr)]
-    else: years = global_data.years
-    out_list = global_data.binned_2d(substance, single_yr)
+    else: years = glob_obj.years
+    out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
 
     for out, yr in zip(out_list, years):
         plt.figure(dpi=300, figsize=(8,3.5))
         plt.gca().set_aspect('equal')
 
         cmap = plt.cm.viridis_r # create colormap
-        if global_data.v_limits: vmin, vmax = global_data.v_limits # set colormap limits
+        if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits # set colormap limits
         else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
         norm = Normalize(vmin, vmax) # normalise color map to set limits
 
@@ -177,8 +182,8 @@ def plot_global_binned_2d(global_data, subs, single_yr=None):
         cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical') # colorbar
         cbar.ax.set_xlabel('Mean SF$_6$ [ppt]')
 
-        plt.title('{} {} SF$_6$ concentration measurements. Gridsize={}'.format(
-            global_data.source, yr, global_data.grid_size))
+        plt.title('{} {} {} concentration measurements. Gridsize={}'.format(
+            subs.upper(), glob_obj.source, yr, glob_obj.grid_size))
         plt.xlabel('Longitude  [degrees east]'); plt.xlim(-180,180)
         plt.ylabel('Latitude [degrees north]'); plt.ylim(-60,100)
         plt.show()
@@ -197,15 +202,15 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
         substance (str): e.g. 'sf6'
         single_yr (int): if specified, plots only data for that year [default=None]
     """
-    substance = get_col_name(subs, mzt_obj.source)
+    # substance = get_col_name(subs, mzt_obj.source)
     if single_yr is not None: years = [int(single_yr)]
     else: years = mzt_obj.years
 
-    out_x_list, out_y_list = mzt_obj.binned_1d(substance, single_yr)
+    out_x_list, out_y_list = mzt_obj.binned_1d(subs, single_yr)
 
     for out_x, out_y, year in zip(out_x_list, out_y_list, years):
         fig, (ax1, ax2) = plt.subplots(dpi=250, ncols=2, figsize=(9,5), sharey=True)
-        fig.suptitle(f'MOZART {year} SF$_6$ at fixed longitudes / latitudes', size=17)
+        fig.suptitle(f'MOZART {year} {subs.upper()} at fixed longitudes / latitudes', size=17)
         mzt_obj.ds.SF6.sel(time = year, longitude=lon_values,
                         method='nearest').plot.line(x = 'latitude', ax=ax1)
         ax1.plot(out_x.xintm, out_x.vmean, c='k', ls='dashed', label='average')
@@ -222,7 +227,7 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
 
 #%% LocalData
 
-def plot_local(local_data_obj, substance=None, greyscale=True, v_limits = (6,9)):
+def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
     """ 
     Plot all available data as timeseries 
     Parameters:
@@ -233,8 +238,8 @@ def plot_local(local_data_obj, substance=None, greyscale=True, v_limits = (6,9))
     if greyscale: colors = {'day':lcm(['grey']), 'msmts': lcm(['silver'])} # defining monoscale colormap for greyscale plots
     else: colors = {'msmts':plt.cm.viridis_r, 'day': plt.cm.viridis_r} 
 
-    if not substance: substance = local_data_obj.substance
-    col_name = get_col_name(substance, local_data_obj.source)
+    if not substance: substance = loc_obj.substance
+    col_name = get_col_name(substance, loc_obj.source)
     vmin, vmax = get_vlims(substance)
     norm = Normalize(vmin, vmax)
     dflt_unit = get_default_unit(substance)
@@ -242,28 +247,28 @@ def plot_local(local_data_obj, substance=None, greyscale=True, v_limits = (6,9))
     # Plot all available info on one graph
     fig, ax = plt.subplots(figsize = (5,3.5), dpi=250)
     # Measurement data
-    plt.scatter(local_data_obj.df.index, local_data_obj.df[col_name], c=local_data_obj.df[col_name], zorder=0,
+    plt.scatter(loc_obj.df.index, loc_obj.df[col_name], c=loc_obj.df[col_name], zorder=0,
                     cmap=colors['msmts'], norm=norm, marker='+',
-                    label=f'{local_data_obj.source_print} {substance.upper()}')
+                    label=f'{loc_obj.source_print} {substance.upper()}')
     
     # Daily mean
-    if not local_data_obj.df_Day.empty: # check if there is data in the daily df
-        plt.scatter(local_data_obj.df_Day.index, local_data_obj.df_Day[col_name], c = local_data_obj.df_Day[col_name], 
+    if not loc_obj.df_Day.empty: # check if there is data in the daily df
+        plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[col_name], c = loc_obj.df_Day[col_name], 
                     cmap=colors['day'], norm=norm, marker='+', zorder=2,
-                    label=f'{local_data_obj.source_print} {substance.upper()} (D)')
+                    label=f'{loc_obj.source_print} {substance.upper()} (D)')
 
     # Monthly mean
-    if not local_data_obj.df_monthly_mean.empty: # check for data in the monthly df
-        for i, mean in enumerate(local_data_obj.df_monthly_mean[col_name]): # plot monthly mean
-            y, m = local_data_obj.df_monthly_mean.index[i].year, local_data_obj.df_monthly_mean.index[i].month
+    if not loc_obj.df_monthly_mean.empty: # check for data in the monthly df
+        for i, mean in enumerate(loc_obj.df_monthly_mean[col_name]): # plot monthly mean
+            y, m = loc_obj.df_monthly_mean.index[i].year, loc_obj.df_monthly_mean.index[i].month
             xmin = dt.datetime(y, m, 1)
             xmax = dt.datetime(y, m, monthrange(y, m)[1])
             ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
         ax.hlines(mean, xmin, xmax, color='black', ls='dashed', 
-                  label=f'{local_data_obj.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
+                  label=f'{loc_obj.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
 
-    plt.ylabel(f'{local_data_obj.substance.upper()} mixing ratio [{dflt_unit}]')
-    plt.xlim(min(local_data_obj.df.index), max(local_data_obj.df.index))
+    plt.ylabel(f'{loc_obj.substance.upper()} mixing ratio [{dflt_unit}]')
+    plt.xlim(min(loc_obj.df.index), max(loc_obj.df.index))
     plt.xlabel('Time')
     
     if not greyscale: 

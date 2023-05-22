@@ -27,25 +27,27 @@ from toolpac.conv.times import datetime_to_fractionalyear #, fractionalyear_to_d
 
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
 
-def pre_flag(data_obj, ref_obj, crit = 'n2o', limit = 0.97, pfx = 'GHG', verbose=False):
+def pre_flag(glob_obj, ref_obj, crit = 'n2o', limit = 0.97, pfx = 'GHG', verbose=False):
     """ 
     Returns df with new strato / tropo columns, and dataframe pre_flagged with results of pre-flagging 
 
     Parameters:
-        data_obj (GlobalData) : measurement data to be sorted into stratospheric or tropospheric air 
+        glob_obj (GlobalData) : measurement data to be sorted into stratospheric or tropospheric air 
         ref_obj (LocalData) : reference data to use for filtering (background)
         crit (str) : substance to use for flagging
         limit (float) : tracer mxr fraction below which air is classified as stratospheric 
         c_pref (str) : e.g. 'GHG', which dataframe to choose from 
     """
-    df = data_obj.data[pfx]
+    if glob_obj.source=='Caribic': df = glob_obj.data[pfx]
+    else: df = glob_obj.df
+
     df.assign(strato = np.nan, inplace = True)
     df.assign(tropo = np.nan, inplace = True)
     
     fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
-    t_obs_tot = np.array(datetime_to_fractionalyear(data_obj.data[pfx].index, method='exact'))
+    t_obs_tot = np.array(datetime_to_fractionalyear(df.index, method='exact'))
     
-    col_name = get_col_name(crit, data_obj.source)
+    col_name = get_col_name(crit, glob_obj.source)
     df.loc[df[col_name] < limit * fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
 
     df[f'{crit}_pre_flag'] = 0 
@@ -54,7 +56,7 @@ def pre_flag(data_obj, ref_obj, crit = 'n2o', limit = 0.97, pfx = 'GHG', verbose
     
     return df # , preflag_df
 
-def filter_strat_trop(data_obj, ref_obj, crit, source='Caribic', pfx='GHG', save=True):
+def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True):
     """ 
     Returns dataset with new bool columns 'strato' and 'tropo' 
     Reconstruction of filter_strat_trop from C_tools (T. Schuck)
@@ -67,8 +69,8 @@ def filter_strat_trop(data_obj, ref_obj, crit, source='Caribic', pfx='GHG', save
         crit: substance to be used for filtering, eg. n2o or sf6 [later maybe O3 und PV]
         save: whether to save the strat / trop filtered data in the dataframe
     """
-    data = pre_flag(data_obj, ref_obj, crit, pfx=pfx) # pre-flagging based on crit  # , preflag_df
-    col_name = get_col_name(crit, data_obj.source) # get column name
+    data = pre_flag(glob_obj, ref_obj, crit, pfx=pfx) # pre-flagging based on crit  # , preflag_df
+    col_name = get_col_name(crit, glob_obj.source, pfx) # get column name
     t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))  # find total observation time as fractional year for fctn calls below
     mxr = data[col_name] # measured n2o mixing ratios
     d_mxr = data[f'd_{col_name}']
@@ -88,15 +90,15 @@ def filter_strat_trop(data_obj, ref_obj, crit, source='Caribic', pfx='GHG', save
     df_strato = data[data['strato'] == True]; df_strato.drop(['tropo', 'strato'], axis=1, inplace=True)
 
     if save:
-        if not hasattr(data_obj, 'ol_filtered'): # initialise dict with trop / strat dataframes
-            data_obj.ol_filtered = {f'tropo_{crit}_{pfx}' : df_tropo, f'strato_{crit}_{pfx}' : df_strato} 
+        if not hasattr(glob_obj, 'ol_filtered'): # initialise dict with trop / strat dataframes
+            glob_obj.ol_filtered = {f'tropo_{crit}_{pfx}' : df_tropo, f'strato_{crit}_{pfx}' : df_strato} 
         else: # overwrite dataframes if they exist, otherwise create them
-            data_obj.ol_filtered[f'tropo_{crit}_{pfx}'] = df_tropo 
-            data_obj.ol_filtered[f'strato_{crit}_{pfx}'] = df_strato
+            glob_obj.ol_filtered[f'tropo_{crit}_{pfx}'] = df_tropo 
+            glob_obj.ol_filtered[f'strato_{crit}_{pfx}'] = df_strato
 
     return data
 
-def filter_trop_outliers(data_obj, substance_list, pfx):
+def filter_trop_outliers(glob_obj, substance_list, pfx):
     """ 
     After sorting data into stratospheric and tropospheric, now sort the 
     tropospheric data into outliers and non-outliers 
@@ -106,10 +108,10 @@ def filter_trop_outliers(data_obj, substance_list, pfx):
         source (str): source of msmt data, needed to get column name from substances
     """
     # take only tropospheric data 
-    data = data_obj.data[pfx]
+    data = glob_obj.data[pfx]
 
     for subs in substance_list:
-        subs = get_col_name(subs, data_obj.source) # get column name
+        subs = get_col_name(subs, glob_obj.source, pfx) # get column name
         if len(get_no_nan(data.index, data[subs], data[subs])[0]) < 1: # check for valid data
             print(f'no {subs} data'); continue
 
@@ -153,101 +155,28 @@ def filter_trop_outliers(data_obj, substance_list, pfx):
 
     return data_flag
 
-# def filter_trop_outliers(data, substance_list, source='Caribic'):
-#     """ 
-#     After sorting data into stratospheric and tropospheric, now sort the 
-#     tropospheric data into outliers and non-outliers 
-#     Parameters:
-#         data: pandas (geo)dataframe
-#         substance_list: list of strings, substances to receive flags
-#         source (str): source of msmt data, needed to get column name from substances
-#     """
-#     # take only tropospheric data 
-#     for subs in substance_list:
-        
-#         subs = get_col_name(subs, source) # get column name, default is from caribic
-#         if len(get_no_nan(data.index, data[subs], data[subs])[0]) < 1: # check for valid data
-#             print(f'no {subs} data'); continue
-
-#         try: func = get_fct_substance(subs)
-#         except: 
-#             print('No function found. Using 2nd order poly with simple harm')
-#             func = fct.simple
-
-#         data_flag = pd.DataFrame(data, columns=['flight', 'timecref', 'year', 'month', 'day', 'strato', 'tropo'])
-#         data_flag.columns = [f'fl_{x}' if x in substance_list else x for x in data_flag.columns]
-
-#         data_flag[f'ol_{subs}'] = np.nan # outlier ? 
-#         data_flag[f'ol_rel_{subs}'] = np.nan # 
-#         data_flag[f'fl_{subs}'] = 0 # flag
-
-#         # set all strato flags to a value != 0 to exclude them
-#         data_flag.loc[data['strato'] == True, f'fl_{subs}'] = -20
-
-#         time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-#         mxr = data[subs].tolist()
-#         if f'd_{subs}' in data.columns:
-#             d_mxr = data[f'd_{subs}'].tolist()
-#         else:    # case for integrated values of high resolution data
-#             d_mxr = None
-#         flag = data_flag[f'fl_{subs}'].tolist()
-#         tmp = outliers.find_ol(func, time, mxr, d_mxr, flag, direction='pn',
-#                                plot=True, limit=0.1)
-
-#         data_flag[f'fl_{subs}'] = tmp[0]  # flag
-#         data_flag[f'ol_{subs}'] = tmp[1]  # residual
-
-#         data_flag.loc[data_flag['strato'] == True, f'fl_{subs}'] = np.nan
-#         data_flag.loc[data_flag['strato'] == True, f'ol_{subs}'] = np.nan
-
-#         # no residual value for non-outliers
-#         data_flag.loc[data_flag[f'fl_{subs}'] == 0, f'ol_{subs}'] = np.nan
-
-#         fit_result = [func(t, *tmp[3]) for t in time]
-#         # print(len(fit_result), len(data_flag))
-#         data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result
-
-#     return data_flag
-
 #%% Get data
 if __name__=='__main__':
     calc_caribic = False
     if calc_caribic: 
         caribic = Caribic(range(2005, 2021), pfxs = ['GHG', 'INT', 'INT2'])
 
-    mlo_df = Mauna_Loa(range(2008, 2020)).df
-    n2o_df = Mauna_Loa(range(2008, 2020), substance = 'n2o').df
+    mlo_sf6 = Mauna_Loa(range(2008, 2020))
+    mlo_n2o = Mauna_Loa(range(2008, 2020), substance = 'n2o')
+    mlo_co2 = Mauna_Loa(range(2008, 2020), substance = 'co2')
     
-#%% Test outlier identification
-if __name__=='__main__':
-    ol_data = {}
-    df = caribic.data['GHG']
-    for yr in range(2008, 2019):
-        df[df.index.year == yr]
-        for dir_val in ['np', 'p', 'n']:
-            sf6_mxr = df[get_col_name()]
-            ol = outliers.find_ol(fct.simple, df.index, sf6_mxr, None, None,
-                                  plot=True, limit=0.1, direction = dir_val)
-            ol_data.update({f'{yr}_{dir_val}' : ol})
-    
-#%% Time lags
-# if __name__=='__main__':
-#     # Get and prep reference data 
-#     ref_min, ref_max = 2003, 2020
-#     mlo_MM = Mauna_Loa(range(ref_min, ref_max)).df
-#     mlo_MM.resample('1M') # add rows for missing months, filled with NaN 
-#     mlo_MM.interpolate(inplace=True) # linearly interpolate missing data
+    data_filtered_n2o = filter_strat_trop(caribic, mlo_sf6, 'n2o', 'INT2')
 
-#     # loop through years of caribic data
-#     for c_year in range(2005, 2022):
-#         c_data = caribic_data.select_year(c_year)
-#         if len(c_data[c_data['SF6 [ppt]'].notna()]) < 1: 
-#             continue
-#         else:
-#             lags = calc_time_lags(c_data, mlo_MM)
-#             if all(np.isnan(np.array(lags))): 
-#                 print(f'no lags calculated for {c_year}'); continue
-#             plot_time_lags(c_data, lags, ref_min, ref_max)
+    # Test outlier identification
+    # ol_data = {}
+    # df = caribic.data['GHG']
+    # for yr in range(2008, 2019):
+    #     df[df.index.year == yr]
+    #     for dir_val in ['np', 'p', 'n']:
+    #         sf6_mxr = df[get_col_name('sf6', 'Caribic')]
+    #         ol = outliers.find_ol(fct.simple, df.index, sf6_mxr, None, None,
+    #                               plot=True, limit=0.1, direction = dir_val)
+    #         ol_data.update({f'{yr}_{dir_val}' : ol})
 
 #%% Filter tropospheric and stratospheric data
 

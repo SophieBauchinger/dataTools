@@ -23,34 +23,31 @@ import C_tools
 # select_value=[0,0,0]
 # select_cf=['GT','GT', 'GT'] # operators 
 
-def plot_gradient_by_season(caribic, substance, c_pfx = 'INT2',
-                            tp='therm', errorbars=False, ycoord='pt', 
-                            bsize=0.5, ptsmin=5):
+def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', 
+                            errorbars=False, ycoord='pt', bsize=0.5, ptsmin=5):
     """ 
     Plotting gradient by season using 1D binned data 
     Parameters:
-        caribic: pandas (geo)dataframe, detrended
-        tropopause: str, which tropopause definition to use 
-        min_y, max_y: int, defines y range to plot
+        c_obj: caribic object
+        subs (str): substance e.g. 'sf6'
+        tp (str): tropopause definition 
         bsize: int, bin size for 1D binning
         ptsmin: int, minimum number of pts for a bin to be considered 
     
     Re-implementation of C_plot.pl_gradient_by_season
     """
     
-    data = caribic.data['INT']
-    substance = caribic.substance
-    c_pfx = caribic.pfxs
-    
-    int_subs = get_col_name(substance,'Caribic', c_pfx)
-    if not get_col_name(substance, 'Caribic', c_pfx) or int_subs not in data.columns:
-        int_subs = choose_column(data, substance)
+    data = c_obj.data['INT']
+    subs = c_obj.substance    
+    substance = get_col_name(subs,'Caribic', c_pfx)
+    if not get_col_name(subs, 'Caribic', c_pfx) or substance not in data.columns:
+        substance = choose_column(data, subs)
 
     detr = False
     if 'INT_detr' in caribic.data.keys():
-        if 'detr_'+ int_subs  in data.columns: 
-            int_subs = 'detr_' + int_subs
-            print(int_subs)
+        if 'detr_'+ substance  in data.columns: 
+            substance = 'detr_' + substance
+            print(substance)
             detr = True
 
     # height relative to tropopauses
@@ -72,7 +69,7 @@ def plot_gradient_by_season(caribic, substance, c_pfx = 'INT2',
     for s in set(data['season'].tolist()):
         df = data.loc[data['season'] == s]
         y_values = df[H_rel_TP].values # df[eq_lat_col].values # 
-        x_values = df[int_subs].values
+        x_values = df[substance].values
         dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
 
     fig, ax = plt.subplots(dpi=200)
@@ -102,8 +99,8 @@ def plot_gradient_by_season(caribic, substance, c_pfx = 'INT2',
 
     plt.ylim([min_y, max_y])
     plt.ylabel('$\Delta \Theta$) [K]')
-    plt.xlabel(f'{int_subs[4:]}')
-    if detr: plt.xlabel('$\Delta$' + int_subs.split("_")[-1])
+    plt.xlabel(f'{substance[4:]}')
+    if detr: plt.xlabel('$\Delta$' + substance.split("_")[-1])
 
     x_min, x_max = np.floor(x_min), np.ceil(x_max)
     plt.xlim([x_min, x_max])
@@ -113,11 +110,14 @@ def plot_gradient_by_season(caribic, substance, c_pfx = 'INT2',
 
 #%% Fct calls 
 if __name__=='__main__':
-    caribic_int2 = Caribic(range(2005, 2021), pfxs=['INT2'], subst = 'n2o')
+    calc_caribic = False
+    if calc_caribic: 
+        caribic = Caribic(range(2005, 2021), pfxs=['INT2'], subst = 'n2o')
+
     c_n2o_col = get_col_name('n2o', source='Caribic', c_pfx = 'INT2')
 
     ref_data = Mauna_Loa(range(2005, 2020), 'n2o').df
-    c_df_detr = detrend_substance(caribic_int2.df, c_n2o_col, ref_data, 'N2OcatsMLOm')
+    c_df_detr = detrend_substance(caribic.data['INT2'], 'n2o', ref_data, 'N2OcatsMLOm')
 
     for subs in ['o3', 'noy', 'co2', 'ch4', 'no', 'co', 'n2o']:
         plot_gradient_by_season(c_df_detr, subs)
@@ -145,14 +145,14 @@ if __name__=='__main__':
     
 #     Re-implementation of C_plot.pl_gradient_by_season
 #     """
-#     int_subs = get_col_name(substance,'Caribic', c_pfx)
-#     if not get_col_name(substance, 'Caribic', c_pfx) or int_subs not in data.columns:
-#         int_subs = choose_column(data, substance)
+#     substance = get_col_name(substance,'Caribic', c_pfx)
+#     if not get_col_name(substance, 'Caribic', c_pfx) or substance not in data.columns:
+#         substance = choose_column(data, substance)
 
 #     detr = False
-#     if 'detr_'+ int_subs  in data.columns: 
-#         int_subs = 'detr_' + int_subs
-#         print(int_subs)
+#     if 'detr_'+ substance  in data.columns: 
+#         substance = 'detr_' + substance
+#         print(substance)
 #         detr = True
 
 #     # height relative to tropopauses
@@ -174,7 +174,7 @@ if __name__=='__main__':
 #     for s in set(data['season'].tolist()):
 #         df = data.loc[data['season'] == s]
 #         y_values = df[H_rel_TP].values # df[eq_lat_col].values # 
-#         x_values = df[int_subs].values
+#         x_values = df[substance].values
 #         dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
 
 #     fig, ax = plt.subplots(dpi=200)
@@ -204,8 +204,8 @@ if __name__=='__main__':
 
 #     plt.ylim([min_y, max_y])
 #     plt.ylabel('$\Delta \Theta$) [K]')
-#     plt.xlabel(f'{int_subs[4:]}')
-#     if detr: plt.xlabel('$\Delta$' + int_subs.split("_")[-1])
+#     plt.xlabel(f'{substance[4:]}')
+#     if detr: plt.xlabel('$\Delta$' + substance.split("_")[-1])
 
 #     x_min, x_max = np.floor(x_min), np.ceil(x_max)
 #     plt.xlim([x_min, x_max])

@@ -15,34 +15,34 @@ import datetime as dt
 from toolpac.conv.times import datetime_to_fractionalyear
 from dictionaries import get_col_name
 
-def detrend_substance(caribic_obj, substance, ref_data, degree=2, plot=True):
+def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
     """ (redefined from C_tools.detrend_subs)
     Remove trend of in measurements of substances such as SF6 using reference data 
     Parameters:
-        global_obj: GlobalData object, Caribic
-            global_obj.data is dictionary where data[pfx] are GeoDataFrames
-            with datetime index 
+        c_obj: GlobalData object, Caribic
+            c_obj.data is dictionary where data[pfx] are GeoDataFrames
         substance: str, column name of data (e.g. 'sf6')
-        ref_data: pandas (geo)dataframe of reference data to detrend on, index=datetime
-        ref_subs: str, column name of reference data
+        loc_obj: pandas (geo)dataframe of reference data to detrend on, index=datetime
     """
-    for pfx in caribic_obj.pfxs: 
-        df = caribic_obj.data[pfx]
+    detr_data = {}
+    for c_pfx in c_obj.pfxs: 
+        df = c_obj.data[c_pfx]
+        ref_df = loc_obj.df
 
-        car_subs = get_col_name(substance, 'Caribic', pfx)
-        ref_subs = get_col_name(substance, 'Mauna_Loa')
+        car_subs = get_col_name(subs, 'Caribic', c_pfx)
+        ref_subs = get_col_name(subs, loc_obj.source)
 
-        if not car_subs in df.columns or not ref_subs in ref_data.columns: 
+        if not car_subs in df.columns or not ref_subs in loc_obj.df.columns: 
             print('Data not found'); continue
 
         c_obs = df[car_subs].values
         t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
     
         # ignore reference data earlier and later than two years before/after msmts
-        ref_data = ref_data[min(df.index)-dt.timedelta(356*2) : max(df.index)+dt.timedelta(356*2)]
-        ref_data.dropna(how='any', subset=ref_subs, inplace=True) # remove NaN rows
-        c_ref = ref_data[ref_subs].values
-        t_ref = np.array(datetime_to_fractionalyear(ref_data.index, method='exact'))
+        ref_df = ref_df[min(df.index)-dt.timedelta(356*2) : max(df.index)+dt.timedelta(356*2)]
+        ref_df.dropna(how='any', subset=ref_subs, inplace=True) # remove NaN rows
+        c_ref = ref_df[ref_subs].values
+        t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
 
         popt = np.polyfit(t_ref, c_ref, degree)
         c_fit = np.poly1d(popt) # get popt, then make into fct
@@ -57,7 +57,7 @@ def detrend_substance(caribic_obj, substance, ref_data, degree=2, plot=True):
     
         if plot:
             plt.figure(dpi=200)
-            plt.title(f'{substance.upper()} {pfx}')
+            plt.title(f'{subs.upper()} {c_pfx}')
             plt.scatter(t_obs, c_obs, color='orange', label='Flight data')
             plt.scatter(t_ref, c_ref, color='gray', label='MLO data')
             plt.scatter(t_obs, c_obs_detr, color='green', label='detrended')
@@ -65,12 +65,26 @@ def detrend_substance(caribic_obj, substance, ref_data, degree=2, plot=True):
             plt.legend()
             plt.show()
 
-        # c_obs_delta = 
         gdf_detr = geopandas.GeoDataFrame(data, index = df.index, geometry=df.geometry)
-        
-        caribic_obj.data[f'{pfx}_{car_subs}_detr'] = gdf_detr
 
-        # df[f'detr_{car_subs}'] = c_obs_detr
-        # data[f'delta_detr_substance']
-    return gdf_detr
+        c_obj.data[f'{c_pfx}_detr_{car_subs}'] = gdf_detr
+        detr_data[f'{c_pfx}_detr_{car_subs}'] = gdf_detr
 
+    return detr_data
+
+#%% Fctn calls
+if __name__=='__main__':
+    from data_classes import Caribic, Mauna_Loa
+    year_range = (2000, 2020)
+
+    calc_caribic = False
+    if calc_caribic: 
+        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+
+    mlo_sf6 = Mauna_Loa(year_range)
+    mlo_n2o = Mauna_Loa(year_range, substance='n2o')
+
+    sf6_detr = detrend_substance(caribic, 'sf6', mlo_sf6)
+    n2o_detr = detrend_substance(caribic, 'n2o', mlo_n2o)
+    
+    
