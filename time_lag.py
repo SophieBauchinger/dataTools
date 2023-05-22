@@ -67,16 +67,14 @@ def calc_time_lags(c_obj, ref_obj, years, substance='sf6', pfx='GHG',
     col_name = f'lag_{substance} [yr]'
     df_lags = pd.DataFrame(all_lags, index = lag_index, columns = [col_name])
 
-    if save:
-        if not hasattr(c_obj, 'lags'): c_obj.lags = {f'lag_{pfx}' : df_lags} # initialise dict, dataframe (if it doesn't exist)
-        else: 
-            if f'lag_{pfx}' not in c_obj.lags.keys(): c_obj.lags[f'lag_{pfx}'] = df_lags # initialise dataframe
-            elif col_name not in c_obj.lags[f'lag_{pfx}'].columns: # new substance
-                combined_df = c_obj.lags[f'lag_{pfx}'].join(df_lags) # pd.concat([df_lags, c_obj.lags[f'lag_{pfx}']])
-                # combined_df.groupby(combined_df.index).sum()
-                c_obj.lags[f'lag_{pfx}'] = combined_df
-            else: c_obj.lags[f'lag_{pfx}'].merge(df_lags) # overwrite column for current substance # [f'lag_{substance} [yr]'] = all_lags
-
+    if save: # save in data dictionary 
+            if f'lag_{pfx}' not in c_obj.data.keys(): # new lag df for this pfx, create the dict entry  
+                c_obj.data[f'lag_{pfx}'] = df_lags 
+            elif col_name not in c_obj.data[f'lag_{pfx}'].columns: # new substance
+                combined_df = c_obj.data[f'lag_{pfx}'].join(df_lags) 
+                c_obj.data[f'lag_{pfx}'] = combined_df
+            else: # overwrite column for current substance # [f'lag_{substance} [yr]'] = all_lags
+                c_obj.data[f'lag_{pfx}'].merge(df_lags) 
     return df_lags
 
 
@@ -106,7 +104,9 @@ if __name__=='__main__':
     mlo_sf6 = Mauna_Loa(year_range)
     mlo_n2o = Mauna_Loa(year_range, substance='n2o')
     
-    caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+    calc_caribic = False
+    if calc_caribic: 
+        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 
     calc_time_lags(caribic, mlo_sf6, range(2005, 2020), substance = 'sf6')
     lags_n2o_int2 = calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', pfx='INT2')
