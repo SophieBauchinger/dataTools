@@ -50,6 +50,9 @@ calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', pfx='INT2
 calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', plot=False)
 calc_time_lags(caribic, mlo_co2, range(2005, 2020), substance = 'co2', pfx='INT2', plot=False)
 
+# to delete the newly created attributes use
+# del caribic.__dict__['lags']
+
 #%% Get stratosphere / troposphere flags based on n2o mixing ratio
 
 
