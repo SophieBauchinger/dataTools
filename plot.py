@@ -233,6 +233,7 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
 def caribic_plots(c_obj, data_key, subs):
     df = c_obj.data[data_key]
     substance = get_col_name(subs, c_obj.source, data_key)
+    df_mm = monthly_mean(df).notna()
     
     # Plot mixing ratio msmts and monthly mean
     fig, ax = plt.subplots(dpi=250)
@@ -242,7 +243,7 @@ def caribic_plots(c_obj, data_key, subs):
     
     cmap = plt.cm.viridis_r
     extend = 'neither'
-    if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits# ; extend = 'both'
+    if c_obj.v_limits: vmin, vmax = c_obj.v_limits# ; extend = 'both'
     else: vmin = ymin; vmax = ymax
     norm = Normalize(vmin, vmax)
     
