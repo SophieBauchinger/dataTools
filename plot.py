@@ -27,7 +27,11 @@ from dictionaries import get_col_name, get_vlims, get_default_unit, choose_colum
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
 #%% GlobalData
-def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False):
+def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe=None):
+    """
+    Default plotting of scatter values for global data
+    Can speficically plot a caribic dataframe by feeding a df with the dataframe parameter
+    """
     substance = get_col_name(subs, glob_obj.source)
 
     if glob_obj.source=='Caribic':
@@ -35,6 +39,7 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False):
             substance = get_col_name(subs, glob_obj.source, pfx)
 
             df = glob_obj.data[pfx]
+
             if substance not in df.columns: 
                 if verbose: print(f'No {substance} values to plot in {pfx}')
                 continue
@@ -225,6 +230,39 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
     
     return
 
+def caribic_plots(c_obj, data_key, subs):
+    df = c_obj.data[data_key]
+    substance = get_col_name(subs, c_obj.source, data_key)
+    
+    # Plot mixing ratio msmts and monthly mean
+    fig, ax = plt.subplots(dpi=250)
+    plt.title(f'{c_obj.source} {substance} measurements')
+    ymin = np.nanmin(df[substance])
+    ymax = np.nanmax(df[substance])
+    
+    cmap = plt.cm.viridis_r
+    extend = 'neither'
+    if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits# ; extend = 'both'
+    else: vmin = ymin; vmax = ymax
+    norm = Normalize(vmin, vmax)
+    
+    plt.scatter(df.index, df[substance],
+                label=f'{substance.upper()} {min(df.index.year), max(df.index.year)}', marker='x', zorder=1,
+                c = df[substance],
+                cmap = cmap, norm = norm)
+    
+    for i, mean in enumerate(df_mm[substance]):
+        y,m = df_mm.index[i].year, df_mm.index[i].month
+        xmin, xmax = dt.datetime(y, m, 1), dt.datetime(y, m, monthrange(y, m)[1])
+        ax.hlines(mean, xmin, xmax, color='black',
+                  linestyle='dashed', zorder=2)
+    
+    plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
+    plt.ylabel(f'{substance}')
+    plt.ylim(ymin-0.15, ymax+0.15)
+    fig.autofmt_xdate()
+    plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+
 #%% LocalData
 
 def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
@@ -291,9 +329,13 @@ def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
     plt.show()
 
 #%% 
-# if __name__=='__main__':
-#     from data_classes import Caribic
-#     caribic = Caribic([2005])
-#     plot_scatter_global(caribic)
-#     plot_global_binned_1d(caribic)
-#     plot_global_binned_2d(caribic)
+if __name__=='__main__':
+    calc_caribic = False
+    if calc_caribic: 
+        from data_classes import Caribic
+        year_range = range(2000, 2018)
+        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+
+    plot_scatter_global(caribic)
+    plot_global_binned_1d(caribic)
+    plot_global_binned_2d(caribic)

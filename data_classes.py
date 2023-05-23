@@ -374,15 +374,14 @@ class Mace_Head(LocalData):
 
 #%% Fctn calls
 if __name__=='__main__':
-    c_years = np.arange(2005, 2020)
-    caribic = Caribic(c_years, pfxs = ['GHG', 'INT', 'INT2'])
+    year_range = np.arange(2000, 2020)
 
-    mzt_years = np.arange(2000, 2020)
-    mozart = Mozart(years=mzt_years)
+    caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 
-    mlo_years = np.arange(2000, 2020)
-    mlo_sf6 = Mauna_Loa(mlo_years, data_Day = True)
-    mlo_n2o = Mauna_Loa(mlo_years, substance='n2o')
-    mlo_co2 = Mauna_Loa(range(2000, 2010), 'co2')
+    mozart = Mozart(year_range)
+
+    mlo_sf6 = Mauna_Loa(year_range, data_Day = True)
+    mlo_n2o = Mauna_Loa(year_range, substance='n2o')
+    mlo_co2 = Mauna_Loa(year_range, 'co2')
 
     mhd = Mace_Head() # 2012

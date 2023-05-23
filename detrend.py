@@ -67,8 +67,8 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
 
         gdf_detr = geopandas.GeoDataFrame(data, index = df.index, geometry=df.geometry)
 
-        c_obj.data[f'{c_pfx}_detr_{car_subs}'] = gdf_detr
-        detr_data[f'{c_pfx}_detr_{car_subs}'] = gdf_detr
+        c_obj.data[f'detr_{c_pfx}_{subs}'] = gdf_detr
+        detr_data[f'detr_{c_pfx}_{subs}'] = gdf_detr
 
     return detr_data
 
@@ -81,8 +81,10 @@ if __name__=='__main__':
     if calc_caribic: 
         caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 
-    mlo_sf6 = Mauna_Loa(year_range)
-    mlo_n2o = Mauna_Loa(year_range, substance='n2o')
+    calc_mlo = False
+    if calc_mlo:
+        mlo_sf6 = Mauna_Loa(year_range)
+        mlo_n2o = Mauna_Loa(year_range, substance='n2o')
 
     sf6_detr = detrend_substance(caribic, 'sf6', mlo_sf6)
     n2o_detr = detrend_substance(caribic, 'n2o', mlo_n2o)
