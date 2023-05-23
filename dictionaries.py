@@ -23,7 +23,7 @@ def get_fct_substance(substance):
                     'int_co': fct.quadratic}
     return df_func_dict[substance.lower()]
 
-def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
+def get_col_name(substance, source, c_pfx=None, CLaMS=True):
     """ 
     Returns column name for substance as saved in dataframe 
         source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart' 
@@ -31,64 +31,7 @@ def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
     """
     cname=None
 
-    if source=='Caribic' and c_pfx == 'GHG': # caribic / ghg
-        col_names = { 
-            'sf6': 'SF6 [ppt]',
-            'n2o': 'N2O [ppb]',
-            'no' : 'NO [ppb]',
-            'noy': 'NOy [ppb]',
-            'no2': 'NO2 [ppb]',
-            'co' : 'CO [ppm]',
-            'co2': 'CO2 [ppb]',
-            'ch4': 'CH4 [ppb]'}
-
-    elif source=='Caribic' and c_pfx=='INT': # caribic / int
-        col_names = {
-            # CH4 [ppb]
-            # d_CH4 [ppb]
-            # CO2 [ppm]
-            # d_CO2 [ppm]
-            # N2O [ppb]
-            # d_N2O [ppb]
-            # SF6 [ppt]
-            # d_SF6 [ppt]
-            'co' : 'int_CO [ppb]',
-            'o3' : 'int_O3 [ppb]',
-            'h2o': 'int_H2O_gas [ppm]',
-            'no' : 'int_NO [ppb]',
-            'noy': 'int_NOy [ppb]',
-            'co2': 'int_CO2 [ppm]',
-            'ch4': 'int_CH4 [ppb]'
-            # 'ch4_clams' : 'int_CLaMS_CH4 [ppb]', 
-            # 'co_clams' : 'int_CLaMS_CO [ppb]', 
-            # 'co2_clams' : 'int_CLaMS_CO2 [ppm]',
-            # 'f11_clams' : 'int_CLaMS_F11 [ppt]', 
-            # 'f12_clams' : 'int_CLaMS_F12 [ppt]', 
-            # 'h2o_clams' : 'int_CLaMS_H2O [ppm]',
-            # 'n2o' : 'int_CLaMS_N2O [ppb]', 
-            # 'o3_clams' : 'int_CLaMS_O3 [ppb]', 
-            }
-
-    elif source=='Caribic' and c_pfx=='INT2': # caribic / int2
-        col_names = {
-            # CH4 [ppb]
-            # d_CH4 [ppb]
-            # CO2 [ppm]
-            # d_CO2 [ppm]
-            # N2O [ppb]
-            # d_N2O [ppb]
-            # SF6 [ppt]
-            # d_SF6 [ppt]
-            'noy': 'int_CARIBIC2_NOy [ppbv]',
-            'no' : 'int_CARIBIC2_NO [ppbv]',
-            'ch4': 'int_CLaMS_CH4 [ppb]',
-            'co' : 'int_CLaMS_CO [ppb]',
-            'co2': 'int_CLaMS_CO2 [ppm]',
-            'h2o': 'int_CLaMS_H2O [ppm]',
-            'n2o': 'int_CLaMS_N2O [ppb]',
-            'o3' : 'int_CLaMS_O3 [ppb]'}
-
-    elif source=='Mauna_Loa': # mauna loa. monthly or daily median
+    if source=='Mauna_Loa': # mauna loa. monthly or daily median
         col_names = {
             'sf6': 'SF6catsMLOm',
             'n2o': 'N2OcatsMLOm',
@@ -101,6 +44,70 @@ def get_col_name(substance, source, c_pfx='GHG', CLaMS=True):
         
     elif source=='Mozart': # mozart
         col_names = {'sf6': 'SF6'}
+
+    elif source=='Caribic':
+        if 'GHG' in c_pfx: # caribic / ghg
+            col_names = { 
+                'sf6': 'SF6 [ppt]',
+                'n2o': 'N2O [ppb]',
+                'no' : 'NO [ppb]',
+                'noy': 'NOy [ppb]',
+                'no2': 'NO2 [ppb]',
+                'co' : 'CO [ppm]',
+                'co2': 'CO2 [ppb]',
+                'ch4': 'CH4 [ppb]'}
+
+        elif 'INT' in c_pfx and c_pfx!='INT2': # caribic / int
+            col_names = {
+                # CH4 [ppb]
+                # d_CH4 [ppb]
+                # CO2 [ppm]
+                # d_CO2 [ppm]
+                # N2O [ppb]
+                # d_N2O [ppb]
+                # SF6 [ppt]
+                # d_SF6 [ppt]
+                'co' : 'int_CO [ppb]',
+                'o3' : 'int_O3 [ppb]',
+                'h2o': 'int_H2O_gas [ppm]',
+                'no' : 'int_NO [ppb]',
+                'noy': 'int_NOy [ppb]',
+                'co2': 'int_CO2 [ppm]',
+                'ch4': 'int_CH4 [ppb]'
+                # 'ch4_clams' : 'int_CLaMS_CH4 [ppb]', 
+                # 'co_clams' : 'int_CLaMS_CO [ppb]', 
+                # 'co2_clams' : 'int_CLaMS_CO2 [ppm]',
+                # 'f11_clams' : 'int_CLaMS_F11 [ppt]', 
+                # 'f12_clams' : 'int_CLaMS_F12 [ppt]', 
+                # 'h2o_clams' : 'int_CLaMS_H2O [ppm]',
+                # 'n2o' : 'int_CLaMS_N2O [ppb]', 
+                # 'o3_clams' : 'int_CLaMS_O3 [ppb]', 
+                }
+    
+        elif 'INT2' in c_pfx: # caribic / int2
+            col_names = {
+                # CH4 [ppb]
+                # d_CH4 [ppb]
+                # CO2 [ppm]
+                # d_CO2 [ppm]
+                # N2O [ppb]
+                # d_N2O [ppb]
+                # SF6 [ppt]
+                # d_SF6 [ppt]
+                'noy': 'int_CARIBIC2_NOy [ppbv]',
+                'no' : 'int_CARIBIC2_NO [ppbv]',
+                'ch4': 'int_CLaMS_CH4 [ppb]',
+                'co' : 'int_CLaMS_CO [ppb]',
+                'co2': 'int_CLaMS_CO2 [ppm]',
+                'h2o': 'int_CLaMS_H2O [ppm]',
+                'n2o': 'int_CLaMS_N2O [ppb]',
+                'o3' : 'int_CLaMS_O3 [ppb]'}
+
+        # after having gotten the 'standard' col names, deduce the detrended / lag col names
+        if c_pfx.startswith('detr'): 
+            col_names = {k:'detr_'+v for (k, v) in col_names.items()}
+        elif c_pfx.startswith('lag_'): 
+            col_names = {subs:f'lag_{subs} [yr]' for subs in col_names.keys()}
 
     try: cname = col_names[substance.lower()]
     except: print(f'Column name not found for {substance} in {source} ({c_pfx})'); return None
