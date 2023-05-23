@@ -7,6 +7,11 @@ Dictionaries for finding fctnbs, col names, v lims, default unit
 """
 from toolpac.outliers import ol_fit_functions as fct
 
+def substance_list(pfx):
+    if pfx == 'GHG':    return ['ch4', 'co2', 'n2o', 'sf6']
+    if pfx == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'f11', 'f12', 'n2o']
+    if pfx == 'INT2':   return ['noy', 'no', 'ch4', 'co', 'co2', 'h2o', 'n2o', 'o3']
+
 def get_fct_substance(substance):
     """ Returns appropriate fct from toolpac.outliers.ol_fit_functions to a substance """
     df_func_dict = {'co2': fct.higher,
@@ -23,7 +28,7 @@ def get_fct_substance(substance):
                     'int_co': fct.quadratic}
     return df_func_dict[substance.lower()]
 
-def get_col_name(substance, source, c_pfx=None, CLaMS=True):
+def get_col_name(substance, source, c_pfx=None, CLaMS=False):
     """ 
     Returns column name for substance as saved in dataframe 
         source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart' 
@@ -59,41 +64,26 @@ def get_col_name(substance, source, c_pfx=None, CLaMS=True):
 
         elif 'INT' in c_pfx and c_pfx!='INT2': # caribic / int
             col_names = {
-                # CH4 [ppb]
-                # d_CH4 [ppb]
-                # CO2 [ppm]
-                # d_CO2 [ppm]
-                # N2O [ppb]
-                # d_N2O [ppb]
-                # SF6 [ppt]
-                # d_SF6 [ppt]
                 'co' : 'int_CO [ppb]',
                 'o3' : 'int_O3 [ppb]',
                 'h2o': 'int_H2O_gas [ppm]',
                 'no' : 'int_NO [ppb]',
                 'noy': 'int_NOy [ppb]',
                 'co2': 'int_CO2 [ppm]',
-                'ch4': 'int_CH4 [ppb]'
-                # 'ch4_clams' : 'int_CLaMS_CH4 [ppb]', 
-                # 'co_clams' : 'int_CLaMS_CO [ppb]', 
-                # 'co2_clams' : 'int_CLaMS_CO2 [ppm]',
-                # 'f11_clams' : 'int_CLaMS_F11 [ppt]', 
-                # 'f12_clams' : 'int_CLaMS_F12 [ppt]', 
-                # 'h2o_clams' : 'int_CLaMS_H2O [ppm]',
-                # 'n2o' : 'int_CLaMS_N2O [ppb]', 
-                # 'o3_clams' : 'int_CLaMS_O3 [ppb]', 
-                }
+                'ch4': 'int_CH4 [ppb]'}
+            if CLaMS:
+                col_names.update({
+                'ch4' : 'int_CLaMS_CH4 [ppb]', 
+                'co'  : 'int_CLaMS_CO [ppb]', 
+                'co2' : 'int_CLaMS_CO2 [ppm]',
+                'f11' : 'int_CLaMS_F11 [ppt]', 
+                'f12' : 'int_CLaMS_F12 [ppt]', 
+                'h2o' : 'int_CLaMS_H2O [ppm]',
+                'n2o' : 'int_CLaMS_N2O [ppb]', 
+                'o3'  : 'int_CLaMS_O3 [ppb]'})
     
         elif 'INT2' in c_pfx: # caribic / int2
             col_names = {
-                # CH4 [ppb]
-                # d_CH4 [ppb]
-                # CO2 [ppm]
-                # d_CO2 [ppm]
-                # N2O [ppb]
-                # d_N2O [ppb]
-                # SF6 [ppt]
-                # d_SF6 [ppt]
                 'noy': 'int_CARIBIC2_NOy [ppbv]',
                 'no' : 'int_CARIBIC2_NO [ppbv]',
                 'ch4': 'int_CLaMS_CH4 [ppb]',
@@ -186,7 +176,7 @@ def get_default_unit(substance):
         'ch4': 'ppb'}
     return unit[substance.lower()]
 
-#%% Input choice and validation
+'c#%% Input choice and validation
 
 def validated_input(prompt, valid_values):
     valid_input = False
