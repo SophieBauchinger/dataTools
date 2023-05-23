@@ -23,7 +23,7 @@ from dictionaries import get_fct_substance, get_col_name
 
 from toolpac.outliers import outliers
 from toolpac.outliers import ol_fit_functions as fct
-from toolpac.outliers.outliers import get_no_nan# , fit_data
+from toolpac.outliers.outliers import get_no_nan, fit_data
 from toolpac.conv.times import datetime_to_fractionalyear #, fractionalyear_to_datetime
 
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
@@ -57,8 +57,6 @@ def pre_flag(glob_obj, ref_obj, crit = 'n2o', limit = 0.97, pfx = 'GHG', verbose
     
     return df.sort_index() # , preflag_df
 
-from toolpac.outliers.outliers import fit_data, get_no_nan
-
 def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = False):
     """ 
     Returns dataset with new bool columns 'strato' and 'tropo' 
@@ -88,18 +86,17 @@ def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = F
                           flag = data[f'{crit}_pre_flag'], 
                           plot=True, limit=0.1, direction = 'n')
     # plot the results
-    fig, ax = plt.subplots()
-    ax.scatter(t_obs_tot, mxr, c='grey', lw=1, label='data')
+    # fig, ax = plt.subplots()
+    # ax.scatter(t_obs_tot, mxr, c='grey', lw=1, label='data')
 
-    no_nan_time, no_nan_mxr, no_nan_d_mxr = get_no_nan(t_obs_tot, mxr, d_mxr)
-    popt0 = fit_data(fct.simple, no_nan_time, no_nan_mxr, no_nan_d_mxr)
-    baseline0 = fct.simple(np.array(no_nan_time), *popt0)
-    ax.plot(np.array(no_nan_time), baseline0, c='r', lw=1, label='initial')
-    
-    baseline1 = fct.simple(t_obs_tot, *ol[3])
-    ax.plot(t_obs_tot, baseline1, c='k', lw=1, label='filtered')
-    fig.legend()
-    fig.show()
+    # no_nan_time, no_nan_mxr, no_nan_d_mxr = get_no_nan(t_obs_tot, mxr, d_mxr)
+    # popt0 = fit_data(fct.simple, no_nan_time, no_nan_mxr, no_nan_d_mxr)
+    # ax.plot(np.array(no_nan_time), fct.simple(np.array(no_nan_time), *popt0), 
+    #         c='r', lw=1, label='initial')
+    # ax.plot(t_obs_tot, fct.simple(t_obs_tot, *ol[3]), 
+    #         c='k', lw=1, label='filtered')
+    # fig.legend()
+    # fig.show()
 
     data.drop(f'{crit}_pre_flag', axis=1, inplace=True)
 
@@ -114,69 +111,86 @@ def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = F
     df_strato = data[data['strato'] == True]
     df_strato.drop(['tropo', 'strato'], axis=1, inplace=True)
 
-    if save:
-        if not hasattr(glob_obj, 'ol_filtered'): # initialise dict with trop / strat dataframes
-            glob_obj.ol_filtered = {f'tropo_{crit}_{pfx}' : df_tropo, f'strato_{crit}_{pfx}' : df_strato} 
-        else: # overwrite dataframes if they exist, otherwise create them
-            glob_obj.ol_filtered[f'tropo_{crit}_{pfx}'] = df_tropo 
-            glob_obj.ol_filtered[f'strato_{crit}_{pfx}'] = df_strato
+    if save: 
+        glob_obj.data[f'tropo_{pfx}_{crit}'] = df_tropo
+        glob_obj.data[f'strato_{pfx}_{crit}'] = df_strato
 
-    return data
+    return data, ol
 
-def filter_trop_outliers(glob_obj, substance_list, pfx):
+def filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True):
     """ 
     After sorting data into stratospheric and tropospheric, now sort the 
-    tropospheric data into outliers and non-outliers 
+    tropospheric data into outliers and non-outliers (in both directions)
     Parameters:
-        data: pandas (geo)dataframe
-        substance_list: list of strings, substances to receive flags (e.g. 'n2o')
-        source (str): source of msmt data, needed to get column name from substances
+        glob_obj (GlobalData): e.g. caribic
+        subs (str): substances to flag, eg. 'n2o'
+        pfx (str): caribic data prefix, eg. 'GHG'
+        crit (str): criterion for strat / trop sorting 
+        ref_obj (LocalData): reference data for strat / trop sorting if not yet available
     """
-    # take only tropospheric data 
-    data = glob_obj.data[pfx]
+    # take only tropospheric data, select according to crit and availability
+    trop_crits = [x for x in glob_obj.data.keys() if x.startswith('tropo')]
 
-    for subs in substance_list:
-        subs = get_col_name(subs, glob_obj.source, pfx) # get column name
-        if len(get_no_nan(data.index, data[subs], data[subs])[0]) < 1: # check for valid data
-            print(f'no {subs} data'); continue
+    if len(trop_crits) == 0: # no tropospheric data
+        if not crit: crit = input('Please input a substance to sort strat/trop data with (eg. n2o).\n') 
+        filter_strat_trop(glob_obj, ref_obj, crit, pfx=pfx, save=True) # creates tropo data within global_obj
+        data = glob_obj.data[f'tropo_{pfx}_{crit}']
+    
+    if len(trop_crits) == 1 and (crit==None or f'tropo_{pfx}_{crit}' in trop_crits): # one trop dataset exists
+        data = glob_obj.data[trop_crits[0]] 
 
-        try: func = get_fct_substance(subs)
-        except: 
-            print('No function found. Using 2nd order poly with simple harm')
-            func = fct.simple
+    elif len(trop_crits) > 1: 
+        if f'tropo_{pfx}_{crit}' in trop_crits: # ideal case
+            data = glob_obj.data[f'tropo_{pfx}_{crit}']
 
-        data_flag = pd.DataFrame(data, columns=['flight', 'timecref', 'year', 'month', 'day', 'strato', 'tropo'])
-        data_flag.columns = [f'fl_{x}' if x in substance_list else x for x in data_flag.columns]
+        else: # crit not yet 
+            crit = input(f'Please choose one of the following criteria (select by writing e.g. n2o): \n{trop_crits}\n')
+            data = glob_obj.data['{}'.format([x for x in trop_crits if x.endswith(crit)][0])]
 
-        data_flag[f'ol_{subs}'] = np.nan # outlier ? 
-        data_flag[f'ol_rel_{subs}'] = np.nan # 
-        data_flag[f'fl_{subs}'] = 0 # flag
+    else: print('Something went wrong while choosing the data to use')
 
-        # set all strato flags to a value != 0 to exclude them
-        data_flag.loc[data['strato'] == True, f'fl_{subs}'] = -20
+    substance = get_col_name(subs, glob_obj.source, pfx) # get column name for substance to be outlier flagged
+    # print(substance)
 
-        time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-        mxr = data[subs].tolist()
-        if f'd_{subs}' in data.columns:
-            d_mxr = data[f'd_{subs}'].tolist()
-        else:    # case for integrated values of high resolution data
-            d_mxr = None
-        flag = data_flag[f'fl_{subs}'].tolist()
-        tmp = outliers.find_ol(func, time, mxr, d_mxr, flag, direction='pn',
-                               plot=True, ctrl_plot=True, limit=0.1)
+    if len(get_no_nan(data.index, data[substance], data[substance])[0]) < 1: # check for valid data
+        print(f'no {subs} data'); return None
 
-        data_flag[f'fl_{subs}'] = tmp[0]  # flag
-        data_flag[f'ol_{subs}'] = tmp[1]  # residual
+    # Get outlier fit function
+    try: func = get_fct_substance(subs)
+    except: 
+        print(f'No fit function found for {subs}. Using 2nd order poly with simple harm')
+        func = fct.simple
 
-        data_flag.loc[data_flag['strato'] == True, f'fl_{subs}'] = np.nan
-        data_flag.loc[data_flag['strato'] == True, f'ol_{subs}'] = np.nan
+    # create output dataframe
+    data_flag = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo', f'{substance}'])
+    # print(data_flag)
+    
+    # data_flag.columns = [f'fl_{x}' if x in [subs] else x for x in data_flag.columns]
 
-        # no residual value for non-outliers
-        data_flag.loc[data_flag[f'fl_{subs}'] == 0, f'ol_{subs}'] = np.nan
+    data_flag[f'ol_{subs}'] = np.nan # outlier 
+    data_flag[f'ol_rel_{subs}'] = np.nan # residual
+    data_flag[f'fl_{subs}'] = 0 # flag
 
-        fit_result = [func(t, *tmp[3]) for t in time]
-        
-        data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result
+    #### set all strato flags to a value != 0 to exclude them. Nvm there are no strato things here anymore
+    #### data_flag.loc[data['strato'] == True, f'fl_{subs}'] = -20
+
+    time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
+    mxr = data[substance].tolist()
+    if f'd_{substance}' in data.columns:
+        d_mxr = data[f'd_{subs}'].tolist()
+    else: # this is the case for integrated values of high resolution data
+        d_mxr = None
+
+    flag = data_flag[f'fl_{subs}'].tolist()
+    tmp = outliers.find_ol(func, time, mxr, d_mxr, flag, direction='pn',
+                            plot=True, limit=0.1)
+
+    data_flag[f'fl_{subs}'] = tmp[0]  # flag
+    data_flag[f'ol_{subs}'] = tmp[1]  # outlier 
+    fit_result = [func(t, *tmp[3]) for t in time]
+    data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result # residzak
+
+    # data_flag.loc[data_flag[f'fl_{subs}'] == 0, f'ol_{subs}'] = np.nan # no residual value for non-outliers
 
     return data_flag
 
@@ -190,8 +204,11 @@ if __name__=='__main__':
     mlo_n2o = Mauna_Loa(range(2008, 2020), substance = 'n2o')
     mlo_co2 = Mauna_Loa(range(2008, 2020), substance = 'co2')
 
-    data_filtered_n2o = filter_strat_trop(caribic, mlo_n2o, 'n2o', 'INT2')
-    data_filtered_co2 = filter_strat_trop(caribic, mlo_co2, 'co2', 'INT2')
+    data_filtered_n2o, n2o_ol = filter_strat_trop(caribic, mlo_n2o, 'n2o', 'INT2')
+    data_filtered_co2, co2_ol = filter_strat_trop(caribic, mlo_co2, 'co2', 'INT2')
+    
+    for subs in ['ch4', 'co2', 'co']:
+        filter_trop_outliers(caribic, subs, 'INT2', crit='n2o')
 
     # Test outlier identification
     # ol_data = {}
