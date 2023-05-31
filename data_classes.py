@@ -250,7 +250,7 @@ class Mozart(GlobalData):
 
     def __init__(self, years, grid_size=5, v_limits=None):
         """ Initialise MOZART object """
-        super().__init__( years, grid_size, v_limits)
+        super().__init__(years, grid_size, v_limits)
         self.years = years
         self.source = 'Mozart'; self.source_print = 'MZT'
         self.substance = 'SF6'
@@ -304,7 +304,6 @@ class LocalData(object):
             elif self.data_format == 'ccgg' and self.substance !='co': 
                 filter_cols = ['index', 'site_code', 'year', 'month', 'day', 'hour', 'minute', 'second', 'time_decimal', 'latitude', 'longitude', 'altitude', 'elevation', 'intake_height', 'qcflag']
                 df.drop(filter_cols, axis=1, inplace=True)
-                df.dropna(how='any', subset='value', inplace=True)
                 unit_dic = {'co2':'[ppm]', 'ch4' : '[ppb]'}
                 df.rename(columns = {'value' : f'{self.substance} {unit_dic[self.substance]}', 'value_std_dev' : f'{self.substance}_std_dev {unit_dic[self.substance]}'}, inplace=True)
 
@@ -321,6 +320,9 @@ class LocalData(object):
             if self.data_format == 'CATS':
                 try: df.dropna(how='any', subset=str(self.substance.upper()+'catsMLOm'), inplace=True)
                 except: print('didnt drop NA. ', str(self.substance.upper()+'catsMLOm'))
+            if self.data_format == 'ccgg' and self.substance !='co': 
+                df.replace([-999.999, -999.99, -99.99, -9], np.nan, inplace=True)
+                df.dropna(how='any', subset=f'{self.substance} {unit_dic[self.substance]}', inplace=True)
             return df
 
         elif self.source == 'Mace_Head': # make col names with space (like caribic)
