@@ -28,7 +28,7 @@ def get_fct_substance(substance):
                     'int_co': fct.quadratic}
     return df_func_dict[substance.lower()]
 
-def get_col_name(substance, source, c_pfx=None, CLaMS=False):
+def get_col_name(substance, source, c_pfx='', CLaMS=False):
     """ 
     Returns column name for substance as saved in dataframe 
         source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart' 
@@ -41,7 +41,8 @@ def get_col_name(substance, source, c_pfx=None, CLaMS=False):
             'sf6': 'SF6catsMLOm',
             'n2o': 'N2OcatsMLOm',
             'co2': 'co2 [ppm]',
-            'ch4': 'ch4 [ppb]'}
+            'ch4': 'ch4 [ppb]',
+            'co' : 'co [ppb]'}
 
     elif source=='Mace_Head': # mace head
         col_names={'sf6': 'SF6 [ppt]',
@@ -59,7 +60,7 @@ def get_col_name(substance, source, c_pfx=None, CLaMS=False):
                 'noy': 'NOy [ppb]',
                 'no2': 'NO2 [ppb]',
                 'co' : 'CO [ppm]',
-                'co2': 'CO2 [ppb]',
+                'co2': 'CO2 [ppm]',
                 'ch4': 'CH4 [ppb]'}
 
         elif 'INT' in c_pfx and c_pfx!='INT2': # caribic / int
@@ -100,7 +101,7 @@ def get_col_name(substance, source, c_pfx=None, CLaMS=False):
             col_names = {subs:f'lag_{subs} [yr]' for subs in col_names.keys()}
 
     try: cname = col_names[substance.lower()]
-    except: print(f'Column name not found for {substance} in {source} ({c_pfx})'); return None
+    except: print(f'No data for {substance} in {source} ({c_pfx})'); return None
     return cname
 
 def get_coord_name(coord, source, c_pfx='INT', CLaMS=True):
@@ -164,8 +165,9 @@ def get_vlims(substance):
     v_limits = {
         'sf6': (6,9),
         'n2o': (0,10),
-        'co2': (0,10),
-        'ch4': (0,10)}
+        'co2': (320,430),
+        'ch4': (1600,1950),
+        'co' : (50, 160)}
     return v_limits[substance.lower()]
 
 def get_default_unit(substance):
@@ -176,7 +178,7 @@ def get_default_unit(substance):
         'ch4': 'ppb'}
     return unit[substance.lower()]
 
-'c#%% Input choice and validation
+#%% Input choice and validation
 
 def validated_input(prompt, valid_values):
     valid_input = False

@@ -18,7 +18,7 @@ from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, rename_columns #,  same_col_merge
+from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, rename_columns
 from dictionaries import get_col_name # , get_vlims, get_default_unit
 
 # Note: Flights [340, 344, 346, 360, 364, 400, 422, 424, 440, 442, 444, 446, 467] have the wrong day saved
@@ -158,22 +158,22 @@ class GlobalData(object):
         else: df = self.df 
 
         for yr in years: # loop through available years if possible
-            try: df = df[df.index.year == yr]
-            except: df = df
+            try: df_yr = df[df.index.year == yr]
+            except: df_yr = df
 
-            if not any(df[df.index.year == yr][substance].notna()): continue # check for "empty" data array
-            if df.empty: continue # go on to next year
+            if not any(df_yr[df_yr.index.year == yr][substance].notna()): continue # check for "empty" data array
+            if df_yr.empty: continue # go on to next year
 
-            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
-            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
+            x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
+            y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
 
             xbmin, xbmax = min(x), max(x)
             ybmin, ybmax = min(y), max(y)
 
             # average over lon / lat
-            out_x = bin_1d_2d.bin_1d(df[substance], x,
+            out_x = bin_1d_2d.bin_1d(df_yr[substance], x,
                                      xbmin, xbmax, self.grid_size)
-            out_y = bin_1d_2d.bin_1d(df[substance], y,
+            out_y = bin_1d_2d.bin_1d(df_yr[substance], y,
                                      ybmin, ybmax, self.grid_size)
 
             out_x_list.append(out_x); out_y_list.append(out_y)
@@ -197,19 +197,19 @@ class GlobalData(object):
         else: df = self.df 
 
         for yr in years: # loop through available years if possible
-            try: df = df[df.index.year == yr]
-            except: df = df
+            try: df_yr = df[df.index.year == yr]
+            except: df_yr = df
 
-            if not any(df[df.index.year == yr][substance].notna()): continue
-            if df[substance].empty: continue
+            if not any(df_yr[df_yr.index.year == yr][substance].notna()): continue
+            if df_yr[substance].empty: continue
 
-            x = np.array([df.geometry[i].x for i in range(len(df.index))]) # lat
-            y = np.array([df.geometry[i].y for i in range(len(df.index))]) # lon
+            x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
+            y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
 
             xbmin, xbmax, xbsize = min(x), max(x), self.grid_size
             ybmin, ybmax, ybsize = min(y), max(y), self.grid_size
 
-            out = bin_1d_2d.bin_2d(np.array(df[substance]), x, y,
+            out = bin_1d_2d.bin_2d(np.array(df_yr[substance]), x, y,
                                    xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
             out_list.append(out)
         return out_list
@@ -276,7 +276,11 @@ class LocalData(object):
                     else: title = line.split(); break # first non-header line has column names
 
             with open(path) as f: # get units from 2nd to last line of header
-                self.description = f.readlines()[header_lines-2]
+                if self.substance=='co': # get col names from last line
+                    # print(f.readlines()[header_lines-1])
+                    self.description = f.readlines()[header_lines-1]
+                    title = self.description.split()[2:]
+                else: self.description = f.readlines()[header_lines-2]
 
             mlo_data = np.genfromtxt(path, skip_header=header_lines)
             df = pd.DataFrame(mlo_data, columns=title, dtype=float)
@@ -294,14 +298,22 @@ class LocalData(object):
                 day_col = [x for x in df.columns if 'catsMLOday' in x][0]
                 time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
                 df = df.drop(day_col, axis=1) # get rid of day column
-            else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])]
+            else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])] # choose middle of month for monthly data 
+
             if self.data_format == 'CATS': df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
-            elif self.data_format == 'ccgg': 
+            elif self.data_format == 'ccgg' and self.substance !='co': 
                 filter_cols = ['index', 'site_code', 'year', 'month', 'day', 'hour', 'minute', 'second', 'time_decimal', 'latitude', 'longitude', 'altitude', 'elevation', 'intake_height', 'qcflag']
                 df.drop(filter_cols, axis=1, inplace=True)
                 df.dropna(how='any', subset='value', inplace=True)
                 unit_dic = {'co2':'[ppm]', 'ch4' : '[ppb]'}
                 df.rename(columns = {'value' : f'{self.substance} {unit_dic[self.substance]}', 'value_std_dev' : f'{self.substance}_std_dev {unit_dic[self.substance]}'}, inplace=True)
+
+            elif self.data_format == 'ccgg' and self.substance == 'co': 
+                filter_cols = ['index', 'site', 'year', 'month']
+                df.drop(filter_cols, axis=1, inplace=True)
+                df.dropna(how='any', subset='value', inplace=True)
+                unit_dic = {'co':'[ppb]'}
+                df.rename(columns = {'value' : f'{self.substance} {unit_dic[self.substance]}'}, inplace=True)
 
             df.astype(float)
             df['Date_Time'] = time
@@ -353,9 +365,10 @@ class Mauna_Loa(LocalData):
                 try: self.df_monthly_mean = monthly_mean(self.df_Day)
                 except: pass
 
-        if substance in ['co2', 'ch4']:
+        if substance in ['co2', 'ch4', 'co']:
             self.data_format = 'ccgg'
             fname = r'\{}_mlo_surface-insitu_1_ccgg_MonthlyData.txt'.format(self.substance)
+            if substance=='co': fname = r'\co_mlo_surface-flask_1_ccgg_month.txt'
             self.df = self.get_data(path_dir+fname)
 
 class Mace_Head(LocalData):
