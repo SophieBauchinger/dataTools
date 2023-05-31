@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Apr 27 15:56:59 2023
+@Author: Sophie Bauchimger, IAU
+@Date: Thu Apr 27 15:56:59 2023
 
-@author: sophie_bauchinger
+Main script for Caribic measurement analysis routine.
 """
 import pandas as pd
 
@@ -26,22 +27,26 @@ mlo_co2 = Mauna_Loa(year_range, substance='co2')
 mlo_ch4 = Mauna_Loa(year_range, substance='ch4')
 mlo_co  = Mauna_Loa(year_range, substance='co')
 
-mlo_data = {'sf6' : mlo_sf6, 'n2o' : mlo_n2o, 
-            'co2' : mlo_co2, 'ch4' : mlo_ch4, 
-            'co' : mlo_co }
+mlo_data = {'sf6' : mlo_sf6, 'n2o' : mlo_n2o, 'co2' : mlo_co2, 
+            'ch4' : mlo_ch4, 'co' : mlo_co }
+
+# mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
 
 caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
-# available substance in caribic data:
-# 'GHG':    ['ch4', 'co2', 'n2o', 'sf6']
-# 'INT':    ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'f11', 'f12', 'n2o']
-# 'INT2':   ['noy', 'no', 'ch4', 'co', 'co2', 'h2o', 'n2o', 'o3']
+""" 
+Available substance in caribic data:
+'GHG':    ['ch4', 'co2', 'n2o', 'sf6']
+'INT':    ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'f11', 'f12', 'n2o']
+'INT2':   ['noy', 'no', 'ch4', 'co', 'co2', 'h2o', 'n2o', 'o3'] 
+"""
 
 mhd = Mace_Head() # only 2012 data available
 
 mzt = Mozart(year_range) # only available up to 2008
 
 #%% Plot data
-plot_scatter_global(caribic, subs='sf6')
+for subs in substance_list('c_total'):
+    plot_scatter_global(caribic, subs)
 plot_global_binned_1d(caribic, subs='sf6', c_pfx='GHG')
 plot_global_binned_2d(caribic, subs='sf6', c_pfx='GHG')
 
@@ -67,9 +72,8 @@ calc_time_lags(caribic, mlo_co2, range(2005, 2020), substance = 'co2', pfx='INT2
 # del caribic.__dict__['lags']
 
 #%% Detrend
-# for now only have mlo data for n2o and sf6, so can only detrend those 
-sf6_detr = detrend_substance(caribic, 'sf6', mlo_sf6)
-n2o_detr = detrend_substance(caribic, 'n2o', mlo_n2o)
+for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+    detrend_substance(caribic, subs, mlo_data[subs])
 
 #%% Plot gradients 
 for pfx in caribic.pfxs:
@@ -77,24 +81,28 @@ for pfx in caribic.pfxs:
         plot_gradient_by_season(caribic, subs, pfx)
 
 #%% Filter tropospheric / stratospheric data points based on tracer mixing ratio wrt background data
-substances = ['co2', 'n2o', 'sf6', 'ch4']
-
-ref_dfs = {'sf6' : mlo_sf6,
-           'n2o' : mlo_n2o,
-           'co2' : mlo_co2}
-
-for subs in substances: 
+for subs in ['sf6', 'n2o', 'co2', 'ch4']:
     for pfx in caribic.pfxs:
-        filter_strat_trop(caribic, mlo_co2, subs,  'GHG')
-        filter_trop_outliers(caribic, subs, 'INT2', crit='n2o')
+        filter_strat_trop(caribic, mlo_data[subs], subs, pfx)
+        filter_trop_outliers(caribic, subs, pfx, crit=subs)
+
+
+# substances = ['co2', 'n2o', 'sf6', 'ch4']
+
+# ref_dfs = {'sf6' : mlo_sf6,
+#            'n2o' : mlo_n2o,
+#            'co2' : mlo_co2}
+
+# for subs in substances: 
+
         
 
-filter_strat_trop(caribic, mlo_co2, 'co2', 'GHG')
-filter_strat_trop(caribic, mlo_n2o, 'n2o', 'INT2')
-filter_strat_trop(caribic, mlo_co2, 'co2', 'INT2')
+# filter_strat_trop(caribic, mlo_co2, 'co2', 'GHG')
+# filter_strat_trop(caribic, mlo_n2o, 'n2o', 'INT2')
+# filter_strat_trop(caribic, mlo_co2, 'co2', 'INT2')
 
-for subs in ['ch4', 'co2', 'co']:
-    filter_trop_outliers(caribic, subs, 'INT2', crit='n2o')
+# for subs in ['ch4', 'co2', 'co']:
+#     filter_trop_outliers(caribic, subs, 'INT2', crit='n2o')
 
 
 # # loop through years of caribic data
