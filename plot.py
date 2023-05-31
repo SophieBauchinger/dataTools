@@ -76,10 +76,7 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe
 
     elif glob_obj.source=='Mozart':
         substance = get_col_name(subs, glob_obj.source)
-        #!!! ugly implementation but using the grid size setting to plot all data points individually
-        glob_obj.grid_size=1
-        plot_global_binned_1d(glob_obj, subs)
-        glob_obj.grid_size=1
+        plot_global_binned_1d(glob_obj, subs, single_yr)
 
 def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, single_graph=False, c_pfx=None):
     """
@@ -95,7 +92,7 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, singl
     if single_yr is not None: years = [int(single_yr)]
     else: years = glob_obj.years
 
-    if glob_obj.source == 'Caribic': out_x_list, out_y_list = glob_obj.binned_1d(glob_obj, subs, single_yr, c_pfx=c_pfx) #!!! CHANGE AFTER NEWLY CREATING caribic
+    if glob_obj.source == 'Caribic': out_x_list, out_y_list = glob_obj.binned_1d(subs, single_yr, c_pfx=c_pfx) 
     else: out_x_list, out_y_list = glob_obj.binned_1d(subs, single_yr, c_pfx=c_pfx)
 
     if not single_graph:
@@ -168,7 +165,7 @@ def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None):
 
     if single_yr is not None: years = [int(single_yr)]
     else: years = glob_obj.years
-    if glob_obj.source == 'Caribic': out_list = glob_obj.binned_2d(glob_obj, subs, single_yr, c_pfx)  #!!! CHANGE AFTER NEWLY CREATING caribic
+    if glob_obj.source == 'Caribic': out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
     else: out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
 
     for out, yr in zip(out_list, years):
@@ -267,7 +264,7 @@ def caribic_plots(c_obj, data_key, subs):
 
 #%% LocalData
 
-def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
+def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
     """ 
     Plot all available data as timeseries 
     Parameters:
@@ -275,7 +272,7 @@ def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
         greyscale (bool): toggle plotting in greyscale or viridis colormap
         v_limits (tuple(int, int)): change limits for colormap
     """
-    if greyscale: colors = {'day':lcm(['grey']), 'msmts': lcm(['silver'])} # defining monoscale colormap for greyscale plots
+    if greyscale: colors = {'day':lcm(['silver']), 'msmts': lcm(['grey'])} # defining monoscale colormap for greyscale plots
     else: colors = {'msmts':plt.cm.viridis_r, 'day': plt.cm.viridis_r} 
 
     if not substance: substance = loc_obj.substance
@@ -286,16 +283,16 @@ def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
 
     # Plot all available info on one graph
     fig, ax = plt.subplots(figsize = (5,3.5), dpi=250)
-    # Measurement data
-    plt.scatter(loc_obj.df.index, loc_obj.df[col_name], c=loc_obj.df[col_name], zorder=0,
+    # Measurement data (monthly)
+    plt.scatter(loc_obj.df.index, loc_obj.df[col_name], c=loc_obj.df[col_name], zorder=1,
                     cmap=colors['msmts'], norm=norm, marker='+',
                     label=f'{loc_obj.source_print} {substance.upper()}')
     
     # Daily mean
     if hasattr(loc_obj, 'df_Day'):
         if not loc_obj.df_Day.empty: # check if there is data in the daily df
-            plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[col_name], c = loc_obj.df_Day[col_name], 
-                        cmap=colors['day'], norm=norm, marker='+', zorder=2,
+            plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[col_name], # c = loc_obj.df_Day[col_name], 
+                        color = 'silver', marker='+', zorder=0,
                         label=f'{loc_obj.source_print} {substance.upper()} (D)')
 
     # Monthly mean
@@ -309,25 +306,31 @@ def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
             ax.hlines(mean, xmin, xmax, color='black', ls='dashed', 
                       label=f'{loc_obj.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
 
+    # plt.ylim(min(loc_obj.df[col_name]), max(loc_obj.df[col_name]))
     plt.ylabel(f'{loc_obj.substance.upper()} mixing ratio [{dflt_unit}]')
     plt.xlim(min(loc_obj.df.index), max(loc_obj.df.index))
     plt.xlabel('Time')
     
+    handles, labels = ax.get_legend_handles_labels()
     if not greyscale: 
         plt.colorbar(sm(norm=norm, cmap=colors['day']), aspect=50, ax=ax, extend='neither')
+
+        # Slightly weird code to create a legend showing the range of the colormap)
+        if len(labels) > 1:
+            step = 10
+            pa = [ Patch(fc=colors['msmts'](norm(v))) for v in np.linspace(vmin, vmax, step)] # monthly data
+            pb = [ Patch(fc='silver') for v in np.linspace(vmin, vmax, step)] # daily data
+            pc = [ Patch(fc='black') for v in np.linspace(vmin, vmax, step)] # monthly averages
     
-    # Slightly weird code to create a legend showing the range of the colormap)
-    handles, labels = ax.get_legend_handles_labels()
-    step = 0.2
-    pa = [ Patch(fc=colors['msmts'](norm(v))) for v in np.arange(vmin, vmax, step)]
-    pb = [ Patch(fc=colors['day'](norm(v))) for v in np.arange(vmin, vmax, step)]
-    pc = [ Patch(fc='black') for v in np.arange(vmin, vmax, step)]
+            h = [] # list of handles
+            for a, b, c in zip(pa, pb, pc): # need to do this to have them in the right order
+                h.append(a)
+                if hasattr(loc_obj, 'df_Day'): h.append(b)
+                if hasattr(loc_obj, 'df_monthly_mean'): h.append(c)
+            l = [''] * (len(h) - len(labels)) + labels # needed to have multiple color patches for one proper label 
     
-    h = [] # list of handles
-    for a, b, c in zip(pa, pb, pc): # need to do this to have them in the right order
-        h.append(a); h.append(b); h.append(c)            
-    l = [''] * (len(h) - len(labels)) + labels # needed to have multiple color patches for one proper label 
-    ax.legend(handles=h, labels=l, ncol=len(h)/3, handletextpad=1/(len(h)/2)+0.2, handlelength=0.15, columnspacing=-0.3)
+            ax.legend(handles=h, labels=l, ncol=len(h)/3, handletextpad=1/(len(h)/2)+0.2, handlelength=0.12, columnspacing=-0.3)
+    elif len(labels) > 1: ax.legend() # only show greyscale legend if more than one trace
 
     fig.autofmt_xdate()
     plt.show()
