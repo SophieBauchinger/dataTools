@@ -23,7 +23,7 @@ import C_tools
 # select_value=[0,0,0]
 # select_cf=['GT','GT', 'GT'] # operators 
 
-def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', 
+def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', give_choice=False, 
                             errorbars=False, ycoord='pt', bsize=0.5, ptsmin=5):
     """ 
     Plotting gradient by season using 1D binned data 
@@ -37,11 +37,13 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm',
     Re-implementation of C_plot.pl_gradient_by_season
     """
     
-    data = c_obj.data['INT']
+    data = c_obj.data[c_pfx]
     # subs = c_obj.substance
-    substance = get_col_name(subs,'Caribic', c_pfx)
+    substance = get_col_name(subs, 'Caribic', c_pfx)
     if not get_col_name(subs, 'Caribic', c_pfx) or substance not in data.columns:
-        substance = choose_column(data, subs)
+        if give_choice: substance = choose_column(data, subs)
+        else: return
+        if not substance: return
 
     detr = False
     if 'INT_detr' in c_obj.data.keys():
@@ -54,8 +56,9 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm',
     if 'int_pt_rel_dTP_K [K]' in data.columns: H_rel_TP = 'int_pt_rel_dTP_K [K]'
     elif 'int_CARIBIC2_H_rel_TP [km]' in data.columns: H_rel_TP = 'int_CARIBIC2_H_rel_TP [km]'
     else: 
-        try: H_rel_TP = get_coord_name('h_rel_tp', 'Caribic', c_pfx)
-        except: H_rel_TP = choose_column(data, 'h_rel_tp')
+        H_rel_TP = get_coord_name('h_rel_tp', 'Caribic', c_pfx)
+        if not H_rel_TP and give_choice: H_rel_TP = choose_column(data, 'h_rel_tp')
+        if not H_rel_TP: return
 
     min_y, max_y = np.nanmin(data[H_rel_TP].values), np.nanmax(data[H_rel_TP].values)
 
@@ -98,7 +101,7 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm',
     plt.tick_params(direction='in', top=True, right=True)
 
     plt.ylim([min_y, max_y])
-    plt.ylabel('$\Delta \Theta$) [K]')
+    plt.ylabel('$\Delta \Theta$ [K]')
     plt.xlabel(f'{substance[4:]}')
     if detr: plt.xlabel('$\Delta$' + substance.split("_")[-1])
 
