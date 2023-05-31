@@ -9,8 +9,9 @@ from toolpac.outliers import ol_fit_functions as fct
 
 def substance_list(pfx):
     if pfx == 'GHG':    return ['ch4', 'co2', 'n2o', 'sf6']
-    if pfx == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'f11', 'f12', 'n2o']
-    if pfx == 'INT2':   return ['noy', 'no', 'ch4', 'co', 'co2', 'h2o', 'n2o', 'o3']
+    if pfx == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4'] 
+    if pfx == 'INT2':   return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'n2o', 'f11', 'f12']
+    
 
 def get_fct_substance(substance):
     """ Returns appropriate fct from toolpac.outliers.ol_fit_functions to a substance """
@@ -54,15 +55,15 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
     elif source=='Caribic':
         if 'GHG' in c_pfx: # caribic / ghg
             col_names = { 
-                'sf6': 'SF6 [ppt]',
-                'n2o': 'N2O [ppb]',
-                'no' : 'NO [ppb]',
-                'noy': 'NOy [ppb]',
-                'no2': 'NO2 [ppb]',
-                'co' : 'CO [ppm]',
+                'ch4': 'CH4 [ppb]',
                 'co2': 'CO2 [ppm]',
-                'ch4': 'CH4 [ppb]'}
-
+                'n2o': 'N2O [ppb]',
+                'sf6': 'SF6 [ppt]'}
+                # 'no' : 'NO [ppb]',
+                # 'noy': 'NOy [ppb]',
+                # 'no2': 'NO2 [ppb]',
+                # 'co' : 'CO [ppm]'
+                
         elif 'INT' in c_pfx and c_pfx!='INT2': # caribic / int
             col_names = {
                 'co' : 'int_CO [ppb]',
@@ -72,39 +73,39 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
                 'noy': 'int_NOy [ppb]',
                 'co2': 'int_CO2 [ppm]',
                 'ch4': 'int_CH4 [ppb]'}
+    
+        elif 'INT2' in c_pfx: # caribic / int2
+            col_names = {
+                'co' : 'int_CARIBIC2_CO [ppbv]',
+                'o3' : 'int_CARIBIC2_Ozone [ppbV]',
+                'h2o': 'int_CARIBIC2_H2Ogas [ppmv]',
+                'no' : 'int_CARIBIC2_NO [ppbv]',
+                'noy': 'int_CARIBIC2_NOy [ppbv]',
+                'co2': 'int_CARIBIC2_CO2 [ppmV]',
+                'ch4': 'int_CARIBIC2_CH4 [ppbV]',
+                'n2o': 'int_CLaMS_N2O [ppb]',
+                'f11' : 'int_CLaMS_F11 [ppt]', 
+                'f12' : 'int_CLaMS_F12 [ppt]'}
+
             if CLaMS:
                 col_names.update({
                 'ch4' : 'int_CLaMS_CH4 [ppb]', 
                 'co'  : 'int_CLaMS_CO [ppb]', 
                 'co2' : 'int_CLaMS_CO2 [ppm]',
-                'f11' : 'int_CLaMS_F11 [ppt]', 
-                'f12' : 'int_CLaMS_F12 [ppt]', 
                 'h2o' : 'int_CLaMS_H2O [ppm]',
-                'n2o' : 'int_CLaMS_N2O [ppb]', 
                 'o3'  : 'int_CLaMS_O3 [ppb]'})
-    
-        elif 'INT2' in c_pfx: # caribic / int2
-            col_names = {
-                'noy': 'int_CARIBIC2_NOy [ppbv]',
-                'no' : 'int_CARIBIC2_NO [ppbv]',
-                'ch4': 'int_CLaMS_CH4 [ppb]',
-                'co' : 'int_CLaMS_CO [ppb]',
-                'co2': 'int_CLaMS_CO2 [ppm]',
-                'h2o': 'int_CLaMS_H2O [ppm]',
-                'n2o': 'int_CLaMS_N2O [ppb]',
-                'o3' : 'int_CLaMS_O3 [ppb]'}
 
-        # after having gotten the 'standard' col names, deduce the detrended / lag col names
+        # after having gotten the 'standard' col names, create the detrended / lag col names
         if c_pfx.startswith('detr'): 
             col_names = {k:'detr_'+v for (k, v) in col_names.items()}
         elif c_pfx.startswith('lag_'): 
             col_names = {subs:f'lag_{subs} [yr]' for subs in col_names.keys()}
 
     try: cname = col_names[substance.lower()]
-    except: print(f'No data for {substance} in {source} ({c_pfx})'); return None
+    except: print(f'Substance error: No {substance} in {source} ({c_pfx})'); return None
     return cname
 
-def get_coord_name(coord, source, c_pfx='INT', CLaMS=True):
+def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     """ Get name of eq. lat, rel height wrt therm/dyn tp, ..."""
 
     if source=='Caribic' and c_pfx=='INT': # caribic / int
@@ -152,19 +153,21 @@ def get_coord_name(coord, source, c_pfx='INT', CLaMS=True):
             'median_age' : 'int_AgeSpec_MEDIAN_AGE [year]'
             }
 
+# int_CARIBIC2_H_rel_TP [km]
+
     elif source=='Mozart': # mozart
         col_names = {
             'sf6': 'SF6'}
 
     try: cname = col_names[coord.lower()]
-    except: print(f'Column name not found for {coord} in {source}'); return None
+    except: print(f'Coordinate error: No {coord} in {source} ({c_pfx})'); return None
     return cname
 
 def get_vlims(substance):
     """ Get default limits for colormaps per substance """
     v_limits = {
         'sf6': (6,9),
-        'n2o': (0,10),
+        'n2o': (310,340),
         'co2': (320,430),
         'ch4': (1600,1950),
         'co' : (50, 160)}
@@ -175,17 +178,20 @@ def get_default_unit(substance):
         'sf6': 'ppt',
         'n2o': 'ppb',
         'co2': 'ppm',
-        'ch4': 'ppb'}
+        'ch4': 'ppb',
+        'co' : 'ppb'}
     return unit[substance.lower()]
 
 #%% Input choice and validation
 
-def validated_input(prompt, valid_values):
+def validated_input(prompt, choices):
+    valid_values = choices.keys()
     valid_input = False
     while not valid_input:
         value = input(prompt)
+        if int(value) == 99: return None
         if int(value) in valid_values: 
-            yn = input(f'Confirm your choice ({value}): Y/N \n')
+            yn = input(f'Confirm your choice ({choices[int(value)]}): Y/N \n')
             if yn.upper() =='Y': valid_input = int(value) in valid_values
             else: value = None; pass
 
@@ -197,5 +203,7 @@ def choose_column(df, var='subs'):
     """ Let user choose one of the available column names """
     choices = dict(zip(range(0, len(df.columns)), df.columns))
     for k, v in choices.items(): print(k, ':', v)
-    x = validated_input(f'Select a {var} column by choosing a number between 0 and {len(df.columns)}: \n', choices.keys())
+    print('99 : pass')
+    x = validated_input(f'Select a {var} column by choosing a number between 0 and {len(df.columns)}: \n', choices)
+    if not x: return None
     return choices[int(x)]
