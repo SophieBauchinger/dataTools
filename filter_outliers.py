@@ -163,16 +163,10 @@ def filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True
 
     # create output dataframe
     data_flag = pd.DataFrame(data, columns=['Flight number', 'strato', 'tropo', f'{substance}'])
-    # print(data_flag)
     
-    # data_flag.columns = [f'fl_{x}' if x in [subs] else x for x in data_flag.columns]
-
     data_flag[f'ol_{subs}'] = np.nan # outlier 
     data_flag[f'ol_rel_{subs}'] = np.nan # residual
     data_flag[f'fl_{subs}'] = 0 # flag
-
-    #### set all strato flags to a value != 0 to exclude them. Nvm there are no strato things here anymore
-    #### data_flag.loc[data['strato'] == True, f'fl_{subs}'] = -20
 
     time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
     mxr = data[substance].tolist()
@@ -188,7 +182,7 @@ def filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True
     data_flag[f'fl_{subs}'] = tmp[0]  # flag
     data_flag[f'ol_{subs}'] = tmp[1]  # outlier 
     fit_result = [func(t, *tmp[3]) for t in time]
-    data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result # residzak
+    data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result # residuals
 
     # data_flag.loc[data_flag[f'fl_{subs}'] == 0, f'ol_{subs}'] = np.nan # no residual value for non-outliers
 

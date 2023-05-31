@@ -38,13 +38,13 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm',
     """
     
     data = c_obj.data['INT']
-    subs = c_obj.substance    
+    # subs = c_obj.substance
     substance = get_col_name(subs,'Caribic', c_pfx)
     if not get_col_name(subs, 'Caribic', c_pfx) or substance not in data.columns:
         substance = choose_column(data, subs)
 
     detr = False
-    if 'INT_detr' in caribic.data.keys():
+    if 'INT_detr' in c_obj.data.keys():
         if 'detr_'+ substance  in data.columns: 
             substance = 'detr_' + substance
             print(substance)
@@ -116,11 +116,11 @@ if __name__=='__main__':
 
     c_n2o_col = get_col_name('n2o', source='Caribic', c_pfx = 'INT2')
 
-    ref_data = Mauna_Loa(range(2005, 2020), 'n2o').df
-    c_df_detr = detrend_substance(caribic.data['INT2'], 'n2o', ref_data, 'N2OcatsMLOm')
+    ref_data = Mauna_Loa(range(2005, 2020), 'n2o')
+    c_df_detr = detrend_substance(caribic, 'n2o', ref_data)
 
     for subs in ['o3', 'noy', 'co2', 'ch4', 'no', 'co', 'n2o']:
-        plot_gradient_by_season(c_df_detr, subs)
+        plot_gradient_by_season(caribic, subs)
 
 
 #%% Old definition

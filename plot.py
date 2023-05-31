@@ -32,14 +32,12 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe
     Default plotting of scatter values for global data
     Can speficically plot a caribic dataframe by feeding a df with the dataframe parameter
     """
-    substance = get_col_name(subs, glob_obj.source)
 
     if glob_obj.source=='Caribic':
         for pfx in glob_obj.pfxs:
-            substance = get_col_name(subs, glob_obj.source, pfx)
-
             df = glob_obj.data[pfx]
 
+            substance = get_col_name(subs, glob_obj.source, pfx)
             if substance not in df.columns: 
                 if verbose: print(f'No {substance} values to plot in {pfx}')
                 continue
@@ -77,6 +75,7 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe
             plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
 
     elif glob_obj.source=='Mozart':
+        substance = get_col_name(subs, glob_obj.source)
         #!!! ugly implementation but using the grid size setting to plot all data points individually
         glob_obj.grid_size=1
         plot_global_binned_1d(glob_obj, subs)
@@ -96,7 +95,8 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, singl
     if single_yr is not None: years = [int(single_yr)]
     else: years = glob_obj.years
 
-    out_x_list, out_y_list = glob_obj.binned_1d(subs, single_yr, c_pfx)
+    if glob_obj.source == 'Caribic': out_x_list, out_y_list = glob_obj.binned_1d(glob_obj, subs, single_yr, c_pfx=c_pfx) #!!! CHANGE AFTER NEWLY CREATING caribic
+    else: out_x_list, out_y_list = glob_obj.binned_1d(subs, single_yr, c_pfx=c_pfx)
 
     if not single_graph:
         # Plot mixing ratios averages over lats / lons for each year separately
@@ -168,7 +168,8 @@ def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None):
 
     if single_yr is not None: years = [int(single_yr)]
     else: years = glob_obj.years
-    out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
+    if glob_obj.source == 'Caribic': out_list = glob_obj.binned_2d(glob_obj, subs, single_yr, c_pfx)  #!!! CHANGE AFTER NEWLY CREATING caribic
+    else: out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
 
     for out, yr in zip(out_list, years):
         plt.figure(dpi=300, figsize=(8,3.5))
@@ -291,20 +292,22 @@ def plot_local(loc_obj, substance=None, greyscale=True, v_limits = (6,9)):
                     label=f'{loc_obj.source_print} {substance.upper()}')
     
     # Daily mean
-    if not loc_obj.df_Day.empty: # check if there is data in the daily df
-        plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[col_name], c = loc_obj.df_Day[col_name], 
-                    cmap=colors['day'], norm=norm, marker='+', zorder=2,
-                    label=f'{loc_obj.source_print} {substance.upper()} (D)')
+    if hasattr(loc_obj, 'df_Day'):
+        if not loc_obj.df_Day.empty: # check if there is data in the daily df
+            plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[col_name], c = loc_obj.df_Day[col_name], 
+                        cmap=colors['day'], norm=norm, marker='+', zorder=2,
+                        label=f'{loc_obj.source_print} {substance.upper()} (D)')
 
     # Monthly mean
-    if not loc_obj.df_monthly_mean.empty: # check for data in the monthly df
-        for i, mean in enumerate(loc_obj.df_monthly_mean[col_name]): # plot monthly mean
-            y, m = loc_obj.df_monthly_mean.index[i].year, loc_obj.df_monthly_mean.index[i].month
-            xmin = dt.datetime(y, m, 1)
-            xmax = dt.datetime(y, m, monthrange(y, m)[1])
-            ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
-        ax.hlines(mean, xmin, xmax, color='black', ls='dashed', 
-                  label=f'{loc_obj.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
+    if hasattr(loc_obj, 'df_monthly_mean'):
+        if not loc_obj.df_monthly_mean.empty: # check for data in the monthly df
+            for i, mean in enumerate(loc_obj.df_monthly_mean[col_name]): # plot monthly mean
+                y, m = loc_obj.df_monthly_mean.index[i].year, loc_obj.df_monthly_mean.index[i].month
+                xmin = dt.datetime(y, m, 1)
+                xmax = dt.datetime(y, m, monthrange(y, m)[1])
+                ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
+            ax.hlines(mean, xmin, xmax, color='black', ls='dashed', 
+                      label=f'{loc_obj.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
 
     plt.ylabel(f'{loc_obj.substance.upper()} mixing ratio [{dflt_unit}]')
     plt.xlim(min(loc_obj.df.index), max(loc_obj.df.index))

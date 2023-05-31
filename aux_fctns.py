@@ -4,9 +4,9 @@
 @Date: Fri Apr 28 09:51:49 2023
 
 Auxiliary functions:
-    get_fct_substance(substance)
-    get_col_name(substance, source)
-    get_lin_fit(df, substance='N2OcatsMLOm', degree=2)
+    monthly_mean(df), daily_mean(df), ds_to_gdf(ds)
+    rename_columns(columns) - for caribic data extraction
+    
 """
 import numpy as np
 import datetime as dt
@@ -74,10 +74,10 @@ def rename_columns(columns):
 
     return new_names, dictionary, dictionary_reversed
 
-def same_merge(x): return ','.join(x[x.notnull()].astype(str))
-def same_col_merge(df):
-    """ Merge all columns with the same name when given a dataframe """
-    return df.groupby(level=0, axis=1).apply(lambda x: x.apply(same_merge, axis=1))
+# def same_merge(x): return ','.join(x[x.notnull()].astype(str))
+# def same_col_merge(df):
+#     """ Merge all columns with the same name when given a dataframe """
+#     return df.groupby(level=0, axis=1).apply(lambda x: x.apply(same_merge, axis=1))
 
 #%%  Data Handling
 def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
