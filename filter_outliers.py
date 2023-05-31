@@ -49,6 +49,7 @@ def pre_flag(glob_obj, ref_obj, crit = 'n2o', limit = 0.97, pfx = 'GHG', verbose
     t_obs_tot = np.array(datetime_to_fractionalyear(df.index, method='exact'))
     
     col_name = get_col_name(crit, glob_obj.source, pfx)
+    if not col_name: return pd.DataFrame()
     df.loc[df[col_name] < limit * fit(t_obs_tot), ('strato', 'tropo')] = (True, False)
 
     df[f'{crit}_pre_flag'] = 0 
@@ -57,7 +58,7 @@ def pre_flag(glob_obj, ref_obj, crit = 'n2o', limit = 0.97, pfx = 'GHG', verbose
     
     return df.sort_index() # , preflag_df
 
-def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = False):
+def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = False, plot=False):
     """ 
     Returns dataset with new bool columns 'strato' and 'tropo' 
     Reconstruction of filter_strat_trop from C_tools (T. Schuck)
@@ -73,6 +74,7 @@ def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = F
         verbose (bool)
     """
     data = pre_flag(glob_obj, ref_obj, crit, pfx=pfx) # pre-flagging based on crit  # , preflag_df
+    if data.empty: return
     col_name = get_col_name(crit, glob_obj.source, pfx) # get column name
     t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))  # find total observation time as fractional year for fctn calls below
     mxr = data[col_name] # measured mixing ratios
@@ -85,18 +87,19 @@ def filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose = F
     ol = outliers.find_ol(fct.simple, t_obs_tot, mxr, d_mxr, 
                           flag = data[f'{crit}_pre_flag'], 
                           plot=True, limit=0.1, direction = 'n')
-    # plot the results
-    # fig, ax = plt.subplots()
-    # ax.scatter(t_obs_tot, mxr, c='grey', lw=1, label='data')
-
-    # no_nan_time, no_nan_mxr, no_nan_d_mxr = get_no_nan(t_obs_tot, mxr, d_mxr)
-    # popt0 = fit_data(fct.simple, no_nan_time, no_nan_mxr, no_nan_d_mxr)
-    # ax.plot(np.array(no_nan_time), fct.simple(np.array(no_nan_time), *popt0), 
-    #         c='r', lw=1, label='initial')
-    # ax.plot(t_obs_tot, fct.simple(t_obs_tot, *ol[3]), 
-    #         c='k', lw=1, label='filtered')
-    # fig.legend()
-    # fig.show()
+    
+    if plot: 
+        fig, ax = plt.subplots()
+        ax.scatter(t_obs_tot, mxr, c='grey', lw=1, label='data')
+    
+        no_nan_time, no_nan_mxr, no_nan_d_mxr = get_no_nan(t_obs_tot, mxr, d_mxr)
+        popt0 = fit_data(fct.simple, no_nan_time, no_nan_mxr, no_nan_d_mxr)
+        ax.plot(np.array(no_nan_time), fct.simple(np.array(no_nan_time), *popt0), 
+                c='r', lw=1, label='initial')
+        ax.plot(t_obs_tot, fct.simple(t_obs_tot, *ol[3]), 
+                c='k', lw=1, label='filtered')
+        fig.legend()
+        fig.show()
 
     data.drop(f'{crit}_pre_flag', axis=1, inplace=True)
 
@@ -147,7 +150,7 @@ def filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True
             crit = input(f'Please choose one of the following criteria (select by writing e.g. n2o): \n{trop_crits}\n')
             data = glob_obj.data['{}'.format([x for x in trop_crits if x.endswith(crit)][0])]
 
-    else: print('Something went wrong while choosing the data to use')
+    else: print('Something went wrong while choosing the data to use'); return
 
     substance = get_col_name(subs, glob_obj.source, pfx) # get column name for substance to be outlier flagged
     # print(substance)
@@ -171,7 +174,7 @@ def filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True
     time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
     mxr = data[substance].tolist()
     if f'd_{substance}' in data.columns:
-        d_mxr = data[f'd_{subs}'].tolist()
+        d_mxr = data[f'd_{substance}'].tolist()
     else: # this is the case for integrated values of high resolution data
         d_mxr = None
 
