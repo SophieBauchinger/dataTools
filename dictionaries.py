@@ -7,11 +7,13 @@ Dictionaries for finding fctnbs, col names, v lims, default unit
 """
 from toolpac.outliers import ol_fit_functions as fct
 
-def substance_list(pfx):
-    if pfx == 'GHG':    return ['ch4', 'co2', 'n2o', 'sf6']
-    if pfx == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4'] 
-    if pfx == 'INT2':   return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'n2o', 'f11', 'f12']
-    
+def substance_list(ID):
+    """ Get all possible substances according to identifier (ID) """
+    if ID == 'GHG':    return ['ch4', 'co2', 'n2o', 'sf6']
+    if ID == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4'] 
+    if ID == 'INT2':   return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'n2o', 'f11', 'f12']
+    if ID == 'c_total':return ['o3', 'co2', 'n2o', 'co', 'sf6', 'ch4', 'no', 'noy', 'h2o', 'f11', 'f12']
+    if ID == 'MLO':    return ['ch4', 'co2', 'n2o', 'sf6', 'co']
 
 def get_fct_substance(substance):
     """ Returns appropriate fct from toolpac.outliers.ol_fit_functions to a substance """
@@ -109,7 +111,6 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     """ Get name of eq. lat, rel height wrt therm/dyn tp, ..."""
 
     if source=='Caribic' and c_pfx=='INT': # caribic / int
-        pass
         col_names = {
             'p' : 'p [mbar]',
             'h_rel_tp' : 'int_h_rel_TP [km]',
@@ -124,17 +125,6 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
             'z_rel_therm' : 'int_z_rel_sTP_km [km]', # geopotential height relative to thermal tropopause from ECMWF
             'z_rel_dyn' : 'int_z_rel_dTP_km [km]', # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
             'eq_lat' : 'int_eqlat [deg]', # equivalent latitude in degrees north from ECMWF
-            # 'int_AgeSpec_AGE [year]',
-            # 'int_AgeSpec_MODE [year]', 
-            # 'int_AgeSpec_MEDIAN_AGE [year]',
-            # 'int_CARIBIC2_H_rel_TP; H_rel_TP; replacement for H_rel_TP; [km]; [km]\n',
-            # 'int_ERA5_PV [PVU]', 
-            # 'int_Theta [K]', 
-            # 'int_ERA5_PRESS [hPa]',
-            # 'int_ERA5_TEMP [K]', 
-            # 'int_ERA5_EQLAT [deg N]',
-            # 'int_ERA5_TROP1_PRESS [hPa]', 
-            # 'int_ERA5_TROP1_THETA [K]',
             }
 
     elif source=='Caribic' and c_pfx=='INT2': # caribic / int2
@@ -150,10 +140,7 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
             'tp_theta' : 'int_ERA5_TROP1_THETA [K]', # Pot. temperature of local lapse rate tropopause (ERA5)
             'mean_age' : 'int_AgeSpec_AGE [year]',
             'modal_age' : 'int_AgeSpec_MODE [year]', 
-            'median_age' : 'int_AgeSpec_MEDIAN_AGE [year]'
-            }
-
-# int_CARIBIC2_H_rel_TP [km]
+            'median_age' : 'int_AgeSpec_MEDIAN_AGE [year]'}
 
     elif source=='Mozart': # mozart
         col_names = {
