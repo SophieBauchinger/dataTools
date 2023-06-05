@@ -18,7 +18,7 @@ from dictionaries import get_col_name, choose_column, get_coord_name
 import C_tools
 
 #%% Plotting Gradient by season
-""" What data needs to be put in here? """
+""" Original data needed these: """
 # select_var=['fl_ch4','fl_sf6', 'fl_n2o'] # flagged data
 # select_value=[0,0,0]
 # select_cf=['GT','GT', 'GT'] # operators 
@@ -36,31 +36,37 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', give_choice
     
     Re-implementation of C_plot.pl_gradient_by_season
     """
-    
     data = c_obj.data[c_pfx]
-    # subs = c_obj.substance
     substance = get_col_name(subs, 'Caribic', c_pfx)
     if not get_col_name(subs, 'Caribic', c_pfx) or substance not in data.columns:
         if give_choice: substance = choose_column(data, subs)
         else: return
         if not substance: return
 
-    detr = False
-    if 'INT_detr' in c_obj.data.keys():
-        if 'detr_'+ substance  in data.columns: 
+    detr = False # indicator on whether detrended data is used 
+    if f'detr_{c_pfx}_{subs}' in c_obj.data.keys():
+        detr_data = c_obj.data[f'detr_{c_pfx}_{subs}']
+        print(substance)
+
+        if 'detr_'+ substance  in detr_data.columns: 
             substance = 'detr_' + substance
-            print(substance)
-            detr = True
+            print(substance); detr = True
 
-    # height relative to tropopauses
-    if 'int_pt_rel_dTP_K [K]' in data.columns: H_rel_TP = 'int_pt_rel_dTP_K [K]'
-    elif 'int_CARIBIC2_H_rel_TP [km]' in data.columns: H_rel_TP = 'int_CARIBIC2_H_rel_TP [km]'
+    # y-coordinate
+    if c_pfx == 'INT2': # co, co2, ch4, n2o
+        y_coord = 'int_CARIBIC2_H_rel_TP [km]' # height relative to the tropopause in km: H_rel_TP; replacement for H_rel_TP
+        y_label = '$\Delta$z [km]'
+
+    elif c_pfx =='INT': # co, co2, ch4
+        if tp =='therm': y_coord = 'int_pt_rel_sTP_K [K]' #  potential temperature difference relative to thermal tropopause from ECMWF
+        elif tp == 'dyn': y_coord = 'int_pt_rel_dTP_K [K]' #  potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
+        y_label = f'$\Delta$T [K] ({tp})'
+
     else: 
-        H_rel_TP = get_coord_name('h_rel_tp', 'Caribic', c_pfx)
-        if not H_rel_TP and give_choice: H_rel_TP = choose_column(data, 'h_rel_tp')
-        if not H_rel_TP: return
+        y_coord = get_coord_name('p', 'Caribic', c_pfx)
+        y_label = y_coord
 
-    min_y, max_y = np.nanmin(data[H_rel_TP].values), np.nanmax(data[H_rel_TP].values)
+    min_y, max_y = np.nanmin(data[y_coord].values), np.nanmax(data[y_coord].values)
 
     nbins = (max_y - min_y) / bsize
     y_array = min_y + np.arange(nbins) * bsize + bsize * 0.5
@@ -69,29 +75,39 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', give_choice
     dict_season = {'name_1': 'MAM, spring', 'name_2': 'JJA, summer', 'name_3': 'SON, autumn', 'name_4': 'DJF, winter',
                    'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
 
-    for s in set(data['season'].tolist()):
-        df = data.loc[data['season'] == s]
-        y_values = df[H_rel_TP].values # df[eq_lat_col].values # 
-        x_values = df[substance].values
-        dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
-
     fig, ax = plt.subplots(dpi=200)
 
     x_min = np.nan
     x_max = np.nan
-    for s in set(data['season'].tolist()): # using the set to order the seasons 
+
+    for s in set(data['season'].tolist()):
+        df = data.loc[data['season'] == s]
+        y_values = df[y_coord].values # df[eq_lat_col].values # 
+        if detr: df = detr_data.loc[data['season'] == s]
+
+        x_values = df[substance].values
+
+        if detr: x_values -= detr_data[substance].iloc[0] # subtract value. not the best imprementation ngl
+
+        dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
+
+
+    # for s in set(data['season'].tolist()): # using the set to order the seasons 
         vmean = (dict_season[f'bin1d_{s}']).vmean
         vcount = (dict_season[f'bin1d_{s}']).vcount
         vmean = np.array([vmean[i] if vcount[i] >= 5 else np.nan for i in range(len(vmean))])
         
         # find value range for axis limits
-        all_vmin = np.nanmin((dict_season[f'bin1d_{s}']).vmin)
-        all_vmax = np.nanmax((dict_season[f'bin1d_{s}']).vmax)
-        x_min = np.nanmin((x_min, all_vmin))
-        x_max = np.nanmax((x_min, all_vmax))
+        # all_vmin = np.nanmin((dict_season[f'bin1d_{s}']).vmin)
+        # all_vmax = np.nanmax((dict_season[f'bin1d_{s}']).vmax)
+        # x_min = np.nanmin((x_min, all_vmin))
+        # x_max = np.nanmax((x_min, all_vmax))
 
-        plt.plot(vmean, y_array, '-',
-                 marker='o', c=dict_season[f'color_{s}'], label=dict_season[f'name_{s}'])
+        if c_pfx == 'GHG' or c_pfx == 'INT': 
+            plt.scatter(vmean, y_array, marker='o', c=dict_season[f'color_{s}'], label=dict_season[f'name_{s}'])
+        else:
+            plt.plot(vmean, y_array, '-',
+                     marker='o', c=dict_season[f'color_{s}'], label=dict_season[f'name_{s}'])
 
         # add error bars
         if errorbars:
@@ -101,8 +117,8 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', give_choice
     plt.tick_params(direction='in', top=True, right=True)
 
     plt.ylim([min_y, max_y])
-    plt.ylabel('$\Delta \Theta$ [K]')
-    plt.xlabel(f'{substance[4:]}')
+    plt.ylabel(y_label)
+    plt.xlabel(f'{substance}') # [4:]
     if detr: plt.xlabel('$\Delta$' + substance.split("_")[-1])
 
     x_min, x_max = np.floor(x_min), np.ceil(x_max)
