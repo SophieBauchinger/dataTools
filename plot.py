@@ -27,14 +27,16 @@ from dictionaries import get_col_name, get_vlims, get_default_unit, choose_colum
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
 #%% GlobalData
-def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe=None):
+def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe=None, c_pfx=None, as_subplot=False, ax=None):
     """
     Default plotting of scatter values for global data
     Can speficically plot a caribic dataframe by feeding a df with the dataframe parameter
     """
 
     if glob_obj.source=='Caribic':
-        for pfx in glob_obj.pfxs:
+        if c_pfx: pfxs = [c_pfx]
+        else: pfxs = glob_obj.pfxs
+        for pfx in pfxs:
             df = glob_obj.data[pfx]
 
             substance = get_col_name(subs, glob_obj.source, pfx)
@@ -46,18 +48,20 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe
             df_mm = monthly_mean(df).notna()
 
             # Plot mixing ratio msmts and monthly mean
-            fig, ax = plt.subplots(dpi=250)
-            plt.title(f'{glob_obj.source} {pfx} {substance} measurements')
+            if not as_subplot: 
+                fig, ax = plt.subplots(dpi=250)
+                plt.title(f'{glob_obj.source} {pfx} {substance} measurements')
+            elif ax is None: 
+                ax = plt.gca()
             ymin = np.nanmin(df[substance])
             ymax = np.nanmax(df[substance])
     
             cmap = plt.cm.viridis_r
             extend = 'neither'
-            if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits# ; extend = 'both'
-            else: vmin = ymin; vmax = ymax
+            vmin = np.nanmin([ymin, get_vlims(subs)[0]]); vmax = np.nanmax([ymax, get_vlims(subs)[1]])
             norm = Normalize(vmin, vmax)
     
-            plt.scatter(df.index, df[substance],
+            sp = ax.scatter(df.index, df[substance],
                         label=f'{substance.upper()} {min(df.index.year), max(df.index.year)}', marker='x', zorder=1,
                         c = df[substance],
                         cmap = cmap, norm = norm)
@@ -69,14 +73,17 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe
                           linestyle='dashed', zorder=2)
 
             plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
-            plt.ylabel(f'{substance}')
-            plt.ylim(ymin-0.15, ymax+0.15)
-            fig.autofmt_xdate()
-            plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+            ax.set_ylabel(f'{substance}')
+            ax.set_ylim(ymin-0.15, ymax+0.15)
+            if not as_subplot: 
+                fig.autofmt_xdate()
+                plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+            else: return sp
 
     elif glob_obj.source=='Mozart':
         substance = get_col_name(subs, glob_obj.source)
-        plot_global_binned_1d(glob_obj, subs, single_yr)
+        pl = plot_global_binned_1d(glob_obj, subs, single_yr)
+        return pl
 
 def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, single_graph=False, c_pfx=None):
     """
@@ -99,27 +106,24 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, singl
         # Plot mixing ratios averages over lats / lons for each year separately
         for out_x, out_y, year in zip(out_x_list, out_y_list, years):
             fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-            fig.suptitle('{} {} modeled SF$_6$ concentration. Gridsize={}'.format(
-                glob_obj.source, year, glob_obj.grid_size))
+            fig.suptitle(f'{glob_obj.source} ({c_pfx}) {subs.upper()} for {year}. Gridsize={glob_obj.grid_size}')
 
             cmap = plt.cm.viridis_r
-            if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits
-            else:
-                vmin = min([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
-                vmax = max([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean)])
+            vmin = np.nanmin([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean), get_vlims(subs)[0]])
+            vmax = np.nanmax([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean),  get_vlims(subs)[1]])
             norm = Normalize(vmin, vmax) # allows mapping colormap onto available values
 
             ax[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
             ax[0].scatter(out_x.xintm, out_x.vmean, # plot across latitude
                           c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
             ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-            ax[0].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
+            ax[0].set_ylabel(f'{get_col_name(subs, glob_obj.source, c_pfx)}')
 
             ax[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
             ax[1].scatter(out_y.xintm, out_y.vmean, # plot across longitude
                           c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
             ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
-            ax[1].set_ylabel('Mean SF$_6$ mixing ratio [ppt]')
+            ax[1].set_ylabel(f'{get_col_name(subs, glob_obj.source, c_pfx)}')
 
             fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax[1])
             plt.show()
@@ -127,20 +131,16 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, singl
     if single_graph:
         # Plot averaged mixing ratios for all years on one graph
         fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-        fig.suptitle(f'{glob_obj.source} {glob_obj.years[0]} - {glob_obj.years[-1]} modeled {subs.upper()} mixing ratio. Gridsize={glob_obj.grid_size}')
-
-        cmap = cm.get_cmap('plasma_r')
-        vmin, vmax = glob_obj.years[0], glob_obj.years[-1]
-        norm = Normalize(vmin, vmax)
+        fig.suptitle(f'{glob_obj.source} ({c_pfx}) {subs.upper()} for {glob_obj.years[0]} - {glob_obj.years[-1]}. Gridsize={glob_obj.grid_size}')
 
         for out_x, out_y, year in zip(out_x_list, out_y_list, glob_obj.years): # add each year to plot
             ax[0].plot(out_x.xintm, out_x.vmean, label=year)#, c = cmap(norm(year)))
             ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-            ax[0].set_ylabel(f'Mean {subs.upper()} mixing ratio [ppt]')
+            ax[0].set_ylabel(f'{get_col_name(subs, glob_obj.source, c_pfx)}')
 
             ax[1].plot(out_y.xintm, out_y.vmean, label=year)# , c = cmap(norm(year)))
             ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
-            ax[1].set_ylabel(f'Mean {subs.upper()} mixing ratio [ppt]')
+            # ax[1].set_ylabel(f'Mean {subs.upper()} mixing ratio [ppt]')
 
         if plot_mean: # add average over available years to plot
             total_x_vmean = np.mean([i.vmean for i in out_x_list], axis=0)
@@ -154,7 +154,7 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, singl
         plt.show()
     return
 
-def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None):
+def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None, as_subplot=False, ax=None, years=None):
     """
     Create a 2D plot of binned mixing ratios for each available year.
     Parameters:
@@ -163,34 +163,44 @@ def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None):
     """
     # substance = subs # get_col_name(subs, global_data.source, c_pfx)
 
-    if single_yr is not None: years = [int(single_yr)]
-    else: years = glob_obj.years
-    if glob_obj.source == 'Caribic': out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
-    else: out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
+    if single_yr is not None: 
+        years = [int(single_yr)]
+        fig, axs = plt.subplots(dpi=300, figsize=(10,5), squeeze=False) # squeeze=False makes it so axs is still an array 
+    else: 
+        if not years: years = glob_obj.years
+        fig, axs = plt.subplots(max(int(len(years)/3), 1), 3, dpi=300, figsize=(20, max(len(years), 5)))
 
-    for out, yr in zip(out_list, years):
-        plt.figure(dpi=300, figsize=(8,3.5))
-        plt.gca().set_aspect('equal')
+    out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
 
-        cmap = plt.cm.viridis_r # create colormap
-        if glob_obj.v_limits: vmin, vmax = glob_obj.v_limits # set colormap limits
-        else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
-        norm = Normalize(vmin, vmax) # normalise color map to set limits
+    plt.title(f'{glob_obj.source} ({c_pfx}) concentration measurements. Gridsize={glob_obj.grid_size}')
+    cmap = plt.cm.viridis_r # create colormap
+    vmin = np.nanmin([np.nanmin(out.vmin) for out in out_list])
+    vmax = np.nanmax([np.nanmax(out.vmax) for out in out_list])
+    
+    if not vmin: vmin = get_vlims(subs)[0]
+    if not vmax: vmax = get_vlims(subs)[1]
 
-        world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-        world.boundary.plot(ax=plt.gca(), color='black', linewidth=0.3)
+    # vmin = min([np.nanmin([out.vmin for out in out_list]), [get_vlims(subs)[0]]])
+    # vmax = max([np.nanmin([out.vmax for out in out_list]), [get_vlims(subs)[1]]])
 
-        plt.imshow(out.vmean, cmap = cmap, norm=norm, origin='lower',  # plot values
+    norm = Normalize(vmin, vmax) # normalise color map to set limits
+    world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+
+    for out, ax, yr in zip(out_list, axs.flatten(), years):
+        world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+        img = ax.imshow(out.vmean, cmap = cmap, norm=norm, origin='lower',# plot values
                    extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
-        cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical') # colorbar
-        cbar.ax.set_xlabel('Mean SF$_6$ [ppt]')
 
-        plt.title('{} {} {} concentration measurements. Gridsize={}'.format(
-            subs.upper(), glob_obj.source, yr, glob_obj.grid_size))
-        plt.xlabel('Longitude  [degrees east]'); plt.xlim(-180,180)
-        plt.ylabel('Latitude [degrees north]'); plt.ylim(-60,100)
-        plt.show()
-    return
+        cbar = plt.colorbar(img, ax=ax, pad=0.08, orientation='vertical') # colorbar
+        cbar.ax.set_xlabel(f'{get_col_name(subs, glob_obj.source, c_pfx)}')
+
+        ax.set_title(f'{yr}')
+        ax.set_xlabel('Longitude [°E]'); ax.set_xlim(-180,180)
+        ax.set_ylabel('Latitude [°N]'); ax.set_ylim(-60,100)
+
+    plt.tight_layout()
+    plt.show()
+    return 
 
 # Mozart
 def plot_1d_LonLat(mzt_obj, subs='sf6',
@@ -228,9 +238,10 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
     
     return
 
-def caribic_plots(c_obj, data_key, subs):
-    df = c_obj.data[data_key]
-    substance = get_col_name(subs, c_obj.source, data_key)
+# Caribic
+def caribic_plots(c_obj, key, subs):
+    df = c_obj.data[key]
+    substance = get_col_name(subs, c_obj.source, key)
     df_mm = monthly_mean(df).notna()
     
     # Plot mixing ratio msmts and monthly mean
@@ -241,8 +252,7 @@ def caribic_plots(c_obj, data_key, subs):
     
     cmap = plt.cm.viridis_r
     extend = 'neither'
-    if c_obj.v_limits: vmin, vmax = c_obj.v_limits# ; extend = 'both'
-    else: vmin = ymin; vmax = ymax
+    vmin = np.nanmin([ymin, get_vlims(subs)[0]]); vmax = np.nanmax([ymax, get_vlims(subs)[1]])
     norm = Normalize(vmin, vmax)
     
     plt.scatter(df.index, df[substance],
@@ -261,6 +271,121 @@ def caribic_plots(c_obj, data_key, subs):
     plt.ylim(ymin-0.15, ymax+0.15)
     fig.autofmt_xdate()
     plt.show() # for some reason there's a matplotlib user warning here: converting a masked element to nan. xys = np.asarray(xys)
+
+#%% 
+from toolpac.calc import bin_1d_2d
+import C_tools
+
+def plot_eqlat_deltheta(c_obj, c_pfx='INT2', subs='n2o', tp = 'therm'):
+    
+    if c_pfx == 'INT2': # co, co2, ch4, n2o
+        x_coord = 'int_ERA5_EQLAT [deg N]' # Equivalent latitude (ERA5)
+        y_coord = 'int_CARIBIC2_H_rel_TP [km]' # H_rel_TP; replacement for H_rel_TP
+        y_label = '$\Delta$ z [km]'
+
+    elif c_pfx =='INT': # co, co2, ch4
+        x_coord = 'int_eqlat [deg]', # equivalent latitude in degrees north from ECMWF
+        if tp =='therm': 
+            y_coord = 'int_pt_rel_sTP_K [K]', #  potential temperature difference relative to thermal tropopause from ECMWF
+        elif tp == 'dyn': y_coord = 'int_pt_rel_dTP_K [K]', #  potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
+        y_label = f'$\Delta$T [K]({tp})'
+
+    x_label = 'Eq. lat [°N]'
+
+    data = c_obj.data[c_pfx]
+    substance = get_col_name(subs, c_obj.source, c_pfx)
+    
+# =============================================================================
+    f, axs = plt.subplots(2, 2, dpi=250, figsize=(10,6))
+    data['season'] = C_tools.make_season(data.index.month) # 1 = spring etc
+    dict_season = {'name_1': 'spring (MAM)', 'name_2': 'summer (JJA)', 'name_3': 'autumn (SON)', 'name_4': 'winter (DJF)',
+                   'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
+    
+    for s, ax in zip(set(data['season'].tolist()), axs.flatten()):
+        df = data.loc[data['season'] == s]
+
+        x = np.array(df[x_coord]) # °, latitude 
+        y = np.array(df[y_coord]) # K, pot temp
+    
+        xbmin, xbmax, xbsize = np.nanmin(x), np.nanmax(x), 5 # °, latitude 
+        ybmin, ybmax, ybsize = np.nanmin(y), np.nanmax(y), 0.5 # km, height relative to therm. tp
+
+        print('lat', xbmin, xbmax, xbsize)
+        print('temp', ybmin, ybmax, ybsize)
+
+        out = bin_1d_2d.bin_2d(np.array(df[substance]), x, y,
+                               xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
+
+        ax.set_title(dict_season[f'name_{s}'])
+        # plt.gca().set_aspect('equal')
+    
+        cmap = plt.cm.viridis_r # create colormap
+        
+        vmin = np.nanmin([out.vmin, get_vlims(subs)[0]]); vmax = np.nanmax([out.vmax, get_vlims(subs)[1]])
+    
+        norm = Normalize(vmin, vmax) # normalise color map to set limits
+    
+        img = ax.imshow(out.vmean.T, cmap = cmap, norm=norm, origin='lower',  # plot values
+                        extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax], aspect='auto')
+    
+        cbar = plt.colorbar(img, ax=ax, pad=0.2, orientation='horizontal') # colorbar
+        cbar.ax.set_xlabel(f'{substance}')
+    
+        ax.set_xlabel(x_label); ax.set_xlim(0, out.ybmax*1.2)
+        ax.set_ylabel(y_label); ax.set_ylim(out.xbmin*1.2, out.xbmax*1.2)
+    
+    plt.tight_layout()
+    plt.show()
+
+    return 
+
+if __name__=='__main__':
+    calc_caribic = False
+    if calc_caribic: 
+        from data_classes import Caribic
+        caribic = Caribic(range(2000, 2018), pfxs = ['GHG', 'INT', 'INT2'])
+
+    # for subs in ['co', 'co2', 'ch4']:
+    #     plot_eqlat_deltheta(caribic, c_pfx='INT', subs=subs, tp = 'therm')
+    #     plot_eqlat_deltheta(caribic, c_pfx='INT', subs=subs, tp = 'dyn')
+
+    for subs in ['co', 'co2', 'ch4', 'n2o']:
+        plot_eqlat_deltheta(caribic, c_pfx='INT2', subs=subs)
+
+#%% 
+# c_pfx='INT'
+# subs = 'n2o'
+# tp = 'therm'
+# df = c_obj.data[c_pfx]
+# substance = get_col_name(subs, c_obj.source, c_pfx)
+
+# y = np.array(df[x_coord]) # °, latitude
+# x = np.array(df[y_coord])  # K, pot temp
+
+# xbmin, xbmax, xbsize = np.nanmin(x), np.nanmax(x), 0.1
+# ybmin, ybmax, ybsize = np.nanmin(y), np.nanmax(y), 0.1 
+
+# out = bin_1d_2d.bin_2d(np.array(df[substance]), x, y,
+#                        xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
+
+# plt.figure()
+# #plt.gca().set_aspect('equal')
+
+# cmap = plt.cm.viridis_r # create colormap
+# if c_obj.v_limits: vmin, vmax = c_obj.v_limits # set colormap limits
+# else: vmin = np.nanmin(out.vmin); vmax = np.nanmax(out.vmax)
+# norm = Normalize(vmin, vmax) # normalise color map to set limits
+
+# plt.imshow(out.vmean, cmap = cmap, norm=norm, 
+#            extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
+
+# cbar = plt.colorbar(ax=plt.gca(), pad=0.08, orientation='vertical') # colorbar
+# cbar.ax.set_xlabel(f'{substance}')
+
+# plt.xlabel('Equivalent latitude [°N]'); plt.xlim(-2,100)
+# plt.ylabel(f'$\Delta \Theta$ [K] ({tp})'); plt.ylim(-20,20)
+
+# plt.show()
 
 #%% LocalData
 
@@ -286,14 +411,14 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
     # Measurement data (monthly)
     plt.scatter(loc_obj.df.index, loc_obj.df[col_name], c=loc_obj.df[col_name], zorder=1,
                     cmap=colors['msmts'], norm=norm, marker='+',
-                    label=f'{loc_obj.source_print} {substance.upper()}')
+                    label=f'{loc_obj.source} {substance.upper()}')
     
     # Daily mean
     if hasattr(loc_obj, 'df_Day'):
         if not loc_obj.df_Day.empty: # check if there is data in the daily df
             plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[col_name], # c = loc_obj.df_Day[col_name], 
                         color = 'silver', marker='+', zorder=0,
-                        label=f'{loc_obj.source_print} {substance.upper()} (D)')
+                        label=f'{loc_obj.source} {substance.upper()} (D)')
 
     # Monthly mean
     if hasattr(loc_obj, 'df_monthly_mean'):
@@ -304,7 +429,7 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
                 xmax = dt.datetime(y, m, monthrange(y, m)[1])
                 ax.hlines(mean, xmin, xmax, color='black', linestyle='dashed', zorder=2)
             ax.hlines(mean, xmin, xmax, color='black', ls='dashed', 
-                      label=f'{loc_obj.source_print} {substance.upper()} (M)') # needed for legend, just plots on top
+                      label=f'{loc_obj.source} {substance.upper()} (M)') # needed for legend, just plots on top
 
     # plt.ylim(min(loc_obj.df[col_name]), max(loc_obj.df[col_name]))
     plt.ylabel(f'{loc_obj.substance.upper()} mixing ratio [{dflt_unit}]')
