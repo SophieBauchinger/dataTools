@@ -37,15 +37,6 @@ class GlobalData(object):
         """
         self.years = years
         self.grid_size = grid_size
-        self.v_limits = v_limits # colorbar normalisation limits
-
-    def select_year(self, yr, df=None):
-        """ Returns dataframe of selected year only """
-        if hasattr(self, df): df = self.df
-        elif df == 'None': print('Invalid operation. Cannot find a valid dataframe'); return
-
-        try: return df[df.index.year == yr]
-        except: print(f'No data found for {yr} in {self.source}'); return
 
     def get_data(self, c_pfxs=['GHG'], remap_lon=True,
                  mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
@@ -68,7 +59,7 @@ class GlobalData(object):
                 gdf_pfx = geopandas.GeoDataFrame()
                 for yr in self.years:
                     if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
-                        self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year if there's no data
+                        self.years = np.delete(self.years, np.where(self.years==yr)) # removes current year from class attribute if there's no data
                         if verbose: print(f'No data found for {yr} in {self.source}. Removing {yr} from list of years')
                         continue
 
@@ -118,6 +109,8 @@ class GlobalData(object):
                 self.data[pfx] = gdf_pfx
                 self.data[f'{pfx}_dict'] = col_dict
 
+            self.flights = list(set(pd.concat([self.data[pfx]['Flight number'] for pfx in self.pfxs])))
+
             return self.data
 
         elif self.source=='Mozart':
@@ -158,11 +151,7 @@ class GlobalData(object):
         else: df = self.df 
 
         for yr in years: # loop through available years if possible
-            try: df_yr = df[df.index.year == yr]
-            except: df_yr = df
-
-            if not any(df_yr[df_yr.index.year == yr][substance].notna()): continue # check for "empty" data array
-            if df_yr.empty: continue # go on to next year
+            df_yr = df[df.index.year == yr]
 
             x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
             y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
@@ -197,11 +186,7 @@ class GlobalData(object):
         else: df = self.df 
 
         for yr in years: # loop through available years if possible
-            try: df_yr = df[df.index.year == yr]
-            except: df_yr = df
-
-            if not any(df_yr[df_yr.index.year == yr][substance].notna()): continue
-            if df_yr[substance].empty: continue
+            df_yr = df[df.index.year == yr]
 
             x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
             y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
@@ -214,27 +199,53 @@ class GlobalData(object):
             out_list.append(out)
         return out_list
 
+    def sel_year(self, yr):
+        """ Returns new GlobalData object containing only data for selected year """ 
+        if yr not in self.years: 
+            print(f'No available data for {yr}'); return 
+
+        out = out = type(self).__new__(self.__class__) # copy everything over without changing the original class instance
+        out.years = [yr] 
+
+        if self.source == 'Caribic':
+            df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)]
+            for k in df_list: # now delete everything that isn't the chosen year
+                out.data[k] = self.data[k][self.data[k].index.year == yr]
+                out.data[k].sort_index(inplace=True)
+            
+            out.flights = list(set([yr for yr in out.data[k].index.year])) # update available flights
+
+        else: out.df =  out.df[out.df.index.year == yr]
+
+        return out
 
 class Caribic(GlobalData):
     """ CARIBIC data, plotting, averaging """
 
-    def __init__(self, years, grid_size=5, v_limits=None, flight_nr = None, # subst='sf6', 
+    def __init__(self, years, grid_size=5, flight_nr = None, 
                pfxs=['GHG'], verbose=False):
-        super().__init__([yr for yr in years if yr > 2004], grid_size, v_limits) # no caribic data before 2005, takes too long to actually check so cheesing it
-        self.source = 'Caribic'; self.source_print = 'CAR'
+        super().__init__([yr for yr in years if yr > 2004], grid_size) # no caribic data before 2005, takes too long to actually check so cheesing it
+        self.source = 'Caribic'
         self.pfxs = pfxs
-
-        # self.substance_short = subst
-        # self.substance = get_col_name(self.substance_short, self.source, self.pfxs[0]) # default substance
-
         self.get_data(pfxs, verbose=verbose)
-        if flight_nr: self.select_flight()
 
-    def select_flight(self, flight_nr):
+    def sel_flight(self, flight_nr):
         """ Returns dataframe for selected flight only """
-        for pfx, df in self.data.items():
-            try: self.data[pfx] = df[df.values == flight_nr]
-            except: print('No {pfx} data found for Flight {flight_nr}')
+        if flight_nr not in self.flights: 
+            print(f'No available data for {flight_nr}'); return 
+
+        out = type(self).__new__(self.__class__) # copy everything over without changing the original class instance
+        out.flights = [flight_nr] 
+
+        df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)]
+        for k in df_list: # now delete everything that isn't the chosen flight
+            out.data[k] = self.data[k][self.data[k]['Flight number'] == flight_nr]
+            out.data[k].sort_index(inplace=True)
+            if out.data[k].empty: print(f'No data for Flight {flight_nr} in {k}')
+
+        out.years = list(set([yr for yr in out.data[k].index.year])) # probably only one year but who knows
+
+        return out
 
 class Mozart(GlobalData):
     """
@@ -250,10 +261,11 @@ class Mozart(GlobalData):
 
     def __init__(self, years, grid_size=5, v_limits=None):
         """ Initialise MOZART object """
-        super().__init__(years, grid_size, v_limits)
+        super().__init__(years, grid_size)
         self.years = years
         self.source = 'Mozart'; self.source_print = 'MZT'
         self.substance = 'SF6'
+        self.v_limits = v_limits # colorbar normalisation limits
         self.get_data()
 
 #%% Local data
@@ -352,7 +364,7 @@ class Mauna_Loa(LocalData):
                  path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, substance)
-        self.source = 'Mauna_Loa'; self.source_print = 'MLO'
+        self.source = 'Mauna_Loa'
         self.substance = substance
 
         if substance in ['sf6', 'n2o']:
@@ -380,7 +392,7 @@ class Mace_Head(LocalData):
         """ Initialise Mace Head with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, substance)
         self.years = years
-        self.source = 'Mace_Head'; self.source_print = 'MHD'
+        self.source = 'Mace_Head'
         self.substance = substance
 
         self.df = self.get_data(path)
