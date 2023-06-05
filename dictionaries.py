@@ -6,6 +6,7 @@
 Dictionaries for finding fctnbs, col names, v lims, default unit
 """
 from toolpac.outliers import ol_fit_functions as fct
+import numpy as np
 
 def substance_list(ID):
     """ Get all possible substances according to identifier (ID) """
@@ -61,10 +62,6 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
                 'co2': 'CO2 [ppm]',
                 'n2o': 'N2O [ppb]',
                 'sf6': 'SF6 [ppt]'}
-                # 'no' : 'NO [ppb]',
-                # 'noy': 'NOy [ppb]',
-                # 'no2': 'NO2 [ppb]',
-                # 'co' : 'CO [ppm]'
                 
         elif 'INT' in c_pfx and c_pfx!='INT2': # caribic / int
             col_names = {
@@ -109,6 +106,10 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
 
 def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     """ Get name of eq. lat, rel height wrt therm/dyn tp, ..."""
+
+    if source=='Caribic' and c_pfx=='GHG': # caribic / int
+        col_names = {
+            'p' : 'p [mbar]'}
 
     if source=='Caribic' and c_pfx=='INT': # caribic / int
         col_names = {
@@ -158,7 +159,9 @@ def get_vlims(substance):
         'co2': (320,430),
         'ch4': (1600,1950),
         'co' : (50, 160)}
-    return v_limits[substance.lower()]
+    try: v_lims = v_limits[substance.lower()]
+    except: v_lims = (np.nan, np.nan); print('no default v_lims found')
+    return v_lims
 
 def get_default_unit(substance):
     unit = {
