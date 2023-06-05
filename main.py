@@ -4,11 +4,13 @@
 @Date: Thu Apr 27 15:56:59 2023
 
 Main script for Caribic measurement analysis routine.
+
+Substances in Caribic data:
+'GHG':    ['ch4', 'co2', 'n2o', 'sf6']
+'INT':    ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'f11', 'f12', 'n2o']
+'INT2':   ['noy', 'no', 'ch4', 'co', 'co2', 'h2o', 'n2o', 'o3'] 
+
 """
-import pandas as pd
-
-from toolpac.outliers.outliers import get_no_nan
-
 from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
 from time_lag import calc_time_lags
 from dictionaries import substance_list
@@ -21,40 +23,44 @@ from plot import plot_scatter_global, plot_global_binned_1d, plot_global_binned_
 #%% Get data
 year_range = range(1980, 2021)
 
-mlo_sf6 = Mauna_Loa(year_range, data_Day=True)
-mlo_n2o = Mauna_Loa(year_range, substance='n2o')
-mlo_co2 = Mauna_Loa(year_range, substance='co2')
-mlo_ch4 = Mauna_Loa(year_range, substance='ch4')
-mlo_co  = Mauna_Loa(year_range, substance='co')
-
-mlo_data = {'sf6' : mlo_sf6, 'n2o' : mlo_n2o, 'co2' : mlo_co2, 
-            'ch4' : mlo_ch4, 'co' : mlo_co }
-
-# mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
-
+mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
 caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
-""" 
-Available substance in caribic data:
-'GHG':    ['ch4', 'co2', 'n2o', 'sf6']
-'INT':    ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'f11', 'f12', 'n2o']
-'INT2':   ['noy', 'no', 'ch4', 'co', 'co2', 'h2o', 'n2o', 'o3'] 
-"""
-
 mhd = Mace_Head() # only 2012 data available
-
 mzt = Mozart(year_range) # only available up to 2008
 
-#%% Plot data
-for subs in substance_list('c_total'):
-    plot_scatter_global(caribic, subs)
-plot_global_binned_1d(caribic, subs='sf6', c_pfx='GHG')
-plot_global_binned_2d(caribic, subs='sf6', c_pfx='GHG')
+# examples for creating new objects with only certain year / flight number:
+c_2012 = caribic.sel_year(2008)
+c_fl340 = caribic.sel_flight(340)
 
-mzt_yr = 2008
-plot_scatter_global(mzt, subs='sf6', single_yr=mzt_yr)
-plot_global_binned_1d(mzt, 'sf6', single_yr=mzt_yr)
-plot_global_binned_2d(mzt, 'sf6', single_yr=mzt_yr)
-plot_1d_LonLat(mzt, 'sf6', single_yr=mzt_yr)
+#%% Plot data
+import matplotlib.pyplot as plt
+
+for pfx in caribic.pfxs: # scatter plots of all caribic data
+    substs = [x for x in substance_list(pfx) if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+    f, axs = plt.subplots(int(len(substs)/2), 2, figsize=(10,len(substs)*1.5), dpi=200)
+    plt.suptitle(f'Caribic {(pfx)}')
+    for subs, ax in zip(substs, axs.flatten()): 
+        plot_scatter_global(caribic, subs, c_pfx=pfx, as_subplot=True, ax=ax)
+    f.autofmt_xdate()
+    plt.tight_layout()
+    plt.show()
+
+for pfx in caribic.pfxs: # lon/lat plots of all caribic data 
+    substs = [x for x in substance_list(pfx) if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+    for subs in substs: 
+        plot_global_binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
+
+for pfx in caribic.pfxs: # maps of all caribic data
+    substs = [x for x in substance_list(pfx) if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+    for subs in substs: 
+        plot_global_binned_2d(caribic, subs=subs, c_pfx=pfx)
+
+plot_global_binned_1d(mzt, 'sf6', single_graph=True)
+yr_ranges = [mzt.years[i:i + 9] for i in range(0, len(mzt.years), 9)] # creates year ranges of 6 items for mozart data
+for yr_range in yr_ranges:
+    plot_global_binned_2d(mzt, 'sf6', years=yr_range)
+
+plot_1d_LonLat(mzt, 'sf6', single_yr = 2005)
 
 for subs, mlo_obj in mlo_data.items():
     plot_local(mlo_obj, subs)
@@ -62,14 +68,16 @@ for subs, mlo_obj in mlo_data.items():
 plot_local(mhd, 'sf6')
 
 #%% Time lags - lags are added to dictionary caribic.lags as lags_pfx : dataframe
-calc_time_lags(caribic, mlo_sf6, range(2005, 2020), substance = 'sf6', plot=False)
-calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', pfx='INT2', plot=False)
+lag_plot= True
 
-calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', plot=False)
-calc_time_lags(caribic, mlo_co2, range(2005, 2020), substance = 'co2', pfx='INT2', plot=False)
+calc_time_lags(caribic, mlo_data['sf6'], range(2005, 2020), substance = 'sf6', plot_all=lag_plot)
+calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020), substance = 'n2o', pfx='INT2', plot_all=lag_plot)
+
+calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020), substance = 'n2o', plot_all=lag_plot)
+calc_time_lags(caribic, mlo_data['co2'], range(2005, 2020), substance = 'co2', pfx='INT2', plot_all=lag_plot)
 
 # to delete the newly created attributes use
-# del caribic.__dict__['lags']
+# del caribic.data['lag_GHG'] etc
 
 #%% Detrend
 for subs in ['sf6', 'n2o', 'co2', 'ch4']:
@@ -80,57 +88,12 @@ for pfx in caribic.pfxs:
     for subs in substance_list(pfx):
         plot_gradient_by_season(caribic, subs, pfx)
 
-#%% Filter tropospheric / stratospheric data points based on tracer mixing ratio wrt background data
-for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-    for pfx in caribic.pfxs:
-        filter_strat_trop(caribic, mlo_data[subs], subs, pfx)
-        filter_trop_outliers(caribic, subs, pfx, crit=subs)
+#%% Filter tropospheric / stratospheric data points based on n2o mixing ratio wrt Mauna Loa data 
+for pfx in caribic.pfxs: 
+    filter_strat_trop(caribic, mlo_data['n2o'], 'n2o', pfx)
 
-
-# substances = ['co2', 'n2o', 'sf6', 'ch4']
-
-# ref_dfs = {'sf6' : mlo_sf6,
-#            'n2o' : mlo_n2o,
-#            'co2' : mlo_co2}
-
-# for subs in substances: 
-
-        
-
-# filter_strat_trop(caribic, mlo_co2, 'co2', 'GHG')
-# filter_strat_trop(caribic, mlo_n2o, 'n2o', 'INT2')
-# filter_strat_trop(caribic, mlo_co2, 'co2', 'INT2')
-
-# for subs in ['ch4', 'co2', 'co']:
-#     filter_trop_outliers(caribic, subs, 'INT2', crit='n2o')
-
-
-# # loop through years of caribic data
-# data_filtered = pd.DataFrame() # initialise new dataframe
-# for c_year in range(2005, 2022): 
-#     print(f'{c_year}')
-#     c_data = caribic.data['GHG'][caribic.data['GHG'].index.year == c_year]
-
-#     crit = 'n2o'
-#     n2o_filtered = pd.DataFrame()
-#     if len(get_no_nan(c_data.index, c_data['N2O [ppb]'], c_data['d_N2O [ppb]'])[0]) < 1: # check for valid data
-#         print('! no n2o data')
-#     else:
-#         n2o_filtered =  filter_strat_trop(caribic, mlo_n2o, crit)
-#         data_filtered = pd.concat([data_filtered, n2o_filtered])
-
-#     crit = 'sf6'; sf6_filtered = pd.DataFrame()
-#     if crit=='sf6' and len(get_no_nan(c_data.index, c_data['SF6 [ppt]'], c_data['d_SF6 [ppt]'])[0]) < 1: # check for valid data
-#             print('! no sf6 data')
-#     else: 
-#         sf6_filtered =  filter_strat_trop(c_data, crit)
-#         data_filtered = pd.concat([data_filtered, sf6_filtered])
-
-# data_stratosphere = data_filtered.loc[data_filtered['strato'] == True]
-# # print(data_stratosphere.value_counts)
-# data_troposphere = data_filtered.loc[data_filtered['tropo'] == True]
-
-# data_trop_outlier = filter_trop_outliers(data_filtered, ['n2o'], source='Caribic')
-
-
+for pfx in caribic.pfxs:
+    for subs in substance_list(pfx):
+        if subs in ['sf6', 'n2o', 'co2', 'ch4']:
+            filter_trop_outliers(caribic, subs, pfx, crit=subs)
 
