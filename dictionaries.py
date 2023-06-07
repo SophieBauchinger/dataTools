@@ -36,7 +36,7 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
     """ 
     Returns column name for substance as saved in dataframe 
         source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart' 
-        substance (str): sf6, n2o, co2, ch4
+        substance (str): e.g. sf6, n2o, co2, ch4
     """
     cname=None
 
@@ -113,35 +113,38 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
 
     if source=='Caribic' and c_pfx=='INT': # caribic / int
         col_names = {
-            'p' : 'p [mbar]',
-            'h_rel_tp' : 'int_h_rel_TP [km]',
-            'pv' : 'int_PV [PVU]',
-            'to_air_tmp' : 'int_ToAirTmp [degC]', # Total Air Temperature
-            'tpot' : 'int_Tpot [K]', # potential temperature derived from measured pressure and temperature
-            'z' : 'int_z_km [km]', # geopotential height of sample from ECMWF
-            'dp_tp_therm' : 'int_dp_strop_hpa [hPa]', # pressure difference relative to thermal tropopause from ECMWF
-            'dp_tp_dym' : 'int_dp_dtrop_hpa [hPa]', # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
-            'pt_rel_therm' : 'int_pt_rel_sTP_K [K]', #  potential temperature difference relative to thermal tropopause from ECMWF
-            'pt_rel_dyn' : 'int_pt_rel_dTP_K [K]', #  potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
-            'z_rel_therm' : 'int_z_rel_sTP_km [km]', # geopotential height relative to thermal tropopause from ECMWF
-            'z_rel_dyn' : 'int_z_rel_dTP_km [km]', # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
-            'eq_lat' : 'int_eqlat [deg]', # equivalent latitude in degrees north from ECMWF
+            'p'             : 'p [mbar]',
+            'h_rel_tp'      : 'int_h_rel_TP [km]',
+            'pv'            : 'int_PV [PVU]',
+            'to_air_tmp'    : 'int_ToAirTmp [degC]',                            # Total Air Temperature
+            'tpot'          : 'int_Tpot [K]',                                   # potential temperature derived from measured pressure and temperature
+            'z'             : 'int_z_km [km]',                                  # geopotential height of sample from ECMWF
+            'dp_tp_therm'   : 'int_dp_strop_hpa [hPa]',                         # pressure difference relative to thermal tropopause from ECMWF
+            'dp_tp_dym'     : 'int_dp_dtrop_hpa [hPa]',                         # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
+            'pt_rel_therm'  : 'int_pt_rel_sTP_K [K]',                           # potential temperature difference relative to thermal tropopause from ECMWF
+            'pt_rel_dyn'    : 'int_pt_rel_dTP_K [K]',                           # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
+            'z_rel_therm'   : 'int_z_rel_sTP_km [km]',                          # geopotential height relative to thermal tropopause from ECMWF
+            'z_rel_dyn'     : 'int_z_rel_dTP_km [km]',                          # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
+            'eq_lat'        : 'int_eqlat [deg]',                                # equivalent latitude in degrees north from ECMWF
             }
 
     elif source=='Caribic' and c_pfx=='INT2': # caribic / int2
         col_names = {
-            'p' : 'p [mbar]', # pressure (mean value) 
-            'h_rel_tp' : 'int_CARIBIC2_H_rel_TP [km]', # H_rel_TP; replacement for H_rel_TP
-            'pv' : 'int_ERA5_PV [PVU]', 
-            'theta' : 'int_Theta [K]', # Potential temperature
-            'p_era5' : 'int_ERA5_PRESS [hPa]', # Pressure (ERA5)
-            't' : 'int_ERA5_TEMP [K]', # Temperature (ERA5)
-            'eq_lat' : 'int_ERA5_EQLAT [deg N]', # Equivalent latitude (ERA5)
-            'tp_p': 'int_ERA5_TROP1_PRESS [hPa]', # Pressure of local lapse rate tropopause (ERA5)
-            'tp_theta' : 'int_ERA5_TROP1_THETA [K]', # Pot. temperature of local lapse rate tropopause (ERA5)
-            'mean_age' : 'int_AgeSpec_AGE [year]',
-            'modal_age' : 'int_AgeSpec_MODE [year]', 
-            'median_age' : 'int_AgeSpec_MEDIAN_AGE [year]'}
+            'p'                 : 'p [mbar]',                                   # pressure (mean value) 
+            'h_rel_tp'          : 'int_CARIBIC2_H_rel_TP [km]',                 # H_rel_TP; replacement for H_rel_TP
+            'pv'                : 'int_ERA5_PV [PVU]',                          # Potential vorticity (ERA5)
+            'theta'             : 'int_Theta [K]',                              # Potential temperature
+            'p_era5'            : 'int_ERA5_PRESS [hPa]',                       # Pressure (ERA5)
+            't'                 : 'int_ERA5_TEMP [K]',                          # Temperature (ERA5)
+            'eq_lat'            : 'int_ERA5_EQLAT [deg N]',                     # Equivalent latitude (ERA5)
+            'tp_p'              : 'int_ERA5_TROP1_PRESS [hPa]',                 # Pressure of local lapse rate tropopause (ERA5)
+            'tp_theta'          : 'int_ERA5_TROP1_THETA [K]',                   # Pot. temperature of local lapse rate tropopause (ERA5)
+            'mean_age'          : 'int_AgeSpec_AGE [year]',                     # Mean age from age-spectrum (10 yr)
+            'modal_age'         : 'int_AgeSpec_MODE [year]',                    # Modal age from age-spectrum (10 yr)
+            'median_age'        : 'int_AgeSpec_MEDIAN_AGE [year]',              # Median age from age-spectrum
+            'tp_theta_1_5pvu'   : 'int_ERA5_D_1_5PVU_BOT [K]',                  # THETA-Distance to local 1.5 PVU surface (ERA5)
+            'tp_theta_2_0pvu'   : 'int_ERA5_D_2_0PVU_BOT [K]',                  # -"- 2.0 PVU
+            'tp_theta_3_5pvu'   : 'int_ERA5_D_3_5PVU_BOT [K]'}                  # -"- 3.5 PVU
 
     elif source=='Mozart': # mozart
         col_names = {
