@@ -199,23 +199,30 @@ class GlobalData(object):
             out_list.append(out)
         return out_list
 
-    def sel_year(self, yr):
-        """ Returns new GlobalData object containing only data for selected year """ 
-        if yr not in self.years: 
-            print(f'No available data for {yr}'); return 
+    def sel_year(self, *yr_list):
+        """ Returns GlobalData object containing only data for selected years """ 
+        for yr in yr_list:
+            if yr not in self.years: 
+                print(f'No available data for {yr}')
+                yr_list = np.delete(yr_list, np.where(yr_list==yr))
 
-        out = out = type(self).__new__(self.__class__) # copy everything over without changing the original class instance
-        out.years = [yr] 
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+        out.data = self.data.copy() # very important so that self.data doesn't get overwritten
 
         if self.source == 'Caribic':
-            df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)]
-            for k in df_list: # now delete everything that isn't the chosen year
-                out.data[k] = self.data[k][self.data[k].index.year == yr]
+            df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)] # also takes geodataframes
+            for k in df_list: # delete everything that isn't the chosen year
+                out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
                 out.data[k].sort_index(inplace=True)
-            
-            out.flights = list(set([yr for yr in out.data[k].index.year])) # update available flights
 
-        else: out.df =  out.df[out.df.index.year == yr]
+            out.years = yr_list
+            out.flights = list(set([fl for fl in out.data[k]['Flight number']])) # update available flights
+
+        else: #!!! doesn't take into account xarray datasets yet at all 
+            out.df =  out.df[out.df.index.year.isin(yr_list)]
+            out.years = yr_list
 
         return out
 
@@ -229,21 +236,25 @@ class Caribic(GlobalData):
         self.pfxs = pfxs
         self.get_data(pfxs, verbose=verbose)
 
-    def sel_flight(self, flight_nr):
-        """ Returns dataframe for selected flight only """
-        if flight_nr not in self.flights: 
-            print(f'No available data for {flight_nr}'); return 
+    def sel_flight(self, *flights_list):
+        """ Returns Caribic object containing only data for selected flights """
+        for flight_nr in flights_list:
+            if flight_nr not in self.flights: 
+                print(f'No available data for {flight_nr}')
+                flights_list = np.delete(flights_list, np.where(flights_list==flight_nr))
 
-        out = type(self).__new__(self.__class__) # copy everything over without changing the original class instance
-        out.flights = [flight_nr] 
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+        out.data = self.data.copy() # very important so that self.data doesn't get overwritten
 
-        df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)]
-        for k in df_list: # now delete everything that isn't the chosen flight
-            out.data[k] = self.data[k][self.data[k]['Flight number'] == flight_nr]
+        df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut 
+        for k in df_list: # delete everything that isn't on the selected flights 
+            out.data[k] = out.data[k][out.data[k]['Flight number'].isin(flights_list)]
             out.data[k].sort_index(inplace=True)
-            if out.data[k].empty: print(f'No data for Flight {flight_nr} in {k}')
 
-        out.years = list(set([yr for yr in out.data[k].index.year])) # probably only one year but who knows
+        out.flights = flights_list # should only contain available flights 
+        out.years = list(set([yr for yr in out.data[k].index.year])) # will only ever be one year but for completion
 
         return out
 
