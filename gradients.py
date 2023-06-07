@@ -23,7 +23,7 @@ import C_tools
 # select_value=[0,0,0]
 # select_cf=['GT','GT', 'GT'] # operators 
 
-def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', give_choice=False, 
+def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', pvu = 2.0, give_choice=False, 
                             errorbars=False, ycoord='pt', bsize=0.5, ptsmin=5):
     """ 
     Plotting gradient by season using 1D binned data 
@@ -54,8 +54,12 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', give_choice
 
     # y-coordinate
     if c_pfx == 'INT2': # co, co2, ch4, n2o
-        y_coord = 'int_CARIBIC2_H_rel_TP [km]' # height relative to the tropopause in km: H_rel_TP; replacement for H_rel_TP
-        y_label = '$\Delta$z [km]'
+        if tp == 'height':
+            y_coord = 'int_CARIBIC2_H_rel_TP [km]' # height relative to the tropopause in km: H_rel_TP; replacement for H_rel_TP
+            y_label = '$\Delta$z [km]'
+        if tp == 'pvu':
+            y_coord = 'int_ERA5_D_{}_{}PVU_BOT [K]'.format(str(pvu)[0], str(pvu)[2]) # pot temp difference to potential vorticity surface
+            y_label = f'$\Delta$T wrt. {pvu} PV surface [K]'
 
     elif c_pfx =='INT': # co, co2, ch4
         if tp =='therm': y_coord = 'int_pt_rel_sTP_K [K]' #  potential temperature difference relative to thermal tropopause from ECMWF
