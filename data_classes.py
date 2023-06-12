@@ -19,7 +19,7 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
 from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, rename_columns
-from dictionaries import get_col_name # , get_vlims, get_default_unit
+from dictionaries import get_col_name, coord_dict # , get_vlims, get_default_unit
 
 # Note: Flights [340, 344, 346, 360, 364, 400, 422, 424, 440, 442, 444, 446, 467] have the wrong day saved
 
@@ -200,7 +200,8 @@ class GlobalData(object):
         return out_list
 
     def sel_year(self, *yr_list):
-        """ Returns GlobalData object containing only data for selected years """ 
+        """ Returns GlobalData object containing only data for selected years 
+            yr_list (int / list) """ 
         for yr in yr_list:
             if yr not in self.years: 
                 print(f'No available data for {yr}')
@@ -217,7 +218,7 @@ class GlobalData(object):
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
                 out.data[k].sort_index(inplace=True)
 
-            out.years = yr_list
+            out.years = list(yr_list)
             out.flights = list(set([fl for fl in out.data[k]['Flight number']])) # update available flights
 
         else: #!!! doesn't take into account xarray datasets yet at all 
@@ -227,7 +228,17 @@ class GlobalData(object):
         return out
 
 class Caribic(GlobalData):
-    """ CARIBIC data, plotting, averaging """
+    """ 
+    Stores relevant Caribic data 
+
+    Class attributes: 
+        pfxs (list of str): prefixes, e.g. GHG, INT, INT2
+        data (dict): 
+            {pfx} : DataFrame
+            {pfx}_dict : dictionary (col_name_now : col_name_original)
+        years (list of int)
+        flights (list of int)
+    """
 
     def __init__(self, years, grid_size=5, flight_nr = None, 
                pfxs=['GHG'], verbose=False):
@@ -237,7 +248,8 @@ class Caribic(GlobalData):
         self.get_data(pfxs, verbose=verbose)
 
     def sel_flight(self, *flights_list):
-        """ Returns Caribic object containing only data for selected flights """
+        """ Returns Caribic object containing only data for selected flights 
+            flight_list (int / list) """
         for flight_nr in flights_list:
             if flight_nr not in self.flights: 
                 print(f'No available data for {flight_nr}')
@@ -253,7 +265,7 @@ class Caribic(GlobalData):
             out.data[k] = out.data[k][out.data[k]['Flight number'].isin(flights_list)]
             out.data[k].sort_index(inplace=True)
 
-        out.flights = flights_list # should only contain available flights 
+        out.flights = list(flights_list) # should only contain available flights 
         out.years = list(set([yr for yr in out.data[k].index.year])) # will only ever be one year but for completion
 
         return out
@@ -271,7 +283,7 @@ class Mozart(GlobalData):
     """
 
     def __init__(self, years, grid_size=5, v_limits=None):
-        """ Initialise MOZART object """
+        """ Initialise Mozart object """
         super().__init__(years, grid_size)
         self.years = years
         self.source = 'Mozart'; self.source_print = 'MZT'
@@ -410,11 +422,69 @@ class Mace_Head(LocalData):
         self.df_Day = daily_mean(self.df)
         self.df_monthly_mean = monthly_mean(self.df)
 
+#%% Caribic coordinate merge
+"""
+t_concat = coord_concat(caribic) # too many rows (bc different pressures etc)
+t_join = coord_join(caribic) # correct number of rows
+t_merge = coord_merge(caribic) # too few rows (?)
+"""
+
+def coord_concat(c_obj, save=True):
+    """ Create dataframe with all """
+    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
+    df = c_obj.data['GHG'].copy()
+    df = pd.concat([c_obj.data[pfx] for pfx in c_obj.pfxs])
+    # coord_merge.drop([col for col in coord_merge.columns if col not in coords], axis=1, inplace=True)
+    # if save: c_obj.data['coord_merge'] = coord_merge
+    return df
+
+def coord_join(c_obj, save=True):
+    """ Create dataframe with all """
+    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
+    df = c_obj.data['GHG'].copy()
+    for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
+        df = df.combine_first(c_obj.data[pfx].copy())#, rsuffix=pfx)
+    # coord_merge.drop([col for col in coord_merge.columns if col not in coords], axis=1, inplace=True)
+    # if save: c_obj.data['coord_merge'] = coord_merge
+    return df
+
+def coord_merge(c_obj, save=True):
+    """ Create dataframe with all """
+    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
+    df = c_obj.data['GHG'].copy()
+    for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
+        df = df.merge(c_obj.data[pfx].copy())#, rsuffix=pfx)
+    # coord_merge.drop([col for col in coord_merge.columns if col not in coords], axis=1, inplace=True)
+    # if save: c_obj.data['coord_merge'] = coord_merge
+    return df
+
+calc_c = False
+if calc_c:
+    caribic = Caribic(range(2005, 2020), pfxs = ['GHG', 'INT', 'INT2'])
+
+t_concat = coord_concat(caribic) # too many rows
+t_join = coord_join(caribic) # correct number of rows
+t_merge = coord_merge(caribic) # too few rows
+
+# def subs_merge(c_obj, subs, save=True):
+#     """ Insert GHG data into full coordinate dataframe obtained from coord_merge() """
+#     if not 'coord_merge' in c_obj.data.keys(): # create reference df if it doesn't exist
+#         coord_merge(c_obj)
+#     substance = get_col_name(subs, c_obj.source, 'GHG')
+#     ghg_data = pd.DataFrame(c_obj.data['GHG'][substance], index = c_obj.data['GHG'].index)
+#     merged = c_obj.data['coord_merge'].join(ghg_data)
+#     if save: c_obj.data[f'{subs}_data'] = merged
+#     return merged
+    
+# co2_merge = subs_merge(caribic, 'co2')
+
 #%% Fctn calls
 if __name__=='__main__':
     year_range = np.arange(2000, 2020)
 
-    caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+    calc_c = False
+    if calc_c:
+        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 
     mozart = Mozart(year_range)
 
