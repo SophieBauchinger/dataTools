@@ -12,10 +12,10 @@ from matplotlib.colors import Normalize
 import pandas as pd
 
 from toolpac.calc import bin_1d_2d
-import C_tools
 from dictionaries import get_col_name
 from detrend import detrend_substance
-from aux_fctns import subs_merge
+from aux_fctns import subs_merge, make_season
+from data_classes import Mauna_Loa
 
 def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0, x_bin=None, y_bin=None, x_source='ERA5', vlims=None, detr=True):
     """ 
@@ -48,7 +48,7 @@ def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0, 
         elif c_obj.source == 'Mozart': data = c_obj.df
         else: raise('Could not find the specified data set. Check your input')
 
-    data['season'] = C_tools.make_season(data.index.month) # 1 = spring etc
+    data['season'] = make_season(data.index.month) # 1 = spring etc
     dict_season = {'name_1': 'Spring (MAM)', 'name_2': 'Summer (JJA)', 'name_3': 'Autumn (SON)', 'name_4': 'Winter (DJF)',
                    'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
 
