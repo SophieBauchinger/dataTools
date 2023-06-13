@@ -19,9 +19,7 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
 from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, rename_columns
-from dictionaries import get_col_name, coord_dict # , get_vlims, get_default_unit
-
-# Note: Flights [340, 344, 346, 360, 364, 400, 422, 424, 440, 442, 444, 446, 467] have the wrong day saved
+from dictionaries import get_col_name # , get_vlims, get_default_unit
 
 #%% GLobal data
 class GlobalData(object):
@@ -204,7 +202,7 @@ class GlobalData(object):
             yr_list (int / list) """ 
         for yr in yr_list:
             if yr not in self.years: 
-                print(f'No available data for {yr}')
+                print(f'No data available for {yr}')
                 yr_list = np.delete(yr_list, np.where(yr_list==yr))
 
         out = type(self).__new__(self.__class__) # create new class instance
@@ -220,13 +218,41 @@ class GlobalData(object):
 
             out.years = list(yr_list)
             out.flights = list(set([fl for fl in out.data[k]['Flight number']])) # update available flights
+            out.flights.sort()
 
         else: #!!! doesn't take into account xarray datasets yet at all 
             out.df =  out.df[out.df.index.year.isin(yr_list)]
             out.years = yr_list
 
+        out.years.sort()
         return out
 
+    def sel_latitude(self, lat_min, lat_max):
+        """ Returns GlobalData object containing only data for selected years 
+            yr_list (int / list) """ 
+            
+        out = type(self).__new__(self.__class__) # copy everything over without changing the original class instance
+        for attribute_key in self.__dict__.keys():
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+        out.data = self.data.copy()
+        
+        if self.source == 'Caribic':
+            df_list = [k for k in self.data.keys() if isinstance(self.data[k], pd.DataFrame)] # also takes geodataframes
+            for k in df_list: # delete everything that isn't the chosen year
+                out.data[k] = out.data[k].cx[lat_min:lat_max, -180:180] # .query('latitude > 30')
+                out.data[k].sort_index(inplace=True)
+    
+            out.years = list(set([yr for yr in out.data[k].index.year])) # update available years
+            out.flights = list(set([fl for fl in out.data[k]['Flight number']])) # update available flights
+            out.years.sort(); out.flights.sort() 
+    
+        else: #!!! doesn't take into account xarray datasets yet at all 
+            out.df =  out.df.query('latitude > 30')
+            out.years = list(set([yr for yr in out.df.index.year])) # update available years
+    
+        return out
+
+# Caribic
 class Caribic(GlobalData):
     """ 
     Stores relevant Caribic data 
@@ -267,9 +293,12 @@ class Caribic(GlobalData):
 
         out.flights = list(flights_list) # should only contain available flights 
         out.years = list(set([yr for yr in out.data[k].index.year])) # will only ever be one year but for completion
+        out.years.sort(); out.flights.sort() 
 
         return out
 
+
+# Mozart
 class Mozart(GlobalData):
     """
     Class attributes:
@@ -422,61 +451,7 @@ class Mace_Head(LocalData):
         self.df_Day = daily_mean(self.df)
         self.df_monthly_mean = monthly_mean(self.df)
 
-#%% Caribic coordinate merge
-"""
-t_concat = coord_concat(caribic) # too many rows (bc different pressures etc)
-t_join = coord_join(caribic) # correct number of rows
-t_merge = coord_merge(caribic) # too few rows (?)
-"""
 
-def coord_concat(c_obj, save=True):
-    """ Create dataframe with all """
-    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
-    df = c_obj.data['GHG'].copy()
-    df = pd.concat([c_obj.data[pfx] for pfx in c_obj.pfxs])
-    # coord_merge.drop([col for col in coord_merge.columns if col not in coords], axis=1, inplace=True)
-    # if save: c_obj.data['coord_merge'] = coord_merge
-    return df
-
-def coord_join(c_obj, save=True):
-    """ Create dataframe with all """
-    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
-    df = c_obj.data['GHG'].copy()
-    for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
-        df = df.combine_first(c_obj.data[pfx].copy())#, rsuffix=pfx)
-    # coord_merge.drop([col for col in coord_merge.columns if col not in coords], axis=1, inplace=True)
-    # if save: c_obj.data['coord_merge'] = coord_merge
-    return df
-
-def coord_merge(c_obj, save=True):
-    """ Create dataframe with all """
-    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
-    df = c_obj.data['GHG'].copy()
-    for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
-        df = df.merge(c_obj.data[pfx].copy())#, rsuffix=pfx)
-    # coord_merge.drop([col for col in coord_merge.columns if col not in coords], axis=1, inplace=True)
-    # if save: c_obj.data['coord_merge'] = coord_merge
-    return df
-
-calc_c = False
-if calc_c:
-    caribic = Caribic(range(2005, 2020), pfxs = ['GHG', 'INT', 'INT2'])
-
-t_concat = coord_concat(caribic) # too many rows
-t_join = coord_join(caribic) # correct number of rows
-t_merge = coord_merge(caribic) # too few rows
-
-# def subs_merge(c_obj, subs, save=True):
-#     """ Insert GHG data into full coordinate dataframe obtained from coord_merge() """
-#     if not 'coord_merge' in c_obj.data.keys(): # create reference df if it doesn't exist
-#         coord_merge(c_obj)
-#     substance = get_col_name(subs, c_obj.source, 'GHG')
-#     ghg_data = pd.DataFrame(c_obj.data['GHG'][substance], index = c_obj.data['GHG'].index)
-#     merged = c_obj.data['coord_merge'].join(ghg_data)
-#     if save: c_obj.data[f'{subs}_data'] = merged
-#     return merged
-    
-# co2_merge = subs_merge(caribic, 'co2')
 
 #%% Fctn calls
 if __name__=='__main__':

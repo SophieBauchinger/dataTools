@@ -28,12 +28,13 @@ caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
 mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
 
-# examples for creating new objects with only certain year / flight number:
-c_2008 = caribic.sel_year(2008)
-c_fl340 = caribic.sel_flight(340)
+# examples for creating new objects with only certain year / flight number / latitude :
+# c_2008 = caribic.sel_year(2008)
+# c_fl340 = caribic.sel_flight(340)
+# c_gt30N = caribic.sel_latitude(30, 90)
 
-c_yr08_to_12 = caribic.sel_year(*range(2008, 2012))
-c_fl340_to_360 = caribic.sel_flight(*range(340, 360))
+# c_yr08_to_12 = caribic.sel_year(*range(2008, 2012))
+# c_fl340_to_360 = caribic.sel_flight(*range(340, 360))
 
 #%% Plot data
 import matplotlib.pyplot as plt
@@ -89,7 +90,7 @@ for subs in ['sf6', 'n2o', 'co2', 'ch4']:
 #%% Plot gradients 
 for pfx in ['INT2']:# caribic.pfxs:
     for subs in substance_list(pfx):
-        plot_gradient_by_season(caribic, subs, 'INT2', tp='pvu', pvu = 2.0,)
+        plot_gradient_by_season(caribic, subs, 'INT2', tp='pvu', pvu = 2.0)
 
 #%% Filter tropospheric / stratospheric data points based on n2o mixing ratio wrt Mauna Loa data 
 for pfx in caribic.pfxs: 
@@ -101,4 +102,4 @@ for pfx in caribic.pfxs:
             filter_trop_outliers(caribic, subs, pfx, crit=subs)
 
 #%% Eq. lat vs potential temperature wrt tropopause
-plot_eqlat_deltheta(caribic, c_pfx='INT2', subs='n2o')
+plot_eqlat_deltheta(caribic, c_pfx='INT2', subs='n2o', tp='pvu')
