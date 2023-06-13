@@ -14,11 +14,11 @@ from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
 from time_lag import calc_time_lags
 from dictionaries import substance_list
 
-from gradients import plot_gradient_by_season
+from plot.gradients import plot_gradient_by_season
 from filter_outliers import filter_strat_trop, filter_trop_outliers
 from detrend import detrend_substance
-from plot import plot_scatter_global, plot_global_binned_1d, plot_global_binned_2d, plot_1d_LonLat, plot_local
-from eqlat_plots import plot_eqlat_deltheta
+from plot.data import plot_scatter_global, plot_global_binned_1d, plot_global_binned_2d, plot_1d_LonLat, plot_local
+from plot.eqlat import plot_eqlat_deltheta
 
 #%% Get data
 year_range = range(1980, 2021)
