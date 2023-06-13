@@ -154,25 +154,25 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, singl
         plt.show()
     return
 
-def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None, as_subplot=False, ax=None, years=None):
+def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx='GHG', years=None):
     """
-    Create a 2D plot of binned mixing ratios for each available year.
+    Create a 2D plot of binned mixing ratios for each available year on a grid. 
     Parameters:
-        substance (str): if None, plots default substance for the object
-        single_yr (int): if specified, plots only data for that year [default=None]
+        substance (str)
+        single_yr (int): if specified, plots only data for the chosen year
     """
-    # substance = subs # get_col_name(subs, global_data.source, c_pfx)
 
     if single_yr is not None: 
         years = [int(single_yr)]
         fig, axs = plt.subplots(dpi=300, figsize=(10,5), squeeze=False) # squeeze=False makes it so axs is still an array 
     else: 
         if not years: years = glob_obj.years
-        fig, axs = plt.subplots(max(int(len(years)/3), 1), 3, dpi=300, figsize=(20, max(len(years), 5)))
+        if len(years) <= 3: fig, axs = plt.subplots(len(years), 1, dpi=300, figsize=(8, 3*len(years)))
+        elif len(years) > 3: fig, axs = plt.subplots(int(len(years)/3), 3, dpi=300, figsize=(20, max(len(years), 5)))
 
     out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
 
-    plt.title(f'{glob_obj.source} ({c_pfx}) concentration measurements. Gridsize={glob_obj.grid_size}')
+    plt.suptitle(f'{glob_obj.source} ({c_pfx}) {subs.upper()} mixing ratio measurements. Gridsize={glob_obj.grid_size}')
     cmap = plt.cm.viridis_r # create colormap
     vmin = np.nanmin([np.nanmin(out.vmin) for out in out_list])
     vmax = np.nanmax([np.nanmax(out.vmax) for out in out_list])

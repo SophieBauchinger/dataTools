@@ -9,6 +9,7 @@ Defines function to remove trend from measurements
 
 import numpy as np
 import geopandas
+import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
 
@@ -17,7 +18,7 @@ from dictionaries import get_col_name
 
 def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
     """ (redefined from C_tools.detrend_subs)
-    Remove trend of in measurements of substances such as SF6 using reference data 
+    Remove trend of in measurements of substances using Mauna Loa as a reference
     Parameters:
         c_obj: GlobalData object, Caribic
             c_obj.data is dictionary where data[pfx] are GeoDataFrames
@@ -27,6 +28,7 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
     detr_data = {}
     for c_pfx in c_obj.pfxs: 
         df = c_obj.data[c_pfx]
+        flight_df = pd.DataFrame(df['Flight number'], index = df.index)
         ref_df = loc_obj.df
 
         car_subs = get_col_name(subs, 'Caribic', c_pfx)
@@ -60,12 +62,13 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
             plt.title(f'{subs.upper()} {c_pfx}')
             plt.scatter(t_obs, c_obs, color='orange', label='Flight data')
             plt.scatter(t_ref, c_ref, color='gray', label='MLO data')
-            plt.scatter(t_obs, c_obs_detr, color='green', label='detrended')
+            plt.scatter(t_obs, c_obs_detr, color='green', label='trend removed')
             plt.plot(t_obs, c_fit(t_obs), color='black', ls='dashed', label='trendline')
             plt.legend()
             plt.show()
 
         gdf_detr = geopandas.GeoDataFrame(data, index = df.index, geometry=df.geometry)
+        gdf_detr = gdf_detr.join(flight_df)
 
         c_obj.data[f'detr_{c_pfx}_{subs}'] = gdf_detr
         detr_data[f'detr_{c_pfx}_{subs}'] = gdf_detr
@@ -75,6 +78,7 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
 #%% Fctn calls
 if __name__=='__main__':
     from data_classes import Caribic, Mauna_Loa
+    from dictionaries import substance_list
     year_range = (2000, 2020)
 
     calc_caribic = False
@@ -83,10 +87,10 @@ if __name__=='__main__':
 
     calc_mlo = False
     if calc_mlo:
-        mlo_sf6 = Mauna_Loa(year_range)
-        mlo_n2o = Mauna_Loa(year_range, substance='n2o')
+        year_range = range(1980, 2021)
+        mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
 
-    sf6_detr = detrend_substance(caribic, 'sf6', mlo_sf6)
-    n2o_detr = detrend_substance(caribic, 'n2o', mlo_n2o)
+    co2_detr = detrend_substance(caribic, 'co2', mlo_data['co2'])
+    n2o_detr = detrend_substance(caribic, 'n2o', mlo_data['n2o'])
     
     
