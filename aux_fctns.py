@@ -92,6 +92,16 @@ def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     print(f'Fit parameters obtained: {fit}')
     return fit
 
+def make_season(month):
+    """ If given array of months, return integer representation of seasons 
+    1 - spring, 2 - summer, 3 - autumn, 4 - winter """
+    season = len(month)*[None]
+    for i, m in enumerate(month):
+        if m in   [3, 4, 5]:    season[i] = 1 # spring
+        elif m in [6, 7, 8]:    season[i] = 2 # summer
+        elif m in [9, 10, 11]:  season[i] = 3 # autumn
+        elif m in [12, 1, 2]:   season[i] = 4 # winter
+    return season
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_combo(c_obj, save=True):
