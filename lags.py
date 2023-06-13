@@ -100,7 +100,7 @@ if __name__=='__main__':
     from dictionaries import substance_list
     calc_caribic = False
     if calc_caribic: 
-        from data_classes import Caribic, Mauna_Loa, Mace_Head, Mozart
+        from data import Caribic, Mauna_Loa, Mace_Head, Mozart
         year_range = range(2000, 2018)
         mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
         caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020

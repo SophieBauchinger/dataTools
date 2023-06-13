@@ -25,8 +25,8 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning, module=
 
 from local_data import Mauna_Loa# , Mace_Head
 from global_data import Caribic# , Mozart
-from time_lag import calc_time_lags, plot_time_lags
-from aux_fctns import get_fct_substance, get_col_name, get_lin_fit
+from lags import calc_time_lags, plot_time_lags
+from tools import get_fct_substance, get_col_name, get_lin_fit
 from detrend import detrend_substance
 
 from toolpac.calc import bin_1d_2d

@@ -18,7 +18,7 @@ from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean, daily_mean, ds_to_gdf, rename_columns
+from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns
 from dictionaries import get_col_name # , get_vlims, get_default_unit
 
 #%% GLobal data

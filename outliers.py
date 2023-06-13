@@ -16,8 +16,8 @@ import matplotlib.pyplot as plt
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 
-from aux_fctns import get_lin_fit
-from data_classes import Caribic, Mauna_Loa# , Mozart, Mace_Head
+from tools import get_lin_fit
+from data import Caribic, Mauna_Loa# , Mozart, Mace_Head
 from dictionaries import get_fct_substance, get_col_name
 
 from toolpac.outliers import outliers
