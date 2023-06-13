@@ -77,7 +77,7 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
 
 #%% Fctn calls
 if __name__=='__main__':
-    from data_classes import Caribic, Mauna_Loa
+    from data import Caribic, Mauna_Loa
     from dictionaries import substance_list
     year_range = (2000, 2020)
 

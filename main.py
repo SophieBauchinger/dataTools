@@ -10,12 +10,12 @@ Substances in Caribic data:
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
 'INT2':   ['ch4', 'co2', 'co' , 'n2o',      'o3' , 'noy', 'no' , 'h2o', 'f11', 'f12']
 """
-from data_classes import Caribic, Mozart, Mauna_Loa, Mace_Head
-from time_lag import calc_time_lags
+from data import Caribic, Mozart, Mauna_Loa, Mace_Head
+from lags import calc_time_lags
 from dictionaries import substance_list
 
 from plot.gradients import plot_gradient_by_season
-from filter_outliers import filter_strat_trop, filter_trop_outliers
+from outliers import filter_strat_trop, filter_trop_outliers
 from detrend import detrend_substance
 from plot.data import plot_scatter_global, plot_global_binned_1d, plot_global_binned_2d, plot_1d_LonLat, plot_local
 from plot.eqlat import plot_eqlat_deltheta

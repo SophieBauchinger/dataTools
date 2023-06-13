@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 
 from toolpac.calc import bin_1d_2d
 
-from data_classes import Caribic, Mauna_Loa
+from data import Caribic, Mauna_Loa
 from detrend import detrend_substance
 from dictionaries import get_col_name
-from aux_fctns import subs_merge, make_season
+from tools import subs_merge, make_season
 
 #%% Plotting Gradient by season
 """ Fct definition in C_plot needed these: """

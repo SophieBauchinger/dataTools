@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from toolpac.outliers import outliers, ol_fit_functions
 from toolpac.conv.times import datetime_to_fractionalyear, fractionalyear_to_datetime
 
-from aux_fctns import monthly_mean
+from tools import monthly_mean
 
 
 #%% Mauna Loa

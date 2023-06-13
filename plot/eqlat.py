@@ -14,8 +14,8 @@ import pandas as pd
 from toolpac.calc import bin_1d_2d
 from dictionaries import get_col_name
 from detrend import detrend_substance
-from aux_fctns import subs_merge, make_season
-from data_classes import Mauna_Loa
+from tools import subs_merge, make_season
+from data import Mauna_Loa
 
 def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0, x_bin=None, y_bin=None, x_source='ERA5', vlims=None, detr=True):
     """ 
@@ -144,7 +144,7 @@ def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0, 
 if __name__=='__main__':
     calc_caribic = False
     if calc_caribic: 
-        from data_classes import Caribic
+        from data import Caribic
         caribic = Caribic(range(2000, 2018), pfxs = ['GHG', 'INT', 'INT2'])
 
     # for the meeting
