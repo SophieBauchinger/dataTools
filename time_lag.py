@@ -19,14 +19,13 @@ from dictionaries import get_col_name
 def calc_time_lags(c_obj, ref_obj, years, substance='sf6', pfx='GHG', 
                    ref_min=2003, ref_max=2020, plot_yr=False, plot_all=True, save=True, verbose=False):
     """ Calculate and plot time lag for caribic data wrt mauna loa msmts for specified years 
-    c_obj : (Caribic) type object, needs to have attr data
-    re_obj : 
+    c_obj (Caribic)
+    ref_obj (LocalData)
     """
     subs = get_col_name(substance, c_obj.source, pfx)
     if subs == None: return 
     df_tot = c_obj.data[pfx]
     df_tot= df_tot[~pd.isna(df_tot[subs])] # getting rid of nan stuff
-
 
     lag_index = df_tot[(df_tot.index.year >= min(years)) & 
                                 (df_tot.index.year <= max(years))]
@@ -69,13 +68,13 @@ def calc_time_lags(c_obj, ref_obj, years, substance='sf6', pfx='GHG',
     if plot_all: plot_time_lags(df_lags, all_lags, years)
 
     if save: # save in data dictionary 
-            if f'lag_{pfx}' not in c_obj.data.keys(): # new lag df for this pfx, create the dict entry  
-                c_obj.data[f'lag_{pfx}'] = df_lags 
-            elif col_name not in c_obj.data[f'lag_{pfx}'].columns: # new substance
-                combined_df = c_obj.data[f'lag_{pfx}'].join(df_lags) 
-                c_obj.data[f'lag_{pfx}'] = combined_df
-            else: # overwrite column for current substance # [f'lag_{substance} [yr]'] = all_lags
-                c_obj.data[f'lag_{pfx}'].merge(df_lags) 
+        if f'lag_{pfx}' not in c_obj.data.keys(): # new lag df for this pfx, create the dict entry  
+            c_obj.data[f'lag_{pfx}'] = df_lags 
+        elif col_name not in c_obj.data[f'lag_{pfx}'].columns: # new substance
+            combined_df = c_obj.data[f'lag_{pfx}'].join(df_lags) 
+            c_obj.data[f'lag_{pfx}'] = combined_df
+        else: # overwrite column for current substance # [f'lag_{substance} [yr]'] = all_lags
+            c_obj.data[f'lag_{pfx}'].merge(df_lags) 
     return df_lags
 
 
@@ -98,20 +97,20 @@ def plot_time_lags(df, lags, years, ref_min=2003, ref_max=2020, subs = 'sf6'):
 
 #%% Fct calls
 if __name__=='__main__':
-    from data_classes import Caribic, Mauna_Loa
-
-    year_range = (2000, 2020)
-
-    mlo_sf6 = Mauna_Loa(year_range)
-    mlo_n2o = Mauna_Loa(year_range, substance='n2o')
-    
+    from dictionaries import substance_list
     calc_caribic = False
     if calc_caribic: 
-        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+        from data_classes import Caribic, Mauna_Loa, Mace_Head, Mozart
+        year_range = range(2000, 2018)
+        mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
+        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
+        mhd = Mace_Head() # only 2012 data available
+        mzt = Mozart(year_range) # only available up to 2008
 
-    calc_time_lags(caribic, mlo_sf6, range(2005, 2020), substance = 'sf6')
-    lags_n2o_int2 = calc_time_lags(caribic, mlo_n2o, range(2005, 2020), substance = 'n2o', pfx='INT2')
+    lag_plot= True
 
-    # plot_time_lags(caribic.data['INT2'], lags_n2o_int2, range(2005, 2020), subs='n2o') # all years on one plot
-    
-    
+    calc_time_lags(caribic, mlo_data['sf6'], range(2005, 2020), substance = 'sf6', plot_all=lag_plot)
+    calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020), substance = 'n2o', pfx='INT2', plot_all=lag_plot)
+
+    calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020), substance = 'n2o', plot_all=lag_plot)
+    calc_time_lags(caribic, mlo_data['co2'], range(2005, 2020), substance = 'co2', pfx='INT2', plot_all=lag_plot)

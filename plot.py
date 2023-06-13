@@ -13,7 +13,7 @@ import geopandas
 import numpy as np
 from calendar import monthrange
 
-import matplotlib.cm as cm
+# import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable as sm
@@ -21,7 +21,7 @@ from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch
 
 from aux_fctns import monthly_mean
-from dictionaries import get_col_name, get_vlims, get_default_unit, choose_column
+from dictionaries import get_col_name, get_vlims, get_default_unit
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
@@ -348,12 +348,44 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
 
 #%% 
 if __name__=='__main__':
+    from dictionaries import substance_list
     calc_caribic = False
     if calc_caribic: 
-        from data_classes import Caribic
+        from data_classes import Caribic, Mauna_Loa, Mace_Head, Mozart
         year_range = range(2000, 2018)
-        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+        mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
+        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
+        mhd = Mace_Head() # only 2012 data available
+        mzt = Mozart(year_range) # only available up to 2008
 
-    plot_scatter_global(caribic)
-    plot_global_binned_1d(caribic)
-    plot_global_binned_2d(caribic)
+    for pfx in caribic.pfxs: # scatter plots of all caribic data
+        substs = [x for x in substance_list(pfx) if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+        f, axs = plt.subplots(int(len(substs)/2), 2, figsize=(10,len(substs)*1.5), dpi=200)
+        plt.suptitle(f'Caribic {(pfx)}')
+        for subs, ax in zip(substs, axs.flatten()): 
+            plot_scatter_global(caribic, subs, c_pfx=pfx, as_subplot=True, ax=ax)
+        f.autofmt_xdate()
+        plt.tight_layout()
+        plt.show()
+
+    for pfx in caribic.pfxs: # lon/lat plots of all caribic data 
+        substs = [x for x in substance_list(pfx) if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+        for subs in substs: 
+            plot_global_binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
+
+    for pfx in caribic.pfxs: # maps of all caribic data
+        substs = [x for x in substance_list(pfx) if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+        for subs in substs: 
+            plot_global_binned_2d(caribic, subs=subs, c_pfx=pfx)
+    
+    plot_global_binned_1d(mzt, 'sf6', single_graph=True)
+    yr_ranges = [mzt.years[i:i + 9] for i in range(0, len(mzt.years), 9)] # creates year ranges of 6 items for mozart data
+    for yr_range in yr_ranges:
+        plot_global_binned_2d(mzt, 'sf6', years=yr_range)
+
+    plot_1d_LonLat(mzt, 'sf6', single_yr = 2005)
+
+    for subs, mlo_obj in mlo_data.items():
+        plot_local(mlo_obj, subs)
+
+    plot_local(mhd, 'sf6')

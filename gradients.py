@@ -14,9 +14,7 @@ from toolpac.calc import bin_1d_2d
 from data_classes import Caribic, Mauna_Loa
 from detrend import detrend_substance
 from dictionaries import get_col_name
-from aux_fctns import subs_merge
-
-import C_tools
+from aux_fctns import subs_merge, make_season
 
 #%% Plotting Gradient by season
 """ Fct definition in C_plot needed these: """
@@ -44,7 +42,7 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', pvu = 2.0, 
     data = c_obj.data[f'{subs}_data']
     substance = get_col_name(subs, c_obj.source, 'GHG')
     if use_detr and 'delta_'+substance not in data.columns: 
-        detrend_substance(caribic, subs, Mauna_Loa(c_obj.years, subs))
+        detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs))
         subs_merge(c_obj, subs, save=True, detr=True)
     if use_detr: 
         substance = 'delta_'+substance
@@ -81,7 +79,7 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', pvu = 2.0, 
     nbins = (max_y - min_y) / bsize
     y_array = min_y + np.arange(nbins) * bsize + bsize * 0.5
 
-    data['season'] = C_tools.make_season(data.index.month) # 1 = spring etc
+    data['season'] = make_season(data.index.month) # 1 = spring etc
     dict_season = {'name_1': 'MAM, spring', 'name_2': 'JJA, summer', 'name_3': 'SON, autumn', 'name_4': 'DJF, winter',
                    'color_1': 'blue', 'color_2': 'orange', 'color_3': 'green', 'color_4': 'red'}
 
@@ -114,7 +112,7 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', pvu = 2.0, 
     plt.legend()
     plt.show()
 
-##%% Fct calls 
+#%% Fct calls 
 if __name__=='__main__':    
     calc_caribic = False
     if calc_caribic: 

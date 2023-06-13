@@ -31,7 +31,7 @@ mzt = Mozart(year_range) # only available up to 2008
 # examples for creating new objects with only certain year / flight number / latitude :
 # c_2008 = caribic.sel_year(2008)
 # c_fl340 = caribic.sel_flight(340)
-# c_gt30N = caribic.sel_latitude(30, 90)
+c_gt30N = caribic.sel_latitude(30, 90)
 
 # c_yr08_to_12 = caribic.sel_year(*range(2008, 2012))
 # c_fl340_to_360 = caribic.sel_flight(*range(340, 360))
