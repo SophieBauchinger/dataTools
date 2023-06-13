@@ -14,6 +14,8 @@ import pandas as pd
 import geopandas
 from shapely.geometry import Point
 
+from dictionaries import coord_dict, get_col_name
+
 #%% Data extraction
 def monthly_mean(df, first_of_month=True):
     """
@@ -89,3 +91,36 @@ def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
     print(f'Fit parameters obtained: {fit}')
     return fit
+
+
+#%% Caribic combine GHG measurements with INT and INT2 coordinates
+def coord_combo(c_obj, save=True):
+    """ Create dataframe with all possible coordinates but no measurement / substance values """
+    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs] for i in i])) + ['geometry', 'Flight number'] # merge lists of coordinates for all pfxs in the object
+    df = c_obj.data['GHG'].copy() # copy bc don't want to overwrite data 
+    for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
+        df = df.combine_first(c_obj.data[pfx].copy())
+    df.drop([col for col in df.columns if col not in coords], axis=1, inplace=True) # rmv measurement data
+
+    if save: c_obj.data['coord_combo'] = df
+    return df
+
+def subs_merge(c_obj, subs, save=True, detr=True):
+    """ Insert GHG data into full coordinate dataframe obtained from coord_merge() """
+    if not 'coord_combo' in c_obj.data.keys(): # create reference df if it doesn't exist
+        coord_combo(c_obj)
+    substance = get_col_name(subs, c_obj.source, 'GHG')
+    ghg_data = pd.DataFrame(c_obj.data['GHG'][substance], index = c_obj.data['GHG'].index)
+
+    if detr: 
+        ghg_data = ghg_data.join(c_obj.data[f'detr_GHG_{subs}'], rsuffix='_detrend') # add detrended data to 
+        ghg_data.drop([x for x in ghg_data.columns if x.endswith('_detrend')], axis=1, inplace=True) # duplicate columns
+
+    merged = c_obj.data['coord_combo'].join(ghg_data, rsuffix='_ghg')
+    merged.drop([x for x in merged.columns if x.endswith('_ghg')], axis=1, inplace=True) # duplicate columns
+
+    subs_cols = [c for c in ghg_data.columns if c in merged.columns]
+    merged = merged[subs_cols + [c for c in merged.columns if c not in subs_cols]] # reorder columns 
+
+    if save: c_obj.data[f'{subs}_data'] = merged
+    return merged

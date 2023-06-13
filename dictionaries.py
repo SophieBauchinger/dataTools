@@ -154,12 +154,21 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     except: print(f'Coordinate error: No {coord} in {source} ({c_pfx})'); return None
     return cname
 
+def coord_dict():
+    """ Collection of coordinate column names in Caribic data. 
+    Currently available for GHG, INT, INT2 """
+    ghg_coords = ['p [mbar]']
+    int_coords = ['p [mbar]', 'int_h_rel_TP [km]', 'int_PV [PVU]', 'int_ToAirTmp [degC]', 'int_Tpot [K]', 'int_z_km [km]', 'int_dp_strop_hpa [hPa]', 'int_dp_dtrop_hpa [hPa]', 'int_pt_rel_sTP_K [K]', 'int_pt_rel_dTP_K [K]', 'int_z_rel_sTP_km [km]', 'int_z_rel_dTP_km [km]', 'int_eqlat [deg]']
+    int2_coords = ['p [mbar]', 'int_CARIBIC2_H_rel_TP [km]', 'int_ERA5_PV [PVU]', 'int_Theta [K]', 'int_ERA5_PRESS [hPa]', 'int_ERA5_TEMP [K]', 'int_ERA5_EQLAT [deg N]', 'int_ERA5_TROP1_PRESS [hPa]', 'int_ERA5_TROP1_THETA [K]', 'int_AgeSpec_AGE [year]', 'int_AgeSpec_MODE [year]', 'int_AgeSpec_MEDIAN_AGE [year]', 'int_ERA5_D_1_5PVU_BOT [K]', 'int_ERA5_D_2_0PVU_BOT [K]', 'int_ERA5_D_3_5PVU_BOT [K]']
+    coord_dict = {'GHG': ghg_coords, 'INT': int_coords, 'INT2': int2_coords}
+    return coord_dict
+
 def get_vlims(substance):
     """ Get default limits for colormaps per substance """
     v_limits = {
         'sf6': (6,9),
         'n2o': (310,340),
-        'co2': (320,430),
+        'co2': (320,380),
         'ch4': (1600,1950),
         'co' : (50, 160)}
     try: v_lims = v_limits[substance.lower()]
