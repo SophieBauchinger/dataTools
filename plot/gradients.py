@@ -17,42 +17,40 @@ from dictionaries import get_col_name
 from tools import subs_merge, make_season
 
 #%% Plotting Gradient by season
-""" Fct definition in C_plot needed these: """
+# Fct definition in C_plot needed these:
 # select_var=['fl_ch4','fl_sf6', 'fl_n2o'] # flagged data
 # select_value=[0,0,0]
 # select_cf=['GT','GT', 'GT'] # operators 
 
-def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', pvu = 2.0, give_choice=False, 
-                            errorbars=False, bsize=None, ptsmin=5, use_detr=True):
+# ptsmin (int): minimum number of pts for a bin to be considered #!!! implement
+
+def plot_gradient_by_season(c_obj, subs, tp='therm', pvu = 2.0, errorbars=False, 
+                            bsize=None, use_detr=True, note=None):
     """ 
     Plotting gradient by season using 1D binned data. Detrended data used by default
+    (Inspired by C_plot.pl_gradient_by_season)
+
     Parameters:
-        c_obj (Caribic): obj containing data
+        c_obj (Caribic)
         subs (str): substance e.g. 'sf6'
         tp (str): tropopause definition 
-        bsize (int) bin size for 1D binning
-        ptsmin (int): minimum number of pts for a bin to be considered 
-
-    Re-implementation of C_plot.pl_gradient_by_season
+        pvu (float): potential vorticity for dyn. tp definition. 1.5, 2.0 or 3.5
+        errorbars (bool)
+        bsize (int): bin size for 1D binning (depends on coordinate)
+        use_detr (bool)
+        note (str): shown as text box on the plot
     """
+
     if not f'{subs}_data' in c_obj.data.keys():
-        detrend_substance(caribic, subs, Mauna_Loa(c_obj.years, subs))
-        subs_merge(c_obj, subs, save=True, detr=True)
+        if use_detr: detrend_substance(caribic, subs, Mauna_Loa(c_obj.years, subs))
+        subs_merge(c_obj, subs, save=True, detr=True) # creates data[f'{subs}_data']
 
     data = c_obj.data[f'{subs}_data']
     substance = get_col_name(subs, c_obj.source, 'GHG')
-    if use_detr and 'delta_'+substance not in data.columns: 
-        detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs))
-        subs_merge(c_obj, subs, save=True, detr=True)
-    if use_detr: 
-        substance = 'delta_'+substance
-        detr = True
-    # except: 
-    #     if c_obj.source == 'Caribic': 
-    #         data = c_obj.data[c_pfx]
-    #         substance = get_col_name(subs, c_obj.source, c_pfx)
-    #     elif c_obj.source == 'Mozart': data = c_obj.df
-    #     else: raise('Could not find the specified data set. Check your input')
+    if use_detr and 'delta_'+substance not in data.columns: # merged df exists, but without detrended data
+        detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs)) # creates delta_{substance} column
+        subs_merge(c_obj, subs, save=True, detr=True) # re-creates data[f'{subs}_data']
+    if use_detr: substance = 'delta_'+substance
 
     # Get column name for y axis depending on function parameter     
     if tp == 'z':
@@ -103,11 +101,12 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT2', tp='therm', pvu = 2.0, 
             plt.errorbar(vmean, y_array, None, vstdv, c=dict_season[f'color_{s}'], elinewidth=0.5)
 
     plt.tick_params(direction='in', top=True, right=True)
+    if note: plt.annotate(note, xy=(0.025, 0.925), xycoords='axes fraction', bbox=dict(boxstyle="round", fc="w"))
 
     plt.ylim([min_y, max_y])
     plt.ylabel(y_label)
     plt.xlabel(f'{substance}') # [4:]
-    if detr: plt.xlabel('$\Delta $' + substance.split("_")[-1]) # removing the delta_
+    if use_detr: plt.xlabel('$\Delta $' + substance.split("_")[-1]) # removing the delta_
 
     plt.legend()
     plt.show()
@@ -118,9 +117,15 @@ if __name__=='__main__':
     if calc_caribic: 
         caribic = Caribic(range(2005, 2021), pfxs=['INT2'], subst = 'n2o')
 
+    # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
+    #     plot_gradient_by_season(caribic, subs,  tp='pvu', pvu = 2.0)
+    
     for subs in ['ch4', 'co2', 'sf6', 'n2o']:
-        for tp in ['therm', 'dyn', 'pvu']:
-            plot_gradient_by_season(caribic, subs,  c_pfx='INT2', tp=tp, pvu = 2.0)
+        plot_gradient_by_season(caribic.sel_latitude(30, 90), subs, tp='z', pvu = 2.0, note='lat>30°N')
+
+    # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
+    #     for tp in ['therm', 'dyn', 'pvu']:
+    #         plot_gradient_by_season(caribic, subs,  c_pfx='INT2', tp=tp, pvu = 2.0)
 
 
 #%% Müll

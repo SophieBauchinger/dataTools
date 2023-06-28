@@ -72,7 +72,7 @@ for subs, mlo_obj in mlo_data.items():
 plot_local(mhd, 'sf6')
 
 #%% Time lags - lags are added to dictionary caribic.lags as lags_pfx : dataframe
-lag_plot= True
+lag_plot= False
 
 calc_time_lags(caribic, mlo_data['sf6'], range(2005, 2020), substance = 'sf6', plot_all=lag_plot)
 calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020), substance = 'n2o', pfx='INT2', plot_all=lag_plot)
