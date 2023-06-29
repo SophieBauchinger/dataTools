@@ -20,7 +20,7 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 import toolpac.calc.binprocessor as bp 
 
-from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns
+from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d
 from dictionaries import get_col_name # , get_vlims, get_default_unit
 
 #%% GLobal data
@@ -134,83 +134,23 @@ class GlobalData(object):
 
             return ds # xr.concat(datasets, dim = 'time')
 
-    def binned_1d(self, subs, single_yr=None, c_pfx=None):
+    def binned_1d(self, **kwargs):
         """
         Returns 1D binned objects for each year as lists (lat / lon)
         Parameters:
             substance (str): e.g. 'sf6'
             single_yr (int): if specified, use only data for that year [default=None]
         """
-        substance = get_col_name(subs, self.source, c_pfx)
+        return bin_1d(self, **kwargs) # out_x_list, out_y_list
 
-        out_x_list, out_y_list = [], []
-        if single_yr is not None: years = [int(single_yr)]
-        else: years = self.years
-
-        if self.source == 'Caribic': df = self.data[c_pfx] # for Caribic, need to choose the df
-        else: df = self.df 
-
-        for yr in years: # loop through available years if possible
-            df_yr = df[df.index.year == yr]
-
-            x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
-            y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-
-            xbmin, xbmax = min(x), max(x)
-            ybmin, ybmax = min(y), max(y)
-
-            # average over lon / lat
-            # out_x = bin_1d_2d.bin_1d(df_yr[substance], x,
-            #                          xbmin, xbmax, self.grid_size)
-            # out_y = bin_1d_2d.bin_1d(df_yr[substance], y,
-            #                          ybmin, ybmax, self.grid_size)
-
-            out_x = bp.Simple_bin_1d(df_yr[substance], x, 
-                                     bp.Bin_equi1d(xbmin, xbmax, self.grid_size))
-            out_x.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, self.grid_size).__dict__)
-
-            out_y = bp.Simple_bin_1d(df_yr[substance], y, 
-                                     bp.Bin_equi1d(ybmin, ybmax, self.grid_size))
-            out_y.__dict__.update(bp.Bin_equi1d(ybmin, ybmax, self.grid_size).__dict__)
-
-            out_x_list.append(out_x); out_y_list.append(out_y)
-
-        return out_x_list, out_y_list
-
-    def binned_2d(self, subs, single_yr=None, c_pfx=None):
+    def binned_2d(self, **kwargs):
         """
         Returns 2D binned object for each year as a list
         Parameters:
             substance (str): if None, uses default substance for the object
             single_yr (int): if specified, uses only data for that year [default=None]
         """
-        substance = get_col_name(subs, self.source, c_pfx)
-
-        out_list = []
-        if single_yr is not None: years = [int(single_yr)]
-        else: years = self.years
-
-        if self.source == 'Caribic': df = self.data[c_pfx] # for Caribic, need to choose the df
-        else: df = self.df 
-
-        for yr in years: # loop through available years if possible
-            df_yr = df[df.index.year == yr]
-
-            x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
-            y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-
-            xbmin, xbmax, xbsize = min(x), max(x), self.grid_size
-            ybmin, ybmax, ybsize = min(y), max(y), self.grid_size
-
-            # out = bin_1d_2d.bin_2d(np.array(df_yr[substance]), x, y,
-            #                        xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
-
-            out = bp.Simple_bin_2d(np.array(df_yr[substance]), x, y,
-                                   bp.Bin_equi1d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize))
-            out.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize).__dict__)
-
-            out_list.append(out)
-        return out_list
+        return bin_2d(self, **kwargs) # out_list
 
     def sel_year(self, *yr_list):
         """ Returns GlobalData object containing only data for selected years 
@@ -311,7 +251,6 @@ class Caribic(GlobalData):
         out.years.sort(); out.flights.sort() 
 
         return out
-
 
 # Mozart
 class Mozart(GlobalData):

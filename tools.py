@@ -14,6 +14,8 @@ import pandas as pd
 import geopandas
 from shapely.geometry import Point
 
+import toolpac.calc.binprocessor as bp 
+
 from dictionaries import coord_dict, get_col_name
 
 #%% Data extraction
@@ -134,3 +136,85 @@ def subs_merge(c_obj, subs, save=True, detr=True):
 
     if save: c_obj.data[f'{subs}_data'] = merged
     return merged
+
+#%% Binning of global data sets 
+def bin_1d(globaldatainst, subs, single_yr=None, c_pfx=None):
+    """
+    Returns 1D binned objects for each year as lists (lat / lon)
+    Parameters:
+        substance (str): e.g. 'sf6'
+        single_yr (int): if specified, use only data for that year [default=None]
+    """
+    
+    print('Changes in tools affect the initialised caribic instance')
+    
+    substance = get_col_name(subs, globaldatainst.source, c_pfx)
+
+    out_x_list, out_y_list = [], []
+    if single_yr is not None: years = [int(single_yr)]
+    else: years = globaldatainst.years
+
+    if globaldatainst.source == 'Caribic': df = globaldatainst.data[c_pfx] # for Caribic, need to choose the df
+    else: df = globaldatainst.df 
+
+    for yr in years: # loop through available years if possible
+        df_yr = df[df.index.year == yr]
+
+        x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
+        y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
+
+        xbmin, xbmax = min(x), max(x)
+        ybmin, ybmax = min(y), max(y)
+
+        # average over lon / lat
+        # out_x = bin_1d_2d.bin_1d(df_yr[substance], x,
+        #                          xbmin, xbmax, self.grid_size)
+        # out_y = bin_1d_2d.bin_1d(df_yr[substance], y,
+        #                          ybmin, ybmax, self.grid_size)
+
+        out_x = bp.Simple_bin_1d(df_yr[substance], x, 
+                                 bp.Bin_equi1d(xbmin, xbmax, globaldatainst.grid_size))
+        out_x.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, globaldatainst.grid_size).__dict__)
+
+        out_y = bp.Simple_bin_1d(df_yr[substance], y, 
+                                 bp.Bin_equi1d(ybmin, ybmax, globaldatainst.grid_size))
+        out_y.__dict__.update(bp.Bin_equi1d(ybmin, ybmax, globaldatainst.grid_size).__dict__)
+
+        out_x_list.append(out_x); out_y_list.append(out_y)
+
+    return out_x_list, out_y_list
+
+def bin_2d(globaldatainst, subs, single_yr=None, c_pfx=None):
+    """
+    Returns 2D binned object for each year as a list
+    Parameters:
+        substance (str): if None, uses default substance for the object
+        single_yr (int): if specified, uses only data for that year [default=None]
+    """
+    substance = get_col_name(subs, globaldatainst.source, c_pfx)
+
+    out_list = []
+    if single_yr is not None: years = [int(single_yr)]
+    else: years = globaldatainst.years
+
+    if globaldatainst.source == 'Caribic': df = globaldatainst.data[c_pfx] # for Caribic, need to choose the df
+    else: df = globaldatainst.df 
+
+    for yr in years: # loop through available years if possible
+        df_yr = df[df.index.year == yr]
+
+        x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
+        y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
+
+        xbmin, xbmax, xbsize = min(x), max(x), globaldatainst.grid_size
+        ybmin, ybmax, ybsize = min(y), max(y), globaldatainst.grid_size
+
+        # out = bin_1d_2d.bin_2d(np.array(df_yr[substance]), x, y,
+        #                        xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
+
+        out = bp.Simple_bin_2d(np.array(df_yr[substance]), x, y,
+                               bp.Bin_equi1d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize))
+        out.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize).__dict__)
+
+        out_list.append(out)
+    return out_list
