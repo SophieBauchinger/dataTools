@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import pandas as pd
 
-from toolpac.calc import bin_1d_2d
+from toolpac.calc import bin_1d_2d #!!!
 from dictionaries import get_col_name
 from detrend import detrend_substance
 from tools import subs_merge, make_season

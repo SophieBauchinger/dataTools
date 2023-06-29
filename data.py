@@ -8,15 +8,17 @@ Defines classes used as basis for data structures
 import datetime as dt
 import geopandas
 import numpy as np
-from os.path import exists
 import pandas as pd
 from shapely.geometry import Point
 import xarray as xr
+import dill
+from os.path import exists
 
-from toolpac.calc import bin_1d_2d
+# from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
+import toolpac.calc.binprocessor as bp 
 
 from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns
 from dictionaries import get_col_name # , get_vlims, get_default_unit
@@ -158,10 +160,18 @@ class GlobalData(object):
             ybmin, ybmax = min(y), max(y)
 
             # average over lon / lat
-            out_x = bin_1d_2d.bin_1d(df_yr[substance], x,
-                                     xbmin, xbmax, self.grid_size)
-            out_y = bin_1d_2d.bin_1d(df_yr[substance], y,
-                                     ybmin, ybmax, self.grid_size)
+            # out_x = bin_1d_2d.bin_1d(df_yr[substance], x,
+            #                          xbmin, xbmax, self.grid_size)
+            # out_y = bin_1d_2d.bin_1d(df_yr[substance], y,
+            #                          ybmin, ybmax, self.grid_size)
+
+            out_x = bp.Simple_bin_1d(df_yr[substance], x, 
+                                     bp.Bin_equi1d(xbmin, xbmax, self.grid_size))
+            out_x.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, self.grid_size).__dict__)
+
+            out_y = bp.Simple_bin_1d(df_yr[substance], y, 
+                                     bp.Bin_equi1d(ybmin, ybmax, self.grid_size))
+            out_y.__dict__.update(bp.Bin_equi1d(ybmin, ybmax, self.grid_size).__dict__)
 
             out_x_list.append(out_x); out_y_list.append(out_y)
 
@@ -192,8 +202,13 @@ class GlobalData(object):
             xbmin, xbmax, xbsize = min(x), max(x), self.grid_size
             ybmin, ybmax, ybsize = min(y), max(y), self.grid_size
 
-            out = bin_1d_2d.bin_2d(np.array(df_yr[substance]), x, y,
-                                   xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
+            # out = bin_1d_2d.bin_2d(np.array(df_yr[substance]), x, y,
+            #                        xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
+
+            out = bp.Simple_bin_2d(np.array(df_yr[substance]), x, y,
+                                   bp.Bin_equi1d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize))
+            out.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize).__dict__)
+
             out_list.append(out)
         return out_list
 
@@ -457,9 +472,11 @@ class Mace_Head(LocalData):
 if __name__=='__main__':
     year_range = np.arange(2000, 2020)
 
-    calc_c = False
-    if calc_c:
-        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+    calc_c = True
+    if calc_c and exists('caribic_dill.pkl'): # Avoid long file loading times
+        with open('caribic_dill.pkl', 'rb') as f: caribic = dill.load(f)
+        del f
+    elif calc_c: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # only calculate if necessary
 
     mozart = Mozart(year_range)
 

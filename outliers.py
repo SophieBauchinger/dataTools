@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None  # default='warn' - otherwise df[j] = val gives a warning (outliers.outliers)
 import matplotlib.pyplot as plt
+import dill
+from os.path import exists
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
@@ -214,9 +216,15 @@ def filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True
 
 #%% Get data
 if __name__=='__main__':
-    calc_caribic = False
-    if calc_caribic: 
-        caribic = Caribic(range(2005, 2021), pfxs = ['GHG', 'INT', 'INT2'])
+    year_range = np.arange(2000, 2020)
+
+    calc_c = False
+    if calc_c:
+        if exists('caribic_dill.pkl'): # Avoid long file loading times
+            with open('caribic_dill.pkl', 'rb') as f:
+                caribic = dill.load(f)
+            del f
+        else: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # only calculate if necessary
 
     mlo_sf6 = Mauna_Loa(range(2008, 2020))
     mlo_n2o = Mauna_Loa(range(2008, 2020), substance = 'n2o')

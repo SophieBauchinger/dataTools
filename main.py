@@ -10,6 +10,10 @@ Substances in Caribic data:
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
 'INT2':   ['ch4', 'co2', 'co' , 'n2o',      'o3' , 'noy', 'no' , 'h2o', 'f11', 'f12']
 """
+import dill
+from os.path import exists
+from os import remove
+
 from data import Caribic, Mozart, Mauna_Loa, Mace_Head
 from lags import calc_time_lags
 from dictionaries import substance_list
@@ -20,11 +24,24 @@ from detrend import detrend_substance
 from plot.data import plot_scatter_global, plot_global_binned_1d, plot_global_binned_2d, plot_1d_LonLat, plot_local
 from plot.eqlat import plot_eqlat_deltheta
 
-#%% Get data
+#%% Get Data
 year_range = range(1980, 2021)
 
+if exists('caribic_dill.pkl'): # Avoid long file loading times
+    with open('caribic_dill.pkl', 'rb') as f:
+        caribic = dill.load(f)
+    del f
+else: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # only calculate if necessary
+
+def save_caribic(fname = 'caribic_dill.pkl'):
+    """ Drop rows where pressure values don't exist, then save caribic object to dill file """
+    caribic.data['INT2'].dropna(how='any', subset='p [mbar]', inplace=True) #!!! Temporary fix bc otherwise dill/pickle doesn't work
+    with open(fname, 'wb') as f:
+        dill.dump(caribic, f)
+def del_caribic(fname = 'caribic_dill.pkl'): remove(fname)
+# save_caribic() 
+
 mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs in substance_list('MLO')}
-caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
 mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
 

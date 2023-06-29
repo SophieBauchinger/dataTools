@@ -6,10 +6,12 @@
 Plotting of gradients - wants detrended data, sorted into atmos. layers
 
 """
+import dill
+from os.path import exists
 import numpy as np
 import matplotlib.pyplot as plt
 
-from toolpac.calc import bin_1d_2d
+from toolpac.calc.binprocessor import Simple_bin_1d, Bin_equi1d #!!!
 
 from data import Caribic, Mauna_Loa
 from detrend import detrend_substance
@@ -88,7 +90,8 @@ def plot_gradient_by_season(c_obj, subs, tp='therm', pvu = 2.0, errorbars=False,
         y_values = df[y_coord].values # df[eq_lat_col].values # 
         x_values = df[substance].values
 
-        dict_season[f'bin1d_{s}'] = bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
+        dict_season[f'bin1d_{s}'] = Simple_bin_1d(x_values, y_values, Bin_equi1d(min_y, max_y, bsize))
+        # bin_1d_2d.bin_1d(x_values, y_values, min_y, max_y, bsize)
 
         vmean = (dict_season[f'bin1d_{s}']).vmean
         vcount = (dict_season[f'bin1d_{s}']).vcount
@@ -113,9 +116,13 @@ def plot_gradient_by_season(c_obj, subs, tp='therm', pvu = 2.0, errorbars=False,
 
 #%% Fct calls 
 if __name__=='__main__':    
-    calc_caribic = False
-    if calc_caribic: 
-        caribic = Caribic(range(2005, 2021), pfxs=['INT2'], subst = 'n2o')
+    calc_c = False
+    if calc_c:
+        if exists('caribic_dill.pkl'): # Avoid long file loading times
+            with open('caribic_dill.pkl', 'rb') as f:
+                caribic = dill.load(f)
+            del f
+        else: caribic = Caribic(range(1980, 2021), pfxs = ['GHG', 'INT', 'INT2']) # only calculate if necessary
 
     # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
     #     plot_gradient_by_season(caribic, subs,  tp='pvu', pvu = 2.0)

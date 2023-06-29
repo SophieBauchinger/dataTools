@@ -7,7 +7,6 @@ Defines different plotting possibilities for objects of the type GlobalData
 or LocalData as defined in data_classes
 
 """
-
 import datetime as dt
 import geopandas
 import numpy as np
