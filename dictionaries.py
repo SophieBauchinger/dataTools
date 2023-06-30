@@ -11,58 +11,63 @@ import numpy as np
 def substance_list(ID):
     """ Get all possible substances according to identifier (ID) """
     if ID == 'GHG':    return ['ch4', 'co2', 'n2o', 'sf6']
-    if ID == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4'] 
-    if ID == 'INT2':   return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4', 'n2o', 'f11', 'f12']
-    if ID == 'c_total':return ['o3', 'co2', 'n2o', 'co', 'sf6', 'ch4', 'no', 'noy', 'h2o', 'f11', 'f12']
+    if ID == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4']
+    if ID == 'INT2':   return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4',
+                               'n2o', 'f11', 'f12']
+    if ID == 'c_total':return ['o3', 'co2', 'n2o', 'co', 'sf6', 'ch4', 'no',
+                               'noy', 'h2o', 'f11', 'f12']
     if ID == 'MLO':    return ['ch4', 'co2', 'n2o', 'sf6', 'co']
 
 def get_fct_substance(substance):
-    """ Returns appropriate fct from toolpac.outliers.ol_fit_functions to a substance """
+    """ Returns corresponding fct from toolpac.outliers.ol_fit_functions """
     df_func_dict = {'co2': fct.higher,
                     'ch4': fct.higher,
-                    'n2o': fct.simple, 
-                    'sf6': fct.quadratic, 
-                    'trop_sf6_lag': fct.quadratic, 
-                    'sulfuryl_fluoride': fct.simple, 
-                    'hfc_125': fct.simple, 
-                    'hfc_134a': fct.simple, 
-                    'halon_1211': fct.simple, 
-                    'cfc_12': fct.simple, 
-                    'hcfc_22': fct.simple, 
+                    'n2o': fct.simple,
+                    'sf6': fct.quadratic,
+                    'trop_sf6_lag': fct.quadratic,
+                    'sulfuryl_fluoride': fct.simple,
+                    'hfc_125': fct.simple,
+                    'hfc_134a': fct.simple,
+                    'halon_1211': fct.simple,
+                    'cfc_12': fct.simple,
+                    'hcfc_22': fct.simple,
                     'int_co': fct.quadratic}
     return df_func_dict[substance.lower()]
 
 def get_col_name(substance, source, c_pfx='', CLaMS=False):
-    """ 
-    Returns column name for substance as saved in dataframe 
-        source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart' 
+    """
+    Returns column name for substance as saved in dataframe
+        source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart'
         substance (str): e.g. sf6, n2o, co2, ch4
     """
     cname=None
 
-    if source=='Mauna_Loa': # mauna loa. monthly or daily median
+    if source=='Mauna_Loa': # mauna loa
         col_names = {
             'sf6': 'SF6catsMLOm',
             'n2o': 'N2OcatsMLOm',
             'co2': 'co2 [ppm]',
             'ch4': 'ch4 [ppb]',
-            'co' : 'co [ppb]'}
+            'co' : 'co [ppb]',
+            }
 
     elif source=='Mace_Head': # mace head
         col_names={'sf6': 'SF6 [ppt]',
-                   'ch2cl2': 'CH2Cl2 [ppt]'}
-        
+                   'ch2cl2': 'CH2Cl2 [ppt]',
+                   }
+
     elif source=='Mozart': # mozart
         col_names = {'sf6': 'SF6'}
 
     elif source=='Caribic':
         if 'GHG' in c_pfx: # caribic / ghg
-            col_names = { 
+            col_names = {
                 'ch4': 'CH4 [ppb]',
                 'co2': 'CO2 [ppm]',
                 'n2o': 'N2O [ppb]',
-                'sf6': 'SF6 [ppt]'}
-                
+                'sf6': 'SF6 [ppt]',
+                }
+
         elif 'INT' in c_pfx and c_pfx!='INT2': # caribic / int
             col_names = {
                 'co' : 'int_CO [ppb]',
@@ -71,8 +76,9 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
                 'no' : 'int_NO [ppb]',
                 'noy': 'int_NOy [ppb]',
                 'co2': 'int_CO2 [ppm]',
-                'ch4': 'int_CH4 [ppb]'}
-    
+                'ch4': 'int_CH4 [ppb]',
+                }
+
         elif 'INT2' in c_pfx: # caribic / int2
             col_names = {
                 'co' : 'int_CARIBIC2_CO [ppbv]',
@@ -83,25 +89,31 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
                 'co2': 'int_CARIBIC2_CO2 [ppmV]',
                 'ch4': 'int_CARIBIC2_CH4 [ppbV]',
                 'n2o': 'int_CLaMS_N2O [ppb]',
-                'f11' : 'int_CLaMS_F11 [ppt]', 
-                'f12' : 'int_CLaMS_F12 [ppt]'}
+                'f11' : 'int_CLaMS_F11 [ppt]',
+                'f12' : 'int_CLaMS_F12 [ppt]',
+                }
 
             if CLaMS:
                 col_names.update({
-                'ch4' : 'int_CLaMS_CH4 [ppb]', 
-                'co'  : 'int_CLaMS_CO [ppb]', 
+                'ch4' : 'int_CLaMS_CH4 [ppb]',
+                'co'  : 'int_CLaMS_CO [ppb]',
                 'co2' : 'int_CLaMS_CO2 [ppm]',
                 'h2o' : 'int_CLaMS_H2O [ppm]',
-                'o3'  : 'int_CLaMS_O3 [ppb]'})
+                'o3'  : 'int_CLaMS_O3 [ppb]',
+                })
 
-        # after having gotten the 'standard' col names, create the detrended / lag col names
-        if c_pfx.startswith('detr'): 
+        # after having gotten the 'standard' col names,
+        # create the detrended / lag col names
+        if c_pfx.startswith('detr'):
             col_names = {k:'detr_'+v for (k, v) in col_names.items()}
-        elif c_pfx.startswith('lag_'): 
-            col_names = {subs:f'lag_{subs} [yr]' for subs in col_names.keys()}
+        elif c_pfx.startswith('lag_'):
+            col_names = {subs:f'lag_{subs} [yr]' for subs
+                         in col_names.keys()}
 
     try: cname = col_names[substance.lower()]
-    except: print(f'Substance error: No {substance} in {source} ({c_pfx})'); return None
+    except:
+        print(f'Substance error: No {substance} in {source} ({c_pfx})')
+        return None
     return cname
 
 def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
@@ -130,7 +142,7 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
 
     elif source=='Caribic' and c_pfx=='INT2': # caribic / int2
         col_names = {
-            'p'                 : 'p [mbar]',                                   # pressure (mean value) 
+            'p'                 : 'p [mbar]',                                   # pressure (mean value)
             'h_rel_tp'          : 'int_CARIBIC2_H_rel_TP [km]',                 # H_rel_TP; replacement for H_rel_TP
             'pv'                : 'int_ERA5_PV [PVU]',                          # Potential vorticity (ERA5)
             'theta'             : 'int_Theta [K]',                              # Potential temperature
@@ -144,23 +156,40 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
             'median_age'        : 'int_AgeSpec_MEDIAN_AGE [year]',              # Median age from age-spectrum
             'tp_theta_1_5pvu'   : 'int_ERA5_D_1_5PVU_BOT [K]',                  # THETA-Distance to local 1.5 PVU surface (ERA5)
             'tp_theta_2_0pvu'   : 'int_ERA5_D_2_0PVU_BOT [K]',                  # -"- 2.0 PVU
-            'tp_theta_3_5pvu'   : 'int_ERA5_D_3_5PVU_BOT [K]'}                  # -"- 3.5 PVU
+            'tp_theta_3_5pvu'   : 'int_ERA5_D_3_5PVU_BOT [K]',                  # -"- 3.5 PVU
+            }
 
     elif source=='Mozart': # mozart
         col_names = {
             'sf6': 'SF6'}
 
     try: cname = col_names[coord.lower()]
-    except: print(f'Coordinate error: No {coord} in {source} ({c_pfx})'); return None
+    except:
+        print(f'Coordinate error: No {coord} in {source} ({c_pfx})')
+        return None
     return cname
 
 def coord_dict():
-    """ Collection of coordinate column names in Caribic data. 
+    """ Collection of coordinate column names in Caribic data.
     Currently available for GHG, INT, INT2 """
     ghg_coords = ['p [mbar]']
-    int_coords = ['p [mbar]', 'int_h_rel_TP [km]', 'int_PV [PVU]', 'int_ToAirTmp [degC]', 'int_Tpot [K]', 'int_z_km [km]', 'int_dp_strop_hpa [hPa]', 'int_dp_dtrop_hpa [hPa]', 'int_pt_rel_sTP_K [K]', 'int_pt_rel_dTP_K [K]', 'int_z_rel_sTP_km [km]', 'int_z_rel_dTP_km [km]', 'int_eqlat [deg]']
-    int2_coords = ['p [mbar]', 'int_CARIBIC2_H_rel_TP [km]', 'int_ERA5_PV [PVU]', 'int_Theta [K]', 'int_ERA5_PRESS [hPa]', 'int_ERA5_TEMP [K]', 'int_ERA5_EQLAT [deg N]', 'int_ERA5_TROP1_PRESS [hPa]', 'int_ERA5_TROP1_THETA [K]', 'int_AgeSpec_AGE [year]', 'int_AgeSpec_MODE [year]', 'int_AgeSpec_MEDIAN_AGE [year]', 'int_ERA5_D_1_5PVU_BOT [K]', 'int_ERA5_D_2_0PVU_BOT [K]', 'int_ERA5_D_3_5PVU_BOT [K]']
-    coord_dict = {'GHG': ghg_coords, 'INT': int_coords, 'INT2': int2_coords}
+    int_coords = ['p [mbar]', 'int_h_rel_TP [km]', 'int_PV [PVU]',
+                  'int_ToAirTmp [degC]', 'int_Tpot [K]', 'int_z_km [km]',
+                  'int_dp_strop_hpa [hPa]', 'int_dp_dtrop_hpa [hPa]',
+                  'int_pt_rel_sTP_K [K]', 'int_pt_rel_dTP_K [K]',
+                  'int_z_rel_sTP_km [km]', 'int_z_rel_dTP_km [km]',
+                  'int_eqlat [deg]']
+    int2_coords = ['p [mbar]', 'int_CARIBIC2_H_rel_TP [km]',
+                   'int_ERA5_PV [PVU]', 'int_Theta [K]',
+                   'int_ERA5_PRESS [hPa]', 'int_ERA5_TEMP [K]',
+                   'int_ERA5_EQLAT [deg N]', 'int_ERA5_TROP1_PRESS [hPa]',
+                   'int_ERA5_TROP1_THETA [K]', 'int_AgeSpec_AGE [year]',
+                   'int_AgeSpec_MODE [year]', 'int_AgeSpec_MEDIAN_AGE [year]',
+                   'int_ERA5_D_1_5PVU_BOT [K]', 'int_ERA5_D_2_0PVU_BOT [K]',
+                   'int_ERA5_D_3_5PVU_BOT [K]']
+    coord_dict = {'GHG': ghg_coords,
+                  'INT': int_coords,
+                  'INT2': int2_coords}
     return coord_dict
 
 def get_vlims(substance):
@@ -192,20 +221,21 @@ def validated_input(prompt, choices):
     while not valid_input:
         value = input(prompt)
         if int(value) == 99: return None
-        if int(value) in valid_values: 
+        if int(value) in valid_values:
             yn = input(f'Confirm your choice ({choices[int(value)]}): Y/N \n')
             if yn.upper() =='Y': valid_input = int(value) in valid_values
             else: value = None; pass
 
         try: valid_input = int(value) in valid_values
         except: print('')
-    return value    
+    return value
 
 def choose_column(df, var='subs'):
     """ Let user choose one of the available column names """
     choices = dict(zip(range(0, len(df.columns)), df.columns))
     for k, v in choices.items(): print(k, ':', v)
     print('99 : pass')
-    x = validated_input(f'Select a {var} column by choosing a number between 0 and {len(df.columns)}: \n', choices)
+    x = validated_input(f'Select a {var} column by choosing a number between \
+                        0 and {len(df.columns)}: \n', choices)
     if not x: return None
     return choices[int(x)]
