@@ -1,38 +1,68 @@
 # iau-caribic
-All tools etc that I need to analyse Caribic data wrt ground-based measurement stations and model data 
-## toolpac_tutorial
-General data structure is based on Pandas GeoDataFrame
-- Index is datetime format
-- Global datasets have a geometry column (comprised of Points) rather than lon / lat data
+Data extraction and analysis for Caribic GHG measurements & other data sources
 
-Namespace of toolpac tutorial: 
-- class Caribic
-  - __init__(self, years, grid_size=5, v_limits=None, flight_nr = None, subst='sf6', pfxs=['GHG']):
-  - caribic_data(self, pfxs):
-  - get_col_name(self, substance):
-  - plot_scatter(self):
-  - try_plot_2d(self):
-- class Mozart
-  - __init__(self, years, grid_size=5, v_limits=None):
-  - mozart_data(self, year, level = 27, remap = True, file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
-  - plot_scatter(self, total=False):
-- class Mauna_Loa
-  - __init__(self, years, path = None, path_MM = None, substance='sf6')
-  - mlo_data(self, yr, path):
-  - plot_MM(self):
-- class Mace_Head
-  - __init__(self, path = None):
-  - mhd_data(self, path):
-  - plot_mhd(self):
-  - plot_1d_LonLat(self, lon_values = [10, 60, 120, 180], lat_values = [70, 30, 0, -30, -70]):
+### data
+class GlobalData
+- get_data(self, c_pfxs, remap_lon, mozart_file, verbose)
+- binned_1d(self, subs, **kwargs)
+- binned_2d(self, subs, **kwargs)
+- sel_year(self, *yr_list)
+- sel_latitude(self, lat_min, lat_max)
 
-- fct ds_to_gdf(ds)
+class Caribic(GlobalData)
+  - self_flight(self, *flights_list)
+class Mozart(GlobalData)
 
-- fct monthly_mean(df, first_of_month=True)
+class LocalData
+  - get_data(self, path)
+class Mauna_Loa(LocalData)
+class Mace_Head(LocalData)
 
-## strat_filter_on_caribic_data
-- fct cal_time_lags(c_data, ref_data, ref_subs = 'SF6catsMLOm'):
-- fct plot_time_lags(c_data, lags, ref_lims):
-- fct get_mlo_fit(mlo_df, substance='N2OcatsMLOm'):
-- fct pre_flag(data, n2o_col, t_obs_tot, mlo_fit):
-- fct filter_strat_trop(data, ref_data, crit, mlo_fit):
+### plot
+#### .data
+- caribic_plots(c_obj, key, subs)
+- plot_1d_LonLat(mzt_obj, subs='sf6', lon_values=[10, 60, 120, 180], lat_values=[70, 30, 0, -30, -70], single_yr=None)
+- plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, single_graph=False, c_pfx=None)
+- plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx='GHG', years=None)
+- plot_local(loc_obj, substance=None, greyscale=False, v_limits=(None, None))
+- plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False, dataframe=None, c_pfx=None, as_subplot=False, ax=None)
+#### .eqlat
+- plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp='therm', pvu=2.0, x_bin=None, y_bin=None, x_source='ERA5', vlims=None, detr=True, note=None)
+#### .gradients
+- plot_gradient_by_season(c_obj, subs, tp='therm', pvu=2.0, errorbars=False, bsize=None, use_detr=True, note=None)
+
+### dictionaries
+- choose_column(df, var='subs')
+- coord_dict()
+- get_col_name(substance, source, c_pfx='', CLaMS=False)
+- get_coord_name(coord, source, c_pfx=None, CLaMS=True)
+- get_default_unit(substance)
+- get_fct_substance(substance)
+- get_vlims(substance)
+- substance_list(ID)
+- validated_input(prompt, choices)
+
+### tools
+- bin_1d(glob_obj, subs, **kwargs)
+- bin_2d(glob_obj, subs, **kwargs)
+- bin_prep(glob_obj, subs, **kwargs)
+- coord_combo(c_obj, save=True)
+- daily_mean(df)
+- ds_to_gdf(ds)
+- get_lin_fit(df, substance='N2OcatsMLOm', degree=2)
+- make_season(month)
+- monthly_mean(df, first_of_month=True)
+- rename_columns(columns)
+- subs_merge(c_obj, subs, save=True, detr=True)
+
+### lags
+- calc_time_lags(c_obj, ref_obj, years, substance='sf6', pfx='GHG', ref_min=2003, ref_max=2020, plot_yr=False, plot_all=True, save=True, verbose=False)
+- plot_time_lags(df, lags, years, ref_min=2003, ref_max=2020, subs='sf6')
+
+### outliers
+- filter_strat_trop(glob_obj, ref_obj, crit, pfx='GHG', save=True, verbose=False, plot=True, limit=0.97)
+- filter_trop_outliers(glob_obj, subs, pfx, crit=None, ref_obj=None, save=True)
+- pre_flag(glob_obj, ref_obj, crit, limit=0.97, pfx=None, verbose=False)
+
+### detrend
+- detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True)
