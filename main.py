@@ -18,11 +18,10 @@ from data import Caribic, Mozart, Mauna_Loa, Mace_Head
 from lags import calc_time_lags
 from dictionaries import substance_list
 
-from plot.gradients import plot_gradient_by_season
 from outliers import filter_strat_trop, filter_trop_outliers
 from detrend import detrend_substance
-from plot.data import plot_scatter_global, plot_global_binned_1d
-from plot.data import plot_global_binned_2d, plot_1d_LonLat, plot_local
+import plot.data
+from plot.gradients import plot_gradient_by_season
 from plot.eqlat import plot_eqlat_deltheta
 
 #%% Get Data
@@ -68,7 +67,7 @@ for pfx in caribic.pfxs: # scatter plots of all caribic data
                           figsize=(10,len(substs)*1.5), dpi=200)
     plt.suptitle(f'Caribic {(pfx)}')
     for subs, ax in zip(substs, axs.flatten()):
-        plot_scatter_global(caribic, subs, c_pfx=pfx, as_subplot=True, ax=ax)
+        plot.data.scatter_global(caribic, subs, c_pfx=pfx, as_subplot=True, ax=ax)
     f.autofmt_xdate()
     plt.tight_layout()
     plt.show()
@@ -77,26 +76,26 @@ for pfx in caribic.pfxs: # lon/lat plots of all caribic data
     substs = [x for x in substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     for subs in substs:
-        plot_global_binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
+        plot.data.binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
 
 for pfx in caribic.pfxs: # maps of all caribic data
     substs = [x for x in substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     for subs in substs:
-        plot_global_binned_2d(caribic, subs=subs, c_pfx=pfx)
+        plot.data.binned_2d(caribic, subs=subs, c_pfx=pfx)
 
-plot_global_binned_1d(mzt, 'sf6', single_graph=True)
+plot.data.binned_1d(mzt, 'sf6', single_graph=True)
 # creates year ranges of 6 items for mozart data
 yr_ranges = [mzt.years[i:i + 9] for i in range(0, len(mzt.years), 9)]
 for yr_range in yr_ranges:
-    plot_global_binned_2d(mzt, 'sf6', years=yr_range)
+    plot.data.binned_2d(mzt, 'sf6', years=yr_range)
 
-plot_1d_LonLat(mzt, 'sf6', single_yr = 2005)
+plot.data.lonlat_1d(mzt, 'sf6', single_yr = 2005)
 
 for subs, mlo_obj in mlo_data.items():
-    plot_local(mlo_obj, subs)
+    plot.data.local(mlo_obj, subs)
 
-plot_local(mhd, 'sf6')
+plot.data.local(mhd, 'sf6')
 
 #%% Time lags - lags are added to dictionary caribic.lags as lags_pfx : dataframe
 lag_plot= False
