@@ -19,14 +19,14 @@ pd.options.mode.chained_assignment = None
 import warnings; warnings.filterwarnings("ignore", category=UserWarning,
                                          module='matplotlib')
 
-from tools import get_lin_fit
-from data import Caribic, Mauna_Loa# , Mozart, Mace_Head
-from dictionaries import get_fct_substance, get_col_name
-
 from toolpac.outliers import outliers
 from toolpac.outliers import ol_fit_functions as fct
 from toolpac.outliers.outliers import get_no_nan, fit_data
 from toolpac.conv.times import datetime_to_fractionalyear
+
+from tools import get_lin_fit
+from data import Caribic, Mauna_Loa# , Mozart, Mace_Head
+from dictionaries import get_fct_substance, get_col_name
 
 #%% filter data into stratosphere and troposphere (using n2o as a tracer)
 

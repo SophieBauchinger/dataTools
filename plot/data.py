@@ -25,13 +25,17 @@ from dictionaries import get_col_name, get_vlims, get_default_unit
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning,
                                          module='matplotlib')
+# ignore warning for np.nanmin / np.nanmax for all-nan sclice
+warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
 #%% GlobalData
-def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False,
-                        dataframe=None, c_pfx=None, as_subplot=False, ax=None):
+def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
+                        c_pfx=None, as_subplot=False, ax=None):
     """
     Default plotting of scatter values for global data
-    Can speficically plot single caribic dataframe
+    
+    If as_subplot, plots scatterplot onto given axis
+    Returns scatterplot 
     """
 
     if glob_obj.source=='Caribic':
@@ -54,6 +58,7 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False,
                 plt.title(f'{glob_obj.source} {pfx} {substance} measurements')
             elif ax is None:
                 ax = plt.gca()
+
             ymin = np.nanmin(df[substance])
             ymax = np.nanmax(df[substance])
 
@@ -86,10 +91,10 @@ def plot_scatter_global(glob_obj, subs, single_yr=None, verbose=False,
 
     elif glob_obj.source=='Mozart':
         substance = get_col_name(subs, glob_obj.source)
-        pl = plot_global_binned_1d(glob_obj, subs, single_yr)
+        pl = binned_1d(glob_obj, subs, single_yr)
         return pl
 
-def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False,
+def binned_1d(glob_obj, subs, single_yr=None, plot_mean=False,
                           single_graph=False, c_pfx=None):
     """
     Plots 1D averaged values over latitude / longitude including colormap
@@ -104,7 +109,8 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False,
     if single_yr is not None: years = [int(single_yr)]
     else: years = glob_obj.years
 
-    out_x_list, out_y_list = glob_obj.binned_1d(subs, single_yr, c_pfx=c_pfx)
+    out_x_list, out_y_list = glob_obj.binned_1d(subs, c_pfx = c_pfx, 
+                                                single_yr = single_yr)
 
     if not single_graph:
         # Plot mixing ratios averages over lats / lons for each year separately
@@ -164,7 +170,7 @@ def plot_global_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False,
         plt.show()
     return
 
-def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx='GHG', years=None):
+def binned_2d(glob_obj, subs, single_yr=None, c_pfx='GHG', years=None):
     """
     Create a 2D plot of binned mixing ratios for each available year on a grid.
     Parameters:
@@ -185,7 +191,7 @@ def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx='GHG', years=Non
             fig, axs = plt.subplots(int(len(years)/3), 3, dpi=300,
                                     figsize=(20, max(len(years), 5)))
 
-    out_list = glob_obj.binned_2d(subs, single_yr, c_pfx)
+    out_list = glob_obj.binned_2d(subs, single_yr=single_yr, c_pfx=c_pfx)
 
     plt.suptitle(f'{glob_obj.source} ({c_pfx}) {subs.upper()} mixing ratio \
                  measurements. Gridsize={glob_obj.grid_size}')
@@ -219,7 +225,7 @@ def plot_global_binned_2d(glob_obj, subs, single_yr=None, c_pfx='GHG', years=Non
     return
 
 # Mozart
-def plot_1d_LonLat(mzt_obj, subs='sf6',
+def lonlat_1d(mzt_obj, subs='sf6',
                    lon_values = [10, 60, 120, 180],
                    lat_values = [70, 30, 0, -30, -70],
                    single_yr=None):
@@ -235,7 +241,7 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
     if single_yr is not None: years = [int(single_yr)]
     else: years = mzt_obj.years
 
-    out_x_list, out_y_list = mzt_obj.binned_1d(subs, single_yr)
+    out_x_list, out_y_list = mzt_obj.binned_1d(subs, single_yr=single_yr)
 
     for out_x, out_y, year in zip(out_x_list, out_y_list, years):
         fig, (ax1, ax2) = plt.subplots(dpi=250, ncols=2, figsize=(9,5), sharey=True)
@@ -256,7 +262,7 @@ def plot_1d_LonLat(mzt_obj, subs='sf6',
     return
 
 # Caribic
-def caribic_plots(c_obj, key, subs):
+def caribic_2d(c_obj, key, subs):
     df = c_obj.data[key]
     substance = get_col_name(subs, c_obj.source, key)
     df_mm = monthly_mean(df).notna()
@@ -289,12 +295,11 @@ def caribic_plots(c_obj, key, subs):
     plt.ylabel(f'{substance}')
     plt.ylim(ymin-0.15, ymax+0.15)
     fig.autofmt_xdate()
-    plt.show() # ignore matplotlib warning
-
+    plt.show() # ignore matplotlib warning that comes up here
 
 #%% LocalData
 
-def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
+def local(loc_obj, substance=None, greyscale=False, v_limits = (None,None)):
     """
     Plot all available data as timeseries
     Parameters:
@@ -308,7 +313,9 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
 
     if not substance: substance = loc_obj.substance
     col_name = get_col_name(substance, loc_obj.source)
-    vmin, vmax = get_vlims(substance)
+    if all(isinstance(i, (int, float)) for i in v_limits):
+        vmin, vmax = v_limits
+    else: vmin, vmax = get_vlims(substance) # default values 
     norm = Normalize(vmin, vmax)
     dflt_unit = get_default_unit(substance)
 
@@ -318,7 +325,6 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
     plt.scatter(loc_obj.df.index, loc_obj.df[col_name], c=loc_obj.df[col_name],
                     cmap=colors['msmts'], norm=norm, marker='+', zorder=1,
                     label=f'{loc_obj.source} {substance.upper()}')
-
     # Daily mean
     if hasattr(loc_obj, 'df_Day'):
         if not loc_obj.df_Day.empty: # check if there is data in the daily df
@@ -326,13 +332,12 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
                         # c = loc_obj.df_Day[col_name],
                         color = 'silver', marker='+', zorder=0,
                         label=f'{loc_obj.source} {substance.upper()} (D)')
-
     # Monthly mean
     if hasattr(loc_obj, 'df_monthly_mean'):
         if not loc_obj.df_monthly_mean.empty: # check for data in the monthly df
             for i, mean in enumerate(loc_obj.df_monthly_mean[col_name]):
                 # plot monthly mean
-                y = loc_obj.df_monthly_mean.index[i].year,
+                y = loc_obj.df_monthly_mean.index[i].year
                 m = loc_obj.df_monthly_mean.index[i].month
                 xmin = dt.datetime(y, m, 1)
                 xmax = dt.datetime(y, m, monthrange(y, m)[1])
@@ -342,8 +347,6 @@ def plot_local(loc_obj, substance=None, greyscale=False, v_limits = (6,9)):
             ax.hlines(mean, xmin, xmax, color='black', ls='dashed',
                       label=f'{loc_obj.source} {substance.upper()} (M)')
 
-
-    # plt.ylim(min(loc_obj.df[col_name]), max(loc_obj.df[col_name]))
     plt.ylabel(f'{loc_obj.substance.upper()} mixing ratio [{dflt_unit}]')
     plt.xlim(min(loc_obj.df.index), max(loc_obj.df.index))
     plt.xlabel('Time')
@@ -399,7 +402,7 @@ if __name__=='__main__':
                               figsize=(10,len(substs)*1.5), dpi=200)
         plt.suptitle(f'Caribic {(pfx)}')
         for subs, ax in zip(substs, axs.flatten()):
-            plot_scatter_global(caribic, subs, c_pfx=pfx,
+            scatter_global(caribic, subs, c_pfx=pfx,
                                 as_subplot=True, ax=ax)
         f.autofmt_xdate()
         plt.tight_layout()
@@ -409,24 +412,24 @@ if __name__=='__main__':
         substs = [x for x in substance_list(pfx)
                   if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
         for subs in substs:
-            plot_global_binned_1d(caribic, subs=subs, c_pfx=pfx,
+            binned_1d(caribic, subs=subs, c_pfx=pfx,
                                   single_graph=True)
 
     for pfx in caribic.pfxs: # maps of all caribic data
         substs = [x for x in substance_list(pfx)
                   if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
         for subs in substs:
-            plot_global_binned_2d(caribic, subs=subs, c_pfx=pfx)
+            binned_2d(caribic, subs=subs, c_pfx=pfx)
 
-    plot_global_binned_1d(mzt, 'sf6', single_graph=True)
+    binned_1d(mzt, 'sf6', single_graph=True)
     yr_ranges = [mzt.years[i:i + 9] for i
                  in range(0, len(mzt.years), 9)] # create 6-year bundles
     for yr_range in yr_ranges:
-        plot_global_binned_2d(mzt, 'sf6', years=yr_range)
+        binned_2d(mzt, 'sf6', years=yr_range)
 
-    plot_1d_LonLat(mzt, 'sf6', single_yr = 2005)
+    lonlat_1d(mzt, 'sf6', single_yr = 2005)
 
     for subs, mlo_obj in mlo_data.items():
-        plot_local(mlo_obj, subs)
+        local(mlo_obj, subs)
 
-    plot_local(mhd, 'sf6')
+    local(mhd, 'sf6', v_limits=(7, 8))
