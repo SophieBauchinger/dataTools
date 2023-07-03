@@ -147,23 +147,23 @@ class GlobalData(object):
 
             return ds # xr.concat(datasets, dim = 'time')
 
-    def binned_1d(self, **kwargs):
+    def binned_1d(self, subs, **kwargs):
         """
         Returns 1D binned objects for each year as lists (lat / lon)
         Parameters:
             substance (str): e.g. 'sf6'
             single_yr (int): if specified, use only data for that year
         """
-        return bin_1d(self, **kwargs) # out_x_list, out_y_list
+        return bin_1d(self, subs, **kwargs) # out_x_list, out_y_list
 
-    def binned_2d(self, **kwargs):
+    def binned_2d(self, subs, **kwargs):
         """
         Returns 2D binned object for each year as a list
         Parameters:
             substance (str): if None, uses default substance for the object
             single_yr (int): if specified, uses only data for that year
         """
-        return bin_2d(self, **kwargs) # out_list
+        return bin_2d(self, subs, **kwargs) # out_list
 
     def sel_year(self, *yr_list):
         """ Returns GlobalData object containing only data for selected years
