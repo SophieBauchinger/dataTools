@@ -16,28 +16,42 @@ import datetime as dt
 from toolpac.conv.times import datetime_to_fractionalyear
 from dictionaries import get_col_name
 
-def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
+from plot.data import scatter_global
+
+def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
+                      as_subplot=False, ax=None, c_pfx=None):
     """ (redefined from C_tools.detrend_subs)
-    Remove trend of in measurements of substances using Mauna Loa as a reference
+    Remove trend of in measurements of substances using Mauna Loa as reference
     Parameters:
-        c_obj: GlobalData object, Caribic
-            c_obj.data is dictionary where data[pfx] are GeoDataFrames
-        substance: str, column name of data (e.g. 'sf6')
-        loc_obj: (geo)dataframe of reference data to detrend on, index=datetime
+        c_obj (GlobalData/Caribic): measurement dataset
+        subs (str): substance e.g. 'sf6'
+        loc_obj (LocalData): reference data to detrend on, index=datetime
     """
     detr_data = {}
-    for c_pfx in c_obj.pfxs:
+
+    if c_pfx: pfxs = [c_pfx]
+    else: pfxs = c_obj.pfxs
+
+    if not as_subplot:
+        fig, axs = plt.subplots(len(pfxs), dpi=250, figsize=(6,10))
+        plt.title(f'{c_obj.source} {subs.upper()}')
+    elif ax is None:
+        ax = plt.gca()
+
+    for c_pfx, i in zip(pfxs, range(len(pfxs))):
+        if not as_subplot: 
+            ax = axs[i]
         df = c_obj.data[c_pfx]
-        flight_df = pd.DataFrame(df['Flight number'], index = df.index)
+        # flight_df = pd.DataFrame(df['Flight number'], index = df.index)
         ref_df = loc_obj.df
 
-        car_subs = get_col_name(subs, 'Caribic', c_pfx)
+        substance = get_col_name(subs, 'Caribic', c_pfx)
         ref_subs = get_col_name(subs, loc_obj.source)
 
-        if not car_subs in df.columns or not ref_subs in loc_obj.df.columns:
+        if not substance in df.columns or not ref_subs in loc_obj.df.columns:
             print('Data not found'); continue
 
-        c_obs = df[car_subs].values
+        c_obs = df[substance].values
         t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
 
         # ignore reference data earlier and later than two years before/after msmts
@@ -49,33 +63,41 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, plot=True):
 
         popt = np.polyfit(t_ref, c_ref, degree)
         c_fit = np.poly1d(popt) # get popt, then make into fct
-        print(c_fit)
+        # print(c_fit)
 
         detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
         c_obs_detr = c_obs - detrend_correction
         # get variance (?) by substracting offset from 0
         c_obs_delta = c_obs_detr - c_fit(min(t_obs))
 
-        data = {f'detr_{car_subs}' : c_obs_detr,
-                f'delta_{car_subs}' : c_obs_delta}
+        df_detr = pd.DataFrame({f'detr_{substance}' : c_obs_detr,
+                                 f'delta_{substance}' : c_obs_delta,
+                                 f'fit_{substance}' : c_fit(t_obs)}, 
+                                index = df.index)
+        # maintain relationship between detr and fit columns
+        df_detr[f'fit_{substance}'] = df_detr[f'fit_{substance}'].where(
+            ~df_detr[f'detr_{substance}'].isnull(), np.nan)
 
-        if plot:
-            plt.figure(dpi=200)
-            plt.title(f'{subs.upper()} {c_pfx}')
-            plt.scatter(t_obs, c_obs, color='orange', label='Flight data')
-            plt.scatter(t_ref, c_ref, color='gray', label='MLO data')
-            plt.scatter(t_obs, c_obs_detr, color='green', label='trend removed')
-            plt.plot(t_obs, c_fit(t_obs), color='black', ls='dashed',
-                     label='trendline')
-            plt.legend()
-            plt.show()
+        detr_data[f'detr_{c_pfx}_{subs}'] = df_detr
+        detr_data[f'popt_{c_pfx}_{subs}'] = popt
 
-        gdf_detr = geopandas.GeoDataFrame(data, index = df.index,
-                                          geometry=df.geometry)
-        gdf_detr = gdf_detr.join(flight_df)
+        if save:
+            if not f'detr_{c_pfx}' in c_obj.data.keys():
+                c_obj.data[f'detr_{c_pfx}'] = geopandas.GeoDataFrame(
+                    c_obj.data[c_pfx]['Flight number'],
+                    index = df.index, geometry=df.geometry)
+            c_obj.data[f'detr_{c_pfx}'] = c_obj.data[f'detr_{c_pfx}'].join(
+                df_detr, lsuffix='DROP').filter(regex="^(?!.*DROP)")
 
-        c_obj.data[f'detr_{c_pfx}_{subs}'] = gdf_detr
-        detr_data[f'detr_{c_pfx}_{subs}'] = gdf_detr
+        ax.scatter(t_obs, c_obs, color='orange', label='Flight data')
+        ax.scatter(t_ref, c_ref, color='gray', label='MLO data')
+        ax.scatter(t_obs, c_obs_detr, color='green', label='trend removed')
+        ax.plot(t_obs, c_fit(t_obs), color='black', ls='dashed',
+                 label='trendline')
+
+    if plot and not as_subplot:
+        plt.legend()
+        plt.show()
 
     return detr_data
 
@@ -95,6 +117,22 @@ if __name__=='__main__':
         mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs
                     in substance_list('MLO')}
 
-    co2_detr = detrend_substance(caribic, 'co2', mlo_data['co2'])
-    n2o_detr = detrend_substance(caribic, 'n2o', mlo_data['n2o'])
+    for c_pfx in caribic.pfxs:
+        substs = [x for x in substance_list(c_pfx)
+                  if x in ['ch4', 'co2', 'n2o', 'sf6', 'co']]
+        f, axs = plt.subplots(int(len(substs)/2), 2,
+                              figsize=(10,len(substs)*1.5), dpi=200)
+        plt.suptitle(f'Caribic {c_pfx} detrended wrt Mauna Loa')
+        for subs, ax in zip(substs, axs.flatten()):
+            output = detrend_substance(caribic, subs, mlo_data[subs], save=True,
+                              as_subplot=True, ax=ax, c_pfx=c_pfx)
+        f.autofmt_xdate()
+        plt.tight_layout()
+        plt.show()
 
+
+#%% reset detr datasets 
+if __name__=='__main__':
+    del caribic.data['detr_GHG']
+    del caribic.data['detr_INT']
+    del caribic.data['detr_INT2']
