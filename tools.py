@@ -154,86 +154,101 @@ def subs_merge(c_obj, subs, save=True, detr=True):
     return merged
 
 #%% Binning of global data sets
-def bin_1d(glob_ob, subs, c_pfx=None, single_yr=None, **kwargs):
-    """
-    Returns 1D binned objects for each year as lists (lat / lon)
-    Parameters:
-        substance (str): e.g. 'sf6'
-        single_yr (int): if specified, use only data for that year
-    """
-    print('Changes in tools affect the initialised caribic instance')
+def bin_prep(glob_obj, subs, **kwargs):
+    c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
+    substance = get_col_name(subs, glob_obj.source, c_pfx)
+    if kwargs.get('single_yr') is not None: 
+        years = [int(kwargs.get('single_yr'))]
+    else: years = glob_obj.years
 
-    substance = get_col_name(subs, glob_ob.source, c_pfx)
+    # for Caribic, need to choose the df
+    if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
+    else: df = glob_obj.df
+    
+    return substance, years, df
+
+def bin_1d(glob_obj, subs, **kwargs):
+    """ Returns 1D binned objects for each year as lists (lat / lon)
+    
+    Parameters:
+        subs (str): e.g. 'sf6'. 
+    Optional parameters: 
+        c_pfx (str): caribic file pfx, required for caribic data 
+        single_yr (int): if specified, use only data for that specific year
+    
+    Returns: 
+        out_x_list, out_y_list: lists of Bin1D objects binned along x / y
+    """
+    # c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
+    # substance = get_col_name(subs, glob_obj.source, c_pfx)
+    # if kwargs.get('single_yr') is not None: 
+    #     years = [int(kwargs.get('single_yr'))]
+    # else: years = glob_obj.years
+
+    # # for Caribic, need to choose the df
+    # if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
+    # else: df = glob_obj.df
+
+    substance, years, df = bin_prep(glob_obj, subs, **kwargs)
+
+    if kwargs.get('xbinlimits') is not None: # not equidistant binning 
+        x_binclassinstance = bp.Bin_notequi1d(kwargs.get('xbinlimits'))
+    if kwargs.get('ybinlimits') is not None:
+        y_binclassinstance = bp.Bin_notequi1d(kwargs.get('ybinlimits'))
 
     out_x_list, out_y_list = [], []
-    if single_yr is not None: years = [int(single_yr)]
-    else: years = glob_ob.years
-
-     # for Caribic, need to choose the df
-    if glob_ob.source == 'Caribic': df = glob_ob.data[c_pfx]
-    else: df = glob_ob.df
-
-    for yr in years: # loop through available years if possible
+    for yr in years: # loop through available years
         df_yr = df[df.index.year == yr]
 
         x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
+        if kwargs.get('xbinlimits') is None: # equidistant binning
+            xbmin, xbmax = min(x), max(x)
+            x_binclassinstance = bp.Bin_equi1d(xbmin, xbmax, glob_obj.grid_size)
+        out_x = bp.Simple_bin_1d(df_yr[substance], x, x_binclassinstance)
+        out_x.__dict__.update(x_binclassinstance.__dict__)
+
         y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-
-        xbmin, xbmax = min(x), max(x)
-        ybmin, ybmax = min(y), max(y)
-
-        # average over lon / lat
-        # out_x = bin_1d_2d.bin_1d(df_yr[substance], x,
-        #                          xbmin, xbmax, self.grid_size)
-        # out_y = bin_1d_2d.bin_1d(df_yr[substance], y,
-        #                          ybmin, ybmax, self.grid_size)
-
-        out_x = bp.Simple_bin_1d(df_yr[substance], x,
-                                 bp.Bin_equi1d(xbmin, xbmax, glob_ob.grid_size))
-        out_x.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, glob_ob.grid_size).__dict__)
-
-        out_y = bp.Simple_bin_1d(df_yr[substance], y,
-                                 bp.Bin_equi1d(ybmin, ybmax, glob_ob.grid_size))
-        out_y.__dict__.update(bp.Bin_equi1d(ybmin, ybmax, glob_ob.grid_size).__dict__)
+        if kwargs.get('ybinlimits') is None: 
+            ybmin, ybmax = min(y), max(y)
+            y_binclassinstance = bp.Bin_equi1d(ybmin, ybmax, glob_obj.grid_size)
+        out_y = bp.Simple_bin_1d(df_yr[substance], y, y_binclassinstance)
+        out_y.__dict__.update(y_binclassinstance.__dict__)
 
         out_x_list.append(out_x); out_y_list.append(out_y)
 
     return out_x_list, out_y_list
 
-def bin_2d(glob_ob, subs, c_pfx=None, single_yr=None, **kwargs):
+def bin_2d(glob_obj, subs, **kwargs):
     """
     Returns 2D binned object for each year as a list
     Parameters:
         substance (str): if None, uses default substance for the object
         single_yr (int): if specified, uses only data for that year
     """
-    substance = get_col_name(subs, glob_ob.source, c_pfx)
+    substance, years, df = bin_prep(glob_obj, subs, **kwargs)
 
     out_list = []
-    if single_yr is not None: years = [int(single_yr)]
-    else: years = glob_ob.years
-
-    # for Caribic, need to choose the df
-    if glob_ob.source == 'Caribic': df = glob_ob.data[c_pfx]
-    else: df = glob_ob.df
-
     for yr in years: # loop through available years if possible
         df_yr = df[df.index.year == yr]
 
+        xbinlimits = kwargs.get('xbinlimits')
+        ybinlimits = kwargs.get('ybinlimits')
+
         x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
+        if xbinlimits is None: 
+            # use equidistant binning if not specified else
+            xbmin, xbmax = min(x), max(x)
+            xbinlimits = list(bp.Bin_equi1d(xbmin, xbmax, glob_obj.grid_size).xbinlimits)
+
         y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
+        if ybinlimits is None: 
+            ybmin, ybmax = min(y), max(y)
+            ybinlimits = list(bp.Bin_equi1d(ybmin, ybmax, glob_obj.grid_size).xbinlimits)
 
-        xbmin, xbmax, xbsize = min(x), max(x), glob_ob.grid_size
-        ybmin, ybmax, ybsize = min(y), max(y), glob_ob.grid_size
-
-        # out = bin_1d_2d.bin_2d(np.array(df_yr[substance]), x, y,
-        #                        xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
-
-        out = bp.Simple_bin_2d(np.array(df_yr[substance]), x, y,
-                               bp.Bin_equi1d(xbmin, xbmax, xbsize,
-                                             ybmin, ybmax, ybsize))
-        out.__dict__.update(bp.Bin_equi1d(xbmin, xbmax, xbsize,
-                                          ybmin, ybmax, ybsize).__dict__)
+        # create binclassinstance that's valid for both equi and nonequi
+        binclassinstance = bp.Bin_notequi2d(xbinlimits, ybinlimits)
+        out = bp.Simple_bin_2d(np.array(df_yr[substance]), x, y, binclassinstance)
+        out.__dict__.update(binclassinstance.__dict__)
 
         out_list.append(out)
     return out_list
