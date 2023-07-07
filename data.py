@@ -282,6 +282,69 @@ class Caribic(GlobalData):
 
         return out
 
+    def data_filter(self, filter_type = None, **kwargs):
+        """ Returns Caribic object containing only tropospheric data 
+        Parameters:    
+            filter_type(str): 'chem', 'dyn', 'therm'
+        optional:
+            crit(str): substance to use for chem filter
+            pvu(float): potential vorticity unit for pv surface
+            
+            
+                either 'tropo', 'strato', 'trop_ol', 'trop_Nol' 
+        """
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+        # very important so that self.data doesn't get overwritten
+        
+        initial_data = {k:v for k,v in self.data.items() if k in self.pfxs}
+        
+        for pfx, df in initial_data.items(): 
+            if not [x for x in df.columns if 'tropo' in x]: 
+                # no tropo col exists, so try and make it
+                
+                
+                
+                if 'crit' in kwargs: crit = kwargs['crit']
+                else: crit = None
+                if 'ref_obj' in kwargs: ref_obj=kwargs['ref_obj']
+                else: ref_obj=None
+            
+                chemical(self, pfx, criterion)
+            
+            else: 
+            
+            try: out.data.update({pfx:df}) # add to data 
+            except: print('Trop / Strat filter not possible with current config') 
+                
+            
+
+
+        out.data = initial_data # self.data.copy()
+
+        data_dfs = out.pfxs # those are the original dataframes 
+
+        df_list = [k for k in self.data.keys()
+                   if isinstance(self.data[k], pd.DataFrame)]
+
+        df_list_filtered = [k for k in self.data.keys()
+                   if (isinstance(self.data[k], pd.DataFrame) and
+                       len([x for x in self.data[k].columns if 'trop' in x])>0)] # list of all datasets to cut
+        
+
+        if len(df_list) == 0: 
+            print('Could not find any tropospheric data...')
+            return self
+
+        for k in df_list: # delete everything but selected flights
+            out.data[k] = out.data[k].loc['strato']
+        
+        # merged coordinate thingy...
+
+        return out
+
+
 # Mozart
 class Mozart(GlobalData):
     """ Stores relevant Mozart data
@@ -439,21 +502,21 @@ class Mace_Head(LocalData):
 
 
 
-#%% Fctn calls
-if __name__=='__main__':
-    year_range = np.arange(2000, 2020)
+#%% Fctn calls - data
+# if __name__=='__main__':
+#     year_range = np.arange(2000, 2020)
 
-    # only calculate caribic if necessary
-    calc_c = False
-    if calc_c and exists('caribic_dill.pkl'): # Avoid long file loading times
-        with open('caribic_dill.pkl', 'rb') as f: caribic = dill.load(f)
-        del f
-    elif calc_c: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+#     # only calculate caribic if necessary
+#     calc_c = False
+#     if calc_c and exists('caribic_dill.pkl'): # Avoid long file loading times
+#         with open('caribic_dill.pkl', 'rb') as f: caribic = dill.load(f)
+#         del f
+#     elif calc_c: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 
-    mozart = Mozart(year_range)
+#     mozart = Mozart(year_range)
 
-    mlo_sf6 = Mauna_Loa(year_range, data_Day = True)
-    mlo_n2o = Mauna_Loa(year_range, substance='n2o')
-    mlo_co2 = Mauna_Loa(year_range, 'co2')
+#     mlo_sf6 = Mauna_Loa(year_range, data_Day = True)
+#     mlo_n2o = Mauna_Loa(year_range, substance='n2o')
+#     mlo_co2 = Mauna_Loa(year_range, 'co2')
 
-    mhd = Mace_Head() # 2012
+#     mhd = Mace_Head() # 2012
