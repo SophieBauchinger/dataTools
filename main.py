@@ -13,6 +13,7 @@ Substances in Caribic data:
 import dill
 from os.path import exists
 from os import remove
+import matplotlib.pyplot as plt
 
 from data import Caribic, Mozart, Mauna_Loa, Mace_Head
 from lags import calc_time_lags
@@ -42,24 +43,23 @@ else: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 def save_caribic(fname = 'caribic_dill.pkl'):
     """ Drop rows where pressure values don't exist, then save
     caribic object to dill file """
-    #!!! Temporary fix bc otherwise dill/pickle doesn't work
+    #!!! Temporary fix for missing data bc otherwise dill/pickle doesn't work
     caribic.data['INT2'].dropna(how='any', subset='p [mbar]', inplace=True)
     with open(fname, 'wb') as f:
         dill.dump(caribic, f)
-def del_caribic(fname = 'caribic_dill.pkl'): remove(fname)
-# save_caribic()
+def del_caribic_file(fname = 'caribic_dill.pkl'): remove(fname)
+# save_caribic(fname= 'carbic_dill_mod.pkl')
 
 # examples for creating new objects with only certain year / flight nr / lat :
 # c_2008 = caribic.sel_year(2008)
 # c_fl340 = caribic.sel_flight(340)
-c_gt30N = caribic.sel_latitude(30, 90)
+# c_gt30N = caribic.sel_latitude(30, 90)
 
 # c_yr08_to_12 = caribic.sel_year(*range(2008, 2012))
 # c_fl340_to_360 = caribic.sel_flight(*range(340, 360))
 
-#%% Plot data
-import matplotlib.pyplot as plt
 
+#%% Plot data
 for pfx in caribic.pfxs: # scatter plots of all caribic data
     substs = [x for x in substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
@@ -124,6 +124,9 @@ for pfx in ['INT2']:# caribic.pfxs:
 
 #%% Filter tropospheric / stratospheric data points based on
 # n2o mixing ratio wrt Mauna Loa data
+
+# ref_obj = Mauna_Loa(year_range, 'n2o')
+
 for pfx in caribic.pfxs:
     filter_strat_trop(caribic, mlo_data['n2o'], 'n2o', pfx)
 

@@ -15,6 +15,7 @@ import geopandas
 from shapely.geometry import Point
 
 import toolpac.calc.binprocessor as bp
+from toolpac.conv.times import datetime_to_fractionalyear
 
 from dictionaries import coord_dict, get_col_name
 
