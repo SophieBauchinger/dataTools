@@ -149,23 +149,23 @@ def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0,
 
     return
 
-#%%
-if __name__=='__main__':
-    calc_caribic = False
-    if calc_caribic:
-        from data import Caribic
-        caribic = Caribic(range(2000, 2018), pfxs = ['GHG', 'INT', 'INT2'])
+#%% Fctn calls - eqlat
+# if __name__=='__main__':
+#     calc_caribic = False
+#     if calc_caribic:
+#         from data import Caribic
+#         caribic = Caribic(range(2000, 2018), pfxs = ['GHG', 'INT', 'INT2'])
 
-    # for the meeting
-    for subs in ['ch4', 'co2', 'n2o', 'sf6']:
-        plot_eqlat_deltheta(caribic, subs=subs, tp = 'pvu',
-                            x_source = 'ERA5', pvu=2.0)
+#     # for the meeting
+#     for subs in ['ch4', 'co2', 'n2o', 'sf6']:
+#         plot_eqlat_deltheta(caribic, subs=subs, tp = 'pvu',
+#                             x_source = 'ERA5', pvu=2.0)
 
-    for subs in ['ch4', 'co2', 'n2o', 'sf6']:
-        for tp, xs in zip(['therm', 'dyn', 'pvu'],
-                          ['ECMWF', 'ECMWF', 'ERA5']):
-            plot_eqlat_deltheta(caribic, subs=subs, c_pfx='INT2',
-                                tp = tp, x_source = xs, pvu=2.0)
+#     for subs in ['ch4', 'co2', 'n2o', 'sf6']:
+#         for tp, xs in zip(['therm', 'dyn', 'pvu'],
+#                           ['ECMWF', 'ECMWF', 'ERA5']):
+#             plot_eqlat_deltheta(caribic, subs=subs, c_pfx='INT2',
+#                                 tp = tp, x_source = xs, pvu=2.0)
 
     # plot_eqlat_deltheta(mzt, subs = 'sf6', y_bin =5e3)
 

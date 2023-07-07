@@ -14,9 +14,8 @@ import matplotlib.pyplot as plt
 import datetime as dt
 
 from toolpac.conv.times import datetime_to_fractionalyear
-from dictionaries import get_col_name
 
-from plot.data import scatter_global
+from dictionaries import get_col_name
 
 def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
                       as_subplot=False, ax=None, c_pfx=None):
@@ -101,38 +100,38 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
 
     return detr_data
 
-#%% Fctn calls
-if __name__=='__main__':
-    from data import Caribic, Mauna_Loa
-    from dictionaries import substance_list
-    year_range = (2000, 2020)
+#%% Fctn calls - detrend
+# if __name__=='__main__':
+#     from data import Caribic, Mauna_Loa
+#     from dictionaries import substance_list
+#     year_range = (2000, 2020)
 
-    calc_caribic = False
-    if calc_caribic:
-        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+#     calc_caribic = False
+#     if calc_caribic:
+#         caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
 
-    calc_mlo = False
-    if calc_mlo:
-        year_range = range(1980, 2021)
-        mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs
-                    in substance_list('MLO')}
+#     calc_mlo = False
+#     if calc_mlo:
+#         year_range = range(1980, 2021)
+#         mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs
+#                     in substance_list('MLO')}
 
-    for c_pfx in caribic.pfxs:
-        substs = [x for x in substance_list(c_pfx)
-                  if x in ['ch4', 'co2', 'n2o', 'sf6', 'co']]
-        f, axs = plt.subplots(int(len(substs)/2), 2,
-                              figsize=(10,len(substs)*1.5), dpi=200)
-        plt.suptitle(f'Caribic {c_pfx} detrended wrt Mauna Loa')
-        for subs, ax in zip(substs, axs.flatten()):
-            output = detrend_substance(caribic, subs, mlo_data[subs], save=True,
-                              as_subplot=True, ax=ax, c_pfx=c_pfx)
-        f.autofmt_xdate()
-        plt.tight_layout()
-        plt.show()
+#     for c_pfx in caribic.pfxs:
+#         substs = [x for x in substance_list(c_pfx)
+#                   if x in ['ch4', 'co2', 'n2o', 'sf6', 'co']]
+#         f, axs = plt.subplots(int(len(substs)/2), 2,
+#                               figsize=(10,len(substs)*1.5), dpi=200)
+#         plt.suptitle(f'Caribic {c_pfx} detrended wrt Mauna Loa')
+#         for subs, ax in zip(substs, axs.flatten()):
+#             output = detrend_substance(caribic, subs, mlo_data[subs], save=True,
+#                               as_subplot=True, ax=ax, c_pfx=c_pfx)
+#         f.autofmt_xdate()
+#         plt.tight_layout()
+#         plt.show()
 
 
 #%% reset detr datasets 
-if __name__=='__main__':
-    del caribic.data['detr_GHG']
-    del caribic.data['detr_INT']
-    del caribic.data['detr_INT2']
+# if __name__=='__main__':
+#     del caribic.data['detr_GHG']
+#     del caribic.data['detr_INT']
+#     del caribic.data['detr_INT2']

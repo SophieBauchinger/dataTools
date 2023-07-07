@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 
 from toolpac.calc.binprocessor import Simple_bin_1d, Bin_equi1d #!!!
 
-from data import Caribic, Mauna_Loa
 from detrend import detrend_substance
 from dictionaries import get_col_name
 from tools import subs_merge, make_season
@@ -25,7 +24,7 @@ from tools import subs_merge, make_season
 # select_cf=['GT','GT', 'GT'] # operators
 
 # ptsmin (int): minimum number of pts for a bin to be considered #!!! implement
-
+from data import Mauna_Loa
 def plot_gradient_by_season(c_obj, subs, tp='therm', pvu = 2.0, errorbars=False,
                             bsize=None, use_detr=True, note=None):
     """
@@ -44,7 +43,7 @@ def plot_gradient_by_season(c_obj, subs, tp='therm', pvu = 2.0, errorbars=False,
     """
 
     if not f'{subs}_data' in c_obj.data.keys():
-        if use_detr: detrend_substance(caribic, subs, Mauna_Loa(c_obj.years, subs))
+        if use_detr: detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs))
         subs_merge(c_obj, subs, save=True, detr=True) # creates data[f'{subs}_data']
 
     data = c_obj.data[f'{subs}_data']
@@ -130,22 +129,22 @@ def plot_gradient_by_season(c_obj, subs, tp='therm', pvu = 2.0, errorbars=False,
     plt.legend()
     plt.show()
 
-#%% Fct calls
-if __name__=='__main__':
+#%% Fct calls - gradients
+# if __name__=='__main__':
     # only calculate caribic if necessary
-    calc_c = False
-    if calc_c:
-        if exists('caribic_dill.pkl'): # Avoid long file loading times
-            with open('caribic_dill.pkl', 'rb') as f:
-                caribic = dill.load(f)
-            del f
-        else: caribic = Caribic(range(1980, 2021), pfxs = ['GHG', 'INT', 'INT2'])
+    # calc_c = False
+    # if calc_c:
+    #     if exists('caribic_dill.pkl'): # Avoid long file loading times
+    #         with open('caribic_dill.pkl', 'rb') as f:
+    #             caribic = dill.load(f)
+    #         del f
+    #     else: caribic = Caribic(range(1980, 2021), pfxs = ['GHG', 'INT', 'INT2'])
 
     # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
     #     plot_gradient_by_season(caribic, subs,  tp='pvu', pvu = 2.0)
 
-    for subs in ['ch4', 'co2', 'sf6', 'n2o']:
-        plot_gradient_by_season(caribic.sel_latitude(30, 90), subs, tp='z', pvu = 2.0, note='lat>30°N')
+    # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
+    #     plot_gradient_by_season(caribic.sel_latitude(30, 90), subs, tp='z', pvu = 2.0, note='lat>30°N')
 
     # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
     #     for tp in ['therm', 'dyn', 'pvu']:
