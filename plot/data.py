@@ -53,11 +53,9 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
             df_mm = monthly_mean(df).notna()
 
             # Plot mixing ratio msmts and monthly mean
-            if not as_subplot:
+            if ax is None:
                 fig, ax = plt.subplots(dpi=250)
                 plt.title(f'{glob_obj.source} {pfx} {substance} measurements')
-            elif ax is None:
-                ax = plt.gca()
 
             ymin = np.nanmin(df[substance])
             ymax = np.nanmax(df[substance])
@@ -68,7 +66,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
             vmax = np.nanmax([ymax, get_vlims(subs)[1]])
             norm = Normalize(vmin, vmax)
 
-            sp = ax.scatter(df.index, df[substance],
+            ax.scatter(df.index, df[substance],
                         label=f'{substance.upper()} \
                                 {min(df.index.year), max(df.index.year)}',
                         marker='x', zorder=1, c = df[substance],
@@ -84,10 +82,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
             plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
             ax.set_ylabel(f'{substance}')
             ax.set_ylim(ymin-0.15, ymax+0.15)
-            if not as_subplot:
-                fig.autofmt_xdate()
-                plt.show() # can safely ignore the warning
-            else: return sp
+            if 'fig' in locals(): fig.autofmt_xdate(); plt.show()
 
     elif glob_obj.source=='Mozart':
         substance = get_col_name(subs, glob_obj.source)
@@ -95,7 +90,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
         return pl
 
 def binned_1d(glob_obj, subs, single_yr=None, plot_mean=False,
-                          single_graph=False, c_pfx=None):
+                          single_graph=False, c_pfx=None, ax=None):
     """
     Plots 1D averaged values over latitude / longitude including colormap
     Parameters:
@@ -115,9 +110,10 @@ def binned_1d(glob_obj, subs, single_yr=None, plot_mean=False,
     if not single_graph:
         # Plot mixing ratios averages over lats / lons for each year separately
         for out_x, out_y, year in zip(out_x_list, out_y_list, years):
-            fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-            fig.suptitle(f'{glob_obj.source} ({c_pfx}) {subs.upper()} for \
-                         {year}. Gridsize={glob_obj.grid_size}')
+            if not ax: 
+                fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
+                fig.suptitle(f'{glob_obj.source} ({c_pfx}) {subs.upper()} for \
+                             {year}. Gridsize={glob_obj.grid_size}')
 
             cmap = plt.cm.viridis_r
             vmin = np.nanmin([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean),
@@ -382,54 +378,54 @@ def local(loc_obj, substance=None, greyscale=False, v_limits = (None,None)):
     fig.autofmt_xdate()
     plt.show()
 
-#%%
-if __name__=='__main__':
-    from dictionaries import substance_list
-    calc_caribic = False
-    if calc_caribic:
-        from data import Caribic, Mauna_Loa, Mace_Head, Mozart
-        year_range = range(2000, 2018)
-        mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs
-                    in substance_list('MLO')}
-        caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
-        mhd = Mace_Head() # only 2012 data available
-        mzt = Mozart(year_range) # only available up to 2008
+#%% Fctn calls - data.plot
+# if __name__=='__main__':
+#     from dictionaries import substance_list
+#     calc_caribic = False
+#     if calc_caribic:
+#         from data import Caribic, Mauna_Loa, Mace_Head, Mozart
+#         year_range = range(2000, 2018)
+#         mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs
+#                     in substance_list('MLO')}
+#         caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2']) # 2005-2020
+#         mhd = Mace_Head() # only 2012 data available
+#         mzt = Mozart(year_range) # only available up to 2008
 
-    for pfx in caribic.pfxs: # scatter plots of all caribic data
-        substs = [x for x in substance_list(pfx)
-                  if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
-        f, axs = plt.subplots(int(len(substs)/2), 2,
-                              figsize=(10,len(substs)*1.5), dpi=200)
-        plt.suptitle(f'Caribic {(pfx)}')
-        for subs, ax in zip(substs, axs.flatten()):
-            scatter_global(caribic, subs, c_pfx=pfx,
-                                as_subplot=True, ax=ax)
-        f.autofmt_xdate()
-        plt.tight_layout()
-        plt.show()
+#     for pfx in caribic.pfxs: # scatter plots of all caribic data
+#         substs = [x for x in substance_list(pfx)
+#                   if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+#         f, axs = plt.subplots(int(len(substs)/2), 2,
+#                               figsize=(10,len(substs)*1.5), dpi=200)
+#         plt.suptitle(f'Caribic {(pfx)}')
+#         for subs, ax in zip(substs, axs.flatten()):
+#             scatter_global(caribic, subs, c_pfx=pfx,
+#                                 as_subplot=True, ax=ax)
+#         f.autofmt_xdate()
+#         plt.tight_layout()
+#         plt.show()
 
-    for pfx in caribic.pfxs: # lon/lat plots of all caribic data
-        substs = [x for x in substance_list(pfx)
-                  if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
-        for subs in substs:
-            binned_1d(caribic, subs=subs, c_pfx=pfx,
-                                  single_graph=True)
+#     for pfx in caribic.pfxs: # lon/lat plots of all caribic data
+#         substs = [x for x in substance_list(pfx)
+#                   if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+#         for subs in substs:
+#             binned_1d(caribic, subs=subs, c_pfx=pfx,
+#                                   single_graph=True)
 
-    for pfx in caribic.pfxs: # maps of all caribic data
-        substs = [x for x in substance_list(pfx)
-                  if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
-        for subs in substs:
-            binned_2d(caribic, subs=subs, c_pfx=pfx)
+#     for pfx in caribic.pfxs: # maps of all caribic data
+#         substs = [x for x in substance_list(pfx)
+#                   if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
+#         for subs in substs:
+#             binned_2d(caribic, subs=subs, c_pfx=pfx)
 
-    binned_1d(mzt, 'sf6', single_graph=True)
-    yr_ranges = [mzt.years[i:i + 9] for i
-                 in range(0, len(mzt.years), 9)] # create 6-year bundles
-    for yr_range in yr_ranges:
-        binned_2d(mzt, 'sf6', years=yr_range)
+#     binned_1d(mzt, 'sf6', single_graph=True)
+#     yr_ranges = [mzt.years[i:i + 9] for i
+#                  in range(0, len(mzt.years), 9)] # create 6-year bundles
+#     for yr_range in yr_ranges:
+#         binned_2d(mzt, 'sf6', years=yr_range)
 
-    lonlat_1d(mzt, 'sf6', single_yr = 2005)
+#     lonlat_1d(mzt, 'sf6', single_yr = 2005)
 
-    for subs, mlo_obj in mlo_data.items():
-        local(mlo_obj, subs)
+#     for subs, mlo_obj in mlo_data.items():
+#         local(mlo_obj, subs)
 
-    local(mhd, 'sf6', v_limits=(7, 8))
+#     local(mhd, 'sf6', v_limits=(7, 8))
