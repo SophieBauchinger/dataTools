@@ -31,8 +31,12 @@ def get_fct_substance(substance):
                     'halon_1211': fct.simple,
                     'cfc_12': fct.simple,
                     'hcfc_22': fct.simple,
-                    'int_co': fct.quadratic}
-    return df_func_dict[substance.lower()]
+                    'co': fct.quadratic, # prev. int_co
+                    }
+    try: return df_func_dict[substance.lower()]
+    except:
+        print(f'Substance error: No function found for {substance}. Using poly harm')
+        return fct.simple
 
 def get_col_name(substance, source, c_pfx='', CLaMS=False):
     """
@@ -214,7 +218,6 @@ def get_default_unit(substance):
     return unit[substance.lower()]
 
 #%% Input choice and validation
-
 def validated_input(prompt, choices):
     valid_values = choices.keys()
     valid_input = False
