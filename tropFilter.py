@@ -20,22 +20,29 @@ from toolpac.outliers.outliers import get_no_nan, fit_data
 from toolpac.conv.times import datetime_to_fractionalyear
 
 from data import Mauna_Loa
-from tools import get_lin_fit
+from tools import get_lin_fit, assign_t_s
 from dictionaries import get_fct_substance, get_col_name, substance_list
 
 filter_types = {
     'chem' : ['n2o', 'o3'], # 'crit'
-    'therm' : ['therm'], # 'lapse_rate'
+    'therm' : ['therm'], 
     'dyn' : ['1.5pvu', '2pvu', '3.5pvu'], # 'pvu'
     }
 
+coordinates = {
+    'pt' : 'Potential temperature [K]',
+    'dp' : 'Pressure difference [hPa]',
+    'z' : 'Geopotential height [km]',
+    }
+
 #%% Baseline filtering 
-#Filter tropospheric / stratospheric air using n2o mixing ratio
+
+# Sort trop / strat using mixing ratios relative to trop. background value
 def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG', 
              save=True, verbose=False):
     """ Sort data into strato / tropo based on difference to ground obs.
 
-    Returns dataframe containing index and strato/tropo/pre_flag columns and 
+    Returns dataframe containing index and strato/tropo/pre_flag columns 
 
     Parameters:
         glob_obj (GlobalData) : msmt data to be sorted into stratr / trop air
@@ -48,38 +55,41 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
     """
     state = f'pre_flag: crit={crit}, c_pfx={c_pfx}\n'
     if glob_obj.source=='Caribic': 
-        df = glob_obj.data[c_pfx]
-    else: df = glob_obj.df
+        df = glob_obj.data[c_pfx].copy()
+    else: df = glob_obj.df.copy()
     df.sort_index(inplace=True)
+    
+    substance = get_col_name(crit, glob_obj.source, c_pfx)
+    if not substance: raise Exception(state+'No {crit} data in {c_pfx}')
 
-    df_flag = pd.DataFrame({f'strato_{crit}':np.nan, f'tropo_{crit}':np.nan}, 
-                           index=df.index)
+
 
     if not ref_obj: 
         if verbose: print(state+f'No reference data supplied. Using Mauna Loa {crit} data')
         ref_obj = Mauna_Loa(glob_obj.years, crit)
 
     fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
-    t_obs_tot = np.array(datetime_to_fractionalyear(df.index, method='exact'))
 
-    substance = get_col_name(crit, glob_obj.source, c_pfx)
-    if not substance: raise Exception(state+'No {crit} data in {c_pfx}')
+    df_flag = pd.DataFrame({f'strato_{crit}':np.nan, 
+                            f'tropo_{crit}':np.nan}, 
+                           index=df.index)
 
+    t_obs_tot = np.array(datetime_to_fractionalyear(df_flag.index, method='exact'))
     df_flag.loc[df[substance] < limit * fit(t_obs_tot),
            (f'strato_{crit}', f'tropo_{crit}')] = (True, False)
 
     df_flag[f'flag_{crit}'] = 0
     df_flag.loc[df_flag[f'strato_{crit}'] == True, f'flag_{crit}'] = 1
+
     if verbose: print('Result of pre-flagging: \n',
                       df_flag[f'flag_{crit}'].value_counts())
-    
     if save and glob_obj.source == 'Caribic':
-        glob_obj.data[c_pfx] = pd.concat([glob_obj.data[c_pfx], df_flag])
+        glob_obj.data[c_pfx][f'flag_{crit}'] = df_flag[f'flag_{crit}']
     
     return df_flag
 
-def chemical(glob_obj, ref_obj=None, crit='n2o', c_pfx='GHG', 
-                      verbose = False, plot=True, limit=0.97):
+def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
+                      verbose = False, plot=True, limit=0.97, subs=None):
     """ Returns data set with new bool columns 'strato' and 'tropo'
     Reconstruction of filter_strat_trop from C_tools (T. Schuck)
 
@@ -102,121 +112,228 @@ def chemical(glob_obj, ref_obj=None, crit='n2o', c_pfx='GHG',
         INT: co, o3, h2o
         INT2: co, o3, h2o
     
+    IF INT or INT2, can use O3 tropopause from Zahn et. al. 2004 !
+    -> H_rel_TP
+    
     """
-
-    if ID == 'GHG':    return ['ch4', 'co2', 'n2o', 'sf6']
-    if ID == 'INT':    return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4']
-    if ID == 'INT2':   return ['co', 'o3', 'h2o', 'no', 'noy', 'co2', 'ch4',
-                               'n2o', 'f11', 'f12']
-
-    'int_CARIBIC2_H_rel_TP [km]'
-
-
     state = f'filter_strat_trop: crit={crit}, c_pfx={c_pfx}\n'
-    try: flag =  glob_obj.data[c_pfx][f'flag_{crit}']
-    except: # f'flag_{crit}' not in glob_obj.data[c_pfx].columns:
-        if verbose: print(state + 'No pre-flagged data found, calculating now')
-        try: 
-            pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
-            flag =  glob_obj.data[c_pfx][f'flag_{crit}']
-        except: 
-            if verbose: print('Pre-flagging unsuccessful, proceeding without')
+    tropo = f'tropo_{crit}'
+    strato = f'strato_{crit}'
+
+    data = glob_obj.data[c_pfx].copy()
+    df_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'), 
+                              tropo:pd.Series(np.nan, dtype='float')},
+                             index=data.index)
+    
+    # INT and INT2 have coordinates relative to O3 TP (Zahl 2003)
+    if crit == 'o3' and c_pfx == 'INT':
+        col, coord = 'int_h_rel_TP [km]', 'z'
+    elif crit == 'o3' and c_pfx == 'INT2':
+        col, coord = 'int_CARIBIC2_H_rel_TP [km]', 'z'
+
+    if crit == 'o3' and c_pfx in ['INT', 'INT2']:
+        df_sorted.loc[assign_t_s(data[col], 't', coord), 
+                    (strato, tropo)] = (False, True)
+        df_sorted.loc[assign_t_s(data[col], 's', coord), 
+                    (strato, tropo)] = (True, False)
+        
+        if plot: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs)
+
+    # Calculate simple pre-flag if not in data 
+    if crit in ['n2o'] and c_pfx in ['GHG', 'INT2']:
+
+        substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
+        df_sorted[substance] = data[substance]
+        if  f'd_{substance}' in data.columns: df_sorted[f'd_{substance}'] = data[f'd_{substance}']
+        if not f'flag_{crit}' in data.columns: 
             flag = None
-    data = glob_obj.data[c_pfx]
+            pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
+        if f'flag_{crit}' in data.columns: 
+            try: df_sorted[f'flag_{crit}'] = glob_obj.data[c_pfx][f'flag_{crit}']
+            except: print('Pre-flagging unsuccessful, proceeding without')
 
-    substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
-    substance = 'int_Tpot [K]'
-    mxr = data[substance] # measured mixing ratios
-    if f'd_{substance}' in data.columns: d_mxr = data[f'd_{substance}']
-    else: d_mxr = None; print(state+f'No abs. error for {crit}')
-    t_obs_tot = np.array(datetime_to_fractionalyear(data.index, method='exact'))
+        df_sorted.dropna(subset=substance, inplace=True) # remove rows without data
+        df_sorted.sort_index(inplace=True)
 
-    func = get_fct_substance(crit)
-    ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
-                          flag = flag, verbose=False, 
-                          plot=not(plot), limit=0.1, direction = 'n')
+        mxr = df_sorted[substance] # measured mixing ratios
+        if f'd_{substance}' in df_sorted.columns: d_mxr = df_sorted[f'd_{substance}']
+        else: d_mxr = None; print(state+f'No abs. error for {crit}')
+        t_obs_tot = np.array(datetime_to_fractionalyear(df_sorted.index, method='exact'))
+        try: flag = df_sorted[f'flag_{crit}']
+        except: pass
 
-    # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
-    data.loc[(ol[0] != 0), (f'strato_{crit}', f'tropo_{crit}')] = (True, False)
-    data.loc[(ol[0] == 0), (f'strato_{crit}', f'tropo_{crit}')] = (False, True)
+        func = get_fct_substance(crit)
+        ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
+                              flag = flag, verbose=False, plot=not(plot),
+                              limit=0.1, direction = 'n')
+    
+        # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
+        df_sorted.loc[(ol[0] != 0), (f'strato_{crit}', f'tropo_{crit}')] = (True, False)
+        df_sorted.loc[(ol[0] == 0), (f'strato_{crit}', f'tropo_{crit}')] = (False, True)
+        df_sorted.drop(columns=substance)
+       
+        if plot: 
+            popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
+            plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs)
+    
+    return df_sorted
 
-    # separate trop/strat data
-    df_tropo = data[data[f'tropo_{crit}'] == True]
-    df_strato = data[data[f'strato_{crit}'] == True]
+# Sort trop / strat using temperature gradient
+def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False, subs='n2o'):
+    """ Sort into strat/trop depending on temperature lapse rate / gradient
+    
+    Parameters: 
+        coord (str): dp, pt, z - coordinate (rel. to tropopause)
+        c_pfx (str): INT, INT2
+        """
 
-    if plot:
-        t_strato = np.array(datetime_to_fractionalyear(
-            df_strato.index, method='exact'))
-        t_tropo = np.array(datetime_to_fractionalyear(
-            df_tropo.index, method='exact'))
-        fig, ax = plt.subplots(dpi=200)
-        plt.title(f'{state}')
-        # ax.scatter(t_obs_tot-2005, mxr,
-        #            c='silver', lw=1, label='data', zorder=0,  marker='+')
-        ax.scatter(t_strato-2005, df_strato[substance],
-                    c='xkcd:kelly green',  marker='.', zorder=1, label='strato')
-        ax.scatter(t_tropo-2005, df_tropo[substance],
-                    c='grey',  marker='.', zorder=0, label='tropo')
-        no_nan_time, no_nan_mxr, no_nan_d_mxr = get_no_nan(t_obs_tot, mxr, d_mxr)
-        popt0 = fit_data(func, no_nan_time, no_nan_mxr, no_nan_d_mxr)
-        ax.plot(np.array(no_nan_time), func(np.array(no_nan_time), *popt0),
-                c='r', lw=1, label='initial')
-        ax.plot(t_obs_tot, func(t_obs_tot, *ol[3]),
-                c='k', lw=1, label='filtered')
+    if (coord not in ['dp', 'pt', 'z'] or c_pfx not in ['INT', 'INT2'] 
+        or (c_pfx == 'INT2' and coord == 'z')):
+        raise ValueError(f'Thermal TP sorting not yet implemented \
+                         for {glob_obj.source} {c_pfx} with coord = {coord}')
 
-        plt.ylabel(substance)
-        plt.xlabel('Time delta')
-        plt.legend()
-        plt.show()
-
-    return data
-
-def thermal(glob_obj, crit='dp', c_pfx='INT', verbose=False, plot=True):
-    """ Sort into strat/trop depending on temperature lapse rate / gradient"""
     data = glob_obj.data[c_pfx].copy()
 
-    tropo = f'tropo_therm_{crit}'
-    strato = f'strato_therm_{crit}'
+    tropo = f'tropo_therm_{coord}'
+    strato = f'strato_therm_{coord}'
 
-    # pd.DataFrame({'strato':pd.Series(np.nan, dtype='float')}, index=data.index)
+    df_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'), 
+                                tropo:pd.Series(np.nan, dtype='float')}, 
+                               index=data.index)
 
-    df_flag = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'), 
+    if c_pfx == 'INT2':
+        cols  = {
+            'dp' : 'int_ERA5_PRESS [hPa]',
+            'dp_tp' : 'int_ERA5_TROP1_PRESS [hPa]',
+            'pt' : 'int_Theta [K]',
+            'pt_tp' : 'int_ERA5_TROP1_THETA [K]'}
+        col, TP = cols[coord], cols[f'{coord}_tp']
+
+        df_sorted.loc[assign_t_s(data[col], 't', coordinate = coord, tp_val=data[TP]), 
+                    (strato, tropo)] = (False, True)
+        df_sorted.loc[assign_t_s(data[col], 's', coordinate = coord, tp_val=data[TP]), 
+                    (strato, tropo)] = (True, False)
+
+    elif c_pfx == 'INT':
+        coords = {
+            'dp' : 'int_dp_strop_hpa [hPa]',
+            'pt' : 'int_pt_rel_sTP_K [K]',
+            'z' : 'int_z_rel_sTP_km [km]'}
+        col = coords[coord]
+        df_sorted.loc[assign_t_s(data[col], 't', coord), 
+                    (strato, tropo)] = (False, True)
+        df_sorted.loc[assign_t_s(data[col], 's', coord), 
+                    (strato, tropo)] = (True, False)
+
+    if verbose: print(df_sorted[strato].value_counts())
+    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs)
+
+    return df_sorted
+
+# Sort trop / strat using potential vorticity gradient
+def dynamical(glob_obj, pvu=2.0, coord = 'pt', c_pfx='INT', verbose=False, plot=False, subs='n2o'):
+    """ Sort into strat/trop depending on potential vorticity gradient / values 
+    Parameters: 
+        coord (str): dp, pt, z - coordinate (rel. to tropopause)
+        pvu (float): 1.5, 2.0, 3.5 - value of potential vorticity surface for TP
+        c_pfx (str): INT, INT2
+    """
+    data = glob_obj.data[c_pfx].copy()
+
+    tropo = 'tropo_dyn_{}_{}'.format(coord, str(pvu).replace('.', '_'))
+    strato = 'strato_dyn_{}_{}'.format(coord, str(pvu).replace('.', '_'))
+
+    df_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'), 
                             tropo:pd.Series(np.nan, dtype='float')}, 
                            index=data.index)
 
-    if c_pfx == 'INT2':
-        data['int_dp_strop_hpa [hPa]'] = (data['int_ERA5_PRESS [hPa]'] 
-                                          - data['int_ERA5_TROP1_PRESS [hPa]'])
-        data['int_pt_rel_sTP_K [K]'] = (data['int_Theta [K]']
-                                        - data['int_ERA5_TROP1_THETA [K]'])
+    if pvu not in [1.5, 2.0, 3.5]: raise ValueError('No data for {pvu} pvu')
 
-    if crit == 'dp': # pressure lower above TP
-        coord = 'int_dp_strop_hpa [hPa]' # pressure difference relative to thermal tropopause
-        df_flag.loc[(data[coord] > 0), (strato, tropo)] = (False, True)
-        df_flag.loc[(data[coord] < 0), (strato, tropo)] = (True, False)
+    # if c_pfx == 'INT': col = 'int_z_rel_dTP_km [km]'
 
-    elif crit == 'pt': # potential temperature higher above TP
-        coord = 'int_pt_rel_sTP_K [K]' # potential temperature difference relative to thermal tropopause
-        df_flag.loc[(data[coord] < 0), (strato, tropo)] = (False, True)
-        df_flag.loc[(data[coord] > 0), (strato, tropo)] = (True, False)
+    if c_pfx == 'INT2': 
+        col = 'int_ERA5_D_{}PVU_BOT [K]'.format(str(pvu).replace('.', '_'))
+    if c_pfx == 'INT':
+        coords = {
+            'dp' : 'int_dp_dtrop_hpa [hPa]',
+            'pt' : 'int_pt_rel_dTP_K [K]',
+            'z' : 'int_z_rel_dTP_km [km]'}
+        col = coords[coord]
 
-    elif crit == 'z': # geopotential height higher above TP
-        coord = 'int_z_rel_sTP_km [km]' # geopotential height relative to thermal tropopause
-        df_flag.loc[(data[coord] < 0), (strato, tropo)] = (False, True)
-        df_flag.loc[(data[coord] > 0), (strato, tropo)] = (True, False)
+    df_sorted.loc[assign_t_s(data[col], 't', coord), 
+                (strato, tropo)] = (False, True)
+    df_sorted.loc[assign_t_s(data[col], 's', coord), 
+                (strato, tropo)] = (True, False)
+    
+    if verbose: print(df_sorted[strato].value_counts())
+    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs)
+    
+    return df_sorted
 
-    else: raise Exception(f'Thermal TP sorting not yet implemented for {glob_obj.source} {c_pfx} with crit = {crit}')
-    if verbose: print(df_flag[strato].value_counts())
+# Plotting sorted data
+def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, subs=None):
+    """ Plot strat / trop sorted data """ 
+    # only take data with index that is available in df_sorted 
+    data = glob_obj.data[c_pfx][glob_obj.data[c_pfx].index.isin(df_sorted.index)]
+    data.sort_index(inplace=True)
 
-    return df_flag
+    # separate trop/strat data for any criterion
+    tropo_col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
+    strato_col = [col for col in df_sorted.columns if col.startswith('strato')][0]
 
-def dynamical(glob_obj, pvu=2.0, c_pfx=None, verbose=False, plot=True):
-    """ Sort into strat/trop depending on potential vorticity gradient / values """
+    # take 'data' here because substances may not be available in df_sorted
+    df_tropo = data[df_sorted[tropo_col] == True]
+    df_strato = data[df_sorted[strato_col] == True]
+
+    if crit in ['o3', 'n2o'] and not subs: subs = crit
+
+    substance = get_col_name(subs, glob_obj.source, c_pfx)
+    if substance is None: print('Cannot plot {subs} from {c_pfx}'); return
+    
+    fig, ax = plt.subplots(dpi=200)
+    plt.title(f'{crit} {c_pfx}')
+    ax.scatter(df_strato.index, df_strato[substance],
+                c='xkcd:kelly green',  marker='.', zorder=1, label='strato')
+    ax.scatter(df_tropo.index, df_tropo[substance],
+                c='grey',  marker='.', zorder=0, label='tropo')
+
+    if popt0 is not None and popt1 is not None and (subs==crit or subs is None):
+        t_obs_tot = np.array(datetime_to_fractionalyear(
+            df_sorted.index, method='exact'))
+        ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0), 
+                c='r', lw=1, label='initial')
+        ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt1),
+                c='k', lw=1, label='filtered')
+
+    plt.ylabel(substance)
+    plt.xlabel('Time delta')
+    plt.legend()
+    plt.show()
+#%% 
+
+        # if coord == 'dp': # pressure lower above TP
+        #     col = 'int_dp_dtrop_hpa [hPa]' # pressure difference relative to thermal tropopause
+        #     df_sorted.loc[(data[col] > 0), (strato, tropo)] = (False, True)
+        #     df_sorted.loc[(data[col] < 0), (strato, tropo)] = (True, False)
+    
+        # elif coord == 'pt': # potential temperature higher above TP
+        #     col = 'int_pt_rel_dTP_K [K]' # potential temperature difference relative to thermal tropopause
+        #     df_sorted.loc[(data[col] < 0), (strato, tropo)] = (False, True)
+        #     df_sorted.loc[(data[col] > 0), (strato, tropo)] = (True, False)
+    
+        # elif coord == 'z': # geopotential height higher above TP
+        #     col = 'int_z_rel_dTP_km [km]' # geopotential height relative to thermal tropopause
+        #     df_sorted.loc[(data[col] < 0), (strato, tropo)] = (False, True)
+        #     df_sorted.loc[(data[col] > 0), (strato, tropo)] = (True, False)
+
+
+    # if coord == 'pt': # potential temperature higher above TP
+    #     df_sorted.loc[(data[col] < 0), (strato, tropo)] = (False, True)
+    #     df_sorted.loc[(data[col] > 0), (strato, tropo)] = (True, False)
 
     # 'tp_theta_1_5pvu'   : 'int_ERA5_D_1_5PVU_BOT [K]',                  # THETA-Distance to local 1.5 PVU surface (ERA5)
     # 'tp_theta_2_0pvu'   : 'int_ERA5_D_2_0PVU_BOT [K]',                  # -"- 2.0 PVU
     # 'tp_theta_3_5pvu'   : 'int_ERA5_D_3_5PVU_BOT [K]',                  # -"- 3.5 PVU
-    # 'h_rel_tp'          : 'int_CARIBIC2_H_rel_TP [km]',                 # H_rel_TP; replacement for H_rel_TP
     
     # (INT2)
     # 'int_ERA5_D_1_5PVU_BOT [K]',                  # THETA-Distance to local 1.5 PVU surface (ERA5)
@@ -227,9 +344,7 @@ def dynamical(glob_obj, pvu=2.0, c_pfx=None, verbose=False, plot=True):
     # 'int_z_rel_dTP_km [km]',                          # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
     # 'int_dp_dtrop_hpa [hPa]',                         # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
     # 'int_pt_rel_dTP_K [K]',                           # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
-    pass
 
-#%% 
 # c_pfx=None; source=None
 # if source=='Caribic' and c_pfx=='GHG': # caribic / int
 #     col_names = {
