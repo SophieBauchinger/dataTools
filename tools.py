@@ -111,6 +111,24 @@ def make_season(month):
         elif m in [12, 1, 2]:   season[i] = 4 # winter
     return season
 
+def assign_t_s(df, TS, coordinate, tp_val=0):
+    """ Returns the appropriate comparison for a chosen coord to sort into trop / strat
+    Parameters: 
+        df (DataFrame): reference data 
+        TS (str): 't' / 's';  troposphere / stratosphere
+        coord (str): dp, pt, z
+        tp_val (float): value of tropopause in chosen coordinates
+    """
+    if ((coordinate in ['dp'] and TS == 't') 
+        or (coordinate in ['pt', 'z'] and TS == 's')):
+        return df.gt(tp_val)
+
+    elif ((coordinate in ['dp'] and TS == 's') 
+          or (coordinate in ['pt', 'z'] and TS == 't')):
+        return df.lt(tp_val)
+
+    else: raise KeyError(f'STrat/Trop assignment undefined for {coordinate}')
+
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_combo(c_obj, save=True):
     """ Create dataframe with all possible coordinates but
