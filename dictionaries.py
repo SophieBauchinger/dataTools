@@ -129,9 +129,9 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
 
     if source=='Caribic' and c_pfx=='INT': # caribic / int
         col_names = {
-            'p'             : 'p [mbar]',
-            'h_rel_tp'      : 'int_h_rel_TP [km]',
-            'pv'            : 'int_PV [PVU]',
+            'p'             : 'p [mbar]',                                       # pressure (mean value)
+            'h_rel_tp'      : 'int_h_rel_TP [km]',  	                        # height above O3 tropopause according to Zahn et al. (2003), Atmospheric Environment, 37, 439-440
+            'pv'            : 'int_PV [PVU]',                                   # PV from ECMWF (integral)
             'to_air_tmp'    : 'int_ToAirTmp [degC]',                            # Total Air Temperature
             'tpot'          : 'int_Tpot [K]',                                   # potential temperature derived from measured pressure and temperature
             'z'             : 'int_z_km [km]',                                  # geopotential height of sample from ECMWF
@@ -147,7 +147,7 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     elif source=='Caribic' and c_pfx=='INT2': # caribic / int2
         col_names = {
             'p'                 : 'p [mbar]',                                   # pressure (mean value)
-            'h_rel_tp'          : 'int_CARIBIC2_H_rel_TP [km]',                 # H_rel_TP; replacement for H_rel_TP
+            'h_rel_tp'          : 'int_CARIBIC2_H_rel_TP [km]',                 # H_rel_TP; replacement for H_rel_TP => O3 tropopause 
             'pv'                : 'int_ERA5_PV [PVU]',                          # Potential vorticity (ERA5)
             'theta'             : 'int_Theta [K]',                              # Potential temperature
             'p_era5'            : 'int_ERA5_PRESS [hPa]',                       # Pressure (ERA5)
