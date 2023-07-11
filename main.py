@@ -152,13 +152,17 @@ for pfx in ['INT2']:# caribic.pfxs:
 # dyn_3_5 = {'INT' : ['dp', 'pt', 'z'],
 #            'INT2' : ['pt']}
 # dyn_1_5 = dyn_2_0 = {'INT2' : ['pt']}
-for subs in substance_list('INT2'):
-    f, axs = plt.subplots(1, 3, figsize=(10, 4), dpi=200)
-    for tp_def, ax in zip(['chem', 'therm', 'dyn'], axs.flatten()):
-        baseline_filter(caribic, subs, 'INT2', tp_def, ax=ax)
-    f.autofmt_xdate()
-    plt.tight_layout()
-    plt.show()
+
+
+# Baseline Filter on tropospheric datasets
+for pfx in ['GHG', 'INT', 'INT2']:
+    for subs in substance_list(pfx):
+        f, axs = plt.subplots(1, 3, figsize=(10, 4), dpi=200)
+        for tp_def, ax in zip(['chem', 'therm', 'dyn'], axs.flatten()):
+            baseline_filter(caribic, subs=subs, c_pfx=pfx, tp_def=tp_def, ax=ax)
+        f.autofmt_xdate()
+        plt.tight_layout()
+        plt.show()
     
 
 
