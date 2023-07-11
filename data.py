@@ -284,6 +284,87 @@ class Caribic(GlobalData):
 
         return out
 
+    def sel_tropo(self, filter_type, **kwargs):
+        """ Returns Caribic object containing only tropospheric data points.
+        Parameters:
+            filter_type (str): 'chem', 'therm' or 'dyn'
+
+            crit (str): 'n2o', 'o3'
+            coord (str): 'pt', 'dp', 'z'
+            pvu (float): 1.5, 2.0, 3.5
+            limit (float): pre-flag limit for chem. TP sorting
+
+            subs (str): substance for plotting
+            c_pfx (str): 'GHG', 'INT', 'INT2'
+            verbose (bool)
+            plot (bool)
+        """
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+
+        out.data = {k:v.copy() for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
+        functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
+
+        if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
+        else: pfxs = [kwargs['c_pfx']]
+
+        for pfx in pfxs: 
+            try: df_sorted = functions[filter_type](out, c_pfx = pfx, **kwargs)
+            except: 
+                print(f'Sorting of {pfx} with {filter_type} unsuccessful')
+                del out.data[pfx]; continue
+
+            col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
+            
+            # only keep rows that are in df_sorted, then only tropospheric data
+            out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)]
+            out.data[pfx] = out.data[pfx][df_sorted[col] == True]
+            out.data[pfx][col] = df_sorted[col]
+
+        out.pfxs = [k for k in out.data.keys()]
+        return out
+
+
+    def sel_strato(self, filter_type, **kwargs):
+        """ Returns Caribic object containing only tropospheric data points.
+        Parameters:
+            filter_type (str): 'chem', 'therm' or 'dyn'
+
+            crit (str): 'n2o', 'o3'
+            coord (str): 'pt', 'dp', 'z'
+            pvu (float): 1.5, 2.0, 3.5
+            limit (float): pre-flag limit for chem. TP sorting
+
+            subs (str): substance for plotting
+            c_pfx (str): 'GHG', 'INT', 'INT2'
+            verbose (bool)
+            plot (bool)
+        """
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+
+        out.data = {k:v.copy() for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
+        functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
+
+        if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
+        else: pfxs = [kwargs['c_pfx']]
+        
+        for pfx in pfxs:
+            try: df_sorted = functions[filter_type](out, c_pfx = pfx, **kwargs)
+            except: print(f'Sorting of {pfx} with {filter_type} unsuccessful'); continue
+
+            col = [col for col in df_sorted.columns if col.startswith('strato')][0]
+
+            # only keep rows that are in df_sorted, then only tropospheric data
+            out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)]
+            out.data[pfx] = out.data[pfx][df_sorted[col] == True]
+            out.data[pfx][col] = df_sorted[col]
+
+        out.pfxs = [k for k in out.data.keys()]
+        return out
+
     def data_filter(self, filter_type = None, tropo_strato = 'tropo', **kwargs):
         """ Returns Caribic object containing only tropo- or strato-spheric data 
         Parameters:
@@ -299,8 +380,6 @@ class Caribic(GlobalData):
             verbose (bool)
             plot (bool): plot data sorted into strat/trop, also baseline for chem
             subs (str): substance for plotting
-            
-                either 'tropo', 'strato'
         """
         #!!! Put tropo / strato columns in data and leave them there or rather only calculate & keep data if specifically requested? 
 
