@@ -4,6 +4,9 @@
 @Date: Wed Jul  5 14:41:45 2023
 
 Filtering of data in tropospheric / stratospheric origin depending on TP definition
+
+Functions return df_sorted which contains boolean strato* / tropo* columns 
+which are named according to TP definition and parameters used to create them
 """
 import numpy as np
 import pandas as pd
@@ -34,7 +37,7 @@ coordinates = {
     'z' : 'Geopotential height [km]',
     }
 
-#%% Baseline filtering 
+#%% Troposphere / Stratosphere sorting - function definitions
 
 # Sort trop / strat using mixing ratios relative to trop. background value
 def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG', 
@@ -108,6 +111,7 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
         INT: 'o3'
         INT2: 'o3', 'n2o'
     """
+    print(crit, c_pfx)
     if c_pfx == 'GHG' and crit != 'n2o':
         print(f'{crit} not available in {c_pfx}, using n2o'); crit = 'n2o'
     elif c_pfx == 'INT' and crit != 'o3':
@@ -172,9 +176,6 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
         df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
         df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
 
-        # df_sorted.loc[(ol[0] != 0), (strato, tropo)] = (True, False)
-        # df_sorted.loc[(ol[0] == 0), (strato, tropo)] = (False, True)
-
         if plot: 
             popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
             plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs)
@@ -194,7 +195,7 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
         INT: dp, pt
         INT2: dp, pt, z
         """
-
+    print(c_pfx, coord)
     if (coord not in ['dp', 'pt', 'z'] or c_pfx not in ['INT', 'INT2'] 
         or (c_pfx == 'INT2' and coord == 'z')):
         print(f'Thermal TP sorting not yet implemented for {c_pfx} with coord={coord}')
@@ -235,6 +236,8 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
     if verbose: print(df_sorted[strato].value_counts())
     if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs)
 
+    df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
+    df_sorted.sort_index(inplace=True)
     return df_sorted
 
 # Sort trop / strat using potential vorticity gradient
@@ -250,6 +253,7 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
         INT: coord: 'dp', 'pt', 'z' / pvu: 3.5 
         INT2: coord: 'pt' / pvu: 1.5, 2.0, 3.5 
     """
+    print(c_pfx, coord, pvu)
     if not c_pfx in ['INT', 'INT2']: raise ValueError(f'Cannot dyn sort {c_pfx}')
     if c_pfx=='INT2' and pvu not in [1.5, 2.0, 3.5]: 
         raise ValueError(f'No {c_pfx} data for {pvu} pvu')
@@ -282,7 +286,9 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
     
     if verbose: print(df_sorted[strato].value_counts())
     if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs)
-    
+
+    df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
+    df_sorted.sort_index(inplace=True)
     return df_sorted
 
 # Plotting sorted data
