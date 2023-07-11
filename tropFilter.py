@@ -5,18 +5,6 @@
 
 Filtering of data in tropospheric / stratospheric origin
 
-chemical:
-    GHG: 'n2o'
-    INT: 'o3'
-    INT2: 'o3', 'n2o'
-
-thermal: 
-    INT: 'dp', 'pt'
-    INT2: 'dp', 'pt', 'z'
-
-dynamical:
-    INT: 'dp', 'pt', 'z' / 3.5
-    INT2: 'pt' / 1.5, 2.0, 3.5
 
 
 """
@@ -31,7 +19,7 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning,
 
 from toolpac.outliers import outliers
 from toolpac.outliers.outliers import fit_data
-from toolpac.conv.times import datetime_to_fractionalyear
+from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
 import data #!!! kinda cyclic, but need Mauna_Loa for pre_flag
 from tools import get_lin_fit, assign_t_s
@@ -86,7 +74,7 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
                             f'tropo_{crit}':np.nan}, 
                            index=df.index)
 
-    t_obs_tot = np.array(datetime_to_fractionalyear(df_flag.index, method='exact'))
+    t_obs_tot = np.array(dt_to_fy(df_flag.index, method='exact'))
     df_flag.loc[df[substance] < limit * fit(t_obs_tot),
            (f'strato_chem_{crit}', f'tropo_chem_{crit}')] = (True, False)
 
@@ -101,12 +89,13 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
     return df_flag
 
 def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
-             verbose = False, plot=True, limit=0.97, subs=None):
-    """ Returns data set with new bool columns 'strato' and 'tropo'
-    Reconstruction of filter_strat_trop from C_tools (T. Schuck)
+             verbose = False, plot=False, limit=0.97, subs=None, **kwargs):
+    """ Returns DataFrame with bool columns 'strato' and 'tropo'.
 
+    Reconstruction of filter_strat_trop from C_filter (T. Schuck)
     Sort data into stratosphere or troposphere based on outlier statistics
     with respect to measurements eg. at Mauna Loa Observatory
+    Resulting dataframe only contains rows where filtering was possible.
 
     Parameters:
         glob_obj (GlobalData) : measurement data to be sorted into
@@ -122,14 +111,11 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
         INT2: 'o3', 'n2o'
     """
     if c_pfx == 'GHG' and crit != 'n2o':
-        print(f'{crit} not available in {c_pfx}, using n2o')
-        crit = 'n2o'
+        print(f'{crit} not available in {c_pfx}, using n2o'); crit = 'n2o'
     elif c_pfx == 'INT' and crit != 'o3':
-        print(f'{crit} not available in {c_pfx}, using o3')
-        crit = 'o3'
+        print(f'{crit} not available in {c_pfx}, using o3'); crit = 'o3'
     elif c_pfx == 'INT' and crit not in ['n2o', 'o3']:
-        print(f'{crit} not available in {c_pfx}, using n2o')
-        crit = 'n2o'
+        print(f'{crit} not available in {c_pfx}, using n2o'); crit = 'n2o'
 
     state = f'filter_strat_trop: crit={crit}, c_pfx={c_pfx}\n'
     tropo = f'tropo_chem_{crit}'
@@ -149,18 +135,23 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
                     (strato, tropo)] = (False, True)
         df_sorted.loc[assign_t_s(data[col], 's', coord), 
                     (strato, tropo)] = (True, False)
+
+        df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
+        df_sorted.sort_index(inplace=True)
+
         if plot: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs)
 
     if crit == 'n2o' and c_pfx in ['GHG', 'INT2']:
         substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
         df_sorted[substance] = data[substance]
-        if  f'd_{substance}' in data.columns: df_sorted[f'd_{substance}'] = data[f'd_{substance}']
+        if f'd_{substance}' in data.columns: 
+            df_sorted[f'd_{substance}'] = data[f'd_{substance}']
 
         # Calculate simple pre-flag if not in data 
         if not f'flag_{crit}' in data.columns: 
-            flag = None
             pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
         if f'flag_{crit}' in data.columns: 
+            # make part of df_sorted so that substance=nan rows get dropped
             try: df_sorted[f'flag_{crit}'] = glob_obj.data[c_pfx][f'flag_{crit}']
             except: print('Pre-flagging unsuccessful, proceeding without')
 
@@ -168,29 +159,33 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
         df_sorted.sort_index(inplace=True)
 
         mxr = df_sorted[substance] # measured mixing ratios
+        d_mxr = None
         if f'd_{substance}' in df_sorted.columns: d_mxr = df_sorted[f'd_{substance}']
-        else: d_mxr = None; print(state+f'No abs. error for {crit}')
-        t_obs_tot = np.array(datetime_to_fractionalyear(df_sorted.index, method='exact'))
+        elif verbose: print(state+f'No abs. error for {crit}')
+        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
         try: flag = df_sorted[f'flag_{crit}']
-        except: pass
+        except: flag = None
 
         func = get_fct_substance(crit)
         ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
-                              flag = flag, verbose=False, plot=not(plot),
+                              flag = flag, verbose=False, plot=False,
                               limit=0.1, direction = 'n')
-
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
-        df_sorted.loc[(ol[0] != 0), (strato, tropo)] = (True, False)
-        df_sorted.loc[(ol[0] == 0), (strato, tropo)] = (False, True)
-        df_sorted.drop(columns=substance, inplace=True)
+        df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
+        df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
+
+        # df_sorted.loc[(ol[0] != 0), (strato, tropo)] = (True, False)
+        # df_sorted.loc[(ol[0] == 0), (strato, tropo)] = (False, True)
 
         if plot: 
             popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
             plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs)
+
     return df_sorted
 
 # Sort trop / strat using temperature gradient
-def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False, subs='co2'):
+def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False, 
+            subs='co2', **kwargs):
     """ Sort into strat/trop depending on temperature lapse rate / gradient
     
     Parameters: 
@@ -204,7 +199,7 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False, subs='
 
     if (coord not in ['dp', 'pt', 'z'] or c_pfx not in ['INT', 'INT2'] 
         or (c_pfx == 'INT2' and coord == 'z')):
-        print(f'Thermal TP sorting not yet implemented for {glob_obj.source} {c_pfx} with coord = {coord}')
+        print(f'Thermal TP sorting not yet implemented for {c_pfx} with coord={coord}')
 
     data = glob_obj.data[c_pfx].copy()
 
@@ -245,7 +240,8 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False, subs='
     return df_sorted
 
 # Sort trop / strat using potential vorticity gradient
-def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False, plot=False, subs='co2'):
+def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False, 
+              plot=False, subs='co2', **kwargs):
     """ Sort into strat/trop depending on potential vorticity gradient / values 
     Parameters: 
         coord (str): dp, pt, z - coordinate (rel. to tropopause). Required for INT
@@ -315,13 +311,12 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, subs=N
     plt.title('{} ({}) filtered using {}-{}'.format(
         subs.upper(), c_pfx, *tropo_col.split('_')[1:]))
     ax.scatter(df_strato.index, df_strato[substance],
-                c='xkcd:kelly green',  marker='.', zorder=1, label='strato')
+                c='grey',  marker='.', zorder=0, label='strato')
     ax.scatter(df_tropo.index, df_tropo[substance],
-                c='grey',  marker='.', zorder=0, label='tropo')
+                c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
 
     if popt0 is not None and popt1 is not None and (subs==crit or subs is None):
-        t_obs_tot = np.array(datetime_to_fractionalyear(
-            df_sorted.index, method='exact'))
+        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0), 
                 c='r', lw=1, label='initial')
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt1),
