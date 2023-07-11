@@ -30,14 +30,12 @@ warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
 #%% GlobalData
 def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
-                        c_pfx=None, as_subplot=False, ax=None):
+                   c_pfx=None, as_subplot=False, ax=None):
     """
     Default plotting of scatter values for global data
     
-    If as_subplot, plots scatterplot onto given axis
-    Returns scatterplot 
+    If as_subplot, plots scatterplot onto given axis (ax)
     """
-
     if glob_obj.source=='Caribic':
         if c_pfx: pfxs = [c_pfx]
         else: pfxs = glob_obj.pfxs
@@ -258,9 +256,9 @@ def lonlat_1d(mzt_obj, subs='sf6',
     return
 
 # Caribic
-def caribic_2d(c_obj, key, subs):
-    df = c_obj.data[key]
-    substance = get_col_name(subs, c_obj.source, key)
+def caribic_2d(c_obj, c_pfx, subs):
+    df = c_obj.data[c_pfx]
+    substance = get_col_name(subs, c_obj.source, c_pfx)
     df_mm = monthly_mean(df).notna()
 
     # Plot mixing ratio msmts and monthly mean
