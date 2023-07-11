@@ -294,6 +294,7 @@ class Caribic(GlobalData):
             coord (str): 'dp', 'pt', 'z' [dyn, therm]
             pvu(float): potential vorticity unit for pv surface [dyn]
             limit (float): pre-flag limit for OL detection [chem]
+            c_pfx (str): 'GHG', 'INT' or 'INT2'
 
             verbose (bool)
             plot (bool): plot data sorted into strat/trop, also baseline for chem
@@ -307,136 +308,49 @@ class Caribic(GlobalData):
         for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
             out.__dict__[attribute_key] = self.__dict__[attribute_key]
 
-        out.data = {k:v for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
+        tropo_out = strato_out = out # take attributes only
+
+        out.data = {k:v.copy() for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
 
         functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
 
-        for pfx in set(out.data.keys()):
-            try: 
-                df_sorted = functions[filter_type](out, c_pfx = pfx, **kwargs)
-                print(pfx, df_sorted)
+        if not 'c_pfx' in kwargs.keys(): 
+            pfxs = set(out.data.keys())
+        else: 
+            pfxs = [kwargs['c_pfx']]
+            kwargs.pop('c_pfx') # otherwise giving multiple values to tropFilter functions
+
+        for pfx in pfxs:
+            try: df_sorted = functions[filter_type](out, c_pfx = pfx, **kwargs)
             except: 
-                print(f'Cannot sort {pfx} using {filter_type} TP')
-                out.data.pop(pfx)
+                print(f'Sorting of {pfx} with {filter_type} unsuccessful')
                 continue
 
-            # only keep rows that are in df_sorted
-            out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)] 
-
             # now filter for strato / tropo data
-            ts_col = [col for col in df_sorted.columns if col.startswith(tropo_strato)][0]
-            out.data[pfx] = out.data[pfx][df_sorted[ts_col] == True]
-            out.data[pfx][ts_col] = df_sorted[ts_col]
+            t_col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
+            s_col = [col for col in df_sorted.columns if col.startswith('strato')][0]
 
-        out.pfxs = list(set([pfx for pfx in out.data.keys()]))
-    
-        if len(out.pfxs) == 0:
+            # only keep rows that are in df_sorted
+            out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)]
+
+            tropo_out.data[pfx] = pd.DataFrame({t_col:df_sorted[t_col][df_sorted[t_col] == True]}, 
+                                                index=out.data[pfx].index)
+
+            strato_out.data[pfx] = pd.DataFrame({s_col:df_sorted[s_col][df_sorted[s_col] == True]}, 
+                                                index=out.data[pfx].index)
+
+            tropo_out.data[pfx] = out.data[pfx].loc[df_sorted[t_col] == True]
+            # tropo_out.data[pfx][t_col] = df_sorted[t_col][df_sorted[t_col] == True]
+
+            strato_out.data[pfx] = out.data[pfx][df_sorted[s_col] == True]
+            # strato_out.data[pfx][s_col] = df_sorted[s_col][df_sorted[s_col] == True]
+
+        tropo_out.pfxs = strato_out.pfxs = [pfx for pfx in tropo_out.data.keys()]
+        if len(tropo_out.pfxs) == 0 or len(strato_out.pfxs) == 0:
             raise Exception('Filtering was unsuccessful for all data sets.')
-        else: 
-            return out
+
+        return tropo_out, strato_out
             
-            
-            # try: df_sorted = functions[filter_type](self, **kwargs)
-            # except: print(f'Cannot sort {pfx} using {filter_type} TP')
-
-            # # Now choose only strato or tropo data
-            # ts_col = [col for col in df_sorted.columns if col.startswith(tropo_strato)][0]
-            # out.data[pfx] = initial_data[pfx][df_sorted[ts_col] == True]
-
-        # create merged coordinate file, keep only rows also in df_sorted
-        # cc = coord_combo(out, save=True) 
-        # out.data['coord_combo'] = cc[cc.index.isin(df_sorted)]
-        
-
-        # for pfx, df in initial_data.items(): 
-        #     if filter_type == 'chem':
-        #         pvu = 3.5
-        #         crits  = trop_filter_dict(filter_type, pfx, pvu=pvu)
-
-        #         try: df_sorted = chemical(self, c_pfx = pfx, **kwargs)
-        #         except: print('No chem tp for {c_pfx}')
-        #     elif filter_type == 'dyn':
-        #         pvus = [1.5, 2.0, 3.5]
-        #         for pvu in pvus:
-        #             crits = trop_filter_dict('dyn', pfx, pvu) # list of coordinates or whatever
-        #             for crit in crits: 
-        #                 df_sorted = dynamical(self, c_pfx=pfx, pvu=pvu, coord=crit)
-        #                 print(df_sorted)
-
-
-        #         try: df_sorted = dynamical(self, c_pfx = pfx, **kwargs)
-        #         except: print('No dyn tp for {c_pfx}')
-        #     elif filter_type == 'therm':
-        #         try: df_sorted = thermal(self, c_pfx=pfx, **kwargs)
-        #         except: print('No therm tp for c_pfx')
-            
-        #     for tp_def in ['chem', 'therm']:
-        #         crits = trop_filter_dict(tp_def, pfx)
-
-            
-
-        #     for tp_def in ['dyn']:
-        #         for pvu in [1.5, 2.0, 3.5]:
-        #             crits = trop_filter_dict(tp_def, pfx, pvu=pvu)
-        #     # if not [x for x in df.columns if 'tropo' in x]: 
-        #     #     # no tropo col exists, so try and make it
-        #     #     print('No tropo data found. Going to make it.')
-
-        #     # else: # already something there
-        #     #     print('Tropo data found. Not using it though')
-
-        #     for coord in ['pt', 'dp', 'z']:
-
-        #         if filter_type == 'chem':
-        #             try: df_sorted = chemical(self, c_pfx = pfx, **kwargs)
-        #             except: print('No chem tp for {c_pfx}')
-        #         elif filter_type == 'dyn':
-        #             try: df_sorted = dynamical(self, c_pfx = pfx, **kwargs)
-        #             except: print('No dyn tp for {c_pfx}')
-        #         elif filter_type == 'therm':
-        #             try: df_sorted = thermal(self, c_pfx=pfx, **kwargs)
-        #             except: print('No therm tp for c_pfx')
-            
-
-        #     try: out.data.update({pfx:df}) # add to data 
-        #     except: print('Trop / Strat filter not possible with current config') 
-
-
-        # out.data = initial_data # self.data.copy()
-
-        # data_dfs = out.pfxs # those are the original dataframes 
-
-        # df_list = [k for k in self.data.keys()
-        #             if isinstance(self.data[k], pd.DataFrame)]
-
-        # df_list_filtered = [k for k in self.data.keys()
-        #             if (isinstance(self.data[k], pd.DataFrame) and
-        #                 len([x for x in self.data[k].columns if 'trop' in x])>0)] # list of all datasets to cut
-
-        # if len(df_list) == 0: 
-        #     print('Could not find any tropospheric data...')
-        #     return self
-
-        # for k in df_list: # delete everything but selected flights
-        #     out.data[k] = out.data[k].loc['strato']
-        
-        
-    # def trop_filter(self, baseline=False, **kwargs):
-    #     """ Sort data into baseline and non-baseline and return new Caribic object.
-    #     Parameters: data
-    #         baseline(bool): If True, take only baseline data 
-    #     """
-    #     out = type(self).__new__(self.__class__) # create new class instance
-    #     for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
-    #         out.__dict__[attribute_key] = self.__dict__[attribute_key]
-    #     # avoid self.data doesn't get overwritten
-    #     initial_data = {k:v for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
-
-    #     if 'c_pfx' in kwargs.keys():
-    #         initial_data = initial_data[kwargs['c_pfx']] # only use specific c_pfx
-
-    #     return out
-
 # Mozart
 class Mozart(GlobalData):
     """ Stores relevant Mozart data

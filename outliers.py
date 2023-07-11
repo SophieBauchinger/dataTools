@@ -26,7 +26,8 @@ from toolpac.outliers import ol_fit_functions as fct
 from toolpac.outliers.outliers import get_no_nan, fit_data
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from tools import get_lin_fit, pre_flag
+from tools import get_lin_fit
+from tropFilter import pre_flag, chemical, dynamical, thermal
 from dictionaries import get_fct_substance, get_col_name, substance_list
 
 #!!! TO-DO:
@@ -56,14 +57,14 @@ def baseline_filter(glob_obj, subs, c_pfx='GHG', crit='n2o', direction='p',
             data = glob_obj.data[c_pfx]
         elif len(trop_crits) > 0 and f'tropo_{crit}' not in glob_obj.data[c_pfx].columns:
             try: 
-                data = filter_strat_trop(glob_obj, ref_obj=ref_obj, crit=crit, 
+                data = chemical(glob_obj, ref_obj=ref_obj, crit=crit, 
                                          c_pfx=c_pfx, plot=False)
             except: 
                 data = glob_obj.data[c_pfx]
                 crit = trop_crits[0][5:]
                 print(state+f'Cannot use chosen crit, so using {crit} instead')
         else: 
-            data = filter_strat_trop(glob_obj, ref_obj=ref_obj, crit=crit, 
+            data = chemical(glob_obj, ref_obj=ref_obj, crit=crit, 
                                      c_pfx=c_pfx, plot=False)
         # now take only data that has been flagged as tropospheric 
         strato = data[data[f'strato_{crit}'] == True]
