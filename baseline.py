@@ -21,6 +21,7 @@ from toolpac.conv.times import datetime_to_fractionalyear
 
 from dictionaries import get_col_name, get_fct_substance
 
+#%% Baseline Filter
 def baseline_filter(glob_obj, subs='co2', c_pfx='GHG', tp_def='chem', crit='n2o', 
                     coord='pt', pvu=3.5, direction='p', ref_obj=None, save=True, 
                     plot=True, plot_strat=True, ol_limit=0.1, **kwargs):
@@ -57,40 +58,38 @@ def baseline_filter(glob_obj, subs='co2', c_pfx='GHG', tp_def='chem', crit='n2o'
     strato = strato_obj.data[c_pfx]
     strato.sort_index(inplace=True)
 
-    # if isinstance(subs, str): substances = [subs]
-    # elif isinstance(subs, list): substances = subs
+    if isinstance(subs, str): substances = [subs]
+    elif isinstance(subs, list): substances = subs
 
-    # for subs in substances:
-    substance = get_col_name(subs, glob_obj.source, c_pfx)
-    if substance not in data.columns:
-        print(state+f'{substance} not found in {c_pfx}') # ; continue
-
-    print(data)
-
-    data_flag = pd.DataFrame(data, columns=['Flight number', f'{substance}'])
-    time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-    mxr = data[substance].tolist()
-    if f'd_{substance}' in data.columns:
-        d_mxr = data[f'd_{substance}'].tolist()
-    else: d_mxr = None # integrated values of high resolution data
-
-    func = get_fct_substance(subs)
-    tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
-                           direction=direction, verbose=False,
-                           plot=not(plot), limit=ol_limit, ctrl_plots=not(plot))
-
-    data_flag[f'fl_{subs}'] = tmp[0]  # flag
-    data_flag[f'ol_{subs}'] = tmp[1]  # residual
-    # data_flag[f'ol_rel_TMP_{subs}'] = tmp[2] # warning
-    fit_result = [func(t, *tmp[3]) for t in time] # popt1
-    data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result # residuals
-
-    if plot: 
-        plot_BLfilter_time(subs, tp_def, crit, coord, pvu, c_pfx, data_flag, 
-                               substance, strato, plot_strat, fit_result, **kwargs)
-
-    # no residual value for non-outliers
-    data_flag.loc[data_flag[f'fl_{subs}'] == 0, f'ol_{subs}'] = np.nan
+    for subs in substances:
+        substance = get_col_name(subs, glob_obj.source, c_pfx)
+        if substance not in data.columns:
+            print(state+f'{substance} not found in {c_pfx}'); continue
+        
+        data_flag = pd.DataFrame(data, columns=['Flight number', f'{substance}'])
+        time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
+        mxr = data[substance].tolist()
+        if f'd_{substance}' in data.columns:
+            d_mxr = data[f'd_{substance}'].tolist()
+        else: d_mxr = None # integrated values of high resolution data
+        
+        func = get_fct_substance(subs)
+        tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
+                               direction=direction, verbose=False,
+                               plot=not(plot), limit=ol_limit, ctrl_plots=not(plot))
+        
+        data_flag[f'fl_{subs}'] = tmp[0]  # flag
+        data_flag[f'ol_{subs}'] = tmp[1]  # residual
+        # data_flag[f'ol_rel_TMP_{subs}'] = tmp[2] # warning
+        fit_result = [func(t, *tmp[3]) for t in time] # popt1
+        data_flag[f'ol_rel_{subs}'] = data_flag[f'ol_{subs}'] / fit_result # residuals
+        
+        if plot: 
+            plot_BLfilter_time(subs, tp_def, crit, coord, pvu, c_pfx, data_flag, 
+                                   substance, strato, plot_strat, fit_result, **kwargs)
+        
+        # no residual value for non-outliers
+        data_flag.loc[data_flag[f'fl_{subs}'] == 0, f'ol_{subs}'] = np.nan
 
     return data_flag
 
