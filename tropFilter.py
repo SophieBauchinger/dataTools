@@ -3,10 +3,7 @@
 @Author: Sophie Bauchimger, IAU
 @Date: Wed Jul  5 14:41:45 2023
 
-Filtering of data in tropospheric / stratospheric origin
-
-
-
+Filtering of data in tropospheric / stratospheric origin depending on TP definition
 """
 import numpy as np
 import pandas as pd
@@ -88,6 +85,7 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
     
     return df_flag
 
+# Sort trop / strat using tracer mixing ratio
 def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
              verbose = False, plot=False, limit=0.97, subs=None, **kwargs):
     """ Returns DataFrame with bool columns 'strato' and 'tropo'.

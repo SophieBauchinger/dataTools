@@ -40,30 +40,21 @@ def baseline_filter(glob_obj, subs='co2', c_pfx='GHG', tp_def='chem', crit='n2o'
         save (bool): adds filtered data to glob_obj
     """
     state = f'filter_trop_outliers: subs={subs}, c_pfx={c_pfx}, crit={crit}\n'
-    # check availability of tropospheric filtered datasets
     if not glob_obj.source == 'Caribic': 
         raise Exception(state+'Need a Caribic instance.')
 
     # Tropospheric data
-    tropo_obj, strato_obj = glob_obj.data_filter(tp_def)
-
-    # tropo_obj, strato_obj = glob_obj.data_filter(filter_type=tp_def, c_pfx=c_pfx,
-    #                                  crit=crit, coord=coord, ref_obj=ref_obj, **kwargs)
-    print('tropo_obj.data[c_pfx] in bl 55 - baseline_filter\n', tropo_obj.data[c_pfx])
+    tropo_obj = glob_obj.sel_tropo(tp_def, **kwargs)
+    strato_obj = glob_obj.sel_strato(tp_def, **kwargs)
 
     if c_pfx not in tropo_obj.pfxs: 
         raise KeyError('Filtering did not result in desired cols being created.')
 
-
-    # t_col = [x for x in tropo_obj.data[c_pfx].columns if x.startswith('tropo')][0]
-    data = tropo_obj.data[c_pfx] # [tropo_obj.data[c_pfx] #[t_col] == True]
+    data = tropo_obj.data[c_pfx] 
     data.sort_index(inplace=True)
 
     # Stratospheric data
-    # strato_obj = glob_obj.data_filter(filter_type=tp_def, tropo_strato = 'strato', c_pfx=c_pfx, 
-    #                                   crit=crit, coord=coord, ref_obj=ref_obj, **kwargs)
-    # s_col = [x for x in strato_obj.data[c_pfx].columns if x.startswith('strato')][0]
-    strato = strato_obj.data[c_pfx] # [strato_obj.data[c_pfx][s_col] == True]
+    strato = strato_obj.data[c_pfx]
     strato.sort_index(inplace=True)
 
     # if isinstance(subs, str): substances = [subs]
