@@ -9,6 +9,21 @@ Substances in Caribic data:
 'GHG':    ['ch4', 'co2',        'n2o', 'sf6']
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
 'INT2':   ['ch4', 'co2', 'co' , 'n2o',      'o3' , 'noy', 'no' , 'h2o', 'f11', 'f12']
+
+Implementation of tropopause filtering in CARIBIC-2 data:
+    chemical:
+        GHG: 'n2o'
+        INT: 'o3'
+        INT2: 'o3', 'n2o'
+    
+    thermal: 
+        INT: 'dp', 'pt'
+        INT2: 'dp', 'pt', 'z'
+    
+    dynamical:
+        INT: 'dp', 'pt', 'z' / 3.5
+        INT2: 'pt' / 1.5, 2.0, 3.5
+
 """
 import dill
 from os.path import exists
@@ -19,11 +34,12 @@ from data import Caribic, Mozart, Mauna_Loa, Mace_Head
 from lags import calc_time_lags
 from dictionaries import substance_list
 
-from outliers import filter_strat_trop, filter_trop_outliers
+from tropFilter import chemical, thermal, dynamical
 from detrend import detrend_substance
 import plot.data
 from plot.gradients import plot_gradient_by_season
 from plot.eqlat import plot_eqlat_deltheta
+from baseline import baseline_filter
 
 #%% Get Data
 year_range = range(1980, 2021)
@@ -123,17 +139,37 @@ for pfx in ['INT2']:# caribic.pfxs:
         plot_gradient_by_season(caribic, subs, 'INT2', tp='pvu', pvu = 2.0)
 
 #%% Filter tropospheric / stratospheric data points based on
+# chem = {'GHG' : ['n2o'],
+#         'INT' : ['o3'],
+#         'INT2' : ['n2o', 'o3']}
+# therm = {'INT' : ['dp', 'pt'],
+#          'INT2' : ['dp', 'pt', 'z']}
+# dyn_3_5 = {'INT' : ['dp', 'pt', 'z'],
+#            'INT2' : ['pt']}
+# dyn_1_5 = dyn_2_0 = {'INT2' : ['pt']}
+for subs in substance_list('INT2'):
+    f, axs = plt.subplots(1, 3, figsize=(10, 4), dpi=200)
+    for tp_def, ax in zip(['chem', 'therm', 'dyn'], axs.flatten()):
+        baseline_filter(caribic, subs, 'INT2', tp_def, ax=ax)
+    f.autofmt_xdate()
+    plt.tight_layout()
+    plt.show()
+    
+
+
+
+        
 # n2o mixing ratio wrt Mauna Loa data
 
 # ref_obj = Mauna_Loa(year_range, 'n2o')
 
-for pfx in caribic.pfxs:
-    filter_strat_trop(caribic, mlo_data['n2o'], 'n2o', pfx)
+# for pfx in caribic.pfxs:
+#     chemical(caribic, mlo_data['n2o'], 'n2o', pfx)
 
-for pfx in caribic.pfxs:
-    for subs in substance_list(pfx):
-        if subs in ['sf6', 'n2o', 'co2', 'ch4']:
-            filter_trop_outliers(caribic, subs, pfx, crit=subs)
+# for pfx in caribic.pfxs:
+#     for subs in substance_list(pfx):
+#         if subs in ['sf6', 'n2o', 'co2', 'ch4']:
+#             filter_trop_outliers(caribic, subs, pfx, crit=subs)
 
 #%% Eq. lat vs potential temperature wrt tropopause
 plot_eqlat_deltheta(caribic, c_pfx='INT2', subs='n2o', tp='pvu')
