@@ -307,24 +307,22 @@ class Caribic(GlobalData):
         functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
 
         if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
-        else: pfxs = [kwargs['c_pfx']]
+        else: pfxs = [kwargs['c_pfx']]; del kwargs['c_pfx']
 
         for pfx in pfxs: 
-            try: df_sorted = functions[filter_type](out, c_pfx = pfx, **kwargs)
-            except: 
+            try: df_sorted = functions[filter_type](out, c_pfx=pfx, **kwargs)
+            except: # remove pfxs that can't be sorted
                 print(f'Sorting of {pfx} with {filter_type} unsuccessful')
                 del out.data[pfx]; continue
 
             col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
-            
             # only keep rows that are in df_sorted, then only tropospheric data
             out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)]
-            out.data[pfx] = out.data[pfx][df_sorted[col] == True]
-            out.data[pfx][col] = df_sorted[col]
+            out.data[pfx][col] = df_sorted[col] # copy to keep track of tp def
+            out.data[pfx] = out.data[pfx][out.data[pfx][col]]
 
         out.pfxs = [k for k in out.data.keys()]
         return out
-
 
     def sel_strato(self, filter_type, **kwargs):
         """ Returns Caribic object containing only tropospheric data points.
@@ -349,18 +347,19 @@ class Caribic(GlobalData):
         functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
 
         if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
-        else: pfxs = [kwargs['c_pfx']]
+        else: pfxs = [kwargs['c_pfx']]; del kwargs['c_pfx']
         
         for pfx in pfxs:
-            try: df_sorted = functions[filter_type](out, c_pfx = pfx, **kwargs)
-            except: print(f'Sorting of {pfx} with {filter_type} unsuccessful'); continue
+            try: df_sorted = functions[filter_type](out, c_pfx=pfx, **kwargs)
+            except: # remove pfxs that can't be sorted
+                print(f'Sorting of {pfx} with {filter_type} unsuccessful')
+                del out.data[pfx]; continue
 
             col = [col for col in df_sorted.columns if col.startswith('strato')][0]
-
             # only keep rows that are in df_sorted, then only tropospheric data
             out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)]
-            out.data[pfx] = out.data[pfx][df_sorted[col] == True]
             out.data[pfx][col] = df_sorted[col]
+            out.data[pfx] = out.data[pfx][out.data[pfx][col]]
 
         out.pfxs = [k for k in out.data.keys()]
         return out
