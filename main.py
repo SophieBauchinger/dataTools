@@ -50,11 +50,13 @@ mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
 
 # only calculate caribic data if necessary
-if exists('caribic_dill.pkl'): # Avoid long file loading times
-    with open('caribic_dill.pkl', 'rb') as f:
-        caribic = dill.load(f)
-    del f
-else: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+def load_caribic(fname = 'caribic_dill.pkl'):
+    if exists(fname): # Avoid long file loading times
+        with open(fname, 'rb') as f:
+            caribic = dill.load(f)
+        del f
+    else: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
+    return caribic
 
 def save_caribic(fname = 'caribic_dill.pkl'):
     """ Drop rows where pressure values don't exist, then save
@@ -64,6 +66,9 @@ def save_caribic(fname = 'caribic_dill.pkl'):
     with open(fname, 'wb') as f:
         dill.dump(caribic, f)
 def del_caribic_file(fname = 'caribic_dill.pkl'): remove(fname)
+
+caribic = load_caribic()
+
 # save_caribic(fname= 'carbic_dill_mod.pkl')
 
 # examples for creating new objects with only certain year / flight nr / lat :
