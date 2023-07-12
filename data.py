@@ -11,17 +11,18 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Point
 import xarray as xr
-import dill
 from os.path import exists
 
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
+from toolpac.outliers import outliers
+from toolpac.conv.times import datetime_to_fractionalyear
 
-from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_combo
+from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d
 from tropFilter import chemical, dynamical, thermal
-from dictionaries import trop_filter_dict
+from dictionaries import get_col_name, substance_list, get_fct_substance
 
 #%% GLobal data
 class GlobalData(object):
@@ -37,6 +38,7 @@ class GlobalData(object):
         """
         self.years = years
         self.grid_size = grid_size
+        self.status = {} # use this dict to keep track of changes made to data
 
     def get_data(self, c_pfxs=['GHG'], remap_lon=True,
                  mozart_file = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc',
@@ -108,6 +110,10 @@ class GlobalData(object):
                         gdf_yr.drop(del_column_names, axis=1, inplace=True)
 
                     gdf_pfx = pd.concat([gdf_pfx, gdf_yr])
+                    if pfx=='INT': gdf_pfx.drop(columns=['int_acetone [ppt]',
+                                     'int_acetonitrile [ppt]'], inplace=True)
+                    if pfx=='INT2': gdf_pfx.drop(columns=['int_CARIBIC2_Ac [pptV]',
+                                     'int_CARIBIC2_AN [pptV]'], inplace=True)
 
                 if gdf_pfx.empty: print("Data extraction unsuccessful. \
                                         Please check your input data"); return
@@ -284,7 +290,7 @@ class Caribic(GlobalData):
 
         return out
 
-    def sel_tropo(self, filter_type, **kwargs):
+    def sel_tropo(self, tp_def, **kwargs):
         """ Returns Caribic object containing only tropospheric data points.
         Parameters:
             filter_type (str): 'chem', 'therm' or 'dyn'
@@ -303,16 +309,18 @@ class Caribic(GlobalData):
         for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
             out.__dict__[attribute_key] = self.__dict__[attribute_key]
 
-        out.data = {k:v.copy() for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
+        if not 'c_pfx' in kwargs.keys(): pfxs = self.pfxs
+        else:
+            pfxs = [kwargs['c_pfx']]
+            del kwargs['c_pfx'] # delete otherwise double kwarg in filter fctn
+
+        out.data = {k:v.copy() for k,v in self.data.items() if k in pfxs} # only using OG msmt data
         functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
 
-        if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
-        else: pfxs = [kwargs['c_pfx']]; del kwargs['c_pfx']
-
-        for pfx in pfxs: 
-            try: df_sorted = functions[filter_type](out, c_pfx=pfx, **kwargs)
+        for pfx in pfxs:
+            try: df_sorted = functions[tp_def](out, c_pfx=pfx, **kwargs)
             except: # remove pfxs that can't be sorted
-                print(f'Sorting of {pfx} with {filter_type} unsuccessful')
+                print(f'Sorting of {pfx} with {tp_def} unsuccessful')
                 del out.data[pfx]; continue
 
             col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
@@ -324,7 +332,7 @@ class Caribic(GlobalData):
         out.pfxs = [k for k in out.data.keys()]
         return out
 
-    def sel_strato(self, filter_type, **kwargs):
+    def sel_strato(self, tp_def, **kwargs):
         """ Returns Caribic object containing only tropospheric data points.
         Parameters:
             filter_type (str): 'chem', 'therm' or 'dyn'
@@ -348,11 +356,11 @@ class Caribic(GlobalData):
 
         if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
         else: pfxs = [kwargs['c_pfx']]; del kwargs['c_pfx']
-        
+
         for pfx in pfxs:
-            try: df_sorted = functions[filter_type](out, c_pfx=pfx, **kwargs)
+            try: df_sorted = functions[tp_def](out, c_pfx=pfx, **kwargs)
             except: # remove pfxs that can't be sorted
-                print(f'Sorting of {pfx} with {filter_type} unsuccessful')
+                print(f'Sorting of {pfx} with {tp_def} unsuccessful')
                 del out.data[pfx]; continue
 
             col = [col for col in df_sorted.columns if col.startswith('strato')][0]
@@ -362,6 +370,69 @@ class Caribic(GlobalData):
             out.data[pfx] = out.data[pfx][out.data[pfx][col]]
 
         out.pfxs = [k for k in out.data.keys()]
+        return out
+
+    def filter_extreme_events(self, tp_def, **kwargs):
+        """ Filter out all tropospheric extreme events.
+
+        Returns new Caribic object where trop. extreme events have been removed.
+        Result depends on tropopause definition for trop / strat sorting.
+
+        Parameters:
+            filter_type (str): 'chem', 'therm' or 'dyn'
+
+            crit (str): 'n2o', 'o3'
+            coord (str): 'pt', 'dp', 'z'
+            pvu (float): 1.5, 2.0, 3.5
+            limit (float): pre-flag limit for chem. TP sorting
+
+            subs (str): substance for plotting
+            c_pfx (str): 'GHG', 'INT', 'INT2'
+            verbose (bool)
+            plot (bool)
+        """
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
+            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+
+        # Find and filter tropospheric extreme events
+        tropo_obj = self.sel_tropo(tp_def, **kwargs)
+        out.pfxs = tropo_obj.pfxs # only take trop. sorted pfx data
+        out.data = {k:v.copy() for k,v in self.data.items() if k in tropo_obj.pfxs} # only using OG msmt data
+
+        for pfx in tropo_obj.pfxs:
+            data = tropo_obj.data[pfx].sort_index()
+            if 'subs' in kwargs.keys(): subs_list = [kwargs['subs']]
+            else: subs_list = substance_list(pfx)
+
+            for subs in subs_list:
+                substance = get_col_name(subs, tropo_obj.source, pfx)
+                if substance not in data.columns: continue
+                time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
+                mxr = data[substance].tolist()
+                if f'd_{substance}' in data.columns:
+                    d_mxr = data[f'd_{substance}'].tolist()
+                else: d_mxr = None # integrated values of high resolution data
+
+                func = get_fct_substance(subs)
+                # Find extreme events
+                tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
+                                       direction='p', verbose=False,
+                                       plot=False, limit=0.1, ctrl_plots=False)
+
+                subs_cols = [c for c in data.columns if substance in c]
+
+                # Set rows that were flagged as extreme events to 9999, then nan
+                for c in subs_cols:
+                    data.loc[(flag != 0 for flag in tmp[0]), c] = 9999
+                out.data[pfx].update(data) # essential to update before setting to nan
+                out.data[pfx].replace(9999, np.nan, inplace=True)
+
+            # delete unfiltered data
+            drop_subs = [subs for subs in substance_list(pfx) if subs not in subs_list]
+            drop_cols = [get_col_name(subs, out.source, pfx) for subs in drop_subs]
+            out.data[pfx].drop(columns = drop_cols, inplace=True)
+
         return out
 
 # Mozart
