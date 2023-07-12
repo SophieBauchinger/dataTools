@@ -51,7 +51,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
             df_mm = monthly_mean(df).notna()
 
             # Plot mixing ratio msmts and monthly mean
-            if ax is None:
+            if ax is None or 'fig' in locals():
                 fig, ax = plt.subplots(dpi=250)
                 plt.title(f'{glob_obj.source} {pfx} {substance} measurements')
 
@@ -290,7 +290,6 @@ def caribic_2d(c_obj, c_pfx, subs):
     plt.ylim(ymin-0.15, ymax+0.15)
     fig.autofmt_xdate()
     plt.show() # ignore matplotlib warning that comes up here
-
 #%% LocalData
 
 def local(loc_obj, substance=None, greyscale=False, v_limits = (None,None)):
