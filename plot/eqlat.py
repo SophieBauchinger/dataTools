@@ -18,36 +18,50 @@ from data import Mauna_Loa
 
 def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0,
                         x_bin=None, y_bin=None, x_source='ERA5', vlims=None,
-                        detr=True, note=None):
-    """
+                        detr=False, note=None):
+    """ Plot binned mxr on EqL vs. pot.T or 
+    
     Creates plots of equivalent latitude versus potential temperature or height
     difference relative to tropopause (depends on tropopause definition).
     Plots each season separately on a 2x2 grid.
 
-    c_obj (Caribic)
-    c_pfx (str): 'INT', 'INT2'
-    subs (str): substance to plot. 'n2o', 'ch4', ...
-    tp (str): tropopause definition. 'therm', 'dyn', 'z' or 'pvu'
-    pvu (float): potential vorticity set as tropopause definition. 1.5, 2.0 or 3.5
+        c_obj (Caribic)
+        c_pfx (str): 'INT', 'INT2'
+        subs (str): substance to plot. 'n2o', 'ch4', ...
+        tp (str): tropopause definition. 'therm', 'dyn', 'z' or 'pvu'
+        pvu (float): potential vorticity set as tropopause definition. 1.5, 2.0 or 3.5
     """
+    if c_obj.source == 'Caribic': data = c_obj.data[c_pfx]
+    else: data = c_obj.df
 
-    #!!! detrended data ?
+    substance = get_col_name(subs, c_obj.source, c_pfx)
+    if detr: 
+        if not f'detr_{substance}' in data.columns:
+            try: 
+                detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs), save=True)
+                data = c_obj.data[c_pfx]
+                substance = f'detr_{substance}'
+            except: print('Detrending not successful, proceeding with original data.')
+        else: substance = f'detr_{substance}'
 
-    if not f'{subs}_data' in c_obj.data.keys():
-        detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs))
-        subs_merge(c_obj, subs, save=True, detr=True)
-
-    try:
-        data = c_obj.data[f'{subs}_data']
-        substance = get_col_name(subs, c_obj.source, 'GHG')
-        if detr and 'delta_'+substance in data.columns:
-            substance = 'delta_'+substance
-    except:
-        if c_obj.source == 'Caribic':
-            data = c_obj.data[c_pfx]
-            substance = get_col_name(subs, c_obj.source, c_pfx)
-        elif c_obj.source == 'Mozart': data = c_obj.df
-        else: raise('Could not find the specified data set. Check your input')
+# Old code: 
+# =============================================================================
+#     if not f'{subs}_data' in c_obj.data.keys():
+#         detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs))
+#         subs_merge(c_obj, subs, save=True, detr=True)
+# 
+#     try:
+#         data = c_obj.data[f'{subs}_data']
+#         substance = get_col_name(subs, c_obj.source, 'GHG')
+#         if detr and 'delta_'+substance in data.columns:
+#             substance = 'delta_'+substance
+#     except:
+#         if c_obj.source == 'Caribic':
+#             data = c_obj.data[c_pfx]
+#             substance = get_col_name(subs, c_obj.source, c_pfx)
+#         elif c_obj.source == 'Mozart': data = c_obj.df
+#         else: raise('Could not find the specified data set. Check your input')
+# =============================================================================
 
     data['season'] = make_season(data.index.month) # 1 = spring etc
     dict_season = {'name_1': 'Spring (MAM)', 'name_2': 'Summer (JJA)',
@@ -57,7 +71,7 @@ def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0,
 
     # Get column name for y axis depending on function parameter
     if tp == 'z':
-        # height relative to the tropopause in km: H_rel_TP
+        # height relative to the tropopause in km: H_rel_TP (chem OZONE TP)
         y_coord = 'int_CARIBIC2_H_rel_TP [km]'
         y_label = '$\Delta$z [km]'
         if not y_bin: y_bin = 0.25 # km
@@ -93,6 +107,8 @@ def plot_eqlat_deltheta(c_obj, subs='n2o', c_pfx='INT2', tp = 'therm', pvu=2.0,
 
     if c_obj.source == 'Mozart':
         y_coord = 'PS'; y_label='Surface Pressure [Pa]'; y_bin = 5e3
+
+    print(data.columns)
 
     y_lims = np.nanmin(data[y_coord])-y_bin, np.nanmax(data[y_coord])+y_bin
     x_lims = (-90-x_bin, 90+x_bin)
