@@ -136,7 +136,8 @@ def coord_combo(c_obj, save=True):
     # merge lists of coordinates for all pfxs in the object
     coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs]
              for i in i])) + ['geometry', 'Flight number']
-    df = c_obj.data['GHG'].copy() # copy bc don't want to overwrite data
+    if 'GHG' in c_obj.pfxs: df = c_obj.data['GHG'].copy() # copy bc don't want to overwrite data
+    else: df = pd.DataFrame()
     for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
         df = df.combine_first(c_obj.data[pfx].copy())
     df.drop([col for col in df.columns if col not in coords],
