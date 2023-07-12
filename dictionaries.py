@@ -29,22 +29,22 @@ def substance_list(ID):
 
 def get_fct_substance(substance):
     """ Returns corresponding fct from toolpac.outliers.ol_fit_functions """
-    df_func_dict = {'co2': fct.higher,
-                    'ch4': fct.higher,
-                    'n2o': fct.simple,
-                    'sf6': fct.quadratic,
-                    'trop_sf6_lag': fct.quadratic,
-                    'sulfuryl_fluoride': fct.simple,
-                    'hfc_125': fct.simple,
-                    'hfc_134a': fct.simple,
-                    'halon_1211': fct.simple,
-                    'cfc_12': fct.simple,
-                    'hcfc_22': fct.simple,
-                    'co': fct.quadratic, # prev. int_co
-                    }
-    try: return df_func_dict[substance.lower()]
+    fct_dict = {'co2': fct.higher,
+                'ch4': fct.higher,
+                'n2o': fct.simple,
+                'sf6': fct.quadratic,
+                'trop_sf6_lag': fct.quadratic,
+                'sulfuryl_fluoride': fct.simple,
+                'hfc_125': fct.simple,
+                'hfc_134a': fct.simple,
+                'halon_1211': fct.simple,
+                'cfc_12': fct.simple,
+                'hcfc_22': fct.simple,
+                'co': fct.quadratic, # prev. int_co
+                }
+    try: return fct_dict[substance.lower()]
     except:
-        print(f'Substance error: No function found for {substance}. Using poly harm')
+        print(f'No default fctn for {substance}. Using simple harmonic')
         return fct.simple
 
 def get_col_name(substance, source, c_pfx='', CLaMS=False):
@@ -125,10 +125,74 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
 
     try: cname = col_names[substance.lower()]
     except:
-        print(f'Substance error: No {substance} in {source} ({c_pfx})')
+        print(f'No {substance} data in {source} ({c_pfx})')
         return None
     return cname
 
+def get_v_coord_tp(c_pfx, coord, tp_def, pvu=3.5):
+    """ Coordinates relative to tropopause 
+    coord (str): 'pt', 'dp', 'z'
+    tp_def (str): 'chem', 'dyn', 'therm'
+    pvu (float): 1.5, 2.0, 3.5
+    """
+    if c_pfx=='INT':
+        if tp_def == 'chem': 
+            col_names = {
+                'z'       : 'int_h_rel_TP [km]'}                               # height above O3 tropopause according to Zahn et al. (2003), Atmospheric Environment, 37, 439-440
+        if tp_def == 'therm':
+            col_names = {
+                'dp'      : 'int_dp_strop_hpa [hPa]',                          # pressure difference relative to thermal tropopause from ECMWF
+                'pt'      : 'int_pt_rel_sTP_K [K]',                            # potential temperature difference relative to thermal tropopause from ECMWF
+                'z'       : 'int_z_rel_sTP_km [km]'}                           # geopotential height relative to thermal tropopause from ECMWF
+                
+        elif tp_def == 'dyn':
+            col_names = {
+                'dp'        : 'int_dp_dtrop_hpa [hPa]',                        # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
+                'ptpt'        : 'int_pt_rel_dTP_K [K]',                        # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
+                'z'         : 'int_z_rel_dTP_km [km]'}                         # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
+        return col_names[coord]
+
+    elif c_pfx=='INT2' and tp_def == 'dyn' and coord=='pt':
+        col_names = {
+            'pt_dyn_1_5'    : 'int_ERA5_D_1_5PVU_BOT [K]',                     # THETA-Distance to local 1.5 PVU surface (ERA5)
+            'pt_dyn_2_0'    : 'int_ERA5_D_2_0PVU_BOT [K]',                     # -"- 2.0 PVU
+            'pt_dyn_3_5'    : 'int_ERA5_D_3_5PVU_BOT [K]'}                     # -"- 3.5 PVU
+        return col_names['pt_dyn_{}_{}'.format(pvu[0], pvu[2])]
+
+def get_h_coord(c_pfx, coord):
+    """ coord: eql, """
+    if c_pfx == 'INT':
+        col_names = {
+            'eql' : 'int_eqlat [deg]',                               # equivalent latitude in degrees north from ECMWF
+            }
+    elif c_pfx == 'INT2':
+        col_names = {
+            'eql' : 'int_ERA5_EQLAT [deg N]',                        # Equivalent latitude (ERA5)
+            }
+    return col_names[coord]
+
+def get_val_coord(c_pfx, val):
+    """ val(str): t, p, pv, pt """
+    if c_pfx == 'GHG':
+        col_names = {
+            'p' : 'p [mbar]'}
+    elif c_pfx == 'INT':
+        col_names = {
+            'p'  : 'p [mbar]',                                      # pressure (mean value)
+            't'  : 'int_ToAirTmp [degC]',                           # Total Air Temperature
+            'pv' : 'int_PV [PVU]',                                  # PV from ECMWF (integral)
+            'pt' : 'int_Tpot [K]',                                  # potential temperature derived from measured pressure and temperature
+            'z'  : 'int_z_km [km]',                                 # geopotential height of sample from ECMWF
+            }
+    elif c_pfx == 'INT2':
+        col_names = {
+            'p' : 'p [mbar]',                                      # pressure (mean value)
+            't' : 'int_ERA5_TEMP [K]',                             # Temperature (ERA5)
+            'pv': 'int_ERA5_PV [PVU]',                             # Potential vorticity (ERA5)
+            'pt': 'int_Theta [K]',                                 # Potential temperature
+            }
+    return col_names[val]
+# =============================================================================
 def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     """ Get name of eq. lat, rel height wrt therm/dyn tp, ..."""
 
