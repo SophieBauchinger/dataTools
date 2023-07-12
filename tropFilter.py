@@ -23,7 +23,7 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
 import data #!!! kinda cyclic, but need Mauna_Loa for pre_flag
 from tools import get_lin_fit, assign_t_s
-from dictionaries import get_fct_substance, get_col_name
+from dictionaries import get_fct_substance, get_col_name, substance_list
 
 filter_types = {
     'chem' : ['n2o', 'o3'], # 'crit'
@@ -111,14 +111,11 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
         INT: 'o3'
         INT2: 'o3', 'n2o'
     """
-    print(crit, c_pfx)
-    if c_pfx == 'GHG' and crit != 'n2o':
-        print(f'{crit} not available in {c_pfx}, using n2o'); crit = 'n2o'
-    elif c_pfx == 'INT' and crit != 'o3':
-        print(f'{crit} not available in {c_pfx}, using o3'); crit = 'o3'
-    elif c_pfx == 'INT' and crit not in ['n2o', 'o3']:
-        print(f'{crit} not available in {c_pfx}, using n2o'); crit = 'n2o'
-
+    if crit not in substance_list(c_pfx):
+        default_crit = {'GHG' : 'n2o', 'INT' : 'n2o', 'INT2' : 'o3'}
+        print(f'{crit} not available in {c_pfx}, using {default_crit[c_pfx]}')
+        crit = default_crit(c_pfx)
+        
     state = f'filter_strat_trop: crit={crit}, c_pfx={c_pfx}\n'
     tropo = f'tropo_chem_{crit}'
     strato = f'strato_chem_{crit}'
@@ -195,10 +192,10 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
         INT: dp, pt
         INT2: dp, pt, z
         """
-    print(c_pfx, coord)
-    if (coord not in ['dp', 'pt', 'z'] or c_pfx not in ['INT', 'INT2'] 
-        or (c_pfx == 'INT2' and coord == 'z')):
-        print(f'Thermal TP sorting not yet implemented for {c_pfx} with coord={coord}')
+    if (c_pfx == 'INT2' and coord == 'z'):
+        print(f'{coord} not available in {c_pfx}, using pt'); coord = 'pt'
+    elif (coord not in ['dp', 'pt', 'z'] or c_pfx not in ['INT', 'INT2']):
+        raise ValueError(f'Cannot sort {c_pfx} with thermal TP with coord={coord}')
 
     data = glob_obj.data[c_pfx].copy()
 
@@ -253,13 +250,12 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
         INT: coord: 'dp', 'pt', 'z' / pvu: 3.5 
         INT2: coord: 'pt' / pvu: 1.5, 2.0, 3.5 
     """
-    print(c_pfx, coord, pvu)
-    if not c_pfx in ['INT', 'INT2']: raise ValueError(f'Cannot dyn sort {c_pfx}')
+    if not c_pfx in ['INT', 'INT2']: 
+        raise ValueError(f'Cannot sort {c_pfx} using dynamical tropopause')
     if c_pfx=='INT2' and pvu not in [1.5, 2.0, 3.5]: 
         raise ValueError(f'No {c_pfx} data for {pvu} pvu')
     elif c_pfx == 'INT' and pvu != 3.5: 
-        print(f'{pvu} PVU not available for {c_pfx}, setting it to 3.5 PVU')
-        pvu = 3.5
+        print(f'{pvu} PVU not available for {c_pfx}, using 3.5 PVU'); pvu = 3.5
 
     data = glob_obj.data[c_pfx].copy()
 
@@ -309,7 +305,8 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, subs=N
     if crit in ['o3', 'n2o'] and not subs: subs = crit
 
     substance = get_col_name(subs, glob_obj.source, c_pfx)
-    if substance is None: print('No {subs} in {c_pfx}'); return
+    if substance is None: 
+        print(f'Cannot plot {subs.upper()}, not available in {c_pfx}.'); return
     
     fig, ax = plt.subplots(dpi=200)
     plt.title('{} ({}) filtered using {}-{}'.format(
@@ -320,6 +317,7 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, subs=N
                 c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
 
     if popt0 is not None and popt1 is not None and (subs==crit or subs is None):
+        # only plot baseline for chemical tropopause def and where crit is being plotted
         t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0), 
                 c='r', lw=1, label='initial')
