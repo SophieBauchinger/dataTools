@@ -10,6 +10,41 @@ Substances in Caribic data:
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
 'INT2':   ['ch4', 'co2', 'co' , 'n2o',      'o3' , 'noy', 'no' , 'h2o', 'f11', 'f12']
 
+Met / Reanalysis data for Caribic-2: 
+    'Flight number',
+     'p [mbar]',
+     'int_z_km [km]',
+     'int_eqlat [deg]',
+     'geometry'
+     'int_ERA5_EQLAT [deg N]',
+     'int_ERA5_PRESS [hPa]',
+     'int_ERA5_PV [PVU]',
+     'int_ERA5_TEMP [K]',
+
+chemical TP:
+     'int_CARIBIC2_H_rel_TP [km]',
+     'int_h_rel_TP [km]',
+     'int_PV [PVU]',
+     'int_Theta [K]',
+     'int_ToAirTmp [degC]',
+     'int_Tpot [K]',
+
+dynamical TP: 
+     'int_dp_dtrop_hpa [hPa]',
+     'int_pt_rel_dTP_K [K]',
+     'int_z_rel_dTP_km [km]',
+     'int_ERA5_D_1_5PVU_BOT [K]',
+     'int_ERA5_D_2_0PVU_BOT [K]',
+     'int_ERA5_D_3_5PVU_BOT [K]',
+     
+thermal TP: 
+     'int_dp_strop_hpa [hPa]',
+     'int_pt_rel_sTP_K [K]',
+     'int_z_rel_sTP_km [km]',
+     'int_ERA5_PRESS [hPa]' cf. 'int_ERA5_TROP1_PRESS [hPa]'
+     'int_ERA5_TEMP [K]' cf. 'int_ERA5_TROP1_THETA [K]'
+
+
 Implementation of tropopause filtering in CARIBIC-2 data:
     chemical:
         GHG: 'n2o'
@@ -70,6 +105,7 @@ def save_caribic(fname = 'caribic_dill.pkl'):
 def del_caribic_file(fname = 'caribic_dill.pkl'): remove(fname)
 
 caribic = load_caribic()
+caribic_filtered = caribic.filter_extreme_events('chem')
 
 # save_caribic(fname= 'carbic_dill_mod.pkl')
 
