@@ -129,7 +129,7 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
         return None
     return cname
 
-def get_v_coord_tp(c_pfx, coord, tp_def, pvu=3.5):
+def get_v_coord(c_pfx, coord, tp_def, pvu=3.5):
     """ Coordinates relative to tropopause 
     coord (str): 'pt', 'dp', 'z'
     tp_def (str): 'chem', 'dyn', 'therm'
@@ -148,7 +148,7 @@ def get_v_coord_tp(c_pfx, coord, tp_def, pvu=3.5):
         elif tp_def == 'dyn':
             col_names = {
                 'dp'        : 'int_dp_dtrop_hpa [hPa]',                        # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
-                'ptpt'        : 'int_pt_rel_dTP_K [K]',                        # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
+                'pt'        : 'int_pt_rel_dTP_K [K]',                        # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
                 'z'         : 'int_z_rel_dTP_km [km]'}                         # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
         return col_names[coord]
 
@@ -157,7 +157,10 @@ def get_v_coord_tp(c_pfx, coord, tp_def, pvu=3.5):
             'pt_dyn_1_5'    : 'int_ERA5_D_1_5PVU_BOT [K]',                     # THETA-Distance to local 1.5 PVU surface (ERA5)
             'pt_dyn_2_0'    : 'int_ERA5_D_2_0PVU_BOT [K]',                     # -"- 2.0 PVU
             'pt_dyn_3_5'    : 'int_ERA5_D_3_5PVU_BOT [K]'}                     # -"- 3.5 PVU
-        return col_names['pt_dyn_{}_{}'.format(pvu[0], pvu[2])]
+        try: return col_names['pt_dyn_{}_{}'.format(str(pvu)[0], str(pvu)[2])]
+        except: 
+            print(f'No vertical coordinate found for {c_pfx} {coord} {tp_def} ({pvu})')
+            return None
 
 def get_h_coord(c_pfx, coord):
     """ coord: eql, """
@@ -169,7 +172,10 @@ def get_h_coord(c_pfx, coord):
         col_names = {
             'eql' : 'int_ERA5_EQLAT [deg N]',                        # Equivalent latitude (ERA5)
             }
-    return col_names[coord]
+    try: return col_names[coord]
+    except: 
+        print(f'No horizontal coordinate found for {c_pfx} {coord}')
+        return None
 
 def get_val_coord(c_pfx, val):
     """ val(str): t, p, pv, pt """
@@ -191,7 +197,10 @@ def get_val_coord(c_pfx, val):
             'pv': 'int_ERA5_PV [PVU]',                             # Potential vorticity (ERA5)
             'pt': 'int_Theta [K]',                                 # Potential temperature
             }
-    return col_names[val]
+    try: return col_names[val]
+    except: 
+        print(f'No coordinate found for {c_pfx} {val}')
+        return None
 # =============================================================================
 def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     """ Get name of eq. lat, rel height wrt therm/dyn tp, ..."""
@@ -269,6 +278,12 @@ def coord_dict():
                   'INT2': int2_coords}
     return coord_dict
 
+def dict_season():
+    return {'name_1': 'Spring (MAM)', 'name_2': 'Summer (JJA)',
+            'name_3': 'Autumn (SON)', 'name_4': 'Winter (DJF)',
+            'color_1': 'blue', 'color_2': 'orange',
+            'color_3': 'green', 'color_4': 'red'}
+
 def trop_filter_dict(tp_def, pvu=None, c_pfx=None):
     """ Return available criteria per tropopause definition (tp_def) """
     if tp_def == 'chem':
@@ -309,6 +324,11 @@ def get_default_unit(substance):
         'ch4': 'ppb',
         'co' : 'ppb'}
     return unit[substance.lower()]
+
+# def default_parameters(substance):
+#     defaults = {
+#         'n2o' : {
+#             }}
 
 #%% Input choice and validation
 def validated_input(prompt, choices):
