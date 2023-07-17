@@ -13,11 +13,13 @@ import datetime as dt
 import pandas as pd
 import geopandas
 from shapely.geometry import Point
+import copy
 
 import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from dictionaries import coord_dict, get_col_name
+from dictionaries import coord_dict, get_col_name, get_v_coord, get_h_coord
+from detrend import detrend_substance
 
 #%% Data extraction
 def monthly_mean(df, first_of_month=True):
@@ -88,6 +90,33 @@ def rename_columns(columns):
 
     return new_names, dictionary, dictionary_reversed
 
+#%% Data selection
+def data_selection(c_obj, flights=None, years=None, latitudes=None, 
+                   tropo=False, strato=False, extr_events=False, **kwargs):
+    """ Return new Caribic instance with selection of parameters 
+        flights (int / list(int))
+        years (int / list(int))
+        latitudes (tuple): lat_min, lat_max
+        tropo, strato, extr_events (bool)
+        kwargs: e.g. tp_def, ... - for strat / trop filtering 
+    """
+    out = copy.deepcopy(c_obj)
+    if flights is not None: out = out.sel_flight(flights)
+    if years is not None: out = out.sel_year(years)
+    if latitudes is not None: 
+        out = out.sel_latitude(*latitudes)
+        out.status.update({'latitudes' : latitudes})
+    if strato: 
+        out = out.sel_strato(**kwargs)
+        out.status.update({'strato' : True})
+    if tropo: 
+        out = out.sel_tropo(**kwargs)
+        out.status.update({'tropo' : True})
+    if extr_events: 
+        out = out.filter_extreme_events(**kwargs)
+        out.status.update({'no_ee' : True})
+    return out
+
 #%%  Data Handling
 def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
@@ -129,6 +158,25 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 
     else: raise KeyError(f'STrat/Trop assignment undefined for {coordinate}')
 
+def coordinate_tools(tp_def, c_pfx, ycoord, pvu, xcoord=None):
+    if tp_def == 'chem' and c_pfx=='INT': ycoord = 'z'
+    y_coord = get_v_coord(c_pfx, ycoord, tp_def, pvu)
+    if y_coord is None: raise KeyError(f'Could not get a coordinate for {ycoord} in {c_pfx} with {tp_def} TP.')
+
+    if tp_def == 'dyn': pv = f', {pvu}'
+    else: pv=''
+    y_labels = {'z' : f'$\Delta$z ({tp_def+pv}) [km]',
+                'pt' : f'$\Delta\Theta$ ({tp_def+pv}) [K]',
+                'dp' : f'$\Delta$p ({tp_def+pv}) [hPa]'}
+    y_label = y_labels[ycoord]
+
+    # x coordinate = equivalent latitude
+    if xcoord: x_coord = get_h_coord(c_pfx, xcoord)
+    x_label = 'Eq. latitude (%s) ' % ('ECMWF' if c_pfx=='INT' else 'ERA5') + '[°N]'
+
+    if xcoord: return y_coord, y_label, x_coord, x_label
+    else: return y_coord, y_label
+
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_combo(c_obj, save=True):
     """ Create dataframe with all possible coordinates but
@@ -141,37 +189,42 @@ def coord_combo(c_obj, save=True):
     for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
         df = df.combine_first(c_obj.data[pfx].copy())
     df.drop([col for col in df.columns if col not in coords],
-            axis=1, inplace=True) # rmv measurement data
+            axis=1, inplace=True) # remove non-met / non-coord data
 
-    if save: c_obj.data['coord_combo'] = df
+    # reorder columns
+    df = df[list(['Flight number', 'p [mbar]'] 
+                      + [col for col in df.columns 
+                         if col not in ['Flight number', 'p [mbar]', 'geometry']] 
+                      + ['geometry'])]
     return df
 
-def subs_merge(c_obj, subs, save=True, detr=True):
+def coord_merge_substance(c_obj, subs, save=True, detr=True):
     """ Insert GHG data into full coordinate df from coord_merge() """
     # create reference df if it doesn't exist
-    if not 'coord_combo' in c_obj.data.keys():
-        coord_combo(c_obj)
-    substance = get_col_name(subs, c_obj.source, 'GHG')
-    ghg_data = pd.DataFrame(c_obj.data['GHG'][substance],
-                            index = c_obj.data['GHG'].index)
+    if not 'met_data' in dir(c_obj): df = coord_combo(c_obj)
+    else: df = c_obj.met_data.copy()
+    subs_cols = {pfx:get_col_name(subs, 'Caribic', pfx) for pfx in c_obj.pfxs
+                 if get_col_name(subs, 'Caribic', pfx) is not None}
 
-    if detr:
-        ghg_data = ghg_data.join(c_obj.data[f'detr_GHG_{subs}'],
-                                 rsuffix='_detrend') # add detrended data to
-        ghg_data.drop([x for x in ghg_data.columns if x.endswith('_detrend')],
-                      axis=1, inplace=True) # duplicate columns
+    if detr: 
+        try: detrend_substance(c_obj, subs)
+        except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
 
-    merged = c_obj.data['coord_combo'].join(ghg_data, rsuffix='_ghg')
-    merged.drop([x for x in merged.columns if x.endswith('_ghg')],
-                axis=1, inplace=True) # duplicate columns
+    for pfx, substance in subs_cols.items():
+        data = c_obj.data[pfx].sort_index()
+        # print(data['geometry'])
+        cols = [col for col in data if substance in col] # include detrended etc
+        # print(pfx, data[cols].columns)
+        df = df.join(data[cols])
 
-    subs_cols = [c for c in ghg_data.columns if c in merged.columns]
-    # reorder columns
-    merged = merged[subs_cols +
-                    [c for c in merged.columns if c not in subs_cols]]
-
-    if save: c_obj.data[f'{subs}_data'] = merged
-    return merged
+        # Reorder columns to match initial dataframes & put substance to front
+        df = df[list(['Flight number', 'p [mbar]'] + cols 
+                          + [c for c in df.columns if c not in 
+                              list(['Flight number', 'p [mbar]', 'geometry']+cols)]
+                          + ['geometry'])]
+    
+    df.dropna(subset = subs_cols.values(), how='all') # drop rows without any subs data
+    return df
 
 #%% Binning of global data sets
 def bin_prep(glob_obj, subs, **kwargs):
