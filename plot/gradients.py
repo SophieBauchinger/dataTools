@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import toolpac.calc.binprocessor as bp
 
 from detrend import detrend_substance
-from dictionaries import get_col_name, dict_season
+from dictionaries import get_col_name, dict_season, choose_column
 from tools import make_season, coordinate_tools
 from data import Mauna_Loa
 
@@ -24,7 +24,7 @@ from data import Mauna_Loa
 
 # ptsmin (int): minimum number of pts for a bin to be considered #!!! implement
 
-def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT', tp_def='therm', pvu = 3.5, errorbars=False,
+def plot_gradient_by_season(c_obj, subs, c_pfx = None, tp_def='therm', pvu = 3.5, errorbars=False,
                             detr=False, note=None, ycoord='pt', y_bin=None):
     """
     Plotting gradient by season using 1D binned data. Detrended data used by default
@@ -41,12 +41,12 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT', tp_def='therm', pvu = 3.
         detr (bool)
         note (str): shown as text box on the plot
     """
-    if c_pfx not in c_obj.pfxs: 
-        print(f'No data found for {c_pfx}'); return
+    if c_pfx is not None and c_pfx in c_obj.pfxs: data = c_obj.data[c_pfx]
+    elif subs in c_obj.data.keys(): data = c_obj.data[subs]
+    else: print(f'No data found for {subs} / {c_pfx}'); return
 
-    data = c_obj.data[c_pfx]
-    substance = get_col_name(subs, c_obj.source, c_pfx)
-    if substance is None: return
+    try: substance = get_col_name(subs, c_obj.source, c_pfx)
+    except: substance = get_col_name(subs, 'Caribic', 'GHG')
     if detr: 
         if not f'detr_{substance}' in data.columns:
             try: 
@@ -56,7 +56,10 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = 'INT', tp_def='therm', pvu = 3.
             except: print('Detrending not successful, proceeding with original data.')
         else: substance = f'detr_{substance}'
     
-    y_coord, y_label = coordinate_tools(tp_def=tp_def, c_pfx=c_pfx, ycoord=ycoord, pvu=pvu)
+    try: y_coord, y_label = coordinate_tools(tp_def=tp_def, c_pfx=c_pfx, ycoord=ycoord, pvu=pvu)
+    except: 
+        y_coord = choose_column(data, var='y-coordinate')
+        y_label = input('Please input the y-label\n')
     y_bins = {'z' : 0.5, 'pt' : 10, 'p' : 40}
     if not y_bin: y_bin = y_bins[ycoord]
     min_y, max_y = np.nanmin(data[y_coord].values), np.nanmax(data[y_coord].values)

@@ -117,7 +117,7 @@ def data_selection(c_obj, flights=None, years=None, latitudes=None,
         out.status.update({'no_ee' : True})
     return out
 
-#%%  Data Handling
+#%% Data Handling
 def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
     the substance (col name) """
@@ -159,9 +159,15 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
     else: raise KeyError(f'STrat/Trop assignment undefined for {coordinate}')
 
 def coordinate_tools(tp_def, c_pfx, ycoord, pvu, xcoord=None):
+    """ Get appropriate coordinates and labels. Raises error if not possible """
+    # setting defaults if not c_pfx is specified (not cleanly but whatever)
+    if c_pfx is None and pvu is not None: c_pfx = 'INT2'
+    elif c_pfx is None: c_pfx = 'INT'
+
     if tp_def == 'chem' and c_pfx=='INT': ycoord = 'z'
     y_coord = get_v_coord(c_pfx, ycoord, tp_def, pvu)
-    if y_coord is None: raise KeyError(f'Could not get a coordinate for {ycoord} in {c_pfx} with {tp_def} TP.')
+    if y_coord is None: 
+        raise KeyError(f'Could not get a coordinate for {ycoord} in {c_pfx} with {tp_def} TP.')
 
     if tp_def == 'dyn': pv = f', {pvu}'
     else: pv=''
@@ -199,7 +205,7 @@ def coord_combo(c_obj, save=True):
     return df
 
 def coord_merge_substance(c_obj, subs, save=True, detr=True):
-    """ Insert GHG data into full coordinate df from coord_merge() """
+    """ Insert msmt data into full coordinate df from coord_merge() """
     # create reference df if it doesn't exist
     if not 'met_data' in dir(c_obj): df = coord_combo(c_obj)
     else: df = c_obj.met_data.copy()
@@ -207,7 +213,7 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
                  if get_col_name(subs, 'Caribic', pfx) is not None}
 
     if detr: 
-        try: detrend_substance(c_obj, subs)
+        try: detrend_substance(c_obj, subs) # add detrended data to all dataframes
         except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
 
     for pfx, substance in subs_cols.items():
@@ -222,8 +228,7 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
                           + [c for c in df.columns if c not in 
                               list(['Flight number', 'p [mbar]', 'geometry']+cols)]
                           + ['geometry'])]
-    
-    df.dropna(subset = subs_cols.values(), how='all') # drop rows without any subs data
+    df.dropna(subset = subs_cols.values(), how='all', inplace=True) # drop rows without any subs data
     return df
 
 #%% Binning of global data sets

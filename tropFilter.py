@@ -24,6 +24,7 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 import data #!!! kinda cyclic, but need Mauna_Loa for pre_flag
 from tools import get_lin_fit, assign_t_s
 from dictionaries import get_fct_substance, get_col_name, substance_list
+from detrend import detrend_substance
 
 filter_types = {
     'chem' : ['n2o', 'o3'], # 'crit'
@@ -41,7 +42,7 @@ coordinates = {
 
 # Sort trop / strat using mixing ratios relative to trop. background value
 def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG', 
-             save=True, verbose=False):
+             save=True, verbose=False, subs_col=None):
     """ Sort data into strato / tropo based on difference to ground obs.
 
     Returns dataframe containing index and strato/tropo/pre_flag columns 
@@ -60,8 +61,9 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
         df = glob_obj.data[c_pfx].copy()
     else: df = glob_obj.df.copy()
     df.sort_index(inplace=True)
-    
-    substance = get_col_name(crit, glob_obj.source, c_pfx)
+
+    if subs_col is not None: substance = subs_col
+    else: substance = get_col_name(crit, glob_obj.source, c_pfx)
     if not substance: raise ValueError(state+'No {crit} data in {c_pfx}')
 
     if not ref_obj: 
@@ -89,7 +91,7 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
     return df_flag
 
 # Sort trop / strat using tracer mixing ratio
-def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
+def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True, 
              verbose = False, plot=False, limit=0.97, subs=None, **kwargs):
     """ Returns DataFrame with bool columns 'strato' and 'tropo'.
 
@@ -114,8 +116,8 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
     if crit not in substance_list(c_pfx):
         default_crit = {'GHG' : 'n2o', 'INT' : 'n2o', 'INT2' : 'o3'}
         print(f'{crit} not available in {c_pfx}, using {default_crit[c_pfx]}')
-        crit = default_crit(c_pfx)
-        
+        crit = default_crit[c_pfx]
+
     state = f'filter_strat_trop: crit={crit}, c_pfx={c_pfx}\n'
     tropo = f'tropo_chem_{crit}'
     strato = f'strato_chem_{crit}'
@@ -138,17 +140,26 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
         df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
         df_sorted.sort_index(inplace=True)
 
-        if plot: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs)
+        if plot: 
+            if not detr: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs)
+            else: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs, 
+                              subs_col = 'detr_'+get_col_name(subs, glob_obj.source, c_pfx))
 
     if crit == 'n2o' and c_pfx in ['GHG', 'INT2']:
         substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
+        if detr: 
+            try: substance = 'detr_'+substance
+            except: 
+                detrend_substance(glob_obj, subs, save=True)
+                substance = 'detr_'+substance
         df_sorted[substance] = data[substance]
         if f'd_{substance}' in data.columns: 
             df_sorted[f'd_{substance}'] = data[f'd_{substance}']
 
         # Calculate simple pre-flag if not in data 
         if not f'flag_{crit}' in data.columns: 
-            pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
+            if detr: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose, subs_col = substance)
+            else: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
         if f'flag_{crit}' in data.columns: 
             # make part of df_sorted so that substance=nan rows get dropped
             try: df_sorted[f'flag_{crit}'] = glob_obj.data[c_pfx][f'flag_{crit}']
@@ -175,7 +186,8 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None,
 
         if plot: 
             popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
-            plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs)
+            if not detr: plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs)
+            else: plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs, subs_col = substance)
 
     return df_sorted
 
@@ -288,7 +300,8 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
     return df_sorted
 
 # Plotting sorted data
-def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, subs=None):
+def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, 
+                subs=None, subs_col=None):
     """ Plot strat / trop sorted data """ 
     # only take data with index that is available in df_sorted 
     data = glob_obj.data[c_pfx][glob_obj.data[c_pfx].index.isin(df_sorted.index)]
@@ -304,7 +317,8 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, subs=N
 
     if crit in ['o3', 'n2o'] and not subs: subs = crit
 
-    substance = get_col_name(subs, glob_obj.source, c_pfx)
+    if subs_col is None: substance = get_col_name(subs, glob_obj.source, c_pfx)
+    else: substance = subs_col
     if substance is None: 
         print(f'Cannot plot {subs.upper()}, not available in {c_pfx}.'); return
     
