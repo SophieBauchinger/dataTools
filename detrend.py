@@ -3,12 +3,10 @@
 @Author: Sophie Bauchimger, IAU
 @Date: Fri Apr 28 09:58:15 2023
 
-Defines function to remove trend from measurements
+Remove linear trend of substances using free troposphere as reference.
 
 """
-
 import numpy as np
-import geopandas
 import pandas as pd
 import matplotlib.pyplot as plt
 import datetime as dt
@@ -16,8 +14,9 @@ import datetime as dt
 from toolpac.conv.times import datetime_to_fractionalyear
 
 from dictionaries import get_col_name, substance_list
+from data import Mauna_Loa
 
-def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
+def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False,
                       as_subplot=False, ax=None, c_pfx=None, note=''):
     """ Remove linear trend of substances using free troposphere as reference.
     (redefined from C_tools.detrend_subs)
@@ -25,8 +24,11 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
     Parameters:
         c_obj (GlobalData/Caribic)
         subs (str): substance to detrend e.g. 'sf6'
-        loc_obj (LocalData): reference data to detrend on, index=datetime
+        loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
     """
+    if loc_obj is None: 
+        try: loc_obj = Mauna_Loa(c_obj.years, subs)
+        except: raise ValueError(f'Cannot detrend as ref. data could not be found for {subs.upper()}') 
     out_dict = {}
 
     if c_pfx: pfxs = [c_pfx]
@@ -34,7 +36,8 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
 
     if plot:
         if not as_subplot:
-            fig, axs = plt.subplots(len(pfxs), dpi=250, figsize=(6,10))
+            fig, axs = plt.subplots(len(pfxs), dpi=250, figsize=(6,4*len(pfxs)))
+            if len(pfxs)==1: axs = [axs]
         elif ax is None:
             ax = plt.gca()
 
@@ -79,26 +82,24 @@ def detrend_substance(c_obj, subs, loc_obj, degree=2, save=True, plot=False,
             columns = [f'detr_{substance}', 
                        f'delta_{substance}', 
                        f'detrFit_{substance}']
-            c_obj.data[c_pfx][columns] = df_detr[columns]
             
-            # if not f'detr_{c_pfx}' in c_obj.data.keys():
-            #     c_obj.data[f'detr_{c_pfx}'] = geopandas.GeoDataFrame(
-            #         c_obj.data[c_pfx]['Flight number'],
-            #         index = df.index, geometry=df.geometry)
-            # c_obj.data[f'detr_{c_pfx}'] = c_obj.data[f'detr_{c_pfx}'].join(
-            #     df_detr, lsuffix='DROP').filter(regex="^(?!.*DROP)")
+            c_obj.data[c_pfx][columns] = df_detr[columns]
+            # move geometry column to the end again
+            c_obj.data[c_pfx]['geometry'] =  c_obj.data[c_pfx].pop('geometry')
 
         if plot:
             if not as_subplot: ax = axs[i]
-            ax.annotate(f'{c_pfx} {note}', xy=(0.025, 0.925), xycoords='axes fraction',
-                                  bbox=dict(boxstyle="round", fc="w"))
-            ax.scatter(df_detr.index, c_obs, color='orange', label='Flight data')
-            ax.scatter(ref_df.index, c_ref, color='gray', label='MLO data')
-            ax.scatter(df_detr.index, c_obs_detr, color='green', label='trend removed')
+            # ax.annotate(f'{c_pfx} {note}', xy=(0.025, 0.925), xycoords='axes fraction',
+            #                       bbox=dict(boxstyle="round", fc="w"))
+            ax.scatter(df_detr.index, c_obs, color='orange', label='Flight data', marker='.')
+            ax.scatter(df_detr.index, c_obs_detr, color='green', label='trend removed', marker='.')
+            ax.scatter(ref_df.index, c_ref, color='gray', label='MLO data', alpha=0.4, marker='.')
             ax.plot(df_detr.index, c_fit(t_obs), color='black', ls='dashed',
-                     label='trendline')
+                      label='trendline')
             ax.set_ylabel(f'{substance}') # ; ax.set_xlabel('Time')
-            ax.legend()
+            handles, labels = ax.get_legend_handles_labels()
+            leg = ax.legend(title=f'{c_pfx} {note}')
+            leg._legend_box.align = "left"
 
     if plot and not as_subplot:
         fig.tight_layout()
