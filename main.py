@@ -29,6 +29,7 @@ import dill
 from os.path import exists
 from os import remove
 import matplotlib.pyplot as plt
+import copy
 
 from data import Caribic, Mozart, Mauna_Loa, Mace_Head
 from lags import calc_time_lags
@@ -38,19 +39,20 @@ from tropFilter import chemical, thermal, dynamical
 from detrend import detrend_substance
 import plot.data
 from plot.gradients import plot_gradient_by_season
-from plot.eqlat import plot_eqlat_deltheta
+# from plot.eqlat import plot_eqlat_deltheta
 from baseline import baseline_filter
+from tools import data_selection
 
 #%% Get Data
 year_range = range(1980, 2021)
 
-mlo_data = {subs : Mauna_Loa(year_range, substance=subs) for subs
+mlo_data = {subs : Mauna_Loa(year_range, subs=subs) for subs
             in substance_list('MLO')}
 mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
 
 # only calculate caribic data if necessary
-def load_caribic(fname = 'caribic_dill.pkl'):
+def load_caribic(fname = 'caribic_pure.pkl'):
     if exists(fname): # Avoid long file loading times
         with open(fname, 'rb') as f:
             caribic = dill.load(f)
@@ -72,12 +74,10 @@ caribic = load_caribic()
 # save_caribic(fname= 'carbic_dill_mod.pkl')
 
 # examples for creating new objects with only certain year / flight nr / lat :
-# c_2008 = caribic.sel_year(2008)
-# c_fl340 = caribic.sel_flight(340)
-# c_gt30N = caribic.sel_latitude(30, 90)
+# kwargs = {'tp_def' : 'chem'}
+# new_caribic = data_selection(caribic, flights=None, years=None, latitudes=None, 
+#                               tropo=False, strato=False, extr_events=False, **kwargs)
 
-# c_yr08_to_12 = caribic.sel_year(*range(2008, 2012))
-# c_fl340_to_360 = caribic.sel_flight(*range(340, 360))
 
 
 #%% Plot data
@@ -164,10 +164,6 @@ for pfx in ['GHG', 'INT', 'INT2']:
         plt.tight_layout()
         plt.show()
     
-
-
-
-        
 # n2o mixing ratio wrt Mauna Loa data
 
 # ref_obj = Mauna_Loa(year_range, 'n2o')
