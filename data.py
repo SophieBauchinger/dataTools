@@ -20,9 +20,10 @@ from toolpac.conv.times import fractionalyear_to_datetime
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d
-from tropFilter import chemical, dynamical, thermal
 from dictionaries import get_col_name, substance_list, get_fct_substance
+from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, coord_combo
+from tropFilter import chemical, dynamical, thermal
+from detrend import detrend_substance
 
 #%% GLobal data
 class GlobalData(object):
@@ -261,15 +262,18 @@ class Caribic(GlobalData):
         super().__init__([yr for yr in years if yr > 2004], grid_size)
         self.source = 'Caribic'
         self.pfxs = pfxs
-        self.get_data(pfxs, verbose=verbose)
+        self.get_data(pfxs, verbose=verbose) # creates self.data dictionary
+        self.met_data = coord_combo(self)
 
-    def sel_flight(self, *flights_list):
+    def sel_flight(self, flights, verbose=False):
         """ Returns Caribic object containing only data for selected flights
             flight_list (int / list) """
-        for flight_nr in flights_list:
-            if flight_nr not in self.flights:
-                print(f'No available data for {flight_nr}')
-                flights_list = np.delete(flights_list, np.where(flights_list==flight_nr))
+        if isinstance(flights, int): flights = [flights]
+        # elif isinstance(flights, range): flights = list(flights)
+        invalid = [f for f in flights if f not in self.flights]
+        if len(invalid)>0 and verbose: 
+            print(f'No data found for flights {invalid}. Proceeding without.')
+        flights = [f for f in flights if f in self.flights]
 
         out = type(self).__new__(self.__class__) # create new class instance
         for attribute_key in self.__dict__.keys(): # copy stuff like pfxs
@@ -281,10 +285,10 @@ class Caribic(GlobalData):
                    if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut
         for k in df_list: # delete everything but selected flights
             out.data[k] = out.data[k][
-                out.data[k]['Flight number'].isin(flights_list)]
+                out.data[k]['Flight number'].isin(flights)]
             out.data[k].sort_index(inplace=True)
 
-        out.flights = list(flights_list) # now only actually available flights
+        out.flights = flights # update to chosen & available flights
         out.years = list(set([yr for yr in out.data[k].index.year]))
         out.years.sort(); out.flights.sort()
 
@@ -402,7 +406,8 @@ class Caribic(GlobalData):
 
         for pfx in tropo_obj.pfxs:
             data = tropo_obj.data[pfx].sort_index()
-            if 'subs' in kwargs.keys(): subs_list = [kwargs['subs']]
+            if 'subs' in kwargs.keys() and isinstance(kwargs['subs'], str): subs_list = [kwargs['subs']]
+            elif 'subs' in kwargs.keys() and isinstance(kwargs['subs'], list): subs_list = kwargs['subs']
             else: subs_list = substance_list(pfx)
 
             for subs in subs_list:
@@ -435,6 +440,14 @@ class Caribic(GlobalData):
 
         return out
 
+    def detrend(self, subs, **kwargs):
+        """ Remove linear trend for the substance & add detr. data to all dataframes """
+        detrend_substance(self, subs, **kwargs)
+
+    def create_substance_df(self, subs):
+        """ Create dataframe containing all met.+ msmt. data for a substance """
+        self.data[f'{subs}'] = coord_merge_substance(self, subs)
+    
 # Mozart
 class Mozart(GlobalData):
     """ Stores relevant Mozart data
@@ -550,31 +563,33 @@ class LocalData(object):
 
 class Mauna_Loa(LocalData):
     """ Mauna Loa data, plotting, averaging """
-    def __init__(self, years, substance='sf6', data_Day = False,
+    def __init__(self, years, subs='sf6', data_Day = False,
                  path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
-        super().__init__(years, data_Day, substance)
+        super().__init__(years, data_Day, subs)
         self.source = 'Mauna_Loa'
-        self.substance = substance
+        self.substance = subs
 
-        if substance in ['sf6', 'n2o']:
+        if subs in ['sf6', 'n2o']:
             self.data_format = 'CATS'
             fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
             self.df = self.get_data(path_dir+fname_MM)
 
             self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
             if data_Day: # user input saying if daily data should exist
-                fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
+                fname_Day = r'\mlo_{}_Day.dat'.format(self.subs.upper())
                 self.df_Day = self.get_data(path_dir + fname_Day)
                 try: self.df_monthly_mean = monthly_mean(self.df_Day)
                 except: pass
 
-        if substance in ['co2', 'ch4', 'co']:
+        elif subs in ['co2', 'ch4', 'co']:
             self.data_format = 'ccgg'
             fname = r'\{}_mlo_surface-insitu_1_ccgg_MonthlyData.txt'.format(
                 self.substance)
-            if substance=='co': fname = r'\co_mlo_surface-flask_1_ccgg_month.txt'
+            if subs=='co': fname = r'\co_mlo_surface-flask_1_ccgg_month.txt'
             self.df = self.get_data(path_dir+fname)
+        
+        else: raise KeyError(f'Mauna Loa data not available for {subs.upper()}')
 
 class Mace_Head(LocalData):
     """ Mauna Loa data, plotting, averaging """
