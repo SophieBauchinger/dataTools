@@ -263,7 +263,7 @@ class Caribic(GlobalData):
         self.source = 'Caribic'
         self.pfxs = pfxs
         self.get_data(pfxs, verbose=verbose) # creates self.data dictionary
-        self.met_data = coord_combo(self)
+        self.met_data = coord_combo(self) # reference for met data for all msmts
 
     def sel_flight(self, flights, verbose=False):
         """ Returns Caribic object containing only data for selected flights
@@ -271,7 +271,7 @@ class Caribic(GlobalData):
         if isinstance(flights, int): flights = [flights]
         # elif isinstance(flights, range): flights = list(flights)
         invalid = [f for f in flights if f not in self.flights]
-        if len(invalid)>0 and verbose: 
+        if len(invalid)>0 and verbose:
             print(f'No data found for flights {invalid}. Proceeding without.')
         flights = [f for f in flights if f in self.flights]
 
@@ -437,7 +437,6 @@ class Caribic(GlobalData):
             drop_subs = [subs for subs in substance_list(pfx) if subs not in subs_list]
             drop_cols = [get_col_name(subs, out.source, pfx) for subs in drop_subs]
             out.data[pfx].drop(columns = drop_cols, inplace=True)
-
         return out
 
     def detrend(self, subs, **kwargs):
@@ -447,7 +446,7 @@ class Caribic(GlobalData):
     def create_substance_df(self, subs):
         """ Create dataframe containing all met.+ msmt. data for a substance """
         self.data[f'{subs}'] = coord_merge_substance(self, subs)
-    
+
 # Mozart
 class Mozart(GlobalData):
     """ Stores relevant Mozart data
@@ -588,7 +587,7 @@ class Mauna_Loa(LocalData):
                 self.substance)
             if subs=='co': fname = r'\co_mlo_surface-flask_1_ccgg_month.txt'
             self.df = self.get_data(path_dir+fname)
-        
+
         else: raise KeyError(f'Mauna Loa data not available for {subs.upper()}')
 
 class Mace_Head(LocalData):
