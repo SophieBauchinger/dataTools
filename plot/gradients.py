@@ -11,10 +11,8 @@ import matplotlib.pyplot as plt
 
 import toolpac.calc.binprocessor as bp
 
-from detrend import detrend_substance
 from dictionaries import get_col_name, dict_season, choose_column
 from tools import make_season, coordinate_tools
-from data import Mauna_Loa
 
 #%% Plotting Gradient by season
 # Fct definition in C_plot needed these:
@@ -24,44 +22,55 @@ from data import Mauna_Loa
 
 # ptsmin (int): minimum number of pts for a bin to be considered #!!! implement
 
-def plot_gradient_by_season(c_obj, subs, c_pfx = None, tp_def='therm', pvu = 3.5, errorbars=False,
-                            detr=False, note=None, ycoord='pt', y_bin=None):
-    """
+# def plot_gradient_by_season(c_obj, subs, c_pfx = None, tp_def='therm', pvu = 3.5, errorbars=False,
+#                             detr=True, note=None, ycoord='pt', y_bin=None):
+    # """
+    # Plotting gradient by season using 1D binned data. Detrended data used by default
+    # (Inspired by C_plot.pl_gradient_by_season)
+
+    # Parameters:
+    #     c_obj (Caribic)
+    #     subs (str): substance e.g. 'sf6'
+    #     c_pfx (str): 'GHG', 'INT', 'INT2'
+    #     tp_def (str): tropopause definition
+    #     pvu (float): potential vorticity for dyn. tp definition. 1.5, 2.0 or 3.5
+    #     errorbars (bool)
+    #     y_bin (int): bin size for 1D binning (depends on coordinate)
+    #     detr (bool)
+    #     note (str): shown as text box on the plot
+    # """
+    
+def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {}, 
+                            detr=True, note=None, errorbars=False):
+    """ 
     Plotting gradient by season using 1D binned data. Detrended data used by default
     (Inspired by C_plot.pl_gradient_by_season)
 
-    Parameters:
-        c_obj (Caribic)
-        subs (str): substance e.g. 'sf6'
-        c_pfx (str): 'GHG', 'INT', 'INT2'
-        tp_def (str): tropopause definition
-        pvu (float): potential vorticity for dyn. tp definition. 1.5, 2.0 or 3.5
-        errorbars (bool)
-        y_bin (int): bin size for 1D binning (depends on coordinate)
-        detr (bool)
-        note (str): shown as text box on the plot
+    x_params (dict): 
+        keys: x_pfx
+    y_params (dict):
+        keys: ycoord, tp_def, y_pfx, pvu
     """
-    if c_pfx is not None and c_pfx in c_obj.pfxs: data = c_obj.data[c_pfx]
-    elif subs in c_obj.data.keys(): data = c_obj.data[subs]
-    else: print(f'No data found for {subs} / {c_pfx}'); return
+    if (not all(i in x_params.keys() for i in  ['x_pfx']) 
+                or not all(i in y_params.keys() for i in ['ycoord', 'y_pfx', 'tp_def'])): 
+        raise KeyError('Please supply all necessary parameters: x_pfx, (xcoord) / ycoord, tp_def, y_pfx, (pvu)')
+    if not subs in c_obj.data.keys(): c_obj.create_substance_df(subs)
+    data = c_obj.data[subs]
 
-    try: substance = get_col_name(subs, c_obj.source, c_pfx)
-    except: substance = get_col_name(subs, 'Caribic', 'GHG')
-    if detr: 
-        if not f'detr_{substance}' in data.columns:
-            try: 
-                detrend_substance(c_obj, subs, Mauna_Loa(c_obj.years, subs), save=True)
-                data = c_obj.data[c_pfx]
-                substance = f'detr_{substance}'
-            except: print('Detrending not successful, proceeding with original data.')
-        else: substance = f'detr_{substance}'
-    
-    try: y_coord, y_label = coordinate_tools(tp_def=tp_def, c_pfx=c_pfx, ycoord=ycoord, pvu=pvu)
-    except: 
-        y_coord = choose_column(data, var='y-coordinate')
-        y_label = input('Please input the y-label\n')
+    # x-axis
+    substance = get_col_name(subs, c_obj.source, x_params['x_pfx'])
+    if detr: # detrended data for x-axis
+        substance = f'detr_{substance}'
+        if not substance in data.columns:
+            raise ValueError(f'Detrended data not available for {subs.upper()}')
+
+    # y-axis
+    y_coord, y_label = coordinate_tools(**y_params)
     y_bins = {'z' : 0.5, 'pt' : 10, 'p' : 40}
-    if not y_bin: y_bin = y_bins[ycoord]
+    if not 'y_bin' in y_params.keys(): 
+        y_bin = y_bins[y_params['ycoord']]
+    else: y_bin = y_params['y_bin']
+
     min_y, max_y = np.nanmin(data[y_coord].values), np.nanmax(data[y_coord].values)
     nbins = (max_y - min_y) / y_bin
     y_array = min_y + np.arange(nbins) * y_bin + y_bin * 0.5
@@ -95,30 +104,37 @@ def plot_gradient_by_season(c_obj, subs, c_pfx = None, tp_def='therm', pvu = 3.5
 
     plt.ylim([min_y, max_y])
     plt.ylabel(y_label)
-    plt.xlabel(f'{substance}') # [4:]
+    plt.xlabel(f'{substance}')
     if detr: # remove the 'delta_' and replace with symbol
-        plt.xlabel('$\Delta $' + substance.split("_")[-1])
+        plt.xlabel('$\Delta $' + substance.split("_")[-1] + ' wrt. 2005')
 
     plt.legend()
     plt.show()
 
 #%% Fct calls - gradients
-# if __name__=='__main__':
-    # only calculate caribic if necessary
-    # calc_c = False
-    # if calc_c:
-    #     if exists('caribic_dill.pkl'): # Avoid long file loading times
-    #         with open('caribic_dill.pkl', 'rb') as f:
-    #             caribic = dill.load(f)
-    #         del f
-    #     else: caribic = Caribic(range(1980, 2021), pfxs = ['GHG', 'INT', 'INT2'])
 
-    # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
-    #     plot_gradient_by_season(caribic, subs,  tp='pvu', pvu = 2.0)
-
-    # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
-    #     plot_gradient_by_season(caribic.sel_latitude(30, 90), subs, tp='z', pvu = 2.0, note='lat>30°N')
-
-    # for subs in ['ch4', 'co2', 'sf6', 'n2o']:
-    #     for tp in ['therm', 'dyn', 'pvu']:
-    #         plot_gradient_by_season(caribic, subs,  c_pfx='INT2', tp=tp, pvu = 2.0)
+if __name__ == '__main__':
+    if False: caribic = True # BS to avoid error
+    
+    yp1 = {'tp_def' : 'chem', 
+           'y_pfx' : 'INT2',
+           'ycoord' : 'z'}
+    
+    yp2 = {'tp_def' : 'therm', 
+           'y_pfx' : 'INT', 
+           'ycoord' : 'pt'}
+    
+    yp3 = {'tp_def' : 'therm', 
+           'y_pfx' : 'INT2', 
+           'ycoord' : 'pt'}
+    
+    yp4 = {'tp_def' : 'dyn', 
+           'y_pfx' : 'INT', 
+           'ycoord' : 'pt', 
+           'pvu' : 3.5}
+    
+    for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+        for yp in [yp1, yp2, yp3, yp4]:
+            x_params = {'x_pfx' : 'GHG'}
+            y_params = yp
+            plot_gradient_by_season(caribic, subs, x_params, y_params)
