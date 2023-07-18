@@ -24,10 +24,17 @@ Met / Reanalysis data for Caribic-2:
 chemical TP:
      'int_CARIBIC2_H_rel_TP [km]',
      'int_h_rel_TP [km]',
-     'int_PV [PVU]',
-     'int_Theta [K]',
-     'int_ToAirTmp [degC]',
-     'int_Tpot [K]',
+     # 'int_PV [PVU]',
+     # 'int_Theta [K]',
+     # 'int_ToAirTmp [degC]',
+     # 'int_Tpot [K]',
+
+thermal TP: 
+     'int_dp_strop_hpa [hPa]',
+     'int_pt_rel_sTP_K [K]',
+     'int_z_rel_sTP_km [km]',
+     'int_ERA5_PRESS [hPa]' cf. 'int_ERA5_TROP1_PRESS [hPa]'
+     'int_ERA5_TEMP [K]' cf. 'int_ERA5_TROP1_THETA [K]'
 
 dynamical TP: 
      'int_dp_dtrop_hpa [hPa]',
@@ -36,14 +43,6 @@ dynamical TP:
      'int_ERA5_D_1_5PVU_BOT [K]',
      'int_ERA5_D_2_0PVU_BOT [K]',
      'int_ERA5_D_3_5PVU_BOT [K]',
-     
-thermal TP: 
-     'int_dp_strop_hpa [hPa]',
-     'int_pt_rel_sTP_K [K]',
-     'int_z_rel_sTP_km [km]',
-     'int_ERA5_PRESS [hPa]' cf. 'int_ERA5_TROP1_PRESS [hPa]'
-     'int_ERA5_TEMP [K]' cf. 'int_ERA5_TROP1_THETA [K]'
-
 
 Implementation of tropopause filtering in CARIBIC-2 data:
     chemical:
@@ -64,19 +63,20 @@ import dill
 from os.path import exists
 from os import remove
 import matplotlib.pyplot as plt
-import copy
 
-from data import Caribic, Mozart, Mauna_Loa, Mace_Head
+from data import Caribic, Mozart
+from groundbased import Mauna_Loa, Mace_Head
 from lags import calc_time_lags
 from dictionaries import substance_list
 
-from tropFilter import chemical, thermal, dynamical
-from detrend import detrend_substance
+
+# from data import detrend_substance
 import plot.data
 from plot.gradients import plot_gradient_by_season
 # from plot.eqlat import plot_eqlat_deltheta
 from baseline import baseline_filter
-from tools import data_selection
+# from tropFilter import chemical, thermal, dynamical
+# from tools import data_selection
 
 #%% Get Data
 year_range = range(1980, 2021)
@@ -87,7 +87,8 @@ mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
 
 # only calculate caribic data if necessary
-def load_caribic(fname = 'caribic_pure.pkl'):
+def load_caribic(fname = 'caribic_180723.pkl'):
+    """ 'caribic_180723.pkl' ;  """
     if exists(fname): # Avoid long file loading times
         with open(fname, 'rb') as f:
             caribic = dill.load(f)
@@ -105,7 +106,7 @@ def save_caribic(fname = 'caribic_dill.pkl'):
 def del_caribic_file(fname = 'caribic_dill.pkl'): remove(fname)
 
 caribic = load_caribic()
-caribic_filtered = caribic.filter_extreme_events('chem')
+# caribic_filtered = caribic.filter_extreme_events('chem')
 
 # save_caribic(fname= 'carbic_dill_mod.pkl')
 
@@ -172,7 +173,7 @@ calc_time_lags(caribic, mlo_data['co2'], range(2005, 2020),
 
 #%% Detrend
 for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-    detrend_substance(caribic, subs, mlo_data[subs])
+    caribic.detrend(subs, mlo_data[subs])
 
 #%% Plot gradients
 for pfx in ['INT2']:# caribic.pfxs:
@@ -213,4 +214,4 @@ for pfx in ['GHG', 'INT', 'INT2']:
 #             filter_trop_outliers(caribic, subs, pfx, crit=subs)
 
 #%% Eq. lat vs potential temperature wrt tropopause
-plot_eqlat_deltheta(caribic, c_pfx='INT2', subs='n2o', tp='pvu')
+# plot_eqlat_deltheta(caribic, c_pfx='INT2', subs='n2o', tp='pvu')
