@@ -12,6 +12,7 @@ import pandas as pd
 from shapely.geometry import Point
 import xarray as xr
 from os.path import exists
+import matplotlib.pyplot as plt
 
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
@@ -23,7 +24,7 @@ from toolpac.conv.times import datetime_to_fractionalyear
 from dictionaries import get_col_name, substance_list, get_fct_substance
 from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, coord_combo
 from tropFilter import chemical, dynamical, thermal
-from detrend import detrend_substance
+# from detrend import detrend_substance
 
 #%% GLobal data
 class GlobalData(object):
@@ -264,6 +265,8 @@ class Caribic(GlobalData):
         self.pfxs = pfxs
         self.get_data(pfxs, verbose=verbose) # creates self.data dictionary
         self.met_data = coord_combo(self) # reference for met data for all msmts
+        for subs in ['sf6', 'n2o', 'co2', 'ch4']: 
+            self.create_substance_df(subs)
 
     def sel_flight(self, flights, verbose=False):
         """ Returns Caribic object containing only data for selected flights
@@ -322,10 +325,11 @@ class Caribic(GlobalData):
         functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
 
         for pfx in pfxs:
-            try: df_sorted = functions[tp_def](out, c_pfx=pfx, **kwargs)
-            except: # remove pfxs that can't be sorted
-                print(f'Sorting of {pfx} with {tp_def} unsuccessful')
-                del out.data[pfx]; continue
+            df_sorted = functions[tp_def](out, c_pfx=pfx, **kwargs)
+            # try: df_sorted = functions[tp_def](out, c_pfx=pfx, **kwargs)
+            # except: # remove pfxs that can't be sorted
+            #     print(f'Sorting of {pfx} with {tp_def} unsuccessful')
+            #     del out.data[pfx]; continue
 
             col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
             # only keep rows that are in df_sorted, then only tropospheric data
@@ -400,6 +404,8 @@ class Caribic(GlobalData):
             out.__dict__[attribute_key] = self.__dict__[attribute_key]
 
         # Find and filter tropospheric extreme events
+        if tp_def == 'chem' and 'ref_obj' not in kwargs.keys(): 
+            kwargs['ref_obj'] = Mauna_Loa(self.years, 'n2o')
         tropo_obj = self.sel_tropo(tp_def, **kwargs)
         out.pfxs = tropo_obj.pfxs # only take trop. sorted pfx data
         out.data = {k:v.copy() for k,v in self.data.items() if k in tropo_obj.pfxs} # only using OG msmt data
@@ -411,7 +417,8 @@ class Caribic(GlobalData):
             else: subs_list = substance_list(pfx)
 
             for subs in subs_list:
-                substance = get_col_name(subs, tropo_obj.source, pfx)
+                try: substance = get_col_name(subs, tropo_obj.source, pfx)
+                except: substance = None
                 if substance not in data.columns: continue
                 time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
                 mxr = data[substance].tolist()
@@ -604,6 +611,99 @@ class Mace_Head(LocalData):
         self.df_Day = daily_mean(self.df)
         self.df_monthly_mean = monthly_mean(self.df)
 
+
+#%% detrending 
+def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False,
+                      as_subplot=False, ax=None, c_pfx=None, note=''):
+    """ Remove linear trend of substances using free troposphere as reference.
+    (redefined from C_tools.detrend_subs)
+
+    Parameters:
+        c_obj (GlobalData/Caribic)
+        subs (str): substance to detrend e.g. 'sf6'
+        loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
+    """
+    if loc_obj is None: 
+        try: loc_obj = Mauna_Loa(c_obj.years, subs)
+        except: raise ValueError(f'Cannot detrend as ref. data could not be found for {subs.upper()}') 
+    out_dict = {}
+
+    if c_pfx: pfxs = [c_pfx]
+    else: pfxs = [pfx for pfx in c_obj.pfxs if subs in substance_list(pfx)]
+
+    if plot:
+        if not as_subplot:
+            fig, axs = plt.subplots(len(pfxs), dpi=250, figsize=(6,4*len(pfxs)))
+            if len(pfxs)==1: axs = [axs]
+        elif ax is None:
+            ax = plt.gca()
+
+    for c_pfx, i in zip(pfxs, range(len(pfxs))):
+        df = c_obj.data[c_pfx]
+        substance = get_col_name(subs, c_obj.source, c_pfx)
+        if substance is None: continue
+
+        c_obs = df[substance].values
+        t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
+
+        ref_df = loc_obj.df
+        ref_subs = get_col_name(subs, loc_obj.source)
+        if ref_subs is None: raise ValueError(f'No reference data found for {subs}')
+        # ignore reference data earlier and later than two years before/after msmts
+        ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
+                        : max(df.index)+dt.timedelta(356*2)]
+        ref_df.dropna(how='any', subset=ref_subs, inplace=True) # remove NaN rows
+        c_ref = ref_df[ref_subs].values
+        t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
+
+        popt = np.polyfit(t_ref, c_ref, degree)
+        c_fit = np.poly1d(popt) # get popt, then make into fct
+
+        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+        c_obs_detr = c_obs - detrend_correction
+        # get variance (?) by substracting offset from 0
+        c_obs_delta = c_obs_detr - c_fit(min(t_obs))
+
+        df_detr = pd.DataFrame({f'detr_{substance}' : c_obs_detr,
+                                 f'delta_{substance}' : c_obs_delta,
+                                 f'detrFit_{substance}' : c_fit(t_obs)}, 
+                                index = df.index)
+        # maintain relationship between detr and fit columns
+        df_detr[f'detrFit_{substance}'] = df_detr[f'detrFit_{substance}'].where(
+            ~df_detr[f'detr_{substance}'].isnull(), np.nan)
+
+        out_dict[f'detr_{c_pfx}_{subs}'] = df_detr
+        out_dict[f'popt_{c_pfx}_{subs}'] = popt
+
+        if save:
+            columns = [f'detr_{substance}', 
+                       f'delta_{substance}', 
+                       f'detrFit_{substance}']
+            
+            c_obj.data[c_pfx][columns] = df_detr[columns]
+            # move geometry column to the end again
+            c_obj.data[c_pfx]['geometry'] =  c_obj.data[c_pfx].pop('geometry')
+
+        if plot:
+            if not as_subplot: ax = axs[i]
+            # ax.annotate(f'{c_pfx} {note}', xy=(0.025, 0.925), xycoords='axes fraction',
+            #                       bbox=dict(boxstyle="round", fc="w"))
+            ax.scatter(df_detr.index, c_obs, color='orange', label='Flight data', marker='.')
+            ax.scatter(df_detr.index, c_obs_detr, color='green', label='trend removed', marker='.')
+            ax.scatter(ref_df.index, c_ref, color='gray', label='MLO data', alpha=0.4, marker='.')
+            ax.plot(df_detr.index, c_fit(t_obs), color='black', ls='dashed',
+                      label='trendline')
+            ax.set_ylabel(f'{substance}') # ; ax.set_xlabel('Time')
+            handles, labels = ax.get_legend_handles_labels()
+            leg = ax.legend(title=f'{c_pfx} {note}')
+            leg._legend_box.align = "left"
+
+    if plot and not as_subplot:
+        fig.tight_layout()
+        fig.autofmt_xdate()
+        plt.show()
+
+    return out_dict
 
 
 #%% Fctn calls - data
