@@ -53,7 +53,7 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
         source (str) 'Caribic', 'Mauna_Loa', 'Mace_Head', 'Mozart'
         substance (str): e.g. sf6, n2o, co2, ch4
     """
-    cname=None
+    # cname=None
 
     if source=='Mauna_Loa': # mauna loa
         col_names = {
@@ -123,11 +123,48 @@ def get_col_name(substance, source, c_pfx='', CLaMS=False):
             col_names = {subs:f'lag_{subs} [yr]' for subs
                          in col_names.keys()}
 
-    try: cname = col_names[substance.lower()]
+    try: return col_names[substance.lower()]
     except:
-        print(f'No {substance} data in {source} ({c_pfx})')
-        return None
-    return cname
+        raise KeyError(f'No {substance} data in {source} ({c_pfx})')
+        # print(f'No {substance} data in {source} ({c_pfx})')
+        # return None
+    # return cname
+
+
+
+# Met / Reanalysis data for Caribic-2: 
+#     'Flight number',
+#      'p [mbar]',
+#      'int_z_km [km]',
+#      'int_eqlat [deg]',
+#      'geometry'
+#      'int_ERA5_EQLAT [deg N]',
+#      'int_ERA5_PRESS [hPa]',
+#      'int_ERA5_PV [PVU]',
+#      'int_ERA5_TEMP [K]',
+
+# chemical TP:
+#      'int_CARIBIC2_H_rel_TP [km]',
+#      'int_h_rel_TP [km]',
+#      'int_PV [PVU]',
+#      'int_Theta [K]',
+#      'int_ToAirTmp [degC]',
+#      'int_Tpot [K]',
+
+# dynamical TP: 
+#      'int_dp_dtrop_hpa [hPa]',
+#      'int_pt_rel_dTP_K [K]',
+#      'int_z_rel_dTP_km [km]',
+#      'int_ERA5_D_1_5PVU_BOT [K]',
+#      'int_ERA5_D_2_0PVU_BOT [K]',
+#      'int_ERA5_D_3_5PVU_BOT [K]',
+     
+# thermal TP: 
+#      'int_dp_strop_hpa [hPa]',
+#      'int_pt_rel_sTP_K [K]',
+#      'int_z_rel_sTP_km [km]',
+#      'int_ERA5_PRESS [hPa]' cf. 'int_ERA5_TROP1_PRESS [hPa]'
+#      'int_ERA5_TEMP [K]' cf. 'int_ERA5_TROP1_THETA [K]'
 
 def get_v_coord(c_pfx, coord, tp_def, pvu=3.5):
     """ Coordinates relative to tropopause 
@@ -135,47 +172,58 @@ def get_v_coord(c_pfx, coord, tp_def, pvu=3.5):
     tp_def (str): 'chem', 'dyn', 'therm'
     pvu (float): 1.5, 2.0, 3.5
     """
-    if c_pfx=='INT':
-        if tp_def == 'chem': 
+    # chemical tropopause (O3)
+    if tp_def == 'chem': 
+        if c_pfx == 'INT' and coord =='z': 
             col_names = {
                 'z'       : 'int_h_rel_TP [km]'}                               # height above O3 tropopause according to Zahn et al. (2003), Atmospheric Environment, 37, 439-440
-        if tp_def == 'therm':
+        elif c_pfx == 'INT2' and coord == 'z':
+            col_names = {
+                'z'       : 'int_h_rel_TP [km]'}                               # height above O3 tropopause according to Zahn et al. (2003), Atmospheric Environment, 37, 439-440
+        else: raise KeyError(f'No {c_pfx} {coord}-coord available for chemical TP')
+
+    # thermal tropopause
+    elif tp_def == 'therm':
+        if c_pfx == 'INT' and coord in ['dp', 'pt']: 
             col_names = {
                 'dp'      : 'int_dp_strop_hpa [hPa]',                          # pressure difference relative to thermal tropopause from ECMWF
                 'pt'      : 'int_pt_rel_sTP_K [K]',                            # potential temperature difference relative to thermal tropopause from ECMWF
                 'z'       : 'int_z_rel_sTP_km [km]'}                           # geopotential height relative to thermal tropopause from ECMWF
-                
-        elif tp_def == 'dyn':
+        elif c_pfx == 'INT2' and coord in ['dp', 'pt', 'z']:
             col_names = {
-                'dp'        : 'int_dp_dtrop_hpa [hPa]',                        # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
-                'pt'        : 'int_pt_rel_dTP_K [K]',                        # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
-                'z'         : 'int_z_rel_dTP_km [km]'}                         # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
-        return col_names[coord]
+                'dp' : 'int_dp_strop_hpa_ERA5 [hPa]',                          # pressure difference relative to thermal tropopause from ERA5
+                'pt' : 'int_pt_rel_sTP_K_ERA5 [K]'}                            # potential temperature difference relative to thermal tropopause from ERA5
+        else: raise KeyError(f'No {c_pfx} {coord}-coord available for thermal TP')
 
-    elif c_pfx=='INT2' and tp_def == 'dyn' and coord=='pt':
-        col_names = {
-            'pt_dyn_1_5'    : 'int_ERA5_D_1_5PVU_BOT [K]',                     # THETA-Distance to local 1.5 PVU surface (ERA5)
-            'pt_dyn_2_0'    : 'int_ERA5_D_2_0PVU_BOT [K]',                     # -"- 2.0 PVU
-            'pt_dyn_3_5'    : 'int_ERA5_D_3_5PVU_BOT [K]'}                     # -"- 3.5 PVU
-        try: return col_names['pt_dyn_{}_{}'.format(str(pvu)[0], str(pvu)[2])]
-        except: 
-            print(f'No vertical coordinate found for {c_pfx} {coord} {tp_def} ({pvu})')
-            return None
+    # dynamical tropopause
+    elif tp_def == 'dyn': 
+        if c_pfx == 'INT': 
+            col_names = {
+                'dp'        : 'int_dp_dtrop_hpa [hPa]',                         # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
+                'pt'        : 'int_pt_rel_dTP_K [K]',                           # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
+                'z'         : 'int_z_rel_dTP_km [km]'}                          # geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF
+        elif c_pfx == 'INT2' and coord == 'pt' and pvu in [1.5, 2.0, 3.5]:
+            if pvu==1.5: col_names = {'pt' : 'int_ERA5_D_1_5PVU_BOT [K]'}       # THETA-Distance to local 1.5 PVU surface (ERA5)
+            elif pvu==2.0: col_names = {'pt' : 'int_ERA5_D_2_0PVU_BOT [K]'}     # -"- 2.0 PVU
+            elif pvu==3.5: col_names = {'pt' : 'int_ERA5_D_3_5PVU_BOT [K]'}     # -"- 3.5 PVU
+        else: raise KeyError(f'No {c_pfx} {coord}-coord with pvu{pvu} available for dynamical TP')
+
+    return col_names[coord]
+
+# =============================================================================
+
 
 def get_h_coord(c_pfx, coord):
     """ coord: eql, """
-    if c_pfx == 'INT':
+    if c_pfx == 'INT' and coord=='eql':
         col_names = {
-            'eql' : 'int_eqlat [deg]',                               # equivalent latitude in degrees north from ECMWF
-            }
-    elif c_pfx == 'INT2':
+            'eql' : 'int_eqlat [deg]'}                               # equivalent latitude in degrees north from ECMWF
+    elif c_pfx == 'INT2' and coord=='eql':
         col_names = {
-            'eql' : 'int_ERA5_EQLAT [deg N]',                        # Equivalent latitude (ERA5)
-            }
-    try: return col_names[coord]
-    except: 
-        print(f'No horizontal coordinate found for {c_pfx} {coord}')
-        return None
+            'eql' : 'int_ERA5_EQLAT [deg N]'}                        # Equivalent latitude (ERA5)
+    else: raise KeyError(f'No {coord}-coord available for {c_pfx}')
+
+    return col_names[coord]
 
 def get_val_coord(c_pfx, val):
     """ val(str): t, p, pv, pt """
@@ -351,7 +399,6 @@ def choose_column(df, var='subs'):
     choices = dict(zip(range(0, len(df.columns)), df.columns))
     for k, v in choices.items(): print(k, ':', v)
     print('99 : pass')
-    x = validated_input(f'Select a {var} column by choosing a number between \
-                        0 and {len(df.columns)}: \n', choices)
+    x = validated_input(f'Select a {var} column by choosing a number between \0 and {len(df.columns)}: \n', choices)
     if not x: return None
     return choices[int(x)]
