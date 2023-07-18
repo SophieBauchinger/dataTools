@@ -16,10 +16,8 @@ from shapely.geometry import Point
 import copy
 
 import toolpac.calc.binprocessor as bp
-from toolpac.conv.times import datetime_to_fractionalyear
 
-from dictionaries import coord_dict, get_col_name, get_v_coord, get_h_coord
-from detrend import detrend_substance
+from dictionaries import coord_dict, get_col_name, get_v_coord, get_h_coord, substance_list
 
 #%% Data extraction
 def monthly_mean(df, first_of_month=True):
@@ -158,30 +156,26 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 
     else: raise KeyError(f'STrat/Trop assignment undefined for {coordinate}')
 
-def coordinate_tools(tp_def, c_pfx, ycoord, pvu, xcoord=None):
-    """ Get appropriate coordinates and labels. Raises error if not possible """
-    # setting defaults if not c_pfx is specified (not cleanly but whatever)
-    if c_pfx is None and pvu is not None: c_pfx = 'INT2'
-    elif c_pfx is None: c_pfx = 'INT'
+def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
+    """ Get appropriate coordinates and labels. """
 
-    if tp_def == 'chem' and c_pfx=='INT': ycoord = 'z'
-    y_coord = get_v_coord(c_pfx, ycoord, tp_def, pvu)
-    if y_coord is None: 
-        raise KeyError(f'Could not get a coordinate for {ycoord} in {c_pfx} with {tp_def} TP.')
+    y_coord = get_v_coord(y_pfx, ycoord, tp_def, pvu)
 
-    if tp_def == 'dyn': pv = f', {pvu}'
-    else: pv=''
-    y_labels = {'z' : f'$\Delta$z ({tp_def+pv}) [km]',
-                'pt' : f'$\Delta\Theta$ ({tp_def+pv}) [K]',
-                'dp' : f'$\Delta$p ({tp_def+pv}) [hPa]'}
+    pv = '%s' % (f', {pvu}' if tp_def=='dyn' else '')
+    model = '%s' % (' - ECMWF' if (y_pfx=='INT' and tp_def in ['dyn', 'therm']) else '')
+    model += '%s' % (' - ERA5' if (y_pfx=='INT2' and tp_def in ['dyn', 'therm']) else '')
+    y_labels = {'z' : f'$\Delta$z ({tp_def+pv+model}) [km]',
+                'pt' : f'$\Delta\Theta$ ({tp_def+pv+model}) [K]',
+                'dp' : f'$\Delta$p ({tp_def+pv+model}) [hPa]'}
     y_label = y_labels[ycoord]
 
     # x coordinate = equivalent latitude
-    if xcoord: x_coord = get_h_coord(c_pfx, xcoord)
-    x_label = 'Eq. latitude (%s) ' % ('ECMWF' if c_pfx=='INT' else 'ERA5') + '[°N]'
+    if xcoord is not None: 
+        x_coord = get_h_coord(x_pfx, xcoord)
+        x_label = 'Eq. latitude (%s) ' % ('ECMWF' if x_pfx=='INT' else 'ERA5') + '[°N]'
+        return y_coord, y_label, x_coord, x_label
 
-    if xcoord: return y_coord, y_label, x_coord, x_label
-    else: return y_coord, y_label
+    return y_coord, y_label
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_combo(c_obj, save=True):
@@ -197,6 +191,10 @@ def coord_combo(c_obj, save=True):
     df.drop([col for col in df.columns if col not in coords],
             axis=1, inplace=True) # remove non-met / non-coord data
 
+    if 'INT2' in c_obj.pfxs: # create thermal TP relative coordinates
+        df['int_dp_strop_hpa_ERA5 [hPa]'] = df['int_ERA5_PRESS [hPa]'] - df['int_ERA5_TROP1_PRESS [hPa]']
+        df['int_pt_rel_sTP_K_ERA5 [K]'] = df['int_ERA5_TEMP [K]'] - df['int_ERA5_TROP1_THETA [K]']
+
     # reorder columns
     df = df[list(['Flight number', 'p [mbar]'] 
                       + [col for col in df.columns 
@@ -209,11 +207,18 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
     # create reference df if it doesn't exist
     if not 'met_data' in dir(c_obj): df = coord_combo(c_obj)
     else: df = c_obj.met_data.copy()
-    subs_cols = {pfx:get_col_name(subs, 'Caribic', pfx) for pfx in c_obj.pfxs
-                 if get_col_name(subs, 'Caribic', pfx) is not None}
+
+    subs_cols = {}
+    for pfx in c_obj.pfxs:
+        if subs in substance_list(pfx):
+            print(subs, pfx)
+            subs_cols.update({pfx : get_col_name(subs, 'Caribic', pfx)})
+    
+    # subs_cols = {pfx:get_col_name(subs, 'Caribic', pfx) for pfx in c_obj.pfxs
+    #              if get_col_name(subs, 'Caribic', pfx) is not None}
 
     if detr: 
-        try: detrend_substance(c_obj, subs) # add detrended data to all dataframes
+        try: c_obj.detrend(subs) # add detrended data to all dataframes
         except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
 
     for pfx, substance in subs_cols.items():
@@ -235,6 +240,7 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
 def bin_prep(glob_obj, subs, **kwargs):
     c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
     substance = get_col_name(subs, glob_obj.source, c_pfx)
+
     if kwargs.get('single_yr') is not None: 
         years = [int(kwargs.get('single_yr'))]
     else: years = glob_obj.years
@@ -242,7 +248,14 @@ def bin_prep(glob_obj, subs, **kwargs):
     # for Caribic, need to choose the df
     if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
     else: df = glob_obj.df
-    
+
+    if kwargs.get('detr') is True: 
+        if not 'detr_'+substance in df.columns:
+            glob_obj.detrend(subs)
+        substance = 'detr_' + substance
+
+    print(substance)
+
     return substance, years, df
 
 def bin_1d(glob_obj, subs, **kwargs):
@@ -257,16 +270,6 @@ def bin_1d(glob_obj, subs, **kwargs):
     Returns: 
         out_x_list, out_y_list: lists of Bin1D objects binned along x / y
     """
-    # c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
-    # substance = get_col_name(subs, glob_obj.source, c_pfx)
-    # if kwargs.get('single_yr') is not None: 
-    #     years = [int(kwargs.get('single_yr'))]
-    # else: years = glob_obj.years
-
-    # # for Caribic, need to choose the df
-    # if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
-    # else: df = glob_obj.df
-
     substance, years, df = bin_prep(glob_obj, subs, **kwargs)
 
     if kwargs.get('xbinlimits') is not None: # not equidistant binning 
@@ -292,7 +295,9 @@ def bin_1d(glob_obj, subs, **kwargs):
         out_y = bp.Simple_bin_1d(df_yr[substance], y, y_binclassinstance)
         out_y.__dict__.update(y_binclassinstance.__dict__)
 
-        out_x_list.append(out_x); out_y_list.append(out_y)
+        if not all(np.isnan(out_x.vmean)) or all(np.isnan(out_y.vmean)):
+            out_x_list.append(out_x); out_y_list.append(out_y)
+        else: print(f'everything is nan for {yr}')
 
     return out_x_list, out_y_list
 
