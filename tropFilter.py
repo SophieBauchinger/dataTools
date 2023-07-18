@@ -21,10 +21,8 @@ from toolpac.outliers import outliers
 from toolpac.outliers.outliers import fit_data
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-import data #!!! kinda cyclic, but need Mauna_Loa for pre_flag
 from tools import get_lin_fit, assign_t_s
 from dictionaries import get_fct_substance, get_col_name, substance_list
-from detrend import detrend_substance
 
 filter_types = {
     'chem' : ['n2o', 'o3'], # 'crit'
@@ -41,7 +39,7 @@ coordinates = {
 #%% Troposphere / Stratosphere sorting - function definitions
 
 # Sort trop / strat using mixing ratios relative to trop. background value
-def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG', 
+def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, c_pfx = 'GHG', 
              save=True, verbose=False, subs_col=None):
     """ Sort data into strato / tropo based on difference to ground obs.
 
@@ -65,10 +63,6 @@ def pre_flag(glob_obj, ref_obj=None, crit='n2o', limit = 0.97, c_pfx = 'GHG',
     if subs_col is not None: substance = subs_col
     else: substance = get_col_name(crit, glob_obj.source, c_pfx)
     if not substance: raise ValueError(state+'No {crit} data in {c_pfx}')
-
-    if not ref_obj: 
-        if verbose: print(state+f'No reference data supplied. Using Mauna Loa {crit} data')
-        ref_obj = data.Mauna_Loa(glob_obj.years, crit)
 
     fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
 
@@ -114,7 +108,7 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
         INT2: 'o3', 'n2o'
     """
     if crit not in substance_list(c_pfx):
-        default_crit = {'GHG' : 'n2o', 'INT' : 'n2o', 'INT2' : 'o3'}
+        default_crit = {'GHG' : 'n2o', 'INT' : 'o3', 'INT2' : 'n2o'}
         print(f'{crit} not available in {c_pfx}, using {default_crit[c_pfx]}')
         crit = default_crit[c_pfx]
 
@@ -142,16 +136,19 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
 
         if plot: 
             if not detr: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs)
-            else: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs, 
-                              subs_col = 'detr_'+get_col_name(subs, glob_obj.source, c_pfx))
+            else: 
+                if subs is not None and subs in substance_list(c_pfx): 
+                    subs_col = 'detr_'+get_col_name(subs, glob_obj.source, c_pfx)
+                else: subs_col = subs = None
+                plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs, 
+                              subs_col=subs_col)
 
     if crit == 'n2o' and c_pfx in ['GHG', 'INT2']:
         substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
         if detr: 
-            try: substance = 'detr_'+substance
-            except: 
-                detrend_substance(glob_obj, subs, save=True)
-                substance = 'detr_'+substance
+            if not 'detr_'+substance in data.columns: 
+                glob_obj.detrend(subs, save=True)
+            substance = 'detr_'+substance
         df_sorted[substance] = data[substance]
         if f'd_{substance}' in data.columns: 
             df_sorted[f'd_{substance}'] = data[f'd_{substance}']
@@ -317,7 +314,9 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
 
     if crit in ['o3', 'n2o'] and not subs: subs = crit
 
-    if subs_col is None: substance = get_col_name(subs, glob_obj.source, c_pfx)
+    if subs_col is None and subs is not None: 
+        try: substance = get_col_name(subs, glob_obj.source, c_pfx)
+        except: substance = None
     else: substance = subs_col
     if substance is None: 
         print(f'Cannot plot {subs.upper()}, not available in {c_pfx}.'); return
@@ -339,6 +338,5 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
                 c='k', lw=1, label='filtered')
 
     plt.ylabel(substance)
-    plt.xlabel('Time delta')
     plt.legend()
     plt.show()
