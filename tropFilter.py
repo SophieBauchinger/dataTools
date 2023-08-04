@@ -135,13 +135,7 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
         df_sorted.sort_index(inplace=True)
 
         if plot: 
-            if not detr: plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs)
-            else: 
-                if subs is not None and subs in substance_list(c_pfx): 
-                    subs_col = 'detr_'+get_col_name(subs, glob_obj.source, c_pfx)
-                else: subs_col = subs = None
-                plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs, 
-                              subs_col=subs_col)
+            plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs, detr=detr, **kwargs)
 
     if crit == 'n2o' and c_pfx in ['GHG', 'INT2']:
         substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
@@ -183,8 +177,7 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
 
         if plot: 
             popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
-            if not detr: plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs)
-            else: plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs, subs_col = substance)
+            plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs, detr=detr, **kwargs)
 
     return df_sorted
 
@@ -240,7 +233,7 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
                     (strato, tropo)] = (True, False)
 
     if verbose: print(df_sorted[strato].value_counts())
-    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs)
+    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs, **kwargs)
 
     df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
     df_sorted.sort_index(inplace=True)
@@ -290,7 +283,7 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
                 (strato, tropo)] = (True, False)
     
     if verbose: print(df_sorted[strato].value_counts())
-    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs)
+    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs, **kwargs)
 
     df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
     df_sorted.sort_index(inplace=True)
@@ -298,10 +291,14 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
 
 # Plotting sorted data
 def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None, 
-                subs=None, subs_col=None):
+                subs=None, subs_col=None, detr=True, **kwargs):
     """ Plot strat / trop sorted data """ 
     # only take data with index that is available in df_sorted 
-    data = glob_obj.data[c_pfx][glob_obj.data[c_pfx].index.isin(df_sorted.index)]
+    if subs in glob_obj.data.keys(): df = glob_obj.data[subs]
+    else: df = glob_obj.data[c_pfx]
+    data = df[df.index.isin(df_sorted.index)]
+
+    # data = glob_obj.data[c_pfx][glob_obj.data[c_pfx].index.isin(df_sorted.index)]
     data.sort_index(inplace=True)
 
     # separate trop/strat data for any criterion
@@ -314,16 +311,22 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
 
     if crit in ['o3', 'n2o'] and not subs: subs = crit
 
-    if subs_col is None and subs is not None: 
-        try: substance = get_col_name(subs, glob_obj.source, c_pfx)
-        except: substance = None
-    else: substance = subs_col
+    if 'subs_pfx' in kwargs.keys(): 
+        subs_pfx = kwargs['subs_pfx']
+        substance = get_col_name(subs, glob_obj.source, kwargs['subs_pfx'])
+    else:
+        if subs_col is None and subs is not None: 
+            for subs_pfx in (c_pfx, 'GHG', 'INT', 'INT2'):
+                try: substance = get_col_name(subs, glob_obj.source, subs_pfx); break
+                except: substance = None; continue
+        else: substance = subs_col; subs_pfx = c_pfx
     if substance is None: 
         print(f'Cannot plot {subs.upper()}, not available in {c_pfx}.'); return
-    
+    if 'detr_'+substance in data.columns: substance = 'detr_'+substance
+
     fig, ax = plt.subplots(dpi=200)
-    plt.title('{} ({}) filtered using {}-{}'.format(
-        subs.upper(), c_pfx, *tropo_col.split('_')[1:]))
+    plt.title('{} ({}) filtered using {} ({})'.format(
+        subs.upper(), subs_pfx, [i for i in tropo_col.split('_')[1:]], c_pfx))
     ax.scatter(df_strato.index, df_strato[substance],
                 c='grey',  marker='.', zorder=0, label='strato')
     ax.scatter(df_tropo.index, df_tropo[substance],
@@ -332,10 +335,14 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
     if popt0 is not None and popt1 is not None and (subs==crit or subs is None):
         # only plot baseline for chemical tropopause def and where crit is being plotted
         t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
+        ls = 'solid'
+        if not subs_pfx == c_pfx: ls = 'dashed'
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0), 
-                c='r', lw=1, label='initial')
+                c='r', lw=1, ls=ls, label='initial')
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt1),
-                c='k', lw=1, label='filtered')
+                c='k', lw=1, ls=ls, label='filtered')
+
+    # plt.ylim(220, 340)
 
     plt.ylabel(substance)
     plt.legend()
