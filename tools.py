@@ -88,6 +88,22 @@ def rename_columns(columns):
 
     return new_names, dictionary, dictionary_reversed
 
+def EMAC_vars_filter(x):
+    """ 
+        dt - delta_time [s]
+        nstep - current time step
+        tlon - track longitude [degrees_east]
+        tlat - track latitude [degrees_north]
+        tpress - track pressure [hPa]
+        tps - track surface pressure [Pa]
+    """
+    vars_to_keep = ['dt', 'nstep', 'tlon', 'tlat', 'tpress', 'tps', 'time', 
+                    'YYYYMMDD', 'lev', 'hyam', 'hybm', 'ilev', 'hyai', 'hybi']
+    vars_to_drop = [v for v in x.variables if not (v.startswith('tropop_') or
+                                                   # v.startswith('ECHAM5_') or
+                                                   v in vars_to_keep)]
+    return x.drop_vars(vars_to_drop)
+
 #%% Data selection
 def data_selection(c_obj, flights=None, years=None, latitudes=None, 
                    tropo=False, strato=False, extr_events=False, **kwargs):
@@ -193,7 +209,7 @@ def coord_combo(c_obj, save=True):
 
     if 'INT2' in c_obj.pfxs: # create thermal TP relative coordinates
         df['int_dp_strop_hpa_ERA5 [hPa]'] = df['int_ERA5_PRESS [hPa]'] - df['int_ERA5_TROP1_PRESS [hPa]']
-        df['int_pt_rel_sTP_K_ERA5 [K]'] = df['int_ERA5_TEMP [K]'] - df['int_ERA5_TROP1_THETA [K]']
+        df['int_pt_rel_sTP_K_ERA5 [K]'] = df['int_Theta [K]'] - df['int_ERA5_TROP1_THETA [K]']
 
     # reorder columns
     df = df[list(['Flight number', 'p [mbar]'] 
