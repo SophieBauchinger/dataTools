@@ -13,50 +13,13 @@ Substances in Caribic data:
 Met / Reanalysis data for Caribic-2: 
     'Flight number',
      'p [mbar]',
+     'geometry'
      'int_z_km [km]',
      'int_eqlat [deg]',
-     'geometry'
      'int_ERA5_EQLAT [deg N]',
      'int_ERA5_PRESS [hPa]',
      'int_ERA5_PV [PVU]',
      'int_ERA5_TEMP [K]',
-
-chemical TP:
-     'int_CARIBIC2_H_rel_TP [km]',
-     'int_h_rel_TP [km]',
-     # 'int_PV [PVU]',
-     # 'int_Theta [K]',
-     # 'int_ToAirTmp [degC]',
-     # 'int_Tpot [K]',
-
-thermal TP: 
-     'int_dp_strop_hpa [hPa]',
-     'int_pt_rel_sTP_K [K]',
-     'int_z_rel_sTP_km [km]',
-     'int_ERA5_PRESS [hPa]' cf. 'int_ERA5_TROP1_PRESS [hPa]'
-     'int_ERA5_TEMP [K]' cf. 'int_ERA5_TROP1_THETA [K]'
-
-dynamical TP: 
-     'int_dp_dtrop_hpa [hPa]',
-     'int_pt_rel_dTP_K [K]',
-     'int_z_rel_dTP_km [km]',
-     'int_ERA5_D_1_5PVU_BOT [K]',
-     'int_ERA5_D_2_0PVU_BOT [K]',
-     'int_ERA5_D_3_5PVU_BOT [K]',
-
-Implementation of tropopause filtering in CARIBIC-2 data:
-    chemical:
-        GHG: 'n2o'
-        INT: 'o3'
-        INT2: 'o3', 'n2o'
-    
-    thermal: 
-        INT: 'dp', 'pt'
-        INT2: 'dp', 'pt', 'z'
-    
-    dynamical:
-        INT: 'dp', 'pt', 'z' / 3.5
-        INT2: 'pt' / 1.5, 2.0, 3.5
 
 """
 import dill
@@ -67,15 +30,13 @@ import matplotlib.pyplot as plt
 from data import Caribic, Mozart
 from groundbased import Mauna_Loa, Mace_Head
 from lags import calc_time_lags
-from dictionaries import substance_list
-
+from dictionaries import substance_list, get_tp_params
 
 # from data import detrend_substance
 import plot.data
 from plot.gradients import plot_gradient_by_season
 # from plot.eqlat import plot_eqlat_deltheta
-from baseline import baseline_filter
-# from tropFilter import chemical, thermal, dynamical
+# from baseline import baseline_filter
 # from tools import data_selection
 
 #%% Get Data
@@ -116,6 +77,10 @@ caribic = load_caribic()
 #                               tropo=False, strato=False, extr_events=False, **kwargs)
 
 
+#%% Tropopause definitions
+tp_param_dicts = get_tp_params() # ^ for tropopause / stratosphere sorting
+for tp_params in tp_param_dicts:
+    caribic.filter_extreme_events(**tp_params, plot=True)
 
 #%% Plot data
 for pfx in caribic.pfxs: # scatter plots of all caribic data
@@ -134,19 +99,19 @@ for pfx in caribic.pfxs: # lon/lat plots of all caribic data
     substs = [x for x in substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     for subs in substs:
-        plot.data.binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
+        plot.data.plot_binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
 
 for pfx in caribic.pfxs: # maps of all caribic data
     substs = [x for x in substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     for subs in substs:
-        plot.data.binned_2d(caribic, subs=subs, c_pfx=pfx)
+        plot.data.plot_binned_2d(caribic, subs=subs, c_pfx=pfx)
 
-plot.data.binned_1d(mzt, 'sf6', single_graph=True)
+plot.data.plot_binned_1d(mzt, 'sf6', single_graph=True)
 # creates year ranges of 6 items for mozart data
 yr_ranges = [mzt.years[i:i + 9] for i in range(0, len(mzt.years), 9)]
 for yr_range in yr_ranges:
-    plot.data.binned_2d(mzt, 'sf6', years=yr_range)
+    plot.data.plot_binned_2d(mzt, 'sf6', years=yr_range)
 
 plot.data.lonlat_1d(mzt, 'sf6', single_yr = 2005)
 
@@ -196,7 +161,7 @@ for pfx in ['GHG', 'INT', 'INT2']:
     for subs in substance_list(pfx):
         f, axs = plt.subplots(1, 3, figsize=(10, 4), dpi=200)
         for tp_def, ax in zip(['chem', 'therm', 'dyn'], axs.flatten()):
-            baseline_filter(caribic, subs=subs, c_pfx=pfx, tp_def=tp_def, ax=ax)
+            pass # baseline_filter(caribic, subs=subs, c_pfx=pfx, tp_def=tp_def, ax=ax)
         f.autofmt_xdate()
         plt.tight_layout()
         plt.show()
