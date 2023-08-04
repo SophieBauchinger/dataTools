@@ -133,8 +133,8 @@ if __name__ == '__main__':
            'ycoord' : 'pt', 
            'pvu' : 3.5}
     
-    for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+    for subs in ['sf6']: #:, 'n2o', 'co2', 'ch4']:
         for yp in [yp1, yp2, yp3, yp4]:
             x_params = {'x_pfx' : 'GHG'}
             y_params = yp
-            plot_gradient_by_season(caribic, subs, x_params, y_params)
+            plot_gradient_by_season(caribic.sel_latitude(30, 90), subs, x_params, y_params, note='lat>30°N')

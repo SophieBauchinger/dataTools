@@ -25,7 +25,9 @@ def get_right_data(c_obj, subs='n2o', c_pfx='INT2', detr=True):
         if c_pfx not in c_obj.data.keys(): return
         substance = get_col_name(subs, c_obj.source, c_pfx)
     
-    if c_obj.source == 'Caribic': data = c_obj.data[c_pfx]
+    if c_obj.source == 'Caribic': 
+        try: data = c_obj.data[subs]
+        except: data = c_obj.data[c_pfx]
     else: data = c_obj.df
     data['season'] = make_season(data.index.month) # 1 = spring etc
 
@@ -89,24 +91,27 @@ def make_2d_plot(bin2d_inst, x_coord, y_coord, ax, season, note,
 
     return img
 
-def make_diff_plot(
-        bin2d_inst1, bin2d_inst2, x_coord, y_coord, ax, season, note,
-            x_lims, y_lims, vlims, x_label, y_label):
-    """ Plot difference between plots """
-
-    #!!! want to make sure that the simplebin1d is the same for both
-
+def make_2d_MAD(bin2d_inst, x_coord, y_coord, ax, season, note,
+            x_lims, y_lims, vlims, x_label, y_label, percent=False):
+    """ mean absolute deviation - 
+        sum(abs(x - mu)) / N 
+        
+        x - data point value
+        mu - mean (total)
+        N - sample size
+        """
     ax.set_title(dict_season()[f'name_{season}'])
-
-    vmean = bin2d_inst1.vmean - bin2d_inst2.vmean
-    
 
     if percent: 
         vmean_tot = np.nanmean(bin2d_inst.vmean)
         msg = f'% of {vmean_tot:.4}'
     else: vmean_tot = 1.0; msg=None
-    norm = Normalize(vlims[0]/vmean_tot, vlims[1]/vmean_tot)
-    bin2d_inst.vmean = bin2d_inst.vmean / vmean_tot
+    # norm = Normalize(vlims[0]/vmean_tot, vlims[1]/vmean_tot)
+
+    # bin2d_inst.vmean = bin2d_inst.vmean / vmean_tot
+
+    # values = # per bin??
+    norm = Normalize(vlims[0], vlims[1]) # ? 
 
     img = ax.imshow(bin2d_inst.vmean.T, cmap = plt.cm.viridis, norm=norm,
                     aspect='auto', origin='lower',
@@ -125,7 +130,7 @@ def make_diff_plot(
     return img
 
 def plot_2d_binned(c_obj, subs='n2o', v_pfx='GHG', y_params={}, x_params={}, 
-                   detr=True, vlims=None, note=None, percent=False):
+                   detr=True, vlims=None, note=None, percent=False, ylim_plt=None):
     """ Plot binned mxr on EqL vs. pot.T or 
     
     Creates plots of equivalent latitude versus potential temperature or height
@@ -149,14 +154,17 @@ def plot_2d_binned(c_obj, subs='n2o', v_pfx='GHG', y_params={}, x_params={},
         raise KeyError('Please supply all necessary parameters: x_pfx, xcoord / ycoord, tp_def, y_pfx, (pvu)')
     
     if not subs in c_obj.data.keys(): c_obj.create_substance_df(subs)
-    data = c_obj.data[subs]
-    df, substance, v_pfx = get_right_data(c_obj, subs, v_pfx, detr)
+    data, substance, v_pfx = get_right_data(c_obj, subs, v_pfx, detr)
     y_coord, y_label, x_coord, x_label = coordinate_tools(**y_params, **x_params)
+    yextr = np.nanmax(abs(data[y_coord])) # most extreme value of y-coordinate
+    if ylim_plt is not None: yextr=ylim_plt
 
-    y_bins = {'z' : 0.25, 'pt' : 10, 'p' : 40}
-    if not 'y_bin' in y_params.keys(): y_bin = y_bins[y_params['ycoord']]
+    
+    if not 'y_bin' in y_params.keys(): y_bin = yextr / 10
+        # y_bins = {'z' : 0.5, 'pt' : 10, 'p' : 40}
+        # y_bin = y_bins[y_params['ycoord']]
     else: y_bin = y_params['y_bin']
-    y_lims = np.nanmin(data[y_coord])-y_bin, np.nanmax(data[y_coord])+y_bin
+    # y_lims = np.nanmin(data[y_coord])-y_bin, np.nanmax(data[y_coord])+y_bin
 
     if not 'x_bin' in x_params.keys(): x_bin = 10
     else: x_bin = x_params['x_bin']
@@ -170,7 +178,7 @@ def plot_2d_binned(c_obj, subs='n2o', v_pfx='GHG', y_params={}, x_params={},
     for s, ax in zip(set(data['season'].tolist()), axs.flat): # flatten axs array
         out = out_dict[s] # take binned data for current season
         img = make_2d_plot(out, x_coord, y_coord, ax, s, note, 
-                           x_lims, y_lims, (vmin, vmax), x_label, y_label, percent=percent)
+                           x_lims, (-yextr, yextr), (vmin, vmax), x_label, y_label, percent=percent)
         
         # plot_variability(out, x_coord, y_coord, ax, s, note, 
         #               x_lims, y_lims, (vmin, vmax), x_label, y_label)
@@ -183,12 +191,57 @@ def plot_2d_binned(c_obj, subs='n2o', v_pfx='GHG', y_params={}, x_params={},
     cbar.ax.set_xlabel(xlabel)
     plt.show()
 
-    return
+    return out_dict
+
+def make_diff_plot(bin2d_inst1, bin2d_inst2, 
+                   x_coord, y_coord, ax, season, note, 
+                   x_lims, y_lims, vlims, x_label, y_label, percent,
+                   mismatch_indic=False):
+    """ Plot difference between plots """
+
+    ax.set_title(dict_season()[f'name_{season}'])
+
+    # NB simple substraction filters out everything where either is nan
+    vmean = bin2d_inst1.vmean - bin2d_inst2.vmean
+    cmap = plt.cm.PiYG
+    if vlims is not None: norm = Normalize(*vlims)
+    elif percent: #!!! implement percent change...
+        
+    # Maximaldifferenz 
+    
+        norm = Normalize(np.nanmin(vmean), np.nanmax(vmean))
+    else: norm = Normalize(np.nanmin(vmean), np.nanmax(vmean))
+    extent = [bin2d_inst1.binclassinstance.xbmin, 
+              bin2d_inst1.binclassinstance.xbmax, 
+              bin2d_inst1.binclassinstance.ybmin, 
+              bin2d_inst1.binclassinstance.ybmax]
+
+    # indicating on the plot where a single one of them is nan
+    if mismatch_indic:
+        single_nan_bool = np.isnan(bin2d_inst1.vmean) ^ np.isnan(bin2d_inst2.vmean) # bool multidim arr, True where only one is nan
+        single_nan = np.where(np.where(~single_nan_bool, 0, 1), 1, np.nan) # 1 where True, nan where False
+        vmean = np.where(~single_nan_bool, vmean, -9999)
+        cmap.set_under(color='blue', alpha=0.08)
+        ax.contourf(single_nan.T, True, norm=norm, origin='lower', hatches=['....'],
+                    alpha=0, extent=extent, extend='max')
+        # ax.contour(single_nan_bool.T, True, levels=2, origin='lower',
+        #             alpha=0.5, extent=extent, antialiased=True)
+
+    img = ax.imshow(vmean.T, cmap = cmap, norm=norm,
+                    aspect='auto', origin='lower', extent=extent)
+
+    ax.set_xlabel(x_label); ax.set_xlim(*x_lims)
+    ax.set_ylabel(y_label); ax.set_ylim(*y_lims)
+
+    if note: ax.legend([], [], title=note, loc='upper left')
+
+    return img
 
 def plot_2d_diff(c_obj, subs='n2o', v_pfx='GHG', 
                  y1_params={}, x1_params={},
                  y2_params={}, x2_params={},
-                 detr=True, vlims=None, note=None, percent=False):
+                 detr=True, vlims=None, note=None, percent=False, 
+                 mismatch_indic = True, ylim_plt = None):
     """ Plot binned mxr on EqL vs. pot.T or 
     
     Creates plots of equivalent latitude versus potential temperature or height
@@ -214,93 +267,72 @@ def plot_2d_diff(c_obj, subs='n2o', v_pfx='GHG',
         raise KeyError('Please supply all necessary parameters: x_pfx, xcoord / ycoord, tp_def, y_pfx, (pvu)')
     
     if not subs in c_obj.data.keys(): c_obj.create_substance_df(subs)
-    data = c_obj.data[subs]
-    df, substance, v_pfx = get_right_data(c_obj, subs, v_pfx, detr)
+    data, substance, v_pfx = get_right_data(c_obj, subs, v_pfx, detr)
     y1_coord, y1_label, x1_coord, x1_label = coordinate_tools(**y1_params, **x1_params)
     y2_coord, y2_label, x2_coord, x2_label = coordinate_tools(**y2_params, **x2_params)
 
     y_bins = {'z' : 0.25, 'pt' : 10, 'p' : 40}
     if not 'y_bin' in y1_params.keys(): y_bin = y_bins[y1_params['ycoord']]
     else: y_bin = y1_params['y_bin']
-    y_lims = np.nanmin(data[y1_coord])-y_bin, np.nanmax(data[y1_coord])+y_bin
+    
+    ylim = np.nanmax([abs(data[y1_coord]), abs(data[y2_coord])]) # maximum extent of x-coordinate
+    # y_lims = np.nanmin(data[y1_coord])-y_bin, np.nanmax(data[y1_coord])+y_bin
 
     if not 'x_bin' in x1_params.keys(): x_bin = 10
     else: x_bin = x1_params['x_bin']
     x_lims = (-90, 90)
 
-
-    #!!! THERM ERA5 PT is not correct
-
-    # calculate binned output per season
-    # for s in set(data['season'].tolist()):
-    #     df = data[data['season'] == s]
-    #     x = np.array(df[x_coord])
-    #     y = np.array(df[y_coord])
-    #     xbmin, xbmax, xbsize = np.nanmin(x), np.nanmax(x), x_bin
-    #     ybmin, ybmax, ybsize = np.nanmin(y), np.nanmax(y), y_bin
-
-    #     bin_equi2d = bp.Bin_equi2d(xbmin, xbmax, xbsize, ybmin, ybmax, ybsize)
-    #     out = bp.Simple_bin_2d(np.array(df[substance]), x, y, bin_equi2d)
-    #     out_dict[s] = out
-    #     vmin_list.append(np.nanmin(out.vmean))
-    #     vmax_list.append(np.nanmax(out.vmean))
-
-    # if not vlims: vmin, vmax = (np.nanmin(vmin_list), np.nanmax(vmax_list))
-    # else: vmin, vmax = vlims[0], vlims[1]
-
-    # return out_dict, vmin, vmax
-
+    vmin_list = vmax_list = []
     out_dict = {}
     for s in set(data['season'].tolist()):
         df = data[data['season'] == s]
 
         # !!! this doesn't work - need to have bin and data in the same shape...
         
-        bin_equi2d = bp.Bin_equi2d(*x_lims, x_bin, *y_lims, y_bin)
+        bin_equi2d = bp.Bin_equi2d(*x_lims, x_bin, -ylim, ylim, y_bin)
         
         x1 = np.array(df[x1_coord])
         y1 = np.array(df[y1_coord])
-        out1 = bp.Simple_bin_2d(np.array(data[substance]), x1, y1, bin_equi2d)
+        out1 = bp.Simple_bin_2d(np.array(df[substance]), x1, y1, bin_equi2d)
         
         x2 = np.array(df[x2_coord])
         y2 = np.array(df[y2_coord])
-        out2 = bp.Simple_bin_2d(np.array(data[substance]), x2, y2, bin_equi2d)
+        out2 = bp.Simple_bin_2d(np.array(df[substance]), x2, y2, bin_equi2d)
         
         out_dict[s] = (out1, out2)
+        vmin_list.append([np.nanmin(out1.vmean), np.nanmin(out2.vmean)])
+        vmax_list.append([np.nanmax(out1.vmean), np.nanmax(out2.vmean)])
+
+    if not vlims: vmin, vmax = (np.nanmin(vmin_list), np.nanmax(vmax_list))
+    else: vmin, vmax = vlims[0], vlims[1]
+
+    # Create plots for all seasons separately
     
-    return out_dict
-    # if not vlims: vmin, vmax = (np.nanmin(vmin_list), np.nanmax(vmax_list))
+    if ylim_plt is not None: ylims = (-ylim_plt, ylim_plt)
+    else: ylims = (-ylim, ylim)
+    
+    f, axs = plt.subplots(2, 2, dpi=250, figsize=(9,7))
+    for s, ax in zip(set(data['season'].tolist()), axs.flat): # flatten axs array
+        out1 = out_dict[s][0] # take binned data for current season
+        out2 = out_dict[s][1]
 
-
-    # out1_dict, vmin1, vmax1 = seasonal_binning(data, substance, 
-    #                                         y_bin, y1_coord, x1_coord, x_bin, vlims)
-
-    # out2_dict, vmin2, vmax2 = seasonal_binning(data, substance, 
-    #                                         y_bin, y2_coord, x2_coord, x_bin, vlims)
-
-    # vmin = min(vmin1, vmin2); vmax = max(vmax1, vmax2)
-
-    # # Create plots for all seasons separately
-    # f, axs = plt.subplots(2, 2, dpi=250, figsize=(9,7))
-    # for s, ax in zip(set(data['season'].tolist()), axs.flat): # flatten axs array
-    #     out1 = out1_dict[s] # take binned data for current season
-    #     out2 = out2_dict[s]
-    #     img = make_diff_plot(out1, out2, x_coord, y_coord, ax, s, note, 
-    #                        x_lims, y_lims, (vmin, vmax), x_label, y_label, percent=percent)
+        img = make_diff_plot(out1, out2, x1_coord, y1_coord, ax, s, note, 
+                            x_lims, ylims, (vmin, vmax), 
+                            x1_label, y1_label, percent=percent, 
+                            mismatch_indic = mismatch_indic)
         
-    #     # plot_variability(out, x_coord, y_coord, ax, s, note, 
-    #     #               x_lims, y_lims, (vmin, vmax), x_label, y_label)
+        # plot_variability(out, x_coord, y_coord, ax, s, note, 
+        #               x_lims, y_lims, (vmin, vmax), x_label, y_label)
         
-    # f.subplots_adjust(right=0.9)
-    # plt.tight_layout(pad=2.5)
-    # cbar = f.colorbar(img, ax = axs.ravel().tolist(), aspect=30, pad=0.09)
-    # xlabel = subs.upper() + ' ' + substance[substance.find('['):substance.find(']')+1]
-    # if detr: xlabel = '$\Delta$ '+ xlabel + '\n wrt. 2005'
-    # cbar.ax.set_xlabel(xlabel)
-    # plt.show()
+    f.subplots_adjust(right=0.9)
+    plt.tight_layout(pad=2.5)
+    cbar = f.colorbar(img, ax = axs.ravel().tolist(), aspect=30, pad=0.09)
+    xlabel = subs.upper() + ' ' + substance[substance.find('['):substance.find(']')+1]
+    if detr: xlabel = '$\Delta$ '+ xlabel + '\n therm - chem'
+    cbar.ax.set_xlabel(xlabel)
+    plt.show()
 
     return
-
 
 #%% Fctn calls - eqlat
 if False: caribic = True # BS to avoid error
@@ -323,7 +355,7 @@ yp_d1 = {'tp_def' : 'dyn',
        'ycoord' : 'pt', 
        'pvu' : 3.5}
 yp_d2 = {'tp_def' : 'dyn', 
-       'y_pfx' : 'INT', 
+       'y_pfx' : 'INT2', 
        'ycoord' : 'pt', 
        'pvu' : 3.5}
 
@@ -338,6 +370,13 @@ if __name__ == '__main__':
     for subs in ['sf6', 'n2o', 'co2', 'ch4']:
         for yp in [yp_c1, yp_t1, yp_t2, yp_d1, yp_d2]:
             plot_2d_binned(caribic, subs, y_params=yp, x_params=xp1)
-
+            # pass
         for y1, y2 in [(yp_d1, yp_d2)]:
-            pass
+            plot_2d_diff(caribic, subs, 'GHG', y1, xp1, y2, xp2)
+
+    for subs, vlims in zip(['sf6', 'n2o', 'co2', 'ch4'],
+                           [(-0.1, 0.1), (-1, 1), (-1, 1), (-10, 10)]):
+        ylim = 150
+        plot_2d_binned(caribic, subs, 'GHG', yp_t1, xp2, ylim_plt=ylim)
+        plot_2d_binned(caribic, subs, 'GHG', yp_d2, xp2, ylim_plt=ylim)
+        plot_2d_diff(caribic, subs, 'GHG', yp_t1, xp2, yp_d2, xp2, vlims=vlims, ylim_plt=ylim, percent=True)
