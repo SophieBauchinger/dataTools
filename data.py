@@ -264,7 +264,6 @@ class CaribicData(GlobalData):
         self.flights = list(set(pd.concat(
             [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
 
-        self.data
 
 class Caribic(CaribicData):
     def __init__(self, years, grid_size=5, flight_nr = None, pfxs=['GHG'], 
@@ -546,8 +545,6 @@ class EMAC(GlobalData):
         super().__init__(years)
         self.years = years
         self.source = 'EMAC'
-
-
         self.get_data(years, interp, pdir, subsam)
 
     def get_data(self, years, interp, pdir, subsam):
