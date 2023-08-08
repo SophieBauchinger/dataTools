@@ -170,8 +170,8 @@ class CaribicData(GlobalData):
         flights (list of int)
     """
 
-    def __init__(self, years, grid_size=5, flight_nr = None,
-               pfxs=['GHG'], verbose=False):
+    def __init__(self, years=range(2000, 2021), grid_size=5, flight_nr = None,
+               pfxs=['GHG', 'INT', 'INT2'], verbose=False):
         # no caribic data before 2005, takes too long to check so cheesing it
         super().__init__([yr for yr in years if yr > 2004], grid_size)
         self.source = 'Caribic'
@@ -266,8 +266,8 @@ class CaribicData(GlobalData):
 
 
 class Caribic(CaribicData):
-    def __init__(self, years, grid_size=5, flight_nr = None, pfxs=['GHG'], 
-                 verbose=False):
+    def __init__(self, years=range(2000, 2021), grid_size=5, flight_nr = None, 
+                 pfxs=['GHG', 'INT', 'INT2'], verbose=False):
         super().__init__(years, grid_size, flight_nr, pfxs, verbose)
 
         for subs in ['sf6', 'n2o', 'co2', 'ch4']: 
@@ -541,40 +541,55 @@ class Mozart(GlobalData):
 
 class EMAC(GlobalData):
     def __init__(self, years=[y for y in range(2000, 2020)], 
-                 interp='n', pdir=None, subsam=False):
+                 interp='b', pdir=None, subsam=False):
         super().__init__(years)
         self.years = years
         self.source = 'EMAC'
-        self.get_data(years, interp, pdir, subsam)
+        self.pdir = pdir
+        self.get_data(years, interp, subsam)
 
-    def get_data(self, years, interp, pdir, subsam):
+    def get_data(self, years, interp, subsam):
         """ Extract s4d EMAC Data from netCDF files for Caribic """
+        # choose data
         if subsam: 
-            if pdir is None: pdir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
-            fnames = pdir +  f'*{interp}CARIB2_s.nc'
+            if self.pdir is None: self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
+            if interp == 'n': print('No nearest neighbour interpolation, proceeding with bilinear.')
+            fnames = self.pdir +  '*bCARIB2_s.nc'
         else: 
-            if pdir is None: pdir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
-            fnames = pdir + f'*{interp}CARIB2.nc'
+            if self.pdir is None: self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
+            fnames = self.pdir + f'*{interp}CARIB2.nc'
 
-        with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter)) as dataset:
-            ds = dataset
+        # extract data, each file goes through preprocess first to filter variables
+        with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter)) as ds:
+            ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
+        
+        self.ds_total = ds
+        
+        # get variables that depend only on time
+        vars_time = [v for v in ds.variables if ds[v].dims == ('time', ) and v != 'time'] # drop for ML ds
+        vars_ML = [v for v in ds.variables if ds[v].dims != ('time', )] # drop for time ds
 
-        ds.rename({'tlon':'longitude', 'tlat':'latitude'})
+        # put all variables that have more dimensions than just time into another ds
+        
+        ds_ML = ds.drop(vars_time)
+        self.ds_ML = ds_ML
 
-        self.ds = ds
+        ds_time = ds.drop(vars_ML)
+        self.ds = ds_time
+
 
     def make_df(self):
-        self.df = self.ds.to_dataframe()
+        self.df = ds_to_gdf(self.ds)
 
 # =============================================================================
 # if __name__=='__main__': test = EMAC()
 # =============================================================================
 
 def single_file():
-    parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
-    fnames = parent_dir + '200506_s4d_nCARIB2.nc' # f'*{interp}CARIB2.nc'
+    parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
+    fnames = parent_dir + '201204_s4d_bCARIB2_s.nc' # f'*{interp}CARIB2.nc'
     with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter)) as ds_mon:
-        return ds_mon
+        return ds_mon.rename({'tlon':'longitude', 'tlat':'latitude'})
 
 # =============================================================================
 # if __name__=='__main__': ds_filtered = single_file()
