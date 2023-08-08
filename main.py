@@ -48,7 +48,7 @@ mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
 
 # only calculate caribic data if necessary
-def load_caribic(fname = 'caribic_180723.pkl'):
+def load_caribic(fname = 'caribic.pkl'):
     """ 'caribic_180723.pkl' ;  """
     if exists(fname): # Avoid long file loading times
         with open(fname, 'rb') as f:
@@ -60,13 +60,14 @@ def load_caribic(fname = 'caribic_180723.pkl'):
 def save_caribic(fname = 'caribic_dill.pkl'):
     """ Drop rows where pressure values don't exist, then save
     caribic object to dill file """
-    #!!! Temporary fix for missing data bc otherwise dill/pickle doesn't work
-    caribic.data['INT2'].dropna(how='any', subset='p [mbar]', inplace=True)
     with open(fname, 'wb') as f:
         dill.dump(caribic, f)
+
 def del_caribic_file(fname = 'caribic_dill.pkl'): remove(fname)
 
+emac = load_caribic('emac.pkl')
 caribic = load_caribic()
+
 # caribic_filtered = caribic.filter_extreme_events('chem')
 
 # save_caribic(fname= 'carbic_dill_mod.pkl')
