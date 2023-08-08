@@ -66,7 +66,9 @@ def save_caribic(fname = 'caribic_dill.pkl'):
 def del_caribic_file(fname = 'caribic_dill.pkl'): remove(fname)
 
 emac = load_caribic('emac.pkl')
+emac_subsam = load_caribic('emac_subsam.pkl')
 caribic = load_caribic()
+# c_data = load_caribic('caribic_data.pkl')
 
 # caribic_filtered = caribic.filter_extreme_events('chem')
 
