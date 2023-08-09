@@ -49,28 +49,22 @@ def daily_mean(df):
     df_D.set_index('Date_Time', inplace=True)
     return df_D
 
-def ds_to_gdf(ds):
+def ds_to_gdf(ds, source='Mozart'):
     """ Convert xarray Dataset to GeoPandas GeoDataFrame """
-    
-    variables = [var for var in ds.variables if hasattr(ds[var], 'dims')]
-    drop_vars = [v for v in variables if ds[v].dims != ('time',) and v not in ['latitude', 'longitude']]
-
-    print('dropping', drop_vars)
-    # if 'latitude' in drop_vars or 'longitude' in drop_vars: 
-    #     raise Exception('Was about to drop lon / lat info. Something is wrong.')
-
-    ds.drop(drop_vars)
-    
     df = ds.to_dataframe()
+
     if 'longitude' in df.columns and 'latitude' in df.columns:
+        # drop rows without geodata
+        df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
         geodata = [Point(lat, lon) for lat, lon in zip(
             df['latitude'], df['longitude'])]
-    else: geodata = [Point(lat, lon) for lon, lat in zip(
+    else: 
+        geodata = [Point(lat, lon) for lon, lat in zip(
         df.index.to_frame()['longitude'], df.index.to_frame()['latitude'])]
 
     # create geodataframe using lat and lon data from indices
     df.reset_index(inplace=True)
-    for drop_col in ['longitude', 'latitude', 'scalar', 'P0']:
+    for drop_col in ['longitude', 'latitude', 'scalar', 'P0']: # drop as unnecessary
         if drop_col in df.columns: df.drop([drop_col], axis=1, inplace=True)
     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
     
@@ -78,7 +72,8 @@ def ds_to_gdf(ds):
         index_time = [dt.datetime(y, 1, 1) for y in gdf.time]
         gdf['time'] = index_time
     gdf.set_index('time', inplace=True)
-    gdf.index = gdf.index.floor('S')
+    gdf.index = gdf.index.floor('S') # remove micro/nanoseconds 
+
     return gdf
 
 def rename_columns(columns):
@@ -105,23 +100,32 @@ def rename_columns(columns):
 
     return new_names, dictionary, dictionary_reversed
 
-def EMAC_vars_filter(ds):
+def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
     """ 
     Only keeping purely time-dependent variables on the track (not level-dep.)
-
+        time - datetime [ns]
         tlon - track longitude [degrees_east]
         tlat - track latitude [degrees_north]
         tpress - track pressure [hPa]
         tps - track surface pressure [Pa]
-    """
-    vars_to_keep = ['time', 'tlon', 'tlat', 'tpress', 'tps'] + [
-        v for v in ds.variables if v.startswith(('tropop_', 'ECHAM5_', 'e5vdiff_'))]
-    vars_to_drop = [v for v in ds.variables if not v in vars_to_keep]
-    ds = ds.drop_vars(vars_to_drop)
 
-    # variables = [var for var in ds.variables if hasattr(ds[var], 'dims')]
-    # drop_vars = [v for v in variables if ds[v].dims != ('time',) and v not in ['latitude', 'longitude']]
+        tropop_* - tropopause relevant variables
+        ECHAM5_* - modelled met. data
+        e5vdiff_tpot* - potential temperature [K]
+    """
+    variables = ['time', 'tlon', 'tlat', 'tpress', 'tps']
+    if incl_model==True: 
+        variables.extend([v for v in ds.variables if v.startswith(('ECHAM5_', 'e5vdiff_tpot'))])
+    if incl_tropop==True: 
+        variables.extend([v for v in ds.variables if v.startswith('tropop_')])
+
+    ds = ds[variables] # only keep specified variables
+    ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
+    
     return ds
+    # vars_to_drop = [v for v in ds.variables if not v in vars_to_keep]
+    # ds = ds.drop_vars(vars_to_drop)
+    # return ds
 
 #%% Data selection
 def data_selection(c_obj, flights=None, years=None, latitudes=None, 
