@@ -550,21 +550,32 @@ class EMAC(GlobalData):
 
     def get_data(self, years, interp, subsam):
         """ Extract s4d EMAC Data from netCDF files for Caribic """
-        # choose data
-        if subsam: 
-            if self.pdir is None: self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
-            if interp == 'n': print('No nearest neighbour interpolation, proceeding with bilinear.')
-            fnames = self.pdir +  '*bCARIB2_s.nc'
-        else: 
-            if self.pdir is None: self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
-            fnames = self.pdir + f'*{interp}CARIB2.nc'
+        # input validation
+        if subsam and interp == 'n': 
+            print('No n available for subsam data, proceeding with bilinear')
+            interp = 'b'
+        
+        # create file names using given constraints
+        if self.pdir is None: 
+            self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_{}CARIBIC/'.format(
+                "subsam_" if subsam is True else "")
+        fnames = self.pdir + "*{}CARIB2{}.nc".format(
+            interp, "_s" if subsam is True else "")
+        
+        # if subsam: 
+        #     if self.pdir is None: self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
+        #     if interp == 'n': print('Nearest neighbour interpolation not available, proceeding with bilinear.')
+        #     fnames = self.pdir + '*bCARIB2_s.nc'
+        # else: 
+        #     if self.pdir is None: self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
+        #     fnames = self.pdir + f'*{interp}CARIB2.nc'
 
         # extract data, each file goes through preprocess first to filter variables
-        with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter)) as ds:
-            ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
-        
+        with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter), mmap=False) as ds:
+            ds = ds
+
         self.ds_total = ds
-        
+
         # get variables that depend only on time
         vars_time = [v for v in ds.variables if ds[v].dims == ('time', ) and v != 'time'] # drop for ML ds
         vars_ML = [v for v in ds.variables if ds[v].dims != ('time', )] # drop for time ds
@@ -579,17 +590,49 @@ class EMAC(GlobalData):
 
 
     def make_df(self):
-        self.df = ds_to_gdf(self.ds)
+        # self.df = ds_to_gdf(self.ds, source='EMAC')
+        
+        variables = [v for v in self.ds.variables if hasattr(self.ds[v], 'dims')]
+        variables = [v for v in variables if self.ds[v].dims == ('time',)]
+
+        ds = self.ds[['time', 'longitude', 'latitude'] + variables]
+        
+        # ['time'] + [v for v in self.ds.variables if self.ds[v].dims == ('time', )]
+
+    #     variables = [var for var in ds.variables if hasattr(ds[var], 'dims')]
+    #     drop_vars = [v for v in variables if ds[v].dims != ('time',) and v not in ['latitude', 'longitude']]
+    #     print('dropping', drop_vars); ds.drop(drop_vars)
+        
+        df = ds.to_dataframe()
+
+        # drop rows without geodata
+        df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
+        geodata = [Point(lat, lon) for lat, lon in zip(
+            df['latitude'], df['longitude'])]
+        
+        df.drop(['longitude', 'latitude'], axis=1, inplace=True)
+        # df.set_index('time', inplace=True)
+        df.index = df.index.floor('S')
+        
+        gdf = geopandas.GeoDataFrame(df, geometry=geodata)
+
+        self.col_dict = {cname : f'{ds[cname].long_name} [{ds[cname].units}]' 
+                         for cname in df.columns if cname != 'geometry'}
+        self.df = gdf        
 
 # =============================================================================
 # if __name__=='__main__': test = EMAC()
 # =============================================================================
 
-def single_file():
-    parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
-    fnames = parent_dir + '201204_s4d_bCARIB2_s.nc' # f'*{interp}CARIB2.nc'
-    with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter)) as ds_mon:
-        return ds_mon.rename({'tlon':'longitude', 'tlat':'latitude'})
+def single_file(subsam = True):
+    if subsam: 
+        parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
+        fnames = parent_dir + '201204_s4d_bCARIB2_s.nc' # f'*{interp}CARIB2.nc'
+    else: 
+        parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
+        fnames = parent_dir + '201204_s4d_bCARIB2.nc' # f'*{interp}CARIB2.nc'
+    with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter), mmap=False) as ds_mon:
+        return ds_mon # ds_mon.rename({'tlon':'longitude', 'tlat':'latitude'})
 
 # =============================================================================
 # if __name__=='__main__': ds_filtered = single_file()
@@ -607,7 +650,7 @@ class EMAC_subsam(EMAC):
                  parent_dir = r'E:\MODELL\EMAC\TPChange\s4d_subsam_CARIBIC'):
         """ Extract s4d subsampled EMAC Data from netCDF files for Caribic """
 
-#%% Local data
+'#%% Local data
 class LocalData(object):
     """ Defines structure for ground-based station data """
     def __init__(self, years, data_Day=False, substance='sf6'):
