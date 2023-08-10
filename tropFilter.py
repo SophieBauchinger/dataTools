@@ -149,6 +149,7 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
 
         # Calculate simple pre-flag if not in data 
         if not f'flag_{crit}' in data.columns: 
+            if ref_obj is None: raise ValueError('Need to supply a ref_obj.')
             if detr: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose, subs_col = substance)
             else: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
         if f'flag_{crit}' in data.columns: 
