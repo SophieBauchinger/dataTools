@@ -76,30 +76,37 @@ def ds_to_gdf(ds, source='Mozart'):
 
     return gdf
 
+class AMES_variable():
+    def __init__(self, short_name, long_name=None, unit=None):
+        self.short_name = short_name
+        self.long_name = long_name
+        self.unit = unit
+    def __repr__(self):
+        return f'{self.short_name} [{self.unit}] ({self.long_name})'
+
 def rename_columns(columns):
-    """ Get new column names and col_name_dict for AMES data structure.
+    """ Create dictionary relating column name with AMES_variable object
+    
+    Relate dataframe column name with all information in 
+    
+    Get new column names and col_name_dict for AMES data structure.
     Get only short name + unit; Save description in dict
     Standardise names via case changes
     """
-    val_names = [x.split(";")[0] for x in columns if len(x.split(";")) >= 3]
-    units = [x.split(";")[-1][:-1] for x in columns if len(x.split(";")) >= 3]
-
-    for i, x in enumerate(val_names): # Standardise column name
-        if x.startswith('d_'): val_names[i] = x[:-3] + x[-3:].upper()
-        elif x.startswith('int'): continue
-        elif not x=='p': val_names[i] = x.upper()
-
-    # coloumn names with corrected case, in correct order
-    new_names = [v+u for v,u in zip(val_names, units)]
-    # eg. 'CH4 [ppb]' : 'CH4; CH4 mixing ratio; [ppb]\n',
-    #     'd_CH4; absolute precision of CH4; [ppb]\n'
-    dictionary = dict(zip(new_names, [x for x in columns
-                                      if len(x.split(";")) >= 3]))
-    dictionary_reversed = dict(zip([x for x in columns
-                                    if len(x.split(";")) >= 3], new_names))
-
-    return new_names, dictionary, dictionary_reversed
-
+    col_dict = {}
+    for x in columns: 
+        short_name = x.split(";")[0].strip()
+        if len(x.split(';')) >= 3:
+            long_name = x.split(";")[1].strip()
+            unit = x[x.find('[')+1:x.find(']')]
+            variable = AMES_variable(short_name, long_name, unit) # store info
+        else: 
+            variable = AMES_variable(x.split(';')[0])
+        col_dict.update({short_name : variable})
+    
+    col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
+    return col_dict, col_dict_rev
+    
 def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
     """ 
     Only keeping purely time-dependent variables on the track (not level-dep.)
@@ -121,11 +128,7 @@ def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
 
     ds = ds[variables] # only keep specified variables
     ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
-    
     return ds
-    # vars_to_drop = [v for v in ds.variables if not v in vars_to_keep]
-    # ds = ds.drop_vars(vars_to_drop)
-    # return ds
 
 #%% Data selection
 def data_selection(c_obj, flights=None, years=None, latitudes=None, 
