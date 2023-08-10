@@ -1,0 +1,168 @@
+153;1001
+Andreas Engel, Tanja Schuck (an.engel@iau.uni-frankfurt.de)
+Goethe University Frankfurt, Institute for Atmospheric and Environmental Sciences
+Trace gas mixing ratios from whole air sampler
+HEMERA TWIN Launch B47_Kiruna
+1;1
+2021;8;12;20230;7;23
+0
+t_sample;MEAN SAMPLE TIME (UT SECONDS) from 00 HOURS ON LAUNCH DATE
+86
+1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1;1
+99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999
+t_integr;Sample Integration Time;[s]
+alt;altitude;[m]
+p;pressure;[hPa]
+T;temperature;[K]
+Theta;potential temperature;[K]
+lat;latitude;[deg]
+lon;longitude;[deg]
+v_vert;vertical speed during sampling;[m/s]
+sample_number;sample number;[1-15]
+catalyst;1 indicates cotton catalyst;[0-1]
+trichloroethane_111;dry mole fraction scale SIO-05;[ppt]
+d_trichloroethane_111;dry mole fraction absolute error;[ppt]
+bromochloromethane;dry mole fraction scale SIO-10-p;[ppt]
+d_bromochloromethane;dry mole fraction absolute error;[ppt]
+bromomethane;dry mole fraction scale SIO-05;[ppt]
+d_bromomethane;dry mole fraction absolute error;[ppt]
+carbonyl_sulfide;dry mole fraction scale NOAA-SIO-p1;[ppt]
+d_carbonyl_sulfide;dry mole fraction absolute error;[ppt]
+cfc_11;dry mole fraction scale SIO-05;[ppt]
+d_cfc_11;dry mole fraction absolute error;[ppt]
+cfc_112;dry mole fraction scale Empa-p;[ppt]
+d_cfc_112;dry mole fraction absolute error;[ppt]
+cfc_113;dry mole fraction scale SIO-05;[ppt]
+d_cfc_113;dry mole fraction absolute error;[ppt]
+cfc_114;dry mole fraction scale SIO-05;[ppt]
+d_cfc_114;dry mole fraction absolute error;[ppt]
+cfc_115;dry mole fraction scale SIO-05;[ppt]
+d_cfc_115;dry mole fraction absolute error;[ppt]
+cfc_12;dry mole fraction scale SIO-05;[ppt]
+d_cfc_12;dry mole fraction absolute error;[ppt]
+chloromethane;dry mole fraction scale SIO-05;[ppt]
+d_chloromethane;dry mole fraction absolute error;[ppt]
+dibromomethane;dry mole fraction scale NOAA-2003;[ppt]
+d_dibromomethane;dry mole fraction absolute error;[ppt]
+dichloromethane;dry mole fraction scale SIO-14;[ppt]
+d_dichloromethane;dry mole fraction absolute error;[ppt]
+halon_1211;dry mole fraction scale SIO-05;[ppt]
+d_halon_1211;dry mole fraction absolute error;[ppt]
+halon_1301;dry mole fraction scale SIO-05;[ppt]
+d_halon_1301;dry mole fraction absolute error;[ppt]
+halon_2402;dry mole fraction scale SIO-14;[ppt]
+d_halon_2402;dry mole fraction absolute error;[ppt]
+hcfc_133a;dry mole fraction scale Empa-2013;[ppt]
+d_hcfc_133a;dry mole fraction absolute error;[ppt]
+hcfc_141b;dry mole fraction scale SIO-05;[ppt]
+d_hcfc_141b;dry mole fraction absolute error;[ppt]
+hcfc_142b;dry mole fraction scale SIO-05;[ppt]
+d_hcfc_142b;dry mole fraction absolute error;[ppt]
+hcfc_22;dry mole fraction scale SIO-05;[ppt]
+d_hcfc_22;dry mole fraction absolute error;[ppt]
+hfc_125;dry mole fraction scale SIO-14;[ppt]
+d_hfc_125;dry mole fraction absolute error;[ppt]
+hfc_134a;dry mole fraction scale SIO-05;[ppt]
+d_hfc_134a;dry mole fraction absolute error;[ppt]
+hfc_143a;dry mole fraction scale SIO-07;[ppt]
+d_hfc_143a;dry mole fraction absolute error;[ppt]
+hfc_152a;dry mole fraction scale SIO-05;[ppt]
+d_hfc_152a;dry mole fraction absolute error;[ppt]
+hfc_227ea;dry mole fraction scale SIO-14;[ppt]
+d_hfc_227ea;dry mole fraction absolute error;[ppt]
+hfc_236fa;dry mole fraction scale SIO-14;[ppt]
+d_hfc_236fa;dry mole fraction absolute error;[ppt]
+hfc_245fa;dry mole fraction scale SIO-14;[ppt]
+d_hfc_245fa;dry mole fraction absolute error;[ppt]
+hfc_32;dry mole fraction scale SIO-07;[ppt]
+d_hfc_32;dry mole fraction absolute error;[ppt]
+iodomethane;dry mole fraction scale NOAA-2004;[ppt]
+d_iodomethane;dry mole fraction absolute error;[ppt]
+pfc_318;dry mole fraction scale SIO-14;[ppt]
+d_pfc_318;dry mole fraction absolute error;[ppt]
+sulfuryl_fluoride;dry mole fraction scale SIO-07;[ppt]
+d_sulfuryl_fluoride;dry mole fraction absolute error;[ppt]
+tetrachloroethene;dry mole fraction scale NOAA-2003B;[ppt]
+d_tetrachloroethene;dry mole fraction absolute error;[ppt]
+tetrachloromethane;dry mole fraction scale SIO-05;[ppt]
+d_tetrachloromethane;dry mole fraction absolute error;[ppt]
+sulfur_hexafluoride_ecd;dry mole fraction scale SIO-05;[ppt]
+d_sulfur_hexafluoride_ecd;dry mole fraction absolute error;[ppt]
+cfc_12_ecd;dry mole fraction scale SIO-05;[ppt]
+d_cfc_12_ecd;dry mole fraction absolute error;[ppt]
+carbon_dioxide_pic;dry mole fraction scale WMO-X2019;[ppm]
+d_carbon_dioxide_pic;dry mole fraction absolute error;[ppm]
+methane_pic;dry mole fraction scale WMO-x2014a;[ppb]
+d_methane_pic;dry mole fraction absolute error;[ppb]
+carbon_monoxide_pic;dry mole fraction scale WMO-x2004a;[ppb]
+d_carbon_monoxide_pic;dry mole fraction absolute error;[ppb]
+5
+measurement_date;2021 09 13
+Processing_Timestamp:;13.09.2021 19:21
+Calibration_gas_GCMS;Ostern-L
+Calibration_gas_Picarro;GUF-22
+Calibration_gas_ECD;H-218
+5
+* instrumentation used *
+cryogenic air sampler BONBON: Schmidt  et al., Planet. Space Sci. 1978
+halocarbons analyses with GC and quadrupole MS: Hoker et al., AMT 2015 and Schuck et al. ACP 2018
+GC-ECD sulfur hexafluoride and additional values fo CFC-12 - variable names extended by _ecd: Engel et al., ACP 2006
+Picarro G2401  - variable names extended by _pic
+39
+* relative instrumental precision by substance *
+trichloroethane_111;0.0148
+bromochloromethane;0.0197
+bromomethane;0.0064
+carbonyl_sulfide;0.0045
+cfc_11;0.0014
+cfc_112;0.0074
+cfc_113;0.0037
+cfc_114;0.0046
+cfc_115;0.0067
+cfc_12;0.0032
+chloromethane;0.0034
+dibromomethane;0.0202
+dichloromethane;0.0048
+halon_1211;0.006
+halon_1301;0.0092
+halon_2402;0.0162
+hcfc_133a;0.0339
+hcfc_141b;0.0053
+hcfc_142b;0.0045
+hcfc_22;0.0036
+hfc_125;0.0153
+hfc_134a;0.0047
+hfc_143a;0.0131
+hfc_152a;0.0118
+hfc_227ea;0.022
+hfc_236fa;0.1957
+hfc_245fa;0.0921
+hfc_32;0.0321
+iodomethane;0.0161
+pfc_318;0.0175
+sulfuryl_fluoride;0.0254
+tetrachloroethene;0.0071
+tetrachloromethane;0.0024
+sulfur_hexafluoride_ecd;0.0073
+cfc_12_ecd;0.0029
+carbon_dioxide_pic;0.0001;or 0.025ppm
+methane_pic;0.0005;or 0.2 ppb
+carbon_monoxide_pic; -- ;5 ppb
+2
+[s];[s];[m];[hPa];[K];[K];[deg];[deg];[m/s];[1-15];[0-1];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppt];[ppm];[ppb];[ppb]
+t_sample;t_integr;alt;p;t;theta;lat;lon;v_vert;sample_number;catalyst;trichloroethane_111;d_trichloroethane_111;bromochloromethane;d_bromochloromethane;bromomethane;d_bromomethane;carbonyl_sulfide;d_carbonyl_sulfide;cfc_11;d_cfc_11;cfc_112;d_cfc_112;cfc_113;d_cfc_113;cfc_114;d_cfc_114;cfc_115;d_cfc_115;cfc_12;d_cfc_12;chloromethane;d_chloromethane;dibromomethane;d_dibromomethane;dichloromethane;d_dichloromethane;halon_1211;d_halon_1211;halon_1301;d_halon_1301;halon_2402;d_halon_2402;hcfc_133a;d_hcfc_133a;hcfc_141b;d_hcfc_141b;hcfc_142b;d_hcfc_142b;hcfc_22;d_hcfc_22;hfc_125;d_hfc_125;hfc_134a;d_hfc_134a;hfc_143a;d_hfc_143a;hfc_152a;d_hfc_152a;hfc_227ea;d_hfc_227ea;hfc_236fa;d_hfc_236fa;hfc_245fa;d_hfc_245fa;hfc_32;d_hfc_32;iodomethane;d_iodomethane;pfc_318;d_pfc_318;sulfuryl_fluoride;d_sulfuryl_fluoride;tetrachloroethene;d_tetrachloroethene;tetrachloromethane;d_tetrachloromethane;sulfur_hexafluoride_ecd;d_sulfur_hexafluoride_ecd;cfc_12_ecd;d_cfc_12_ecd;carbon_dioxide_pic;d_carbon_dioxide_pic;methane_pic;d_methane_pic;carbon_monoxide_pic;d_carbon_monoxide_pic
+84165;370;30810;11.69;-41.39;827.19;67.90;21.01;0.7;2;0;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999;99999
+85455;246;28786;15.73;-44.53;749.57;67.90;20.91;2.7;5;0;0.664;0.010;99999;99999;0.247;0.002;53.631;1.264;0.219;0.098;99999;99999;5.117;0.184;9.537;0.103;7.01;0.047;70.762;0.332;62.802;1.707;99999;99999;0.858;0.157;99999;99999;99999;99999;99999;99999;0.087;0.003;0.923;0.036;13.010;0.059;136.906;0.493;19.369;0.296;65.911;0.310;16.908;0.261;99999;99999;1.087;0.024;0.154;0.03;1.332;0.123;7.164;0.23;0.053;0.001;1.57;0.027;2.035;0.052;99999;99999;99999;99999;8.58;0.06;73.07;0.22;404.38;0.02;923.38;0.16;118.82;5.40
+86386;148;26465;22.19;-47.26;671.21;67.90;20.83;1.9;8;0;99999;99999;99999;99999;0.258;0.096;51.027;0.741;0.897;0.021;99999;99999;8.418;0.031;9.832;0.045;6.979;0.085;97.315;0.311;56.925;0.194;99999;99999;0.599;0.039;99999;99999;0.098;0.001;99999;99999;0.137;0.005;2.002;0.020;13.438;0.076;137.308;0.494;19.171;0.293;65.957;0.310;16.876;0.221;0.783;0.033;1.096;0.024;0.169;0.033;1.479;0.136;7.262;0.233;0.056;0.001;1.600;0.028;2.034;0.052;99999;99999;99999;99999;8.49;0.06;100.01;0.41;403.62;0.02;949.75;0.12;66.03;5.19
+87521;100;24037;32.02;-49.30;598.94;67.91;20.70;1.9;12;0;99999;99999;0.015;0.001;99999;99999;19.762;0.47;5.379;0.033;99999;99999;11.924;0.045;9.464;0.08;6.832;0.071;125.399;0.401;84.187;1.242;99999;99999;1.096;0.027;99999;99999;0.276;0.007;99999;99999;0.13;0.004;3.231;0.069;12.877;0.103;136.479;0.652;18.171;0.278;61.643;0.290;16.006;0.210;0.887;0.064;0.989;0.024;0.154;0.063;1.327;0.122;6.988;0.565;99999;99999;1.544;0.027;2.067;0.053;99999;99999;99999;99999;8.26;0.09;128.01;0.77;402.54;0.02;945.15;0.10;23.48;5.65
+88705;63;21617;46.18;-48.15;542.21;67.92;20.64;2.3;9;0;0.158;0.041;99999;99999;99999;99999;17.903;0.865;30.866;0.216;99999;99999;22.913;0.085;11.757;0.054;7.511;0.05;227.416;1.365;73.891;1.378;99999;99999;1.486;0.123;0.115;0.001;0.881;0.008;99999;99999;0.139;0.009;6.031;0.175;14.268;0.064;147.043;0.540;20.260;0.310;57.978;0.272;18.018;0.236;0.742;0.134;1.054;0.037;0.181;0.056;1.340;0.123;5.389;0.173;99999;99999;1.587;0.033;2.068;0.053;99999;99999;5.535;0.080;8.78;0.06;229.53;0.71;403.34;0.02;1230.40;0.16;31.00;4.77
+89929;59;19332;65.19;-47.15;493.46;67.93;20.60;1.4;3;0;0.520;0.009;0.085;0.003;2.415;0.016;5326.706;56.266;111.496;0.156;0.266;0.028;45.114;0.184;14.194;0.087;8.091;0.054;353.757;1.181;249.393;5.796;0.102;0.005;5.346;0.072;0.980;0.006;1.974;0.021;0.110;0.002;0.177;0.006;11.704;0.062;16.538;0.074;168.976;0.608;25.808;0.395;75.604;0.576;20.991;0.275;1.030;0.133;1.399;0.031;0.188;0.037;1.769;0.163;6.777;0.218;0.478;0.018;1.724;0.030;2.343;0.060;0.102;0.001;31.353;0.358;9.46;0.07;353.16;1.04;422.58;0.02;1515.80;0.14;104.03;5.92
+91303;731;19326;65.25;-47.14;493.35;67.93;20.60;1.7;4;1;0.630;0.055;0.039;0.001;1.793;0.011;320.593;16.161;114.586;1.037;0.27;0.042;46.584;0.307;14.328;0.066;8.223;0.148;358.202;1.317;198.519;0.675;0.089;0.002;5.432;0.067;1.056;0.006;1.988;0.018;0.109;0.002;0.309;0.010;15.506;0.160;19.174;0.086;208.117;1.488;26.397;0.404;94.675;0.500;21.988;0.288;3.258;0.049;1.474;0.036;0.176;0.034;2.387;0.220;16.082;0.516;0.095;0.003;1.746;0.031;2.31;0.059;0.181;0.001;32.566;0.570;9.37;0.07;354.09;1.04;406.86;0.02;1520.80;0.18;56.08;7.13
+93374;613;17956;80.19;-48.04;463.24;67.94;20.62;1.2;7;1;1.302;0.019;0.121;0.002;5.154;0.033;786.119;3.538;224.646;0.315;0.57;0.004;76.856;0.284;18.874;0.087;9.178;0.061;518.698;1.660;457.573;1.556;0.285;0.006;21.947;0.105;2.456;0.015;2.882;0.027;0.305;0.005;0.452;0.015;27.609;0.146;27.576;0.124;251.927;0.907;35.107;0.537;125.54;0.59;26.965;0.353;5.201;0.061;1.904;0.042;0.175;0.034;3.349;0.308;20.985;0.674;0.318;0.005;2.062;0.036;2.56;0.065;0.247;0.002;71.615;0.172;10.78;0.09;520.15;1.53;414.80;0.02;1684.38;0.20;129.05;5.76
+95094;133;17270;88.92;-46.73;452.38;67.95;20.63;1.5;14;0;0.857;0.013;0.019;0.000;1.384;0.021;159.266;0.717;165.469;0.232;0.379;0.028;57.247;0.212;15.395;0.081;8.479;0.057;429.832;1.375;179.701;0.611;0.089;0.002;1.238;0.085;1.943;0.012;2.653;0.024;0.225;0.012;0.264;0.019;19.071;0.183;20.007;0.090;221.482;0.797;29.944;0.458;101.506;0.477;23.699;0.310;3.961;0.047;1.626;0.036;0.229;0.045;2.568;0.237;20.166;0.647;99999;99999;1.805;0.032;2.397;0.061;99999;99999;48.794;0.852;9.87;0.07;427.81;1.84;409.24;0.02;1698.82;0.14;27.83;4.98
+95876;557;16495;99.95;-46.02;438.87;67.96;20.62;1.0;10;1;1.018;0.015;0.073;0.004;4.933;0.032;733.124;31.53;180.201;0.252;0.408;0.010;60.568;0.224;15.648;0.081;8.553;0.057;446.043;1.427;469.104;1.595;0.239;0.017;22.282;0.158;2.213;0.042;2.831;0.026;0.269;0.007;0.413;0.014;20.644;0.160;20.742;0.102;230.108;0.828;31.263;0.478;105.475;0.624;24.561;0.322;4.930;0.095;1.685;0.037;0.213;0.042;2.954;0.272;22.954;0.737;0.072;0.001;1.845;0.032;2.494;0.063;0.083;0.001;56.785;0.281;10.11;0.09;445.39;1.31;410.43;0.01;1748.17;0.17;43.58;5.19
+89933;88;14850;127.66;-43.17;414.34;68.00;20.73;1.1;15;0;0.994;0.017;0.059;0.002;4.265;0.027;289.764;1.304;173.299;0.307;0.411;0.006;58.466;0.216;15.502;0.071;8.474;0.057;436.445;1.397;395.993;1.516;0.299;0.025;15.715;0.075;2.136;0.037;2.746;0.028;0.254;0.005;0.38;0.013;19.881;0.329;20.327;0.097;224.627;0.809;30.338;0.464;102.783;0.483;24.174;0.317;4.303;0.051;1.636;0.036;0.203;0.040;2.793;0.257;21.031;0.675;99999;99999;1.811;0.032;2.424;0.062;99999;99999;55.346;0.946;9.89;0.07;434.53;1.28;409.93;0.02;1716.04;0.16;26.20;5.34
+90740;393;14799;128.62;-43.03;413.70;68.00;20.73;0.9;1;1;0.992;0.023;0.073;0.002;5.091;0.163;469.047;10.957;177.264;0.514;0.412;0.026;60.321;0.223;15.592;0.072;8.402;0.056;441.095;1.412;455.692;1.752;0.260;0.010;20.557;0.135;2.234;0.032;2.790;0.026;0.285;0.005;0.366;0.012;20.532;0.109;20.502;0.111;227.560;0.819;30.777;0.471;104.304;0.490;24.197;0.317;4.783;0.078;1.693;0.037;0.235;0.046;2.817;0.259;22.291;0.716;0.062;0.010;1.809;0.032;2.521;0.064;0.076;0.001;56.866;0.210;9.80;0.12;439.23;1.29;410.43;0.06;1725.73;0.13;48.31;6.39
+91934;73;13604;153.75;-44.34;390.89;68.04;20.85;1.2;6;0;1.093;0.016;0.092;0.002;5.549;0.036;382.344;1.721;201.06;0.498;0.458;0.008;64.584;0.245;16.222;0.075;8.652;0.058;470.945;1.507;479.282;1.630;0.419;0.010;27.322;0.223;2.692;0.034;3.062;0.044;0.338;0.005;0.419;0.014;22.338;0.215;21.244;0.154;238.087;0.857;33.515;0.513;110.167;0.518;25.665;0.336;5.401;0.103;1.769;0.039;0.199;0.039;3.087;0.284;25.064;0.805;99999;99999;1.881;0.033;2.483;0.063;0.158;0.033;65.233;0.318;10.29;0.08;470.87;1.39;412.81;0.02;1816.95;0.18;43.08;5.45
+93429;297;13553;154.93;-44.93;389.03;68.04;20.86;0.7;13;1;1.110;0.016;0.132;0.003;6.372;0.041;562.773;2.532;200.549;0.281;0.491;0.004;64.888;0.240;16.067;0.074;8.600;0.058;474.600;1.519;533.204;1.813;0.363;0.007;32.864;0.158;2.699;0.016;3.068;0.028;0.334;0.005;0.404;0.014;22.389;0.119;21.277;0.096;239.392;0.862;33.509;0.513;112.092;0.527;26.146;0.343;5.715;0.067;1.781;0.039;0.201;0.039;3.236;0.298;25.581;0.821;0.167;0.003;1.940;0.034;2.564;0.065;0.130;0.001;65.162;0.156;10.29;0.08;470.86;1.39;411.08;0.02;1821.14;0.21;52.36;5.96
+95137;43;12690;176.32;-44.57;375.49;68.06;20.91;12.0;11;0;0.952;0.022;0.073;0.009;4.982;0.047;323.258;1.455;193.306;0.289;0.413;0.013;57.629;0.302;15.723;0.072;8.538;0.057;472.646;1.512;458.664;1.559;0.381;0.014;20.959;0.101;2.662;0.023;3.100;0.029;0.289;0.009;0.351;0.024;19.090;0.104;19.989;0.090;229.659;0.827;32.540;0.498;104.126;0.489;25.518;0.334;4.960;0.082;1.611;0.035;0.198;0.039;2.519;0.232;24.026;0.771;0.062;0.008;1.885;0.033;2.517;0.064;0.127;0.034;58.862;0.844;10.31;0.08;470.94;1.39;412.71;0.02;1817.73;0.18;29.42;5.37
