@@ -196,8 +196,8 @@ class CaribicData(GlobalData):
         flights (list of int)
     """
 
-    def __init__(self, years=range(2000, 2021), grid_size=5, flight_nr = None,
-               pfxs=['GHG', 'INT', 'INT2'], verbose=False):
+    def __init__(self, years=range(2005, 2021), pfxs=['GHG', 'INT', 'INT2'],
+                 grid_size=5, flight_nr = None, verbose=False):
         # no caribic data before 2005, takes too long to check so cheesing it
         super().__init__([yr for yr in years if yr > 2004], grid_size)
         self.source = 'Caribic'
@@ -290,9 +290,9 @@ class CaribicData(GlobalData):
             [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
 
 class Caribic(CaribicData):
-    def __init__(self, years=range(2000, 2021), grid_size=5, flight_nr = None, 
-                 pfxs=['GHG', 'INT', 'INT2'], verbose=False):
-        super().__init__(years, grid_size, flight_nr, pfxs, verbose)
+    def __init__(self, years=range(2005, 2021), pfxs=['GHG', 'INT', 'INT2'],
+                 grid_size=5, flight_nr = None, verbose=False):
+        super().__init__(years, pfxs, grid_size, flight_nr, verbose)
         for subs in ['sf6', 'n2o', 'co2', 'ch4']: 
             self.create_substance_df(subs)
 
