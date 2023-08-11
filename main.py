@@ -10,7 +10,7 @@ Substances in Caribic data:
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
 'INT2':   ['ch4', 'co2', 'co' , 'n2o',      'o3' , 'noy', 'no' , 'h2o', 'f11', 'f12']
 
-Met / Reanalysis data for Caribic-2: 
+Met / Reanalysis data for Caribic-2:
     'Flight number',
      'p [mbar]',
      'geometry'
@@ -76,7 +76,7 @@ caribic = load_caribic()
 
 # examples for creating new objects with only certain year / flight nr / lat :
 # kwargs = {'tp_def' : 'chem'}
-# new_caribic = data_selection(caribic, flights=None, years=None, latitudes=None, 
+# new_caribic = data_selection(caribic, flights=None, years=None, latitudes=None,
 #                               tropo=False, strato=False, extr_events=False, **kwargs)
 
 
@@ -168,7 +168,7 @@ for pfx in ['GHG', 'INT', 'INT2']:
         f.autofmt_xdate()
         plt.tight_layout()
         plt.show()
-    
+
 # n2o mixing ratio wrt Mauna Loa data
 
 # ref_obj = Mauna_Loa(year_range, 'n2o')

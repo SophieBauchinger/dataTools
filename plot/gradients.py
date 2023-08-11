@@ -39,20 +39,20 @@ from tools import make_season, coordinate_tools
     #     detr (bool)
     #     note (str): shown as text box on the plot
     # """
-    
-def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {}, 
+
+def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {},
                             detr=True, note=None, errorbars=False):
-    """ 
+    """
     Plotting gradient by season using 1D binned data. Detrended data used by default
     (Inspired by C_plot.pl_gradient_by_season)
 
-    x_params (dict): 
+    x_params (dict):
         keys: x_pfx
     y_params (dict):
         keys: ycoord, tp_def, y_pfx, pvu
     """
-    if (not all(i in x_params.keys() for i in  ['x_pfx']) 
-                or not all(i in y_params.keys() for i in ['ycoord', 'y_pfx', 'tp_def'])): 
+    if (not all(i in x_params.keys() for i in  ['x_pfx'])
+                or not all(i in y_params.keys() for i in ['ycoord', 'y_pfx', 'tp_def'])):
         raise KeyError('Please supply all necessary parameters: x_pfx, (xcoord) / ycoord, tp_def, y_pfx, (pvu)')
     if not subs in c_obj.data.keys(): c_obj.create_substance_df(subs)
     data = c_obj.data[subs]
@@ -67,7 +67,7 @@ def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {},
     # y-axis
     y_coord, y_label = coordinate_tools(**y_params)
     y_bins = {'z' : 0.5, 'pt' : 10, 'p' : 40}
-    if not 'y_bin' in y_params.keys(): 
+    if not 'y_bin' in y_params.keys():
         y_bin = y_bins[y_params['ycoord']]
     else: y_bin = y_params['y_bin']
 
@@ -115,24 +115,24 @@ def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {},
 
 if __name__ == '__main__':
     if False: caribic = True # BS to avoid error
-    
-    yp1 = {'tp_def' : 'chem', 
+
+    yp1 = {'tp_def' : 'chem',
            'y_pfx' : 'INT2',
            'ycoord' : 'z'}
-    
-    yp2 = {'tp_def' : 'therm', 
-           'y_pfx' : 'INT', 
+
+    yp2 = {'tp_def' : 'therm',
+           'y_pfx' : 'INT',
            'ycoord' : 'pt'}
-    
-    yp3 = {'tp_def' : 'therm', 
-           'y_pfx' : 'INT2', 
+
+    yp3 = {'tp_def' : 'therm',
+           'y_pfx' : 'INT2',
            'ycoord' : 'pt'}
-    
-    yp4 = {'tp_def' : 'dyn', 
-           'y_pfx' : 'INT', 
-           'ycoord' : 'pt', 
+
+    yp4 = {'tp_def' : 'dyn',
+           'y_pfx' : 'INT',
+           'ycoord' : 'pt',
            'pvu' : 3.5}
-    
+
     for subs in ['sf6']: #:, 'n2o', 'co2', 'ch4']:
         for yp in [yp1, yp2, yp3, yp4]:
             x_params = {'x_pfx' : 'GHG'}

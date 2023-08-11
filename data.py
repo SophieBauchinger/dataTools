@@ -66,10 +66,10 @@ class GlobalData(object):
             years (int) """
 
         # input validation, choose only years that are actually available
-        
+
         yr_list = [yr for yr in years if yr in self.years]
         if len(yr_list)==0: raise KeyError(f'No valid for any of the given years {years}')
-        elif len(yr_list) != len(years): 
+        elif len(yr_list) != len(years):
             print(f'No data available for {[yr for yr in years if yr not in self.years]}')
 
         out = type(self).__new__(self.__class__) # new class instance
@@ -85,14 +85,14 @@ class GlobalData(object):
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
                 out.data[k].sort_index(inplace=True)
 
-            if hasattr(out, 'flights'): 
+            if hasattr(out, 'flights'):
                 out.flights = list(set([fl for fl in out.data[k]['Flight number']]))
                 out.flights.sort()
 
             # Datasets
-            ds_list = [k for k in self.data.keys() 
+            ds_list = [k for k in self.data.keys()
                        if isinstance(self.data[k], xr.Dataset)]
-            for k in ds_list: 
+            for k in ds_list:
                 all_dates = pd.to_datetime(out.data[k]['time'].values) # allows extracting 'year'
                 year_mask = all_dates.year.isin(yr_list) # True if date in years
                 chosen_dates = out.data[k]['time'].where(year_mask)
@@ -127,15 +127,15 @@ class GlobalData(object):
             if len(df_list) !=0:
                 out.years = list(set([yr for yr in out.data[k].index.year]))
                 out.years.sort()
-            if hasattr(out, 'flights'): 
+            if hasattr(out, 'flights'):
                 out.flights = list(set([fl for fl in out.data[k]['Flight number']]))
                 out.flights.sort()
 
             # Datasets
             ds_list = [k for k in self.data.keys()
                        if isinstance(self.data[k], xr.Dataset)]
-            
-            for k in ds_list: 
+
+            for k in ds_list:
                 out.data[k] = out.data[k].where(out.data[k]['latitude'] > lat_min)
                 out.data[k] = out.data[k].where(out.data[k]['latitude'] < lat_max)
 
@@ -243,14 +243,14 @@ class CaribicData(GlobalData):
                         continue
                     elif len(f) > 1: f.sort() # sort to get most recent v
 
-                    f_data = FFI1001DataReader(f[-1], df=True, xtype = 'secofday', 
+                    f_data = FFI1001DataReader(f[-1], df=True, xtype = 'secofday',
                                                sep_variables=';')
                     df_flight = f_data.df # index = Datetime
                     df_flight.insert(0, 'Flight number',
                                    [flight_nr for i in range(df_flight.shape[0])])
 
                     col_dict, col_dict_rev = rename_columns(f_data.VNAME)
-                    # set names to the short version including unit 
+                    # set names to the short version including unit
                     df_flight.rename(columns = col_dict_rev, inplace=True)
                     df_yr = pd.concat([df_yr, df_flight])
 
@@ -293,7 +293,7 @@ class Caribic(CaribicData):
     def __init__(self, years=range(2005, 2021), pfxs=['GHG', 'INT', 'INT2'],
                  grid_size=5, flight_nr = None, verbose=False):
         super().__init__(years, pfxs, grid_size, flight_nr, verbose)
-        for subs in ['sf6', 'n2o', 'co2', 'ch4']: 
+        for subs in ['sf6', 'n2o', 'co2', 'ch4']:
             self.create_substance_df(subs)
 
     def __repr__(self):
@@ -333,10 +333,10 @@ class Caribic(CaribicData):
         return out
 
     def sel_atm_layer(self, atm_layer, **kwargs):
-        """ Create Caribic object with strato / tropo sorting 
+        """ Create Caribic object with strato / tropo sorting
         Parameters:
             atm_layer = 'tropo' or 'strato'
-            
+
             tp_def (str): 'chem', 'therm' or 'dyn'
             crit (str): 'n2o', 'o3'
             coord (str): 'pt', 'dp', 'z'
@@ -358,7 +358,7 @@ class Caribic(CaribicData):
         if not 'c_pfx' in kwargs.keys(): pfxs = set(out.data.keys())
         else: pfxs = [kwargs['c_pfx']]; del kwargs['c_pfx']
 
-        if kwargs.get('tp_def') == 'chem' and not 'ref_obj' in kwargs.keys() and kwargs['crit'] == 'n2o': 
+        if kwargs.get('tp_def') == 'chem' and not 'ref_obj' in kwargs.keys() and kwargs['crit'] == 'n2o':
             try: kwargs['ref_obj'] = Mauna_Loa(self.years, subs='n2o')
             except: raise Exception('Could not generate necessary reference data for chem sorting')
 
@@ -412,7 +412,7 @@ class Caribic(CaribicData):
 
         # Find and filter tropospheric extreme events
         tp_def = kwargs.get('tp_def')
-        if tp_def == 'chem' and 'ref_obj' not in kwargs.keys(): 
+        if tp_def == 'chem' and 'ref_obj' not in kwargs.keys():
             kwargs['ref_obj'] = Mauna_Loa(self.years, 'n2o')
         if tp_def in ['dyn', 'therm'] and 'c_pfx' not in kwargs.keys():
             raise Exception('Please supply a pfx to choose data source for TP sorting.')
@@ -420,7 +420,7 @@ class Caribic(CaribicData):
         out.pfxs = tropo_obj.pfxs # only take trop. sorted pfx data
         out.data = {k:v.copy() for k,v in self.data.items() if k in tropo_obj.pfxs} # only using OG msmt data
 
-        #!!! use subs data if available. Need to make a decision on which subs data to use though ? 
+        #!!! use subs data if available. Need to make a decision on which subs data to use though ?
 
         for pfx in tropo_obj.pfxs:
             data = tropo_obj.data[pfx].sort_index()
@@ -483,7 +483,7 @@ class Caribic(CaribicData):
             elif subs in self.data.keys():
                 try: out.create_substance_df(subs)
                 except: print(f'Failed trying to create substance df for {subs}')
-        
+
         self.status.update({'filter' : (kwargs)})
 
         return out
@@ -522,7 +522,7 @@ class Mozart(GlobalData):
     def get_data(self, remap_lon=True, verbose=False,
                  fname = r'C:\Users\sophie_bauchinger\sophie_bauchinger\toolpac_tutorial\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
         """ Create dataset from given file
-        
+
         if remap_lon, longitude is remapped to ±180 degrees
         """
         with xr.open_dataset(fname) as ds:
@@ -550,7 +550,7 @@ class Mozart(GlobalData):
         return ds # xr.concat(datasets, dim = 'time')
 
 class EMAC(GlobalData):
-    def __init__(self, years=[y for y in range(2000, 2020)], 
+    def __init__(self, years=[y for y in range(2000, 2020)],
                  interp='b', pdir=None, subsam=False, single_file=False):
         super().__init__(years)
         self.years = years
@@ -568,19 +568,19 @@ class EMAC(GlobalData):
         """ Extract s4d EMAC Data from netCDF files for Caribic """
         self.data = {}
         # input validation
-        if subsam and interp == 'n': 
+        if subsam and interp == 'n':
             print('No n available for subsam data, proceeding with bilinear')
             interp = 'b'
-        
+
         # create file names using given constraints
-        if self.pdir is None: 
+        if self.pdir is None:
             self.pdir = 'E:/MODELL/EMAC/TPChange/s4d_{}CARIBIC/'.format(
                 "subsam_" if subsam is True else "")
         fnames = self.pdir + "*{}CARIB2{}.nc".format(
             interp, "_s" if subsam is True else "")
-        
+
         if single_file: fnames = self.pdir + single_file
-        
+
         # extract data, each file goes through preprocess first to filter variables
         with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter), mmap=False) as ds:
             self.data['ds'] = ds
@@ -588,14 +588,14 @@ class EMAC(GlobalData):
         # create separate dataset for multi-level variables
         vars_ML =  [v for v in ds.variables if ds[v].dims != ('time', )]
         self.data['ds_ML'] = self.data['ds'][['time', 'longitude', 'latitude'] + vars_ML]
-        
+
         # set self.years according to available data
         self.years = list(set(pd.to_datetime(self.data['ds']['time'].values).year)) #!!!
 
 
     def make_df(self):
         """ Create dataframe from time-dependent variables in dataset """
-        # only choose variables that only depend on time 
+        # only choose variables that only depend on time
         variables = [v for v in self.data['ds'].variables if hasattr(self.data['ds'][v], 'dims')]
         variables = [v for v in variables if self.data['ds'][v].dims == ('time',)]
         ds = self.data['ds'][['time', 'longitude', 'latitude'] + variables]
@@ -611,29 +611,29 @@ class EMAC(GlobalData):
         df.index = df.index.floor('S')
 
         self.data['df'] = geopandas.GeoDataFrame(df, geometry=geodata)
-        self.data['dict'] = {cname : f'{ds[cname].long_name} [{ds[cname].units}]' 
+        self.data['dict'] = {cname : f'{ds[cname].long_name} [{ds[cname].units}]'
                          for cname in df.columns if cname != 'geometry'}
         return self.data['df']
 
     @property
     def df(self):
-        """ (Compute and) return dataframe attribute """ 
-        if 'df' not in self.data.keys(): 
+        """ (Compute and) return dataframe attribute """
+        if 'df' not in self.data.keys():
             choice = input('No dataframe found. Generate it now? [Y/N]\n')
-            if choice.upper()=='Y': 
+            if choice.upper()=='Y':
                 return self.make_df()
         else: return self.data['df']
-        
+
     @property
     def ds(self):
         """ Allow accessing dataset as class attribute """
         return self.data['ds']
 
 def single_file(subsam = True):
-    if subsam: 
+    if subsam:
         parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
         fnames = parent_dir + '201204_s4d_bCARIB2_s.nc' # f'*{interp}CARIB2.nc'
-    else: 
+    else:
         parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
         fnames = parent_dir + '201204_s4d_bCARIB2.nc' # f'*{interp}CARIB2.nc'
     with xr.open_mfdataset(fnames, preprocess=partial(EMAC_vars_filter), mmap=False) as ds_mon:
@@ -779,7 +779,7 @@ class Mace_Head(LocalData):
     def __repr__(self):
         return f'Mace Head - {self.substance}'
 
-#%% detrending 
+#%% detrending
 def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False,
                       as_subplot=False, ax=None, c_pfx=None, note=''):
     """ Remove linear trend of substances using free troposphere as reference.
@@ -790,9 +790,9 @@ def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False
         subs (str): substance to detrend e.g. 'sf6'
         loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
     """
-    if loc_obj is None: 
+    if loc_obj is None:
         try: loc_obj = Mauna_Loa(c_obj.years, subs)
-        except: raise ValueError(f'Cannot detrend as ref. data could not be found for {subs.upper()}') 
+        except: raise ValueError(f'Cannot detrend as ref. data could not be found for {subs.upper()}')
     out_dict = {}
 
     if c_pfx: pfxs = [c_pfx]
@@ -833,7 +833,7 @@ def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False
 
         df_detr = pd.DataFrame({f'detr_{substance}' : c_obs_detr,
                                  f'delta_{substance}' : c_obs_delta,
-                                 f'detrFit_{substance}' : c_fit(t_obs)}, 
+                                 f'detrFit_{substance}' : c_fit(t_obs)},
                                 index = df.index)
         # maintain relationship between detr and fit columns
         df_detr[f'detrFit_{substance}'] = df_detr[f'detrFit_{substance}'].where(
@@ -843,10 +843,10 @@ def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False
         out_dict[f'popt_{c_pfx}_{subs}'] = popt
 
         if save:
-            columns = [f'detr_{substance}', 
-                       f'delta_{substance}', 
+            columns = [f'detr_{substance}',
+                       f'delta_{substance}',
                        f'detrFit_{substance}']
-            
+
             c_obj.data[c_pfx][columns] = df_detr[columns]
             # move geometry column to the end again
             c_obj.data[c_pfx]['geometry'] =  c_obj.data[c_pfx].pop('geometry')

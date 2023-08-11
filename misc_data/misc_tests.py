@@ -11,7 +11,6 @@ from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 
 #%% Test changes to FFI1001ReadHeader, FFI1001DataReader
-
 fnames = [
     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/b47_cryosampler_GCMS_ECD_PIC_w_cat.csv',
     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/ACinst_GUF003_202108122119_RA.ict',
@@ -27,6 +26,3 @@ print(cryo.df.shape, cryo.df.columns[:4])
 print(ac.df.shape, ac.df.columns[:4])
 print(ac_flat.df.shape, ac_flat.df.columns[:4])
 print(c.df.shape, c.df.columns[:4])
-
-
-

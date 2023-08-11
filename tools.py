@@ -58,7 +58,7 @@ def ds_to_gdf(ds, source='Mozart'):
         df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
         geodata = [Point(lat, lon) for lat, lon in zip(
             df['latitude'], df['longitude'])]
-    else: 
+    else:
         geodata = [Point(lat, lon) for lon, lat in zip(
         df.index.to_frame()['longitude'], df.index.to_frame()['latitude'])]
 
@@ -67,12 +67,12 @@ def ds_to_gdf(ds, source='Mozart'):
     for drop_col in ['longitude', 'latitude', 'scalar', 'P0']: # drop as unnecessary
         if drop_col in df.columns: df.drop([drop_col], axis=1, inplace=True)
     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
-    
+
     if not gdf.time.dtype == '<M8[ns]': # mzt, check if time is not in datetime format
         index_time = [dt.datetime(y, 1, 1) for y in gdf.time]
         gdf['time'] = index_time
     gdf.set_index('time', inplace=True)
-    gdf.index = gdf.index.floor('S') # remove micro/nanoseconds 
+    gdf.index = gdf.index.floor('S') # remove micro/nanoseconds
 
     return gdf
 
@@ -86,29 +86,29 @@ class AMES_variable():
 
 def rename_columns(columns):
     """ Create dictionary relating column name with AMES_variable object
-    
-    Relate dataframe column name with all information in 
-    
+
+    Relate dataframe column name with all information in
+
     Get new column names and col_name_dict for AMES data structure.
     Get only short name + unit; Save description in dict
     Standardise names via case changes
     """
     col_dict = {}
-    for x in columns: 
+    for x in columns:
         short_name = x.split(";")[0].strip()
         if len(x.split(';')) >= 3:
             long_name = x.split(";")[1].strip()
             unit = x[x.find('[')+1:x.find(']')]
             variable = AMES_variable(short_name, long_name, unit) # store info
-        else: 
+        else:
             variable = AMES_variable(x.split(';')[0])
         col_dict.update({short_name : variable})
-    
+
     col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
     return col_dict, col_dict_rev
-    
+
 def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
-    """ 
+    """
     Only keeping purely time-dependent variables on the track (not level-dep.)
         time - datetime [ns]
         tlon - track longitude [degrees_east]
@@ -121,9 +121,9 @@ def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
         e5vdiff_tpot* - potential temperature [K]
     """
     variables = ['time', 'tlon', 'tlat', 'tpress', 'tps']
-    if incl_model==True: 
+    if incl_model==True:
         variables.extend([v for v in ds.variables if v.startswith(('ECHAM5_', 'e5vdiff_tpot'))])
-    if incl_tropop==True: 
+    if incl_tropop==True:
         variables.extend([v for v in ds.variables if v.startswith('tropop_')])
 
     ds = ds[variables] # only keep specified variables
@@ -131,28 +131,28 @@ def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
     return ds
 
 #%% Data selection
-def data_selection(c_obj, flights=None, years=None, latitudes=None, 
+def data_selection(c_obj, flights=None, years=None, latitudes=None,
                    tropo=False, strato=False, extr_events=False, **kwargs):
-    """ Return new Caribic instance with selection of parameters 
+    """ Return new Caribic instance with selection of parameters
         flights (int / list(int))
         years (int / list(int))
         latitudes (tuple): lat_min, lat_max
         tropo, strato, extr_events (bool)
-        kwargs: e.g. tp_def, ... - for strat / trop filtering 
+        kwargs: e.g. tp_def, ... - for strat / trop filtering
     """
     out = copy.deepcopy(c_obj)
     if flights is not None: out = out.sel_flight(flights)
     if years is not None: out = out.sel_year(years)
-    if latitudes is not None: 
+    if latitudes is not None:
         out = out.sel_latitude(*latitudes)
         out.status.update({'latitudes' : latitudes})
-    if strato: 
+    if strato:
         out = out.sel_strato(**kwargs)
         out.status.update({'strato' : True})
-    if tropo: 
+    if tropo:
         out = out.sel_tropo(**kwargs)
         out.status.update({'tropo' : True})
-    if extr_events: 
+    if extr_events:
         out = out.filter_extreme_events(**kwargs)
         out.status.update({'no_ee' : True})
     return out
@@ -182,17 +182,17 @@ def make_season(month):
 
 def assign_t_s(df, TS, coordinate, tp_val=0):
     """ Returns the appropriate comparison for a chosen coord to sort into trop / strat
-    Parameters: 
-        df (DataFrame): reference data 
+    Parameters:
+        df (DataFrame): reference data
         TS (str): 't' / 's';  troposphere / stratosphere
         coord (str): dp, pt, z
         tp_val (float): value of tropopause in chosen coordinates
     """
-    if ((coordinate in ['dp'] and TS == 't') 
+    if ((coordinate in ['dp'] and TS == 't')
         or (coordinate in ['pt', 'z'] and TS == 's')):
         return df.gt(tp_val)
 
-    elif ((coordinate in ['dp'] and TS == 's') 
+    elif ((coordinate in ['dp'] and TS == 's')
           or (coordinate in ['pt', 'z'] and TS == 't')):
         return df.lt(tp_val)
 
@@ -212,7 +212,7 @@ def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
     y_label = y_labels[ycoord]
 
     # x coordinate = equivalent latitude
-    if xcoord is not None: 
+    if xcoord is not None:
         x_coord = get_h_coord(x_pfx, xcoord)
         x_label = 'Eq. latitude (%s) ' % ('ECMWF' if x_pfx=='INT' else 'ERA5') + '[°N]'
         return y_coord, y_label, x_coord, x_label
@@ -238,9 +238,9 @@ def coord_combo(c_obj, save=True):
         df['int_pt_rel_sTP_K_ERA5 [K]'] = df['int_Theta [K]'] - df['int_ERA5_TROP1_THETA [K]']
 
     # reorder columns
-    df = df[list(['Flight number', 'p [mbar]'] 
-                      + [col for col in df.columns 
-                         if col not in ['Flight number', 'p [mbar]', 'geometry']] 
+    df = df[list(['Flight number', 'p [mbar]']
+                      + [col for col in df.columns
+                         if col not in ['Flight number', 'p [mbar]', 'geometry']]
                       + ['geometry'])]
     return df
 
@@ -255,11 +255,11 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
         if subs in substance_list(pfx):
             print(subs, pfx)
             subs_cols.update({pfx : get_col_name(subs, 'Caribic', pfx)})
-    
+
     # subs_cols = {pfx:get_col_name(subs, 'Caribic', pfx) for pfx in c_obj.pfxs
     #              if get_col_name(subs, 'Caribic', pfx) is not None}
 
-    if detr: 
+    if detr:
         try: c_obj.detrend(subs) # add detrended data to all dataframes
         except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
 
@@ -271,8 +271,8 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
         df = df.join(data[cols])
 
         # Reorder columns to match initial dataframes & put substance to front
-        df = df[list(['Flight number', 'p [mbar]'] + cols 
-                          + [c for c in df.columns if c not in 
+        df = df[list(['Flight number', 'p [mbar]'] + cols
+                          + [c for c in df.columns if c not in
                               list(['Flight number', 'p [mbar]', 'geometry']+cols)]
                           + ['geometry'])]
     df.dropna(subset = subs_cols.values(), how='all', inplace=True) # drop rows without any subs data
@@ -283,7 +283,7 @@ def bin_prep(glob_obj, subs, **kwargs):
     c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
     substance = get_col_name(subs, glob_obj.source, c_pfx)
 
-    if kwargs.get('single_yr') is not None: 
+    if kwargs.get('single_yr') is not None:
         years = [int(kwargs.get('single_yr'))]
     else: years = glob_obj.years
 
@@ -291,7 +291,7 @@ def bin_prep(glob_obj, subs, **kwargs):
     if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
     else: df = glob_obj.df
 
-    if kwargs.get('detr') is True: 
+    if kwargs.get('detr') is True:
         if not 'detr_'+substance in df.columns:
             glob_obj.detrend(subs)
         substance = 'detr_' + substance
@@ -302,19 +302,19 @@ def bin_prep(glob_obj, subs, **kwargs):
 
 def bin_1d(glob_obj, subs, **kwargs):
     """ Returns 1D binned objects for each year as lists (lat / lon)
-    
+
     Parameters:
-        subs (str): e.g. 'sf6'. 
-    Optional parameters: 
-        c_pfx (str): caribic file pfx, required for caribic data 
+        subs (str): e.g. 'sf6'.
+    Optional parameters:
+        c_pfx (str): caribic file pfx, required for caribic data
         single_yr (int): if specified, use only data for that specific year
-    
-    Returns: 
+
+    Returns:
         out_x_list, out_y_list: lists of Bin1D objects binned along x / y
     """
     substance, years, df = bin_prep(glob_obj, subs, **kwargs)
 
-    if kwargs.get('xbinlimits') is not None: # not equidistant binning 
+    if kwargs.get('xbinlimits') is not None: # not equidistant binning
         x_binclassinstance = bp.Bin_notequi1d(kwargs.get('xbinlimits'))
     if kwargs.get('ybinlimits') is not None:
         y_binclassinstance = bp.Bin_notequi1d(kwargs.get('ybinlimits'))
@@ -331,7 +331,7 @@ def bin_1d(glob_obj, subs, **kwargs):
         out_x.__dict__.update(x_binclassinstance.__dict__)
 
         y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-        if kwargs.get('ybinlimits') is None: 
+        if kwargs.get('ybinlimits') is None:
             ybmin, ybmax = min(y), max(y)
             y_binclassinstance = bp.Bin_equi1d(ybmin, ybmax, glob_obj.grid_size)
         out_y = bp.Simple_bin_1d(df_yr[substance], y, y_binclassinstance)
@@ -360,13 +360,13 @@ def bin_2d(glob_obj, subs, **kwargs):
         ybinlimits = kwargs.get('ybinlimits')
 
         x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
-        if xbinlimits is None: 
+        if xbinlimits is None:
             # use equidistant binning if not specified else
             xbmin, xbmax = min(x), max(x)
             xbinlimits = list(bp.Bin_equi1d(xbmin, xbmax, glob_obj.grid_size).xbinlimits)
 
         y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-        if ybinlimits is None: 
+        if ybinlimits is None:
             ybmin, ybmax = min(y), max(y)
             ybinlimits = list(bp.Bin_equi1d(ybmin, ybmax, glob_obj.grid_size).xbinlimits)
 

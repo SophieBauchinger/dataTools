@@ -34,7 +34,7 @@ def substance_list(ID):
                                    'noy', 'h2o', 'f11', 'f12'],
         'MLO'   : ['ch4', 'co2', 'n2o', 'sf6', 'co'],
         }
-    if not ID in subs_dict.keys(): 
+    if not ID in subs_dict.keys():
         raise KeyError(f'Unable to provide a substance list for {ID}')
     return subs_dict[ID]
 
@@ -167,10 +167,10 @@ def get_tp_params(tp_def=None, c_pfx=None, crit=None, coord=None, pvu=None):
         d1, d2, d3, d4, d5, d6]
 
     for var in [tp_def, c_pfx, crit, coord, pvu]: # e.g. 'therm'
-        if var is not None: 
+        if var is not None:
             param_dicts = [d for d in param_dicts if var in d.values()]
 
-    if len(param_dicts)==0: 
+    if len(param_dicts)==0:
         given_params = ''.join([f"{name} ({val}), " for name, val in zip(['tp_def', 'c_pfx', 'crit', 'coord', 'pvu'],
                             [tp_def, c_pfx, crit, coord, pvu]) if val is not None])
         raise KeyError(f'No TP params with the following constraints: {given_params}')
@@ -178,14 +178,14 @@ def get_tp_params(tp_def=None, c_pfx=None, crit=None, coord=None, pvu=None):
     return param_dicts
 
 def get_v_coord(c_pfx, coord, tp_def, pvu=3.5):
-    """ Coordinates relative to tropopause 
+    """ Coordinates relative to tropopause
     tp_def (str): 'chem', 'dyn', 'therm'
     coord (str): 'pt', 'dp', 'z'
     pvu (float): 1.5, 2.0, 3.5
     """
     # chemical tropopause (O3)
-    if tp_def == 'chem': 
-        if c_pfx == 'INT' and coord =='z': 
+    if tp_def == 'chem':
+        if c_pfx == 'INT' and coord =='z':
             col_names = {
                 'z'       : 'int_h_rel_TP [km]'}                               # height above O3 tropopause according to Zahn et al. (2003), Atmospheric Environment, 37, 439-440
         elif c_pfx == 'INT2' and coord == 'z':
@@ -195,7 +195,7 @@ def get_v_coord(c_pfx, coord, tp_def, pvu=3.5):
 
     # thermal tropopause
     elif tp_def == 'therm':
-        if c_pfx == 'INT' and coord in ['dp', 'pt']: 
+        if c_pfx == 'INT' and coord in ['dp', 'pt']:
             col_names = {
                 'dp'      : 'int_dp_strop_hpa [hPa]',                          # pressure difference relative to thermal tropopause from ECMWF
                 'pt'      : 'int_pt_rel_sTP_K [K]',                            # potential temperature difference relative to thermal tropopause from ECMWF
@@ -207,8 +207,8 @@ def get_v_coord(c_pfx, coord, tp_def, pvu=3.5):
         else: raise KeyError(f'No {c_pfx} {coord}-coord available for thermal TP')
 
     # dynamical tropopause
-    elif tp_def == 'dyn': 
-        if c_pfx == 'INT': 
+    elif tp_def == 'dyn':
+        if c_pfx == 'INT':
             col_names = {
                 'dp'        : 'int_dp_dtrop_hpa [hPa]',                         # pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF
                 'pt'        : 'int_pt_rel_dTP_K [K]',                           # potential temperature difference relative to  dynamical (PV=3.5PVU) tropopause from ECMWF
@@ -235,7 +235,7 @@ def get_h_coord(c_pfx, coord):
     return col_names[coord]
 
 # =============================================================================
-# Met / Reanalysis data for Caribic-2: 
+# Met / Reanalysis data for Caribic-2:
 #     'Flight number',
 #       'p [mbar]',
 #       'int_z_km [km]',
@@ -245,7 +245,7 @@ def get_h_coord(c_pfx, coord):
 #       'int_ERA5_PRESS [hPa]',
 #       'int_ERA5_PV [PVU]',
 #       'int_ERA5_TEMP [K]',
-# 
+#
 # chemical TP:
 #       'int_CARIBIC2_H_rel_TP [km]',
 #       'int_h_rel_TP [km]',
@@ -253,16 +253,16 @@ def get_h_coord(c_pfx, coord):
 #       'int_Theta [K]',
 #       'int_ToAirTmp [degC]',
 #       'int_Tpot [K]',
-# 
-# dynamical TP: 
+#
+# dynamical TP:
 #       'int_dp_dtrop_hpa [hPa]',
 #       'int_pt_rel_dTP_K [K]',
 #       'int_z_rel_dTP_km [km]',
 #       'int_ERA5_D_1_5PVU_BOT [K]',
 #       'int_ERA5_D_2_0PVU_BOT [K]',
 #       'int_ERA5_D_3_5PVU_BOT [K]',
-#      
-# thermal TP: 
+#
+# thermal TP:
 #       'int_dp_strop_hpa [hPa]',
 #       'int_pt_rel_sTP_K [K]',
 #       'int_z_rel_sTP_km [km]',
@@ -297,7 +297,7 @@ def get_coord_name(coord, source, c_pfx=None, CLaMS=True):
     elif source=='Caribic' and c_pfx=='INT2':
         col_names = {
             'p'             : 'p [mbar]',                                       # pressure (mean value)
-            'z_chem'        : 'int_CARIBIC2_H_rel_TP [km]',                     # H_rel_TP; replacement for H_rel_TP => O3 tropopause 
+            'z_chem'        : 'int_CARIBIC2_H_rel_TP [km]',                     # H_rel_TP; replacement for H_rel_TP => O3 tropopause
             'pv'            : 'int_ERA5_PV [PVU]',                              # Potential vorticity (ERA5)
             'pt'            : 'int_Theta [K]',                                  # Potential temperature
             'p_era5'        : 'int_ERA5_PRESS [hPa]',                           # Pressure (ERA5)
