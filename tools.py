@@ -17,7 +17,11 @@ import copy
 
 import toolpac.calc.binprocessor as bp
 
-from dictionaries import coord_dict, get_col_name, get_v_coord, get_h_coord, substance_list
+from dictionaries import get_coordinates, get_col_name, coord_dict, get_coord, substance_list, get_substances
+
+#TODO  Calculate some other lovely stuff from what we have in the data
+# metpy.calc.geopotential_to_height
+# use indices in emac column data to calculate eg. pt at TP in EMAC 
 
 #%% Data extraction
 def monthly_mean(df, first_of_month=True):
@@ -107,28 +111,46 @@ def rename_columns(columns):
     col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
     return col_dict, col_dict_rev
 
-def EMAC_vars_filter(ds, incl_model=True, incl_tropop=True):
-    """
-    Only keeping purely time-dependent variables on the track (not level-dep.)
+def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=False):
+    """ Choose which variables to keep when importing EMAC data .
+
+    Parameters: 
+        ds: currrent xarray dataset 
+        inlc_subs (bool): keep tracer substances 
+        incl_model (bool): keep modelled meteorological data
+        incl_tropop (bool): keep tropopause-relevant variabels
+    
+    Variable description:
         time - datetime [ns]
         tlon - track longitude [degrees_east]
         tlat - track latitude [degrees_north]
         tpress - track pressure [hPa]
         tps - track surface pressure [Pa]
-
+        tracer_* - modelled substances [mol/mol]
         tropop_* - tropopause relevant variables
         ECHAM5_* - modelled met. data
         e5vdiff_tpot* - potential temperature [K]
     """
-    variables = ['time', 'tlon', 'tlat', 'tpress', 'tps']
-    if incl_model==True:
-        variables.extend([v for v in ds.variables if v.startswith(('ECHAM5_', 'e5vdiff_tpot'))])
-    if incl_tropop==True:
-        variables.extend([v for v in ds.variables if v.startswith('tropop_')])
-
+    variables = ['time', 'tlon', 'lev', 'tlat', 'tpress', 'tps']
+    if incl_model:
+        variables.extend([v for v in ds.variables 
+                          if v.startswith(('ECHAM5_', 'e5vdiff_tpot'))
+                          and not v.endswith(('m1', 'aclc'))])
+    if incl_tropop:
+        variables.extend([v for v in ds.variables 
+                          if v.startswith('tropop_') and not v.endswith('_f')
+                          and not any([x in v for x in ['_clim', 'pblh']])])
+    if incl_subs:
+        variables.extend(get_substances(**{'ID':'EMAC'}).keys())
     ds = ds[variables] # only keep specified variables
     ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
     return ds
+
+def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=False):
+    """ Keep only variables that depend only on time """
+    ds = process_emac_s4d(ds)
+    variables = [v for v in ds.variables if ds[v].dims == ('time',)]
+    return ds[variables]
 
 #%% Data selection
 def data_selection(c_obj, flights=None, years=None, latitudes=None,
@@ -201,7 +223,8 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
     """ Get appropriate coordinates and labels. """
 
-    y_coord = get_v_coord(y_pfx, ycoord, tp_def, pvu)
+    y_coord = get_coord({'ID':y_pfx, 'vcoord':ycoord, 'tp_def':tp_def, 'pvu':pvu})
+        # y_pfx, ycoord, tp_def, pvu)
 
     pv = '%s' % (f', {pvu}' if tp_def=='dyn' else '')
     model = '%s' % (' - ECMWF' if (y_pfx=='INT' and tp_def in ['dyn', 'therm']) else '')
@@ -213,41 +236,19 @@ def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
 
     # x coordinate = equivalent latitude
     if xcoord is not None:
-        x_coord = get_h_coord(x_pfx, xcoord)
+        x_coord = get_coord(**{'ID':x_pfx, 'hcoord':xcoord})# get_h_coord(x_pfx, xcoord)
         x_label = 'Eq. latitude (%s) ' % ('ECMWF' if x_pfx=='INT' else 'ERA5') + '[°N]'
         return y_coord, y_label, x_coord, x_label
 
     return y_coord, y_label
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
-def coord_combo(c_obj, save=True):
-    """ Create dataframe with all possible coordinates but
-    no measurement / substance values """
-    # merge lists of coordinates for all pfxs in the object
-    coords = list(set([i for i in [coord_dict()[pfx] for pfx in c_obj.pfxs]
-             for i in i])) + ['geometry', 'Flight number']
-    if 'GHG' in c_obj.pfxs: df = c_obj.data['GHG'].copy() # copy bc don't want to overwrite data
-    else: df = pd.DataFrame()
-    for pfx in [pfx for pfx in c_obj.pfxs if pfx!='GHG']:
-        df = df.combine_first(c_obj.data[pfx].copy())
-    df.drop([col for col in df.columns if col not in coords],
-            axis=1, inplace=True) # remove non-met / non-coord data
 
-    if 'INT2' in c_obj.pfxs: # create thermal TP relative coordinates
-        df['int_dp_strop_hpa_ERA5 [hPa]'] = df['int_ERA5_PRESS [hPa]'] - df['int_ERA5_TROP1_PRESS [hPa]']
-        df['int_pt_rel_sTP_K_ERA5 [K]'] = df['int_Theta [K]'] - df['int_ERA5_TROP1_THETA [K]']
-
-    # reorder columns
-    df = df[list(['Flight number', 'p [mbar]']
-                      + [col for col in df.columns
-                         if col not in ['Flight number', 'p [mbar]', 'geometry']]
-                      + ['geometry'])]
-    return df
 
 def coord_merge_substance(c_obj, subs, save=True, detr=True):
     """ Insert msmt data into full coordinate df from coord_merge() """
     # create reference df if it doesn't exist
-    if not 'met_data' in dir(c_obj): df = coord_combo(c_obj)
+    if not 'met_data' in dir(c_obj): df = c_obj.coord_combo()
     else: df = c_obj.met_data.copy()
 
     subs_cols = {}
