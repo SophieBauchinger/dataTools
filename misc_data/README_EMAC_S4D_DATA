@@ -1,0 +1,58 @@
+The Chemistry Climate Model (CCM) simulation conducted with the
+ECHAM/MESSY Atmospheric Chemistry (EMAC) model.
+The Simulation has "specified dynamics" (SD), i.e. is nudged using
+Newtonian Relaxation in the free troposphere (up until 100 hPa) towards ERA5
+reanalysis data.
+The simulation collects a large list of variables along flight tracks given the path of the aircrafts as input.
+
+The temporal output frequency is 12 minutes. The output is saved into monthly
+files per aircraft.
+
+The value is approximated by either nearest neighbour (n) or bilinear (b)
+interpolation using the flight track and the EMAC global Gaussian Grid with a
+horizontal discretisation into 128 longitudes and 64 latitudes.
+If a surprising value is found in one interpolation, the other should be
+checked.
+
+The entire curtain, i.e. the model output on all 90 vertical levels, is written
+out. The output can be vertically subsampled (_s) to the aircraft location to
+held only one value.
+
+The naming convention is as such:
+
+YYYYMM_s4d_{n/b}{aircraft abbreviation}{_s}.nc
+
+e.g.
+
+200804_s4d_bCARIB2.nc
+Contains the model output on all model levels along the CARIBIC-2
+flight campaign from April 2008. Each value is interpolated using bilinear
+interpolation.
+
+200804_s4d_bCARIB2_s.nc
+The output is additionally vertically subsampled at the location of the
+aircraft.
+
+
+To regrid from the native vertical model layers to pressure levels,
+the calculation is
+
+press = (hyam + hybm * tps)/100
+
+in hPa. This works only for files containing the entire curtain.
+
+
+Overview over campaign and corresponding aircraft data:
+
+AirCore -- BIG002, GMD, GUF003, roo
+ATom ----- N817NA
+CARIBIC -- CARIBIC
+HALO ----- DADLR
+HIPPO ---- N677F
+IAGOS ---- IAGOS
+JULIA ---- CGAWI, CGHGF, double, GLUXE, GHawk, triple
+           (+ DADLR, DCGFD, DCMET, M55204, N677F, N926, PHLAB)
+MOZAIC --- MOZAIC
+
+
+For further questions, please contact moritz.witt@dlr.de .
