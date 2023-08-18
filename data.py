@@ -15,6 +15,7 @@ from os.path import exists
 import matplotlib.pyplot as plt
 from functools import partial
 import metpy.calc
+import dill
 
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
@@ -733,62 +734,6 @@ class EMACData(GlobalData):
             if choice.upper()=='Y':
                 return self.create_df()
         else: return self.data['df']
-
-# =============================================================================
-# class EMAC_s(EMACData):
-#     """ Subsampled EMAC Dataset and Dataframe """
-#     def __init__(self, years=range(2000, 2020), interp='b', 
-#                  pdir=None, single_file=False, df=True): 
-#         super().__init__(years, interp, pdir, True, single_file)
-#         if df: self.make_df()
-# 
-#     def make_df(self):
-#         """ Create dataframe from time-dependent variables in dataset """
-#         # only choose variables that only depend on time
-#         # variables = [v for v in self.data['ds'].variables if hasattr(self.data['ds'][v], 'dims')]
-#         variables = [v for v in self.data['ds'].variables if self.data['ds'][v].dims == ('time',)]
-#         ds = self.data['ds'][variables]#[['time', 'longitude', 'latitude'] + variables]
-# 
-#         df = self.ds.to_dataframe()
-#         # drop rows without geodata
-#         df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
-#         geodata = [Point(lat, lon) for lat, lon in zip(
-#             df['latitude'], df['longitude'])]
-#         df.drop(['longitude', 'latitude'], axis=1, inplace=True)
-#         df.index = df.index.floor('S')
-# 
-#         self.data['df'] = geopandas.GeoDataFrame(df, geometry=geodata)
-#         self.data['dict'] = {cname : f'{ds[cname].long_name} [{ds[cname].units}]'
-#                          for cname in df.columns if cname != 'geometry'}
-#         return self.data['df']
-# 
-#     @property
-#     def df(self):
-#         """ (Compute and) return dataframe attribute """
-#         if 'df' not in self.data:
-#             choice = input('No dataframe found. Generate it now? [Y/N]\n')
-#             if choice.upper()=='Y':
-#                 return self.make_df()
-#         else: return self.data['df']
-# 
-# class EMAC(EMACData):
-#     def __init__(self, years=range(2000, 2020), interp='b', 
-#                  pdir=None, single_file=False): 
-#         super().__init__(years, interp, pdir, False, single_file)
-# =============================================================================
-
-# =============================================================================
-# def single_emac(subsam = True):
-#     """ Test EMAC get_data functionality without doing the whole dang thing """
-#     if subsam:
-#         parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_subsam_CARIBIC/'
-#         fnames = parent_dir + '201204_s4d_bCARIB2_s.nc' # f'*{interp}CARIB2.nc'
-#     else:
-#         parent_dir = 'E:/MODELL/EMAC/TPChange/s4d_CARIBIC/'
-#         fnames = parent_dir + '201204_s4d_bCARIB2.nc' # f'*{interp}CARIB2.nc'
-#     with xr.open_mfdataset(fnames, preprocess=partial(process_emac_s4d), mmap=False) as ds_mon:
-#         return ds_mon # ds_mon.rename({'tlon':'longitude', 'tlat':'latitude'})
-# =============================================================================
 
 #%% Local data
 class LocalData(object):
