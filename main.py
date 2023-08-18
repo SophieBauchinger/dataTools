@@ -5,6 +5,12 @@
 
 Main script for Caribic measurement analysis routine.
 
+Tropopause definitions: 
+    - dynamical: ideal > 30°
+    - chemical: any lat
+    - thermal (WMO): best < 30°
+    - coldpoint: only < 30°
+
 Substances in Caribic data:
 'GHG':    ['ch4', 'co2',        'n2o', 'sf6']
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
