@@ -16,7 +16,7 @@ from dictionaries import get_coord, get_tp_params, get_coordinates
 
 #%% 
 if not 'emac' in locals(): 
-    with open('emac_s_df.pkl', 'rb') as f:
+    with open('emac_df.pkl', 'rb') as f:
         emac = dill.load(f)
 
 if not 'caribic' in locals():
@@ -24,16 +24,12 @@ if not 'caribic' in locals():
         caribic = dill.load(f)
 
 #%% Generate needed values from EMAC
-
-
+if not 'tp' in emac.data: 
+    emac.create_tp()
 
 #%% Tropopause height vs latitude
 
 # def tph_vs_lat(glob_obj, **tp_params):
-
-    
-
-
 #     # if ID == 'ECMWF':
 #     #     data = glob_obj.met_data
 #     #     latitude = np.array(data.geometry.x)
@@ -62,7 +58,6 @@ def plot_tp_height(ax, obj, plot_params, **tp_params):
         data = obj.met_data
     elif obj.source == 'EMAC':
         data = obj.df
-
 
     x = np.array(data.geometry.x)
     # no dynamical tropopause in the tropics
@@ -104,8 +99,6 @@ def plot_av_tp_height(ax, obj, plot_params, **tp_params):
         data = data.where(pd.Series([(i<30 or i>-30) for i in x ]) )
         x = data.geometry.x
 
-    
-
     if tp_params['unit'] == 'Pa': 
         v = v*1e-2 #!!! NONSENSE but want to make it into hPa
 
@@ -137,7 +130,7 @@ def plot_pressure_abs():
     tps = get_coordinates(**{'vcoord':'p', 'tp_def':'not_nan', 'rel_to_tp':False})
     fig, axs = plt.subplots(1, dpi=150)
     plt.title('absolute')
-    for tp in tps.values():
+    for tp in tps:
         if not tp.rel_to_tp:
             # plot_tp_height(axs, get_obj(tp.source), 
             #                 plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
@@ -156,7 +149,7 @@ def plot_pressure_rel():
     tps = get_coordinates(**{'vcoord':'p', 'tp_def':'not_nan', 'rel_to_tp':True})
     fig, axs = plt.subplots(1, dpi=150)
     plt.title('relative')
-    for tp in tps.values():
+    for tp in tps:
         if tp.rel_to_tp:
             plot_tp_height(axs, get_obj(tp.source), 
                             plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
