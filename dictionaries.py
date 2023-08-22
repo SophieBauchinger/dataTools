@@ -38,7 +38,7 @@ class Coordinate():
         hcoord (str): lat, lon, eql
         tp_def (str): chem, dyn, therm, cpt
         rel_to_tp (bool): coordinate relative to tropopause 
-        modell (str): msmt, ECMWF, ERA5, EMAC
+        model (str): msmt, ECMWF, ERA5, EMAC
         pvu (float): 1.5, 2.0, 3.5
         """
         self.__dict__.update(kwargs)
@@ -80,24 +80,13 @@ def coord_dict(*IDs):
     return [y.col_name for id in IDs for y in get_coordinates(**{'ID':id})]
 
 def get_coord(**kwargs):
-    if not any(v in kwargs.keys() for v in ['vcoord', 'hcoord', 'var']):
+    if not any(v in kwargs for v in ['vcoord', 'hcoord', 'var']):
         raise KeyError('Please supply at least one of vcoord, hcoord, var.')
     coordinates = get_coordinates(**kwargs) # dict i:Coordinate
-    if len(coordinates.keys()) > 1: 
-        raise Warning(f'Multiple columns fulfill the conditions: {[i.col_name for i in list(coordinates.values())]}')
-        return [i.col_name for i in list(coordinates.values())]
-    return list(coordinates.values())[0].col_name
-
-def tp_coord_pres(new_coord):
-    """ Returns dictionary of column names needed for calculating new coord """
-    with open('coordinates.csv') as f:
-        tp_coords = pd.read_csv(f)
-    
-    coord_info = tp_coords.loc[new_coord.col_name]
-    var1 = coord_info['var1'] # met 
-    var2 = coord_info['var2'] # tp / rel
-    return var1, var2
-    
+    if len(coordinates) > 1: 
+        raise Warning(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
+        return [i.col_name for i in coordinates]
+    return coordinates[0].col_name
 
 #%% Substances
 class Substance():
@@ -108,7 +97,7 @@ class Substance():
         short_name (str)
         unit (str)
         ID (str): INT, INT2, EMAC, MLO, MZT, MHD
-        modell (str): msmt, CLAMS, EMAC, MOZART
+        model (str): msmt, CLAMS, EMAC, MOZART
         function (str): h, s, q
         """
         self.col_name = col_name
@@ -130,7 +119,7 @@ def get_substances(**kwargs):
     """ Return dictionary of col_name:Substance for all items were conditions are met """
     df = substance_df()
     # keep only rows where all conditions are fulfilled
-    for cond in kwargs.keys(): 
+    for cond in kwargs: 
         df = df[df[cond] == kwargs[cond]]
     if len(df) == 0: 
         raise KeyError('No data found using the given specifications')
@@ -153,29 +142,17 @@ def get_subs(substance, ID, clams=False):
     """ Return Substance object with the given specifications """
     conditions = {'short_name' : substance, 'ID' : ID}
     if ID=='INT2' and substance not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
-        conditions.update({'modell' : 'CLAMS' if clams else 'msmt'})
+        conditions.update({'model' : 'CLAMS' if clams else 'msmt'})
     subs_dict = get_substances(**conditions)
    
-    if len(subs_dict.keys()) > 1: 
-        raise Warning(f'Multiple columns fulfill the conditions: {list(subs_dict.keys())}')
-        return list(subs_dict.keys())
+    if len(subs_dict) > 1: 
+        raise Warning(f'Multiple columns fulfill the conditions: {list(subs_dict)}')
+        return list(subs_dict)
     return list(subs_dict.values())[0]
 
 def get_col_name(substance, ID, clams=False):
+    #TODO change source, c_pfx to ID in all other scripts
     return get_subs(substance, ID, clams).col_name
-
-# def get_col_name(substance, ID, clams=False): #TODO change source, c_pfx to ID in all other scripts
-#     """ Return column name that fits the given conditions.
-#     Backwards compatible with previous fctn definition """
-#     conditions = {'short_name' : substance, 'ID' : ID}
-#     if ID=='INT2' and substance not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
-#         conditions.update({'modell' : 'CLAMS' if clams else 'msmt'})
-#     subs_dict = get_substances(**conditions)
-   
-#     if len(subs_dict.keys()) > 1: 
-#         raise Warning(f'Multiple columns fulfill the conditions: {list(subs_dict.keys())}')
-#         return list(subs_dict.keys())
-#     return list(subs_dict.keys())[0]
 
 def get_fct_substance(substance, verbose=False):
     """ Returns corresponding fct from toolpac.outliers.ol_fit_functions """
@@ -264,7 +241,7 @@ def get_vlims(substance):
 
 #%% Input choice and validation
 def validated_input(prompt, choices):
-    valid_values = choices.keys()
+    valid_values = choices
     valid_input = False
     while not valid_input:
         value = input(prompt)
