@@ -14,7 +14,7 @@ import xarray as xr
 from os.path import exists
 import matplotlib.pyplot as plt
 from functools import partial
-import metpy.calc
+from metpy import calc
 import dill
 
 # from toolpac.calc import bin_1d_2d
@@ -24,7 +24,7 @@ from toolpac.conv.times import fractionalyear_to_datetime
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from dictionaries import get_col_name, substance_list, get_fct_substance, coord_dict, get_coordinates
+from dictionaries import get_col_name, substance_list, get_fct_substance, coord_dict, get_coordinates, get_coord
 from tools import monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, process_emac_s4d, process_emac_s4d_s
 from tropFilter import chemical, dynamical, thermal
 
@@ -68,7 +68,6 @@ class GlobalData(object):
             years (int) """
 
         # input validation, choose only years that are actually available
-
         yr_list = [yr for yr in years if yr in self.years]
         if len(yr_list)==0: raise KeyError(f'No valid for any of the given years {years}')
         elif len(yr_list) != len(years):
@@ -95,10 +94,7 @@ class GlobalData(object):
             ds_list = [k for k in self.data
                        if isinstance(self.data[k], xr.Dataset)]
             for k in ds_list:
-                all_dates = pd.to_datetime(out.data[k]['time'].values) # allows extracting 'year'
-                year_mask = all_dates.year.isin(yr_list) # True if date in years
-                chosen_dates = out.data[k]['time'].where(year_mask)
-                out.data[k] = out.data[k].sel(time = chosen_dates)
+                out.data[k] = out.data[k].sel(time=out.data[k].time.dt.year.isin(yr_list))
 
         else:
             out.df =  out.df[out.df.index.year.isin(yr_list)].sort_index()
@@ -125,13 +121,14 @@ class GlobalData(object):
                 out.data[k] = out.data[k].cx[lat_min:lat_max, -180:180]
                 out.data[k].sort_index(inplace=True)
 
-            # update available years, flights !!! only if dataframe existsss
+            # update available years, flights
             if len(df_list) !=0:
                 out.years = list(set([yr for yr in out.data[df_list[-1]].index.year]))
                 out.years.sort()
-            if hasattr(out, 'flights'):
-                out.flights = list(set([fl for fl in out.data[df_list[-1]]['Flight number']]))
-                out.flights.sort()
+
+                if hasattr(out, 'flights'):
+                    out.flights = list(set([fl for fl in out.data[df_list[-1]]['Flight number']]))
+                    out.flights.sort()
 
             # Datasets
             ds_list = [k for k in self.data
@@ -168,6 +165,7 @@ class GlobalData(object):
         if self.source != 'Caribic': 
             raise NotImplementedError('Action not yet supported for non-Caribic data')
         else:
+            eql_col = get_coord(source=self.source, model=model)
             if model == 'ERA5': eql_col = 'int_ERA5_EQLAT [deg N]'
             elif model == 'ECMWF': eql_col = 'int_eqlat [deg]'
 
@@ -181,8 +179,6 @@ class GlobalData(object):
 
             for k in df_list: # delete everything outside eql range
                 out.data[k] = out.data[k][out.data[k].index.isin(df.index)]
-
-        # caribic.data['INT2'][caribic.data['INT2']['int_ERA5_EQLAT [deg N]'] > 10].dropna(subset='int_ERA5_EQLAT [deg N]')
 
         return out
 
@@ -208,14 +204,14 @@ class CaribicData(GlobalData):
         self.pfxs = pfxs
         self.get_data(verbose=verbose) # creates self.data dictionary
         self.met_data = self.coord_combo() # reference for met data for all msmts
-        self.create_tp_cols()
+        self.create_tp_coords()
 
     def get_data(self, verbose=False):
         """
         If Caribic: Create geopandas df from data files for all available substances
             get all files starting with prefixes in c_pfxs - each in one dataframe
             lon / lat data is put into a geometry column
-            Index is set to datetime of the sampling / modelled times
+            Index is set to datetime of the sampling / modeled times
             a column with flight number is created
 
         If Mozart: Create dataset from given file
@@ -641,7 +637,6 @@ class EMACData(GlobalData):
             return self
 
         except: 
-            #TODO implement selecting only specific years from the getgo
             if s4d: # preprocess: process_s4d
                 fnames = self.pdir + "s4d_CARIBIC/*bCARIB2.nc"
                 # extract data, each file goes through preprocess first to filter variables
@@ -652,52 +647,70 @@ class EMACData(GlobalData):
                 # extract data, each file goes through preprocess first to filter variables
                 with xr.open_mfdataset(fnames_s, preprocess=partial(process_emac_s4d_s), mmap=False) as ds:
                     self.data['s4d_s'] = ds
+            self.sel_year(years) #!!! need to check if this workd
             # update years according to available data
             self.years = list(set(pd.to_datetime(self.data['{}'.format('s4d' if s4d else 's4d_s')]['time'].values).year))
             return self
+
 
     def create_tp(self):
         """ Create dataset with tropopause relevant parameters from s4d and s4d_s""" 
         tp_ds = xr.Dataset()
         ds = self.data['s4d']
-        ds_s = self.data['s4d_s'] # incl. 'e5vdiff_tpot_at_fl'
+        ds_s = self.data['s4d_s'] # flight level values
 
         # get geopotential height from geopotential (s4d & s4d_s for _at_fl)
-        height = get_coordinates(**{'col_name':'ECHAM5_height'})[0]
-        ds[height.col_name] = metpy.calc.geopotential_to_height(ds[height.var1])
+        ds = ds.assign(ECHAM5_height = calc.geopotential_to_height(ds['ECHAM5_geopot'])).metpy.dequantify()
+        ds_s = ds_s.assign(ECHAM5_height_at_fl = calc.geopotential_to_height(ds_s['ECHAM5_geopot_at_fl'])).metpy.dequantify()
+        # ^ metpy.dequantify allows putting the units back into being attributes for WHATEVER REASON
+        
+        new_coords = get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'not_tpress', 'var2':'not_nan'})
+        abs_coords = [c for c in new_coords if c.var2.endswith('_i')] # get eg. value of pt at tp
+        rel_coords = list(get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'tpress', 'var2':'not_nan'}) 
+                          + [c for c in new_coords if c not in abs_coords]) # eg. pt distance to tp
 
-        height_at_fl = get_coordinates(**{'col_name':'ECHAM5_height_at_fl'})[0]
-        ds_s[height_at_fl.col_name] = metpy.calc.geopotential_to_height(ds_s[height_at_fl.var1])
-
-        vs = ['longitude', 'latitude', 'tpress',
-              height.col_name]
+        # copy relevant data into new dataframe
+        vs = ['longitude', 'latitude', 'tpress', 
+              'tropop_tp_PV', 'tropop_tp_WMO', 'tropop_cpt',
+              'e5vdiff_tpot', 'ECHAM5_height']
         for v in vs: tp_ds[v] = ds[v]
 
-        vs_s = ['ECHAM5_tm1_at_fl', 'ECHAM5_tpoteq_at_fl','ECHAM5_press_at_fl',
-                'tropop_PV_at_fl', 'e5v_diff_tpot_at_fl',
-                'tropop_tp_PV', 'tropop_tp_WMO', 'tropop_cpt',
-                height_at_fl.col_name]
+        vs_s = ['tropop_PV_at_fl', 'e5vdiff_tpot_at_fl',
+                'ECHAM5_tm1_at_fl', 'ECHAM5_tpoteq_at_fl', 'ECHAM5_press_at_fl',
+                'ECHAM5_height_at_fl']
         for v in vs_s: tp_ds[v] = ds_s[v]
 
-        new_coords = get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var2':'not_nan'})
-        for coord in new_coords:
-            var1 = ds[coord.var1] if coord.var1 in ds.variables else ds_s[coord.var1]
-            var2 = ds[coord.var2] if coord.var2 in ds.variables else ds_s[coord.var2]
+        for coord in abs_coords: 
+            # eg. potential difference at the tropopause
+            print(f'Calculating {coord.col_name}')
+            met = tp_ds[coord.var1]
+            tp_ds[coord.col_name] = met.sel(lev=ds[coord.var2], method='nearest')
 
-            if coord.var2.endswith('_i') or coord.vars2 == 'lev':
-                # find value at index (var2) from column data (var1)
-                pass
-                tp_ds[coord.col_name] = var1.sel('lev'==np.round(var2)) #!!! this is BS
-            else: 
-                # met(var1) = tp + rel
-                tp_ds[coord.col_name] = var1 - var2
+        for coord in rel_coords:
+            # mostly depend on abs_coords
+            print(f'Calculating {coord.col_name}')
+            met = tp_ds[coord.var1] 
+            tp = tp_ds[coord.var2]
+            tp_ds[coord.col_name] = met - tp
+            # except:  print(coord.var1, met, '\n', coord.var2, tp, '\n\n')
+
+        # remove level dimension by removing 'e5vdiff_tpot', 'ECHAM5_height' 
+        tp_ds = tp_ds.drop_vars(['e5vdiff_tpot', 'ECHAM5_height'])
+        # variables = [v for v in tp_ds.variables if tp_ds[v].dims == ('time',)]
+        # tp_ds = tp_ds[variables]
 
         self.data['tp'] = tp_ds
 
-    def create_df(self):
+    def create_df(self, tp=True):
         """ Create dataframe from time-dependent variables in dataset """
-        #TODO: might get spicy if we have a multiindex here
-        df = self.ds.to_dataframe()
+        ds = self.data['s4d_s'].copy()
+        if tp and not 'tp' in self.data:
+            print('Tropopause dataset not found, generating it now.')
+            self.create_tp()
+            for c in self.data['tp'].variables: 
+                ds[c] = self.data['tp'][c]
+
+        df = ds.to_dataframe()
         # drop rows without geodata
         df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
         geodata = [Point(lat, lon) for lat, lon in zip(
@@ -723,7 +736,7 @@ class EMACData(GlobalData):
     def tp(self):
         """ Returns dataset with tropopause relevant parameters  """
         if not 'tp' in self.data: 
-            self.create_tp_ds()
+            self.create_tp()
         return self.data['tp'] # tropopause relevant parameters, only time-dependent
 
     @property
