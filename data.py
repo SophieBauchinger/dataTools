@@ -140,7 +140,7 @@ class GlobalData(object):
 
             # update years if it hasn't happened with the dataframe already
             if 'df' not in self.data and self.source=='EMAC': # only dataset exists
-                self.years = list(set(pd.to_datetime(self.data['ds']['time'].values).year))
+                self.years = list(set(pd.to_datetime(self.data.ds['time'].values).year))
 
         else:
             out.df =  out.df.query(f'latitude > {lat_min}')
@@ -656,8 +656,8 @@ class EMACData(GlobalData):
     def create_tp(self):
         """ Create dataset with tropopause relevant parameters from s4d and s4d_s""" 
         tp_ds = xr.Dataset()
-        ds = self.data['s4d']
-        ds_s = self.data['s4d_s'] # flight level values
+        ds = self.data['s4d'].copy()
+        ds_s = self.data['s4d_s'].copy() # flight level values
 
         # get geopotential height from geopotential (s4d & s4d_s for _at_fl)
         ds = ds.assign(ECHAM5_height = calc.geopotential_to_height(ds['ECHAM5_geopot'])).metpy.dequantify()
@@ -707,8 +707,8 @@ class EMACData(GlobalData):
         if tp and not 'tp' in self.data:
             print('Tropopause dataset not found, generating it now.')
             self.create_tp()
-            for c in self.data['tp'].variables: 
-                ds[c] = self.data['tp'][c]
+            cols = [c for c in self.tp.variables if not c == 'lev']
+            ds = self.data['tp'][cols]
 
         df = ds.to_dataframe()
         # drop rows without geodata
