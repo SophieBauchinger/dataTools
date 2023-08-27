@@ -14,18 +14,22 @@ from toolpac.calc.binprocessor import Bin_equi1d, Simple_bin_1d
 
 from dictionaries import get_coord, get_tp_params, get_coordinates
 
-#%% 
+#%% Import data
 if not 'emac' in locals(): 
-    with open('emac_df.pkl', 'rb') as f:
+    with open('misc_data\emac_complete.pkl', 'rb') as f:
         emac = dill.load(f)
 
 if not 'caribic' in locals():
-    with open('caribic.pkl', 'rb') as f: 
+    with open('misc_data\caribic.pkl', 'rb') as f: 
         caribic = dill.load(f)
 
-#%% Generate needed values from EMAC
+# Generate needed values from EMAC if not available
 if not 'tp' in emac.data: 
     emac.create_tp()
+
+def get_obj(source):
+    if source == 'Caribic': return caribic
+    if source =='EMAC': return emac
 
 #%% Tropopause height vs latitude
 
@@ -87,6 +91,7 @@ def plot_av_tp_height(ax, obj, plot_params, **tp_params):
     """ """
     if obj.source == 'Caribic': data = obj.met_data
     elif obj.source == 'EMAC': data = obj.df
+    if not tp_params['col_name'] in data.columns: return
     
     x = np.array(data.geometry.x)
     v = data[tp_params['col_name']]
@@ -120,48 +125,41 @@ def plot_av_tp_height(ax, obj, plot_params, **tp_params):
     # ax.set_xlim(plot_params['xlim'])
     return
 
-
-def get_obj(source):
-    if source == 'Caribic': return caribic
-    if source =='EMAC': return emac
-
-def plot_pressure_abs():
+def plot_abs(vcoord):
     """ Plot all absolute tropopause heights on a pressure plot """
-    tps = get_coordinates(**{'vcoord':'p', 'tp_def':'not_nan', 'rel_to_tp':False})
+    tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=False)
     fig, axs = plt.subplots(1, dpi=150)
-    plt.title('absolute')
+    plt.title(f'absolute {vcoord}')
     for tp in tps:
-        if not tp.rel_to_tp:
-            # plot_tp_height(axs, get_obj(tp.source), 
-            #                 plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-            #                 **tp.__dict__)
-            plot_av_tp_height(axs, get_obj(tp.source), 
-                            plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-                            **tp.__dict__)
-            plt.legend(title=tp.tp_def)
+        # plot_tp_height(axs, get_obj(tp.source), 
+        #                 plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+        #                 **tp.__dict__)
+        plot_av_tp_height(axs, get_obj(tp.source), 
+                        plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+                        **tp.__dict__)
+        plt.legend(title=tp.tp_def)
     axs.invert_yaxis()
     plt.show()
 
-plot_pressure_abs()
-
-def plot_pressure_rel():
+def plot_rel(vcoord):
     """ Plot all relative tropopause heights on a pressure plot """
-    tps = get_coordinates(**{'vcoord':'p', 'tp_def':'not_nan', 'rel_to_tp':True})
+    tps = get_coordinates(vcoord=vcoord, tp_def = 'not_nan', rel_to_tp=True)
     fig, axs = plt.subplots(1, dpi=150)
-    plt.title('relative')
+    plt.title(f'relative {vcoord}')
     for tp in tps:
-        if tp.rel_to_tp:
-            plot_tp_height(axs, get_obj(tp.source), 
-                            plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-                            **tp.__dict__)
-            plot_av_tp_height(axs, get_obj(tp.source), 
-                            plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-                            **tp.__dict__)
-            plt.legend(title=tp.tp_def)
+        # plot_tp_height(axs, get_obj(tp.source), 
+        #                 plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+        #                 **tp.__dict__)
+        plot_av_tp_height(axs, get_obj(tp.source), 
+                        plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+                        **tp.__dict__)
+        plt.legend(title=tp.tp_def)
     axs.invert_yaxis()
     plt.show()
 
-plot_pressure_abs()
+for vc in ['p', 'pt', 'z']:
+    plot_abs(vcoord=vc)
+    plot_rel(vcoord=vc)
 
 # fig, axs = plt.subplots(1, dpi=250)
 # for ax, obj, ID in zip([axs, axs, axs], 
