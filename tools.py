@@ -14,6 +14,8 @@ import pandas as pd
 import geopandas
 from shapely.geometry import Point
 import copy
+import metpy
+from metpy.units import units
 
 import toolpac.calc.binprocessor as bp
 
@@ -142,13 +144,21 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=False):
                           and not any([x in v for x in ['_clim', 'pblh']])])
     if incl_subs:
         variables.extend(get_substances(**{'ID':'EMAC'}).keys())
-    ds = ds[variables] # only keep specified variables
+    # only keep specified variables
+    ds = ds[variables]
+    for var in ds.variables: # streamline units 
+        if hasattr(ds[var], 'units'):
+            if ds[var].units == 'Pa': ds[var] = ds[var].metpy.convert_units(units.hPa)
+            elif ds[var].units == 'm': ds[var] = ds[var].metpy.convert_units(units.km)
+            ds[var] = ds[var].metpy.dequantify() # makes units an attribute again
+    # if either lon or lat are nan, drop that timestamp
+    ds.dropna(subset=['tlon', 'tlat'], how='any', dim='time')
     ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
     return ds
 
-def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=False):
+def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Keep only variables that depend only on time """
-    ds = process_emac_s4d(ds)
+    ds = process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 

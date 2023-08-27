@@ -14,7 +14,9 @@ import xarray as xr
 from os.path import exists
 import matplotlib.pyplot as plt
 from functools import partial
+import metpy
 from metpy import calc
+from metpy.units import units
 import dill
 
 # from toolpac.calc import bin_1d_2d
@@ -69,9 +71,9 @@ class GlobalData(object):
 
         # input validation, choose only years that are actually available
         yr_list = [yr for yr in years if yr in self.years]
-        if len(yr_list)==0: raise KeyError(f'No valid for any of the given years {years}')
+        if len(yr_list)==0: raise KeyError(f'No valid data for any of the given years: {years}')
         elif len(yr_list) != len(years):
-            print(f'No data available for {[yr for yr in years if yr not in self.years]}')
+            print(f'Note: No data available for {[yr for yr in years if yr not in self.years]}')
 
         out = type(self).__new__(self.__class__) # new class instance
         for attribute_key in self.__dict__: # copy attributes
@@ -97,6 +99,7 @@ class GlobalData(object):
                 out.data[k] = out.data[k].sel(time=out.data[k].time.dt.year.isin(yr_list))
 
         else:
+            print(self.source)
             out.df =  out.df[out.df.index.year.isin(yr_list)].sort_index()
             if hasattr(out, 'ds'):
                 out.ds = out.ds.sel(time=yr_list)
@@ -630,16 +633,21 @@ class EMACData(GlobalData):
         """ Preprocess EMAC model output and create datasets """
         self.data = {}
         try: 
-            with open('s4d_ds.pkl', 'rb') as f: 
-                self.data['s4d'] = dill.load(f)
-            with open('s4d_s_ds.pkl', 'rb') as f: 
-                self.data['s4d_s'] = dill.load(f)
+            if s4d:
+                with open('misc_data\emac_ds.pkl', 'rb') as f: 
+                    self.data['s4d'] = dill.load(f)
+            if s4d_s:
+                with open('misc_data\emac_ds_s.pkl', 'rb') as f: 
+                    self.data['s4d_s'] = dill.load(f)
+            if any([s4d, s4d_s]): 
+                self.sel_year(*years) # need to check if this works
             return self
 
         except: 
+            print('Data not found. Calculating it anew')
             if s4d: # preprocess: process_s4d
                 fnames = self.pdir + "s4d_CARIBIC/*bCARIB2.nc"
-                # extract data, each file goes through preprocess first to filter variables
+                # extract data, each file goes through preprocess first to filter variables & convert units
                 with xr.open_mfdataset(fnames, preprocess=partial(process_emac_s4d), mmap=False) as ds:
                     self.data['s4d'] = ds
             if s4d_s: # preprocess: process_s4d_s
@@ -647,11 +655,10 @@ class EMACData(GlobalData):
                 # extract data, each file goes through preprocess first to filter variables
                 with xr.open_mfdataset(fnames_s, preprocess=partial(process_emac_s4d_s), mmap=False) as ds:
                     self.data['s4d_s'] = ds
-            self.sel_year(years) #!!! need to check if this workd
+
             # update years according to available data
             self.years = list(set(pd.to_datetime(self.data['{}'.format('s4d' if s4d else 's4d_s')]['time'].values).year))
             return self
-
 
     def create_tp(self):
         """ Create dataset with tropopause relevant parameters from s4d and s4d_s""" 
@@ -659,11 +666,29 @@ class EMACData(GlobalData):
         ds = self.data['s4d'].copy()
         ds_s = self.data['s4d_s'].copy() # flight level values
 
+        for var in ds.variables: # streamline units 
+            if hasattr(ds[var], 'units'):
+                if ds[var].units == 'Pa': ds[var] = ds[var].metpy.convert_units(units.hPa)
+                elif ds[var].units == 'm': ds[var] = ds[var].metpy.convert_units(units.km)
+                ds[var] = ds[var].metpy.dequantify() # makes units an attribute again
+
+        for var in ds_s.variables: # streamline units 
+            if hasattr(ds_s[var], 'units'):
+                if ds_s[var].units == 'Pa': ds_s[var] = ds_s[var].metpy.convert_units(units.hPa)
+                elif ds_s[var].units == 'm': ds_s[var] = ds_s[var].metpy.convert_units(units.km)
+                ds_s[var] = ds_s[var].metpy.dequantify() # makes units an attribute again
+
         # get geopotential height from geopotential (s4d & s4d_s for _at_fl)
-        ds = ds.assign(ECHAM5_height = calc.geopotential_to_height(ds['ECHAM5_geopot'])).metpy.dequantify()
-        ds_s = ds_s.assign(ECHAM5_height_at_fl = calc.geopotential_to_height(ds_s['ECHAM5_geopot_at_fl'])).metpy.dequantify()
         # ^ metpy.dequantify allows putting the units back into being attributes for WHATEVER REASON
-        
+        ds = ds.assign(ECHAM5_height = calc.geopotential_to_height(ds['ECHAM5_geopot'])).metpy.dequantify()
+        ds['ECHAM5_height'] = ds['ECHAM5_height'].metpy.convert_units(units.km)
+        ds['ECHAM5_height'] = ds['ECHAM5_height'].metpy.dequantify()
+
+        # same for subsampled data
+        ds_s = ds_s.assign(ECHAM5_height_at_fl = calc.geopotential_to_height(ds_s['ECHAM5_geopot_at_fl'])).metpy.dequantify()
+        ds_s['ECHAM5_height_at_fl'] = ds_s['ECHAM5_height_at_fl'].metpy.convert_units(units.km)
+        ds_s['ECHAM5_height_at_fl'] = ds_s['ECHAM5_height_at_fl'].metpy.dequantify()        
+
         new_coords = get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'not_tpress', 'var2':'not_nan'})
         abs_coords = [c for c in new_coords if c.var2.endswith('_i')] # get eg. value of pt at tp
         rel_coords = list(get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'tpress', 'var2':'not_nan'}) 
@@ -681,7 +706,7 @@ class EMACData(GlobalData):
         for v in vs_s: tp_ds[v] = ds_s[v]
 
         for coord in abs_coords: 
-            # eg. potential difference at the tropopause
+            # eg. potential difference at the tropopause. units are propagated
             print(f'Calculating {coord.col_name}')
             met = tp_ds[coord.var1]
             tp_ds[coord.col_name] = met.sel(lev=ds[coord.var2], method='nearest')
@@ -692,23 +717,24 @@ class EMACData(GlobalData):
             met = tp_ds[coord.var1] 
             tp = tp_ds[coord.var2]
             tp_ds[coord.col_name] = met - tp
-            # except:  print(coord.var1, met, '\n', coord.var2, tp, '\n\n')
+            # add units to the dataarray
+            tp_ds[coord.col_name] = tp_ds[coord.col_name] * units(met.units)
+            tp_ds[coord.col_name].metpy.dequantify()
 
-        # remove level dimension by removing 'e5vdiff_tpot', 'ECHAM5_height' 
-        tp_ds = tp_ds.drop_vars(['e5vdiff_tpot', 'ECHAM5_height'])
-        # variables = [v for v in tp_ds.variables if tp_ds[v].dims == ('time',)]
-        # tp_ds = tp_ds[variables]
-
+        # remove level dimension by removing 'e5vdiff_tpot' and 'ECHAM5_height' 
+        tp_ds = tp_ds.drop_vars(['e5vdiff_tpot', 'ECHAM5_height', 'lev'])
         self.data['tp'] = tp_ds
+        return self
 
     def create_df(self, tp=True):
         """ Create dataframe from time-dependent variables in dataset """
-        ds = self.data['s4d_s'].copy()
-        if tp and not 'tp' in self.data:
-            print('Tropopause dataset not found, generating it now.')
-            self.create_tp()
-            cols = [c for c in self.tp.variables if not c == 'lev']
-            ds = self.data['tp'][cols]
+        if tp:
+            if not 'tp' in self.data:
+                print('Tropopause dataset not found, generating it now.')
+                self.create_tp()
+            ds = self.data['tp']
+
+        else: ds = self.ds_s
 
         df = ds.to_dataframe()
         # drop rows without geodata
@@ -718,7 +744,7 @@ class EMACData(GlobalData):
         df.drop(['longitude', 'latitude'], axis=1, inplace=True)
         df.index = df.index.floor('S')
         self.data['df'] = geopandas.GeoDataFrame(df, geometry=geodata)
-        return self.data['df']
+        return self
 
     @property
     def ds(self):
@@ -822,10 +848,10 @@ class LocalData(object):
             with open(path) as f:
                 for i, line in enumerate(f):
                     if line.split()[0] == 'unit:':
-                        units = line.split()
+                        unit = line.split()
                         title = list(f)[0].split() # takes next row for some reason
                         header_lines = i+2; break
-            column_headers = [name.lower() + " [" + unit + "]" for name, unit in zip(title, units)] # eg. 'SF6 [ppt]'
+            column_headers = [name.lower() + " [" + u + "]" for name, u in zip(title, unit)] # eg. 'SF6 [ppt]'
 
             mhd_data = np.genfromtxt(path, skip_header=header_lines)
 
