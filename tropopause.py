@@ -3,24 +3,24 @@
 @Author: Sophie Bauchinger, IAU
 @Date Mon Aug 14 14:06:26 2023
 
+Plotting Tropopause heights for different tropopauses different vertical coordinates
 """
-
 import matplotlib.pyplot as plt
 import dill
 import numpy as np
-import pandas as pd
 
 from toolpac.calc.binprocessor import Bin_equi1d, Simple_bin_1d
 
-from dictionaries import get_coord, get_tp_params, get_coordinates
+from tools import make_season
+from dictionaries import get_coordinates, dict_season
 
 #%% Import data
 if not 'emac' in locals(): 
-    with open('misc_data\emac_complete.pkl', 'rb') as f:
-        emac = dill.load(f)
+    from data import EMACData
+    emac = EMACData()
 
 if not 'caribic' in locals():
-    with open('misc_data\caribic.pkl', 'rb') as f: 
+    with open('misc_data\Caribic.pkl', 'rb') as f: 
         caribic = dill.load(f)
 
 # Generate needed values from EMAC if not available
@@ -31,81 +31,47 @@ def get_obj(source):
     if source == 'Caribic': return caribic
     if source =='EMAC': return emac
 
-#%% Tropopause height vs latitude
-
-# def tph_vs_lat(glob_obj, **tp_params):
-#     # if ID == 'ECMWF':
-#     #     data = glob_obj.met_data
-#     #     latitude = np.array(data.geometry.x)
-
-#     #     dp_col =  'int_dp_strop_hpa [hPa]'
-#     #     p_col = 'p [mbar]'
-#     #     tp_p = data[p_col] - data[dp_col]
-
-#     # elif ID == 'ERA5':
-#     #     data = glob_obj.met_data
-#     #     latitude = np.array(data.geometry.x)
-#     #     tp_p = data['int_ERA5_TROP1_PRESS [hPa]']
-
-#     # elif ID == 'EMAC':
-#     #     latitude = np.array(glob_obj.df.geometry.x)
-#     #     tp_p = glob_obj.df['tropop_tp_WMO'] * 1e-2
-
-#     return latitude, tp
-
-
-
 #%% Scatter plot
-def plot_tp_height(ax, obj, plot_params, **tp_params):
+def tp_vs_latitude(ax, obj, plot_params, **tp_params):
     """ """
-    if obj.source == 'Caribic': 
-        data = obj.met_data
-    elif obj.source == 'EMAC':
-        data = obj.df
+    if obj.source == 'Caribic': data = obj.met_data.copy()
+    elif obj.source == 'EMAC': data = obj.df.copy()
+    if not tp_params['col_name'] in data.columns: return
+
+    if tp_params['tp_def'] == 'dyn': # dynamic TP only outside the tropics
+        data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
+    if tp_params['tp_def'] == 'cpt': # cold point TP only in the tropics 
+        data = data[np.array([(i<30 or i>-30) for i in np.array(data.geometry.x) ])]
 
     x = np.array(data.geometry.x)
-    # no dynamical tropopause in the tropics
-    if tp_params['tp_def'] == 'dyn':
-        data = data.where(pd.Series([(i>30 or i<-30) for i in x ]) )
-        x = data.geometry.x
-    # no cold point tropopause outside the tropics
-    if tp_params['tp_def'] == 'cpt':
-        data = data.where(pd.Series([(i<30 or i>-30) for i in x ]) )
-        x = data.geometry.x
-
     v = data[tp_params['col_name']]
 
-    if tp_params['unit'] == 'Pa': 
-        print(tp_params['col_name'], tp_params['unit'])
-        v = v*1e-2 #!!! NONSENSE but want to make it into hPa
+    ax.scatter(x, v,
+               label = '{}_{}'.format(tp_params['source'], tp_params['tp_def']))
 
-    # latitudes, tropopause_heights = tph_vs_lat(obj, ID, **tp_params)
-    ax.scatter(x, v, label = '{}_{}'.format(tp_params['ID'], tp_params['tp_def']))
+    # if tp_params['var1'] in data.columns and not tp_params['rel_to_tp']:
+    #     ax.scatter(x, data[tp_params['var1']], c='k')
+
     ax.set_xlabel('Latitude [°N]')
-    ax.set_ylabel('Pressure of the thermal tropopause [hPa]')
+    ax.set_ylabel('{}{} [{}]'.format('$\Delta$' if tp_params['rel_to_tp'] else '', 
+                                     tp_params['vcoord'], tp_params['unit']))
     # ax.set_ylim(plot_params['ylim'])
     # ax.set_xlim(plot_params['xlim'])
     return
 
-def plot_av_tp_height(ax, obj, plot_params, **tp_params):
+def av_tp_vs_latitude(ax, obj, plot_params, **tp_params):
     """ """
-    if obj.source == 'Caribic': data = obj.met_data
-    elif obj.source == 'EMAC': data = obj.df
+    if obj.source == 'Caribic': data = obj.met_data.copy()
+    elif obj.source == 'EMAC': data = obj.df.copy()
     if not tp_params['col_name'] in data.columns: return
-    
+
+    if tp_params['tp_def'] == 'dyn': # dynamic TP only outside the tropics
+        data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
+    if tp_params['tp_def'] == 'cpt': # cold point TP only in the tropics 
+        data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.x) ])]
+
     x = np.array(data.geometry.x)
     v = data[tp_params['col_name']]
-
-    if tp_params['tp_def'] == 'dyn':
-        data = data.where(pd.Series([(i>30 or i<-30) for i in x ]) )
-        x = data.geometry.x
-    # no cold point tropopause outside the tropics
-    if tp_params['tp_def'] == 'cpt':
-        data = data.where(pd.Series([(i<30 or i>-30) for i in x ]) )
-        x = data.geometry.x
-
-    if tp_params['unit'] == 'Pa': 
-        v = v*1e-2 #!!! NONSENSE but want to make it into hPa
 
     xbmin, xbmax, xbsize = -90, 90, 10
     bci = Bin_equi1d(xbmin, xbmax, xbsize)
@@ -114,8 +80,8 @@ def plot_av_tp_height(ax, obj, plot_params, **tp_params):
     # ax.plot(bin1d.xmean, bin1d.vmean, label = ID)
     #colors = {'clim':'grey', 'cpt':'blue', 'dyn':'green', 'therm':'red', 'combo':'grey'}
     ax.scatter(bin1d.xmean, bin1d.vmean, #c=colors[tp_params['tp_def']],
-               label = '{}_{}'.format(tp_params['ID'], tp_params['tp_def']))
-    # ax.scatter(bin1d.xmean, bin1d.vmean, label = tp_params['col_name'])
+               label = '{}_{}'.format(tp_params['model'], tp_params['tp_def']))
+    # ax.scatter(bin1d.xmean, bin1d.vmean, label = tp_params['col_name'])   
     ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, capsize=2)
 
     ax.set_xlabel('Latitude [°N]')
@@ -125,82 +91,85 @@ def plot_av_tp_height(ax, obj, plot_params, **tp_params):
     # ax.set_xlim(plot_params['xlim'])
     return
 
-def plot_abs(vcoord):
-    """ Plot all absolute tropopause heights on a pressure plot """
-    tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=False)
-    fig, axs = plt.subplots(1, dpi=150)
-    plt.title(f'absolute {vcoord}')
+def tp_scatter(vcoord, rel, av=True):
+    tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=rel)
+    fig, axs = plt.subplots(1, dpi=150, figsize=(7,5))
+    plt.title('{} {}'.format('TP in' if not rel else 'TP wrt flight in', vcoord))
     for tp in tps:
-        # plot_tp_height(axs, get_obj(tp.source), 
-        #                 plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-        #                 **tp.__dict__)
-        plot_av_tp_height(axs, get_obj(tp.source), 
-                        plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-                        **tp.__dict__)
-        plt.legend(title=tp.tp_def)
-    axs.invert_yaxis()
-    plt.show()
-
-def plot_rel(vcoord):
-    """ Plot all relative tropopause heights on a pressure plot """
-    tps = get_coordinates(vcoord=vcoord, tp_def = 'not_nan', rel_to_tp=True)
-    fig, axs = plt.subplots(1, dpi=150)
-    plt.title(f'relative {vcoord}')
-    for tp in tps:
-        # plot_tp_height(axs, get_obj(tp.source), 
-        #                 plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-        #                 **tp.__dict__)
-        plot_av_tp_height(axs, get_obj(tp.source), 
-                        plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-                        **tp.__dict__)
-        plt.legend(title=tp.tp_def)
-    axs.invert_yaxis()
+        if av: 
+            av_tp_vs_latitude(axs, get_obj(tp.source), 
+                            plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+                            **tp.__dict__)
+        else: 
+            tp_vs_latitude(axs, get_obj(tp.source), 
+                            plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+                            **tp.__dict__)
+        plt.legend()
+    if vcoord == 'p': axs.invert_yaxis()
     plt.show()
 
 for vc in ['p', 'pt', 'z']:
-    plot_abs(vcoord=vc)
-    plot_rel(vcoord=vc)
+    tp_scatter(vcoord=vc, rel=False, av=True)
+    tp_scatter(vcoord=vc, rel=False, av=False)
+    tp_scatter(vcoord=vc, rel=True, av=True)
 
-# fig, axs = plt.subplots(1, dpi=250)
-# for ax, obj, ID in zip([axs, axs, axs], 
-#                        [caribic, caribic, emac], 
-#                        ['ECMWF', 'ERA5', 'EMAC']): 
+#%% Per season
+def seasonal_av_tp_vs_latitude(axs, obj, plot_params, **tp_params):
+    """ """
+    if obj.source == 'Caribic': data = obj.met_data.copy()
+    elif obj.source == 'EMAC': data = obj.df.copy()
+    if not tp_params['col_name'] in data.columns: return
 
-#     tps = get_coordinates(**{'vcoord':'pt', 'source':'Caribic'})
-#     for tp in tps.values(): 
-#         tp_params= tp.__dict__
-#         plot_tp_height(ax, caribic, 
-#                        plot_params = {'ylim':(50, 500), 'xlim':(-40, 90)},
-#                        **tp.__dict__)
+    data['season'] = make_season(data.index.month) # 1 = spring etc
 
+    if tp_params['tp_def'] == 'dyn': # dynamic TP only outside the tropics
+        data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
+    if tp_params['tp_def'] == 'cpt': # cold point TP only in the tropics 
+        data = data[np.array([(i<30 or i>-30) for i in np.array(data.geometry.x) ])]
 
-
-#%% Binned
-# def plot_av_tp_height(ax, obj, ID, plot_params, **tp_params):
-#     latitudes, tropopause_heights = tph_vs_lat(obj, ID, **tp_params)
-
-
+    for s,ax in zip(set(data['season'].tolist()), axs.flatten()):
+        df = data.loc[data['season'] == s]
+        x = np.array(df.geometry.x)
+        v = df[tp_params['col_name']]
     
-#     v = tropopause_heights
-#     x = latitudes
-    
-#     bin1d = Simple_bin_1d(v,x,bci)
-    
-#     # ax.plot(bin1d.xmean, bin1d.vmean, label = ID)
-#     ax.scatter(bin1d.xmean, bin1d.vmean, label = ID)
-#     ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, capsize=2)
-#     ax.set_xlabel('Latitude [°N]')
-#     ax.set_ylabel('Pressure of the thermal tropopause [hPa]')
-#     ax.set_ylim(plot_params['ylim'])
-#     ax.set_xlim(plot_params['xlim'])
-#     ax.invert_yaxis()
-#     return
+        xbmin, xbmax, xbsize = -90, 90, 10
+        bci = Bin_equi1d(xbmin, xbmax, xbsize)
+        bin1d = Simple_bin_1d(v,x,bci)
 
-# fig, axs = plt.subplots(1, dpi=250)
-# for ax, obj, ID in zip([axs, axs, axs], 
-#                        [caribic, caribic, emac], 
-#                        ['ECMWF', 'ERA5', 'EMAC']): 
-#     plot_av_tp_height(ax, obj, ID, plot_params = {'ylim':(50, 500),
-#                                                   'xlim':(-40, 90)})
-# plt.legend()
-# plt.show()
+        ax.scatter(bin1d.xmean, bin1d.vmean, # c=colors[tp_params['tp_def']],
+                   label = '{}_{}'.format(tp_params['model'], tp_params['tp_def']))
+                   # c = dict_season()[f'color_{s}'],
+                   # label = dict_season()[f'name_{s}'])
+        ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, capsize=2)
+
+        ax.set_xlabel('Latitude [°N]')
+        ax.set_ylabel('{}{} [{}]'.format('$\Delta$' if tp_params['rel_to_tp'] else '', 
+                                         tp_params['vcoord'], tp_params['unit']))
+        ax.set_title(dict_season()[f'name_{s}'])
+        # ax.set_ylim(plot_params['ylim'])
+        # ax.set_xlim(plot_params['xlim'])
+    return
+
+def seasonal_tp_scatter(vcoord, rel):
+    tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=rel)
+    fig, axs = plt.subplots(2,2, dpi=150, figsize=(9,5))
+    plt.suptitle(f'TP in {vcoord}')
+    for tp in tps:
+        seasonal_av_tp_vs_latitude(axs, get_obj(tp.source), 
+                        plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
+                        **tp.__dict__)
+
+    if vcoord == 'p':
+        for ax in axs.flatten(): ax.invert_yaxis()
+    fig.tight_layout()
+    
+    lines, labels = axs.flatten()[0].get_legend_handles_labels()
+    # lines, labels = [sum(lol, []) for lol in zip(*lines_labels)]
+    fig.legend(lines, labels, loc='center right')
+    plt.subplots_adjust(right=0.8)
+    
+    plt.show()
+    return 
+
+for vc in ['p', 'pt', 'z']:
+    seasonal_tp_scatter(vcoord=vc, rel=False)
