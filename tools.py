@@ -113,7 +113,7 @@ def rename_columns(columns):
     col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
     return col_dict, col_dict_rev
 
-def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=False):
+def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Choose which variables to keep when importing EMAC data .
 
     Parameters: 
@@ -154,6 +154,7 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=False):
     # if either lon or lat are nan, drop that timestamp
     ds.dropna(subset=['tlon', 'tlat'], how='any', dim='time')
     ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
+    ds['time'] = ds.time.dt.round('S') # rmvs floating pt errors 
     return ds
 
 def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
