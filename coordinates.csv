@@ -11,68 +11,68 @@ int_pt_dTP_K [K],Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMW
 int_pt_sTP_K [K],Potential temperature of thermal tropopause (ECMWF) ,K,calc,Caribic,pt,,,therm,FALSE,ECMWF,,,int_Theta [K],int_pt_rel_sTP_K [K]
 int_z_dTP_km [km],geopotential height of dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),km,calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km [km],int_z_rel_dTP_km [km]
 int_z_sTP_km [km],geopotential height of thermal tropopause from ECMWF (with g=9.81 m/s^2),km,calc,Caribic,z,,,therm,FALSE,ERA5,,,int_z_km [km],int_z_rel_sTP_km [km]
-tp_cpt_p_D,Pressure difference relative to cold point tropopause from EMAC,hPa,calc,EMAC,p,,,cpt,TRUE,EMAC,,,tpress,tropop_cpt
-ECHAM5_height,Geopotential height (ECHAM5) ,km,calc,EMAC,z,,,,FALSE,EMAC,,,ECHAM5_geopot,
-ECHAM5_height_at_fl,Geopotential height (ECHAM5) at flight level ,km,EMAC,EMAC,z,,,,FALSE,EMAC,,,ECHAM5_geopot_at_fl,
-e5vdiff_tpot_at_fl,potential temperature at flight level,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
-tp_PV_p_D,Pressure difference relative to PV (3.5PVU) tropopause from EMAC,hPa,calc,EMAC,p,,,dyn,TRUE,EMAC,3.5,,tpress,tropop_tp_PV
-tp_WMO_p_D,Pressure difference relative to thermal (WMO) tropopause from EMAC,hPa,calc,EMAC,p,,,therm,TRUE,EMAC,,,tpress,tropop_tp_WMO
-tp_cpt_pt,Potential temperature of cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,FALSE,EMAC,,,e5vdiff_tpot,tropop_cpt_i
-tp_cpt_pt_D,Potential temperature relative to cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_cpt_pt
-tp_PV_pt,Potential temperature of PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,FALSE,EMAC,3.5,,e5vdiff_tpot,tropop_tp_PV_i
-tp_PV_pt_D,Potential temperature relative to PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,TRUE,EMAC,3.5,,e5vdiff_tpot_at_fl,tp_PV_pt
-tp_WMO_pt,Potential temperature of thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,FALSE,EMAC,,,e5vdiff_tpot,tropop_tp_WMO_i
-tp_WMO_pt_D,Potential temperature relative to thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_WMO_pt
-tp_cpt_z,Geopotential height of cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,FALSE,EMAC,,,ECHAM5_height,tropop_cpt_i
-tp_cpt_z_D,Geopoential height relative to cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_cpt_z
-tp_PV_z,Geopotential height of PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,FALSE,EMAC,3.5,,ECHAM5_height,tropop_tp_PV_i
-tp_PV_z_D,Geopoential height relative to PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,TRUE,EMAC,3.5,,ECHAM5_height_at_fl,tp_PV_z
-tp_WMO_z,Geopotential height of thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,FALSE,EMAC,,,ECHAM5_height,tropop_tp_WMO_i
-tp_WMO_z_D,Geopoential height relative to thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_WMO_z
-longitude,track longitude,degrees_east,EMAC,EMAC,,lon,,,,EMAC,,,,
-latitude,track latitude,degrees_north,EMAC,EMAC,,lat,,,,EMAC,,,,
-ECHAM5_tpoteq,equivalent potential temperature,K,EMAC,EMAC,eqpt,,,,FALSE,EMAC,,,,
-tps,track surface pressure,Pa,EMAC,EMAC,,,p0,,,EMAC,,,,
-tropop_tp_clim_i,clim. tropopause level index,level,EMAC,EMAC,lev,,,clim,FALSE,EMAC,,,,
-ECHAM5_tm1,dry air temperature (tm1),K,EMAC,EMAC,,,t,,,EMAC,,,,
-tropop_tp_PV_i,PV tropopause level index,level,EMAC,EMAC,lev,,,dyn,FALSE,EMAC,3.5,,,
-ECHAM5_qm1,specific humidity (qm1),kg kg-1,EMAC,EMAC,,,qm1,,,EMAC,,,,
-ECHAM5_um1,u-wind,m s-1,EMAC,EMAC,,,um1,,,EMAC,,,,
-ECHAM5_vm1,v-wind,m s-1,EMAC,EMAC,,,vm1,,,EMAC,,,,
-ECHAM5_etadot,vertical wind velocity,1 s-1,EMAC,EMAC,,,etadot,,,EMAC,,,,
-ECHAM5_rhum,relative humidity,%,EMAC,EMAC,,,rhum,,,EMAC,,,,
-ECHAM5_rho_air_dry,density of dry air,kg/m^3,EMAC,EMAC,,,rho_air_dry,,,EMAC,,,,
-ECHAM5_vom1,vorticity,s-1,EMAC,EMAC,,,vom1,,,EMAC,,,,
-ECHAM5_tsurf,surface temperature,K,EMAC,EMAC,,,tsurf,,,EMAC,,,,
-tropop_tp_WMO_i,WMO tropopause level index,level,EMAC,EMAC,lev,,,therm,FALSE,EMAC,,,,
-ECHAM5_xlm1,cloud water (xlm1),kg kg-1,EMAC,EMAC,,,xlm1,,,EMAC,,,,
-ECHAM5_xim1,cloud ice (xim1),kg kg-1,EMAC,EMAC,,,xim1,,,EMAC,,,,
-ECHAM5_aclc,large scale cloud cover,,EMAC,EMAC,,,aclc,,,EMAC,,,,
-tropop_tp_i,tropopause level index,level,EMAC,EMAC,lev,,,combo,FALSE,EMAC,,,,
-tropop_pblh_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-tropop_pblhRi_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-tropop_tp_clim_f,fract. of clim.-TP box in trop.,,EMAC,EMAC,,,frac,clim,FALSE,EMAC,,,,
-tropop_PV,potential vorticity,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
-tropop_PV_at_fl,potential vorticity at current flight level,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
-tropop_cpt_i,cold point level index,level,EMAC,EMAC,lev,,,cpt,FALSE,EMAC,,,,
-lev,hybrid level at layer midpoints,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-tropop_tp_PV_f,fract. of PV-TP box in trop.,,EMAC,EMAC,,,frac,dyn,FALSE,EMAC,3.5,,,
-ilev,hybrid level at layer interfaces,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-tpress,track pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
-tropop_tp_WMO_f,fract. of WMO-TP box in trop.,,EMAC,EMAC,,,frac,therm,FALSE,EMAC,,,,
-ECHAM5_press,pressure,Pa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
-tropop_tp_clim,clim. tropopause pressure,Pa,EMAC,EMAC,p,,,clim,FALSE,EMAC,,,,
-tropop_tp_f,fract. of TP box in trop.,,EMAC,EMAC,,,frac,combo,FALSE,EMAC,,,,
-tropop_tp_PV,PV tropopause pressure,Pa,EMAC,EMAC,p,,,dyn,FALSE,EMAC,3.5,,,
-tropop_tp_WMO,WMO tropopause pressure,Pa,EMAC,EMAC,p,,,therm,FALSE,EMAC,,,,
-tropop_tp,tropopause pressure,Pa,EMAC,EMAC,p,,,combo,FALSE,EMAC,,,,
-tropop_cpt,pressure at cold point,Pa,EMAC,EMAC,p,,,cpt,FALSE,EMAC,,,,
-tropop_slp,sea-level pressure,Pa,EMAC,EMAC,,,slp,,,EMAC,,,,
 e5vdiff_tpot,potential temperature,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
+e5vdiff_tpot_at_fl,potential temperature at flight level,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
+ECHAM5_aclc,large scale cloud cover,,EMAC,EMAC,,,aclc,,,EMAC,,,,
+ECHAM5_etadot,vertical wind velocity,1 s-1,EMAC,EMAC,,,etadot,,,EMAC,,,,
 ECHAM5_geopot,geopotential above ground level,m2 s-2,EMAC,EMAC,z,,geopot,,FALSE,EMAC,,,,
 ECHAM5_geopot_at_fl,geopotential above ground level at current flight level,m2 s-2,EMAC,EMAC,z,,geopot,,FALSE,EMAC,,,,
+ECHAM5_height,Geopotential height (ECHAM5) ,km,calc,EMAC,z,,,,FALSE,EMAC,,,ECHAM5_geopot,
+ECHAM5_height_at_fl,Geopotential height (ECHAM5) at flight level ,km,EMAC,EMAC,z,,,,FALSE,EMAC,,,ECHAM5_geopot_at_fl,
+ECHAM5_press,pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
+ECHAM5_qm1,specific humidity (qm1),kg kg-1,EMAC,EMAC,,,qm1,,,EMAC,,,,
+ECHAM5_rho_air_dry,density of dry air,kg/m^3,EMAC,EMAC,,,rho_air_dry,,,EMAC,,,,
+ECHAM5_rhum,relative humidity,%,EMAC,EMAC,,,rhum,,,EMAC,,,,
+ECHAM5_tm1,dry air temperature (tm1),K,EMAC,EMAC,,,t,,,EMAC,,,,
+ECHAM5_tpoteq,equivalent potential temperature,K,EMAC,EMAC,eqpt,,,,FALSE,EMAC,,,,
+ECHAM5_tsurf,surface temperature,K,EMAC,EMAC,,,tsurf,,,EMAC,,,,
+ECHAM5_um1,u-wind,m s-1,EMAC,EMAC,,,um1,,,EMAC,,,,
+ECHAM5_vm1,v-wind,m s-1,EMAC,EMAC,,,vm1,,,EMAC,,,,
+ECHAM5_vom1,vorticity,s-1,EMAC,EMAC,,,vom1,,,EMAC,,,,
+ECHAM5_xim1,cloud ice (xim1),kg kg-1,EMAC,EMAC,,,xim1,,,EMAC,,,,
+ECHAM5_xlm1,cloud water (xlm1),kg kg-1,EMAC,EMAC,,,xlm1,,,EMAC,,,,
+ilev,hybrid level at layer interfaces,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+latitude,track latitude,degrees_north,EMAC,EMAC,,lat,,,,EMAC,,,,
+lev,hybrid level at layer midpoints,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+longitude,track longitude,degrees_east,EMAC,EMAC,,lon,,,,EMAC,,,,
+tp_cpt_p_D,Pressure difference relative to cold point tropopause from EMAC,hPa,calc,EMAC,p,,,cpt,TRUE,EMAC,,,tpress,tropop_cpt
+tp_cpt_pt,Potential temperature of cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,FALSE,EMAC,,,e5vdiff_tpot,tropop_cpt_i
+tp_cpt_pt_D,Potential temperature relative to cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_cpt_pt
+tp_cpt_z,Geopotential height of cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,FALSE,EMAC,,,ECHAM5_height,tropop_cpt_i
+tp_cpt_z_D,Geopoential height relative to cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_cpt_z
+tp_PV_p_D,Pressure difference relative to PV (3.5PVU) tropopause from EMAC,hPa,calc,EMAC,p,,,dyn,TRUE,EMAC,3.5,,tpress,tropop_tp_PV
+tp_PV_pt,Potential temperature of PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,FALSE,EMAC,3.5,,e5vdiff_tpot,tropop_tp_PV_i
+tp_PV_pt_D,Potential temperature relative to PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,TRUE,EMAC,3.5,,e5vdiff_tpot_at_fl,tp_PV_pt
+tp_PV_z,Geopotential height of PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,FALSE,EMAC,3.5,,ECHAM5_height,tropop_tp_PV_i
+tp_PV_z_D,Geopoential height relative to PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,TRUE,EMAC,3.5,,ECHAM5_height_at_fl,tp_PV_z
+tp_WMO_p_D,Pressure difference relative to thermal (WMO) tropopause from EMAC,hPa,calc,EMAC,p,,,therm,TRUE,EMAC,,,tpress,tropop_tp_WMO
+tp_WMO_pt,Potential temperature of thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,FALSE,EMAC,,,e5vdiff_tpot,tropop_tp_WMO_i
+tp_WMO_pt_D,Potential temperature relative to thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_WMO_pt
+tp_WMO_z,Geopotential height of thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,FALSE,EMAC,,,ECHAM5_height,tropop_tp_WMO_i
+tp_WMO_z_D,Geopoential height relative to thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_WMO_z
+tpress,track pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
+tps,track surface pressure,hPa,EMAC,EMAC,,,p0,,,EMAC,,,,
+tropop_cpt,pressure at cold point,hPa,EMAC,EMAC,p,,,cpt,FALSE,EMAC,,,,
+tropop_cpt_i,cold point level index,level,EMAC,EMAC,lev,,,cpt,FALSE,EMAC,,,,
 tropop_pblh,planetary boundary layer,m,EMAC,EMAC,z,,pblh,,FALSE,EMAC,,,,
+tropop_pblh_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
 tropop_pblhRi,planetary boundary layer,m,EMAC,EMAC,z,,pblhRi,,FALSE,EMAC,,,,
+tropop_pblhRi_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+tropop_PV,potential vorticity,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
+tropop_PV_at_fl,potential vorticity at current flight level,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
+tropop_slp,sea-level pressure,hPa,EMAC,EMAC,,,slp,,,EMAC,,,,
+tropop_tp,tropopause pressure,hPa,EMAC,EMAC,p,,,combo,FALSE,EMAC,,,,
+tropop_tp_clim,clim. tropopause pressure,hPa,EMAC,EMAC,p,,,clim,FALSE,EMAC,,,,
+tropop_tp_clim_f,fract. of clim.-TP box in trop.,,EMAC,EMAC,,,frac,clim,FALSE,EMAC,,,,
+tropop_tp_clim_i,clim. tropopause level index,level,EMAC,EMAC,lev,,,clim,FALSE,EMAC,,,,
+tropop_tp_f,fract. of TP box in trop.,,EMAC,EMAC,,,frac,combo,FALSE,EMAC,,,,
+tropop_tp_i,tropopause level index,level,EMAC,EMAC,lev,,,combo,FALSE,EMAC,,,,
+tropop_tp_PV,PV tropopause pressure,hPa,EMAC,EMAC,p,,,dyn,FALSE,EMAC,3.5,,,
+tropop_tp_PV_f,fract. of PV-TP box in trop.,,EMAC,EMAC,,,frac,dyn,FALSE,EMAC,3.5,,,
+tropop_tp_PV_i,PV tropopause level index,level,EMAC,EMAC,lev,,,dyn,FALSE,EMAC,3.5,,,
+tropop_tp_WMO,WMO tropopause pressure,hPa,EMAC,EMAC,p,,,therm,FALSE,EMAC,,,,
+tropop_tp_WMO_f,fract. of WMO-TP box in trop.,,EMAC,EMAC,,,frac,therm,FALSE,EMAC,,,,
+tropop_tp_WMO_i,WMO tropopause level index,level,EMAC,EMAC,lev,,,therm,FALSE,EMAC,,,,
 p [mbar],pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,msmt,,,,
 geometry,geometry,degrees,GHG,Caribic,,geometry,,,,msmt,,,,
 geometry.x,latitude,degrees_north,GHG,Caribic,,lat,,,,msmt,,,,
