@@ -14,12 +14,11 @@ import pandas as pd
 import geopandas
 from shapely.geometry import Point
 import copy
-import metpy
 from metpy.units import units
 
 import toolpac.calc.binprocessor as bp
 
-from dictionaries import get_col_name, get_col_name, get_coord, substance_list, get_substances
+from dictionaries import get_col_name, get_coord, get_substances
 
 #TODO  Calculate some other lovely stuff from what we have in the data
 # metpy.calc.geopotential_to_height
@@ -143,7 +142,10 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
                           if v.startswith('tropop_') and not v.endswith('_f')
                           and not any([x in v for x in ['_clim', 'pblh']])])
     if incl_subs:
-        variables.extend(get_substances(**{'ID':'EMAC'}).keys())
+        tracers = get_substances(**{'ID':'EMAC'})
+        tracers_at_fl = [t+'_at_fl' for t in tracers]
+        variables.extend([v for v in ds.variables if 
+                          (v in tracers or v in tracers_at_fl) ])
     # only keep specified variables
     ds = ds[variables]
     for var in ds.variables: # streamline units 
@@ -152,13 +154,14 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
             elif ds[var].units == 'm': ds[var] = ds[var].metpy.convert_units(units.km)
             ds[var] = ds[var].metpy.dequantify() # makes units an attribute again
     # if either lon or lat are nan, drop that timestamp
-    ds.dropna(subset=['tlon', 'tlat'], how='any', dim='time')
+    ds = ds.dropna(subset=['tlon', 'tlat'], how='any', dim='time')
     ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
     ds['time'] = ds.time.dt.round('S') # rmvs floating pt errors 
     return ds
 
 def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
-    """ Keep only variables that depend only on time """
+    """ Keep only variables that depend only on time and are available in 
+    subsampled data """
     ds = process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
@@ -214,22 +217,25 @@ def make_season(month):
     return season
 
 def assign_t_s(df, TS, coordinate, tp_val=0):
-    """ Returns the appropriate comparison for a chosen coord to sort into trop / strat
+    """ Returns the bool series of t / s after applying appropriate comparison for a chosen vcoord.
+
     Parameters:
-        df (DataFrame): reference data
-        TS (str): 't' / 's';  troposphere / stratosphere
+        df (DataFrame): reference data - e.g. track pressure / TP p distance to track p
+        TS (str): 't' / 's';  indicates troposphere / stratosphere
         coord (str): dp, pt, z
-        tp_val (float): value of tropopause in chosen coordinates
+
+    optional:
+        tp_val (float): value of tropopause in chosen coordinates. For non-relative coords
     """
-    if ((coordinate in ['dp'] and TS == 't')
+    if ((coordinate in ['p', 'dp'] and TS == 't')
         or (coordinate in ['pt', 'z'] and TS == 's')):
         return df.gt(tp_val)
 
-    elif ((coordinate in ['dp'] and TS == 's')
+    elif ((coordinate in ['p', 'dp'] and TS == 's')
           or (coordinate in ['pt', 'z'] and TS == 't')):
         return df.lt(tp_val)
 
-    else: raise KeyError(f'STrat/Trop assignment undefined for {coordinate}')
+    else: raise KeyError(f'Strat/Trop assignment undefined for {coordinate}')
 
 def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
     """ Get appropriate coordinates and labels. """
