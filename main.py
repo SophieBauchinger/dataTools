@@ -33,7 +33,7 @@ from os.path import exists
 from os import remove
 import matplotlib.pyplot as plt
 
-from data import Caribic, Mozart
+from data import Caribic, Mozart, EMACData
 from groundbased import Mauna_Loa, Mace_Head
 from lags import calc_time_lags
 from dictionaries import substance_list, get_tp_params
@@ -52,39 +52,8 @@ mlo_data = {subs : Mauna_Loa(year_range, subs=subs) for subs
             in substance_list('MLO')}
 mhd = Mace_Head() # only 2012 data available
 mzt = Mozart(year_range) # only available up to 2008
-
-# only calculate caribic data if necessary
-def load_caribic(fname = 'misc_data\caribic.pkl'):
-    """ 'caribic_180723.pkl' ;  """
-    if exists(fname): # Avoid long file loading times
-        with open(fname, 'rb') as f:
-            caribic = dill.load(f)
-        del f
-    else: caribic = Caribic(year_range, pfxs = ['GHG', 'INT', 'INT2'])
-    return caribic
-
-def save_caribic(fname = 'misc_data\caribic_dill.pkl'):
-    """ Drop rows where pressure values don't exist, then save
-    caribic object to dill file """
-    with open(fname, 'wb') as f:
-        dill.dump(caribic, f)
-
-def del_caribic_file(fname = 'misc_data\caribic_dill.pkl'): remove(fname)
-
-emac = load_caribic('misc_data\emac.pkl')
-emac_subsam = load_caribic('misc_data\emac_subsam.pkl')
-caribic = load_caribic()
-# c_data = load_caribic('caribic_data.pkl')
-
-# caribic_filtered = caribic.filter_extreme_events('chem')
-
-# save_caribic(fname= 'carbic_dill_mod.pkl')
-
-# examples for creating new objects with only certain year / flight nr / lat :
-# kwargs = {'tp_def' : 'chem'}
-# new_caribic = data_selection(caribic, flights=None, years=None, latitudes=None,
-#                               tropo=False, strato=False, extr_events=False, **kwargs)
-
+caribic = Caribic()
+emac = EMACData()
 
 #%% Tropopause definitions
 tp_param_dicts = get_tp_params() # ^ for tropopause / stratosphere sorting
