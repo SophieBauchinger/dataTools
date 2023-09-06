@@ -1,3 +1,6 @@
+# Large file
+*emac_ds.nc
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
