@@ -53,7 +53,7 @@ def coordinate_df():
     return coord_df
 
 def get_coordinates(**kwargs):
-    """Return dictionary of col_name:Coordinate for all items were conditions are met 
+    """Return dictionary of col_name:Coordinate for all items where conditions are met 
     Exclusion conditions need to have 'not_' prefix """
     df = coordinate_df()
     for cond, val in kwargs.items():
@@ -104,7 +104,7 @@ class Substance():
         self.__dict__.update(kwargs)
 
     def __repr__(self):
-        return f'Substance : {self.col_name} {self.short_name} : [{self.unit}] from {self.ID}'
+        return f'Substance : {self.short_name} [{self.unit}] - \'{self.col_name}\' from {self.ID}'
 
 def substance_df():
     """ Get dataframe containing all info about all substance variables """
@@ -125,11 +125,11 @@ def get_substances(**kwargs):
         raise KeyError('No data found using the given specifications')
     df.set_index('col_name', inplace=True)
     subs_dict = df.to_dict(orient='index')
-    subs = {k:Substance(k, **v) for k,v in subs_dict.items()}
+    subs = [Substance(k, **v) for k,v in subs_dict.items()]
     return subs
 
 def substance_list(ID):
-    """ Returns all available substances for a specific datset """
+    """ Returns lsit of available substances for a specific datset as short name """
     df = substance_df()
     if ID not in df.ID.values: 
         raise KeyError(f'Unable to provide subs list for {ID}')
@@ -139,7 +139,7 @@ def substance_list(ID):
     return set(df['short_name'])
 
 def get_subs(substance, ID, clams=False):
-    """ Return Substance object with the given specifications """
+    """ Return single Substance object with the given specifications """
     conditions = {'short_name' : substance, 'ID' : ID}
     if ID=='INT2' and substance not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
         conditions.update({'model' : 'CLAMS' if clams else 'msmt'})
@@ -220,6 +220,7 @@ def get_tp_params(tp_def=None, ID=None, crit=None, vcoord=None, pvu=None):
     return param_dicts
 
 def dict_season():
+    """ Use to get name_s, color_s for season s"""
     return {'name_1': 'Spring (MAM)', 'name_2': 'Summer (JJA)',
             'name_3': 'Autumn (SON)', 'name_4': 'Winter (DJF)',
             'color_1': 'blue', 'color_2': 'orange',
