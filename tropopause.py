@@ -22,12 +22,13 @@ from tools import assign_t_s
 #%% Import data
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
-    def __init__(self, years=range(2005, 2020)):
+    def __init__(self, years=range(2005, 2020), interp=True, method='n'):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if yr >= 2000 and yr <= 2019])
         self.source = 'TP'
         self.data = {}
         self.get_data(years)
+        if interp: self.interpolate_emac(method)
 
     def __repr__(self):
         self.years.sort() 
@@ -46,15 +47,39 @@ class TropopauseData(GlobalData):
         df.geometry = df_caribic.geometry.combine_first(df_emac.geometry)
         df = df.drop(columns=['geometry_x', 'geometry_y'])
         df['Flight number'].interpolate(method='nearest', inplace=True) #TODO add other variables here
-        # for c in ['Flight number']:
-        #     if c in df.columns:
-        #         df[c].interpolate(method='nearest', inplace=True)
+        df['Flight number'].interpolate(inplace=True, limit_direction='backward') # fill in first two timestamps too
+        df['Flight number'] = df['Flight number'].astype(int)
         self.data['df'] = df
         return df
     
     @property
     def df(self):
+        """ Allow accessing df as class attribute. """
         return self.data['df']
+
+    def interpolate_emac(self, method):
+        """ Add interpolated EMAC data to joint df to match caribic timestamps. 
+        
+        Parameters: 
+            method (str): interpolation method. Limit is set to 2 consecutive NaN values
+                'n' - nearest neighbour, 'b' - bilinear
+        
+        Note: Residial NaN values in nearest because EMAC only goes to 2019.
+        Explanation on methods see at https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html
+        """
+        data = self.df.copy()
+        tps_emac = [i.col_name for i in get_coordinates(source='EMAC') if i.col_name in self.df.columns] + [
+            i for i in ['ECHAM5_tm1_at_fl', 'ECHAM5_tpoteq_at_fl', 'ECHAM5_press_at_fl'] if i in self.df.columns]
+        subs_emac = [i.col_name for i in get_substances(source='EMAC') if i.col_name in self.df.columns]
+
+        for c in tps_emac+subs_emac:
+            if method=='b': data[c].interpolate(method='linear', inplace=True, limit=2)
+            elif method=='n': data[c].interpolate(method='nearest', inplace=True, limit=2)
+            else: raise KeyError('Please choose either b-linear or n-nearest neighbour interpolation.')
+            data[c] = data[c].astype(float)
+
+        self.data['df'] = data
+        return data
 
 tropopause_data = TropopauseData()
 
@@ -348,155 +373,5 @@ def trop_strat_counts():
 if __name__=='__main__':
     substances = get_substances(source='EMAC') + get_substances(source='Caribic')
     substances = [s for s in substances if not s.col_name.startswith('d_')]
-    df_sorted = sort_tropo_strato(substances)
-    # trop_strat_counts()
-
-#%% Old scatter plots
-# =============================================================================
-# def tp_vs_latitude(ax, obj, plot_params, **tp_params):
-#     """ """
-#     data = obj.df.copy()
-#     if not tp_params['col_name'] in data.columns: 
-#         print('{} not in columns'.format(tp_params['col_name']))
-#         return
-# 
-#     if tp_params['tp_def'] == 'dyn': # dynamic TP only outside the tropics
-#         data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
-#     if tp_params['tp_def'] == 'cpt': # cold point TP only in the tropics 
-#         data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.x) ])]
-# 
-#     x = np.array(data.geometry.x)
-#     v = data[tp_params['col_name']]
-# 
-#     ax.scatter(x, v, label = '{}_{}{}'.format(
-#         tp_params['model'], tp_params['tp_def'], 
-#         '_'+str(tp_params['pvu']) if tp_params['tp_def']=='dyn' else ''))
-# 
-#     # if tp_params['var1'] in data.columns and not tp_params['rel_to_tp']:
-#     #     ax.scatter(x, data[tp_params['var1']], c='k')
-# 
-#     ax.set_xlabel('Latitude [°N]')
-#     ax.set_ylabel('{}{} [{}]'.format('$\Delta$' if tp_params['rel_to_tp'] else '', 
-#                                      tp_params['vcoord'], tp_params['unit']))
-#     # ax.set_ylim(plot_params['ylim'])
-#     # ax.set_xlim(plot_params['xlim'])
-#     return
-# 
-# def av_tp_vs_latitude(ax, obj, plot_params, **tp_params):
-#     """ """
-#     data = obj.df.copy()
-#     if not tp_params['col_name'] in data.columns: return
-# 
-#     if tp_params['tp_def'] == 'dyn': # dynamic TP only outside the tropics
-#         data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
-#     if tp_params['tp_def'] == 'cpt': # cold point TP only in the tropics 
-#         data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.x) ])]
-# 
-#     x = np.array(data.geometry.x)
-#     v = data[tp_params['col_name']]
-# 
-#     xbmin, xbmax, xbsize = -90, 90, 10
-#     bci = Bin_equi1d(xbmin, xbmax, xbsize)
-#     bin1d = Simple_bin_1d(v,x,bci)
-#     
-#     # ax.plot(bin1d.xmean, bin1d.vmean, label = ID)
-#     #colors = {'clim':'grey', 'cpt':'blue', 'dyn':'green', 'therm':'red', 'combo':'grey'}
-#     ax.plot(bin1d.xmean, bin1d.vmean, #c=colors[tp_params['tp_def']],
-#                label = '{}_{}{}'.format(tp_params['model'], tp_params['tp_def'], 
-#                                           '_'+str(tp_params['pvu']) if tp_params['tp_def']=='dyn' else ''))
-#     ax.fill_between(bin1d.xmean, bin1d.vmean-bin1d.vstdv, bin1d.vmean+bin1d.vstdv, alpha=0.3)
-#     # ax.scatter(bin1d.xmean, bin1d.vmean, label = tp_params['col_name'])   
-#     # ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, capsize=2)
-# 
-#     ax.set_xlabel('Latitude [°N]')
-#     ax.set_ylabel('{}{} [{}]'.format('$\Delta$' if tp_params['rel_to_tp'] else '', 
-#                                      tp_params['vcoord'], tp_params['unit']))
-#     # ax.set_ylim(plot_params['ylim'])
-#     # ax.set_xlim(plot_params['xlim'])
-#     return
-# 
-# def tp_vs_lat(vcoord, rel, av=True):
-#     tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=rel)
-#     fig, axs = plt.subplots(round(len(tps)/2), 2, dpi=150, figsize=(10,7), sharey=True, sharex=True)
-#     fig.suptitle('{} {}'.format('TP in' if not rel else 'TP wrt flight in', vcoord))
-#     for tp, ax in zip(tps, axs.flatten()):
-#         if av: 
-#             av_tp_vs_latitude(ax, tropopause_data, 
-#                             plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-#                             **tp.__dict__)
-#         else: 
-#             tp_vs_latitude(ax, tropopause_data, 
-#                             plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-#                             **tp.__dict__)
-#         # if vcoord == 'p': 
-#         #     ax.invert_yaxis()
-#         #     ax.set_yscale('log')
-#     # plt.legend()
-#     # lines, labels = axs.flatten()[0].get_legend_handles_labels()    
-#     # fig.legend(lines, labels, loc='center right')
-#     fig.tight_layout()
-#     plt.show()
-# =============================================================================
-
-#%% Old Seasonal plots
-# =============================================================================
-# def seasonal_av_tp_vs_latitude(axs, obj, plot_params, **tp_params):
-#     """ """
-#     data = obj.df.copy()
-#     if not tp_params['col_name'] in data.columns: return
-# 
-#     data['season'] = make_season(data.index.month) # 1 = spring etc
-# 
-#     if tp_params['tp_def'] == 'dyn': # dynamic TP only outside the tropics
-#         data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
-#     if tp_params['tp_def'] == 'cpt': # cold point TP only in the tropics 
-#         data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.x) ])]
-# 
-#     for s,ax in zip(set(data['season'].tolist()), axs.flatten()):
-#         df = data.loc[data['season'] == s]
-#         x = np.array(df.geometry.x)
-#         v = df[tp_params['col_name']]
-#     
-#         xbmin, xbmax, xbsize = -90, 90, 10
-#         bci = Bin_equi1d(xbmin, xbmax, xbsize)
-#         bin1d = Simple_bin_1d(v,x,bci)
-# 
-#         ax.scatter(bin1d.xmean, bin1d.vmean, # c=colors[tp_params['tp_def']],
-#                label = '{}_{}{}'.format(tp_params['model'], tp_params['tp_def'], 
-#                                           '_'+str(tp_params['pvu']) if tp_params['tp_def']=='dyn' else ''))
-#                    # c = dict_season()[f'color_{s}'],
-#                    # label = dict_season()[f'name_{s}'])
-#         ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, capsize=2)
-# 
-#         ax.set_xlabel('Latitude [°N]')
-#         ax.set_ylabel('{}{} [{}]'.format('$\Delta$' if tp_params['rel_to_tp'] else '', 
-#                                          tp_params['vcoord'], tp_params['unit']))
-#         ax.set_title(dict_season()[f'name_{s}'])
-#         # ax.set_ylim(plot_params['ylim'])
-#         # ax.set_xlim(plot_params['xlim'])
-#     return
-# 
-# def seasonal_tp_scatter_vs_latitude(vcoord, rel):
-#     tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=rel)
-#     fig, axs = plt.subplots(2,2, dpi=150, figsize=(9,5))
-#     plt.suptitle(f'TP in {vcoord}')
-#     for tp in tps:
-#         seasonal_av_tp_vs_latitude(axs, tropopause_data, 
-#                         plot_params = {},#'ylim':(50, 500), 'xlim':(-40, 90)},
-#                         **tp.__dict__)
-# 
-#     if vcoord == 'p':
-#         for ax in axs.flatten(): 
-#             ax.invert_yaxis()
-#             ax.set_yscale('log')
-#     fig.tight_layout()
-#     
-#     lines, labels = axs.flatten()[0].get_legend_handles_labels()
-#     # lines, labels = [sum(lol, []) for lol in zip(*lines_labels)]
-#     fig.legend(lines, labels, loc='center right')
-#     plt.subplots_adjust(right=0.8)
-#     
-#     plt.show()
-#     return
-# 
-# =============================================================================
+    # df_sorted = sort_tropo_strato(substances)
+    trop_strat_counts()
