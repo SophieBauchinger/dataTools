@@ -161,7 +161,7 @@ def tropopause_vs_latitude(vcoord, rel, seasonal=False):
                                          '_'+str(tp.pvu) if tp.tp_def=='dyn' else ''),
                         transform=ax.transAxes, verticalalignment='bottom',
                         bbox = dict(boxstyle='round', facecolor='white', 
-                                    edgecolor='grey', alpha=0.5, pad=0.1))
+                                    edgecolor='grey', alpha=0.5, pad=0.25))
         ax.set_xticks([-30, 0, 30, 60, 90])
 
     if not seasonal: 
@@ -189,10 +189,6 @@ def tropopause_vs_latitude(vcoord, rel, seasonal=False):
                       c = dict_season()[f'color_{s}'], # alpha=0.5, 
                       zorder=1, label=dict_season()[f'name_{s}'])
 
-        # add horizontal legend for seasons 
-        lines, labels = axs.flatten()[0].get_legend_handles_labels()
-        fig.legend(lines, labels, loc='lower center', ncol=4)
-
     # go through axes, (add average), set label
     for ax in axs.flatten()[:len(tps)+1]:
         if not seasonal: 
@@ -210,6 +206,11 @@ def tropopause_vs_latitude(vcoord, rel, seasonal=False):
                                          tp.vcoord, tp.unit))
 
     fig.tight_layout()
+    if seasonal: # add horizontal figure legend for seasons at the top
+        fig.subplots_adjust(top=0.85) # add space for fig legend
+        lines, labels = axs.flatten()[0].get_legend_handles_labels()
+        fig.legend(lines, labels, loc='upper center', ncol=4,
+                   bbox_to_anchor=[0.5, 0.94])
     plt.show()
 
 if __name__=='__main__':
@@ -262,12 +263,10 @@ def plot_sorted_TP(glob_obj, df_sorted, vcoord, subs_col, ax):
     return df_tropo, df_strato
 
 #%% Substances in tropopsphere / stratosphere
-substances = get_substances(source='EMAC') + get_substances(source='Caribic')
-substances = [s for s in substances if not s.col_name.startswith('d_')]
-
 def sort_tropo_strato(substances, vcoords=['p', 'z', 'pt'], plot=True):
+    """ Returns """
     data = tropopause_data.df.copy()
-    out = pd.DataFrame(index=data.index)
+    df_sorted = pd.DataFrame(index=data.index)
 
     for subs in substances: 
         if not subs.col_name in data.columns:
@@ -278,31 +277,37 @@ def sort_tropo_strato(substances, vcoords=['p', 'z', 'pt'], plot=True):
                 tps.remove(tp)
             
             if plot: # initialise figure
-                fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200)
+                fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200,
+                                        figsize=(7, math.ceil(len(tps)/2)*2))
                 if len(tps)%2: axs.flatten()[-1].axis('off')
                 fig.suptitle(f'{subs.col_name} in sorted with TP in {vcoord}')
     
-            for tp, ax in zip(tps, axs.flatten()): 
+            for tp, ax in zip(tps, axs.flatten() if plot else [None]*len(tps)): 
                 tp_df = data.dropna(axis=0, subset=[tp.col_name])
+                
+                if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
+                    tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
+                if tp.tp_def == 'cpt': # cold point TP only in the tropics 
+                    tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
 
                 # col names
                 tropo = 'tropo_'+tp.col_name# 'tropo_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
                 strato ='strato_'+tp.col_name # 'strato_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
                 
-                df_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
+                tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
                                           tropo:pd.Series(np.nan, dtype='float')},
                                          index=tp_df.index)
             
                 # tropo: high p (gt 0), low everything else (lt 0)
-                df_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
+                tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
                             (strato, tropo)] = (False, True)
     
                 # strato: low p (lt 0), high everything else (gt 0)
-                df_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
+                tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
                             (strato, tropo)] = (True, False)
             
-                df_tropo = tp_df[df_sorted[tropo] == True]
-                df_strato = tp_df[df_sorted[strato] == True]
+                df_tropo = tp_df[tp_sorted[tropo] == True]
+                df_strato = tp_df[tp_sorted[strato] == True]
     
                 if plot: # plot data
                     # df_tropo, df_strato = plot_sorted_TP(tropopause_data, df_sorted, vcoord, subs.col_name, ax=ax)
@@ -312,17 +317,39 @@ def sort_tropo_strato(substances, vcoords=['p', 'z', 'pt'], plot=True):
                     ax.scatter(df_tropo.index, df_tropo[subs.col_name],
                                 c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
                 
-                out[tropo] = df_sorted[tropo]
-                out[strato] = df_sorted[strato]
+                df_sorted[tropo] = tp_sorted[tropo]
+                df_sorted[strato] = tp_sorted[strato]
             
             if plot: # add legend, format axes, ...
-                lines, labels = axs.flatten()[0].get_legend_handles_labels()
-                fig.legend(lines, labels, loc='lower center', ncol=2)
-                    
                 fig.autofmt_xdate()
                 fig.tight_layout()
+                fig.subplots_adjust(top=0.85)
+                lines, labels = axs.flatten()[0].get_legend_handles_labels()
+                fig.legend(lines, labels, loc='upper center', ncol=2,
+                           bbox_to_anchor=[0.5, 0.94])
                 plt.show()
-    return out
+    return df_sorted
+
+def trop_strat_counts():
+    """ Plot ratio of tropo / strato datapoints for each troposphere definition """
+    substances = get_substances(source='EMAC') + get_substances(source='Caribic')
+    substances = [s for s in substances if not s.col_name.startswith('d_')]
+
+    for vcoord in ['p', 'z', 'pt']:
+        out = sort_tropo_strato(substances, vcoords=[vcoord], plot=False)
+        val_count = out[[c for c in out.columns if c.startswith('strato')]].apply(pd.value_counts)
+        plt.figure(figsize=(3,3), dpi=240)
+        plt.title(f'Ratio of tropospheric / stratospheric datapoints in {vcoord}')
+        for ratio, l in zip([val_count[c][0] / val_count[c][1] for c in val_count.columns], list(val_count.columns)):
+            plt.hlines(l, 0, ratio, lw=12, alpha=0.7)
+        plt.axvspan(0.99, 1.01, facecolor='k', alpha=0.7)
+        plt.show()
+
+if __name__=='__main__':
+    substances = get_substances(source='EMAC') + get_substances(source='Caribic')
+    substances = [s for s in substances if not s.col_name.startswith('d_')]
+    df_sorted = sort_tropo_strato(substances)
+    # trop_strat_counts()
 
 #%% Old scatter plots
 # =============================================================================
