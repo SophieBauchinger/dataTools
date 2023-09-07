@@ -143,7 +143,12 @@ class GlobalData(object):
             # update years if it hasn't happened with the dataframe already
             if 'df' not in self.data and self.source=='EMAC': # only dataset exists
                 self.years = list(set(pd.to_datetime(self.data.ds['time'].values).year))
-            out.status['latitude'] = (lat_min, lat_max)
+
+            # update object status
+            if 'latitude' in out.status: 
+                out.status['latitude'] = (max([out.status['latitude'][0], lat_min]), 
+                                          min([out.status['latitude'][1], lat_max]))
+            else: out.status['latitude'] = (lat_min, lat_max)
 
         elif self.source == 'Mozart':
             out.df =  out.df.query(f'latitude > {lat_min}')
@@ -170,26 +175,33 @@ class GlobalData(object):
         if self.source != 'Caribic': 
             raise NotImplementedError('Action not yet supported for non-Caribic data')
         else:
-            eql_col = get_coord(source=self.source, model=model)
-            if model == 'ERA5': eql_col = 'int_ERA5_EQLAT [deg N]'
-            elif model == 'ECMWF': eql_col = 'int_eqlat [deg]'
-
+            eql_col = get_coord(source=self.source, model=model, hcoord='eql')
             df = self.met_data.copy()
             df = df[df[eql_col] > eql_min]
             df = df[df[eql_col] < eql_max]
-            self.data['met_data'] = df
+            out.data['met_data'] = df
 
             df_list = [k for k in self.data
                        if isinstance(self.data[k], pd.DataFrame)] # all dataframes
 
             for k in df_list: # delete everything outside eql range
                 out.data[k] = out.data[k][out.data[k].index.isin(df.index)]
+            
+            # update object status
+            if 'eq_lat' in out.status: 
+                out.status['eq_lat'] = (max([out.status['eq_lat'][0], eql_min]), 
+                                          min([out.status['eq_lat'][1], eql_max]))
+            else: out.status['eq_lat'] = (eql_min, eql_max)
 
         return out
 
     def sel_season(self, season):
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
         1 - spring, 2 - summer, 3 - autumn, 4 - winter """
+        if 'season' in self.status:
+            if self.status['season'] == dict_season()[f'name_{season}']: return self
+            else: raise Warning('Cannot select {} as already filtered for {}'.format(
+                dict_season()[f'name_{season}'], self.status['season']))
         out = type(self).__new__(self.__class__) # new class instance
         for attribute_key in self.__dict__: # copy attributes
             out.__dict__[attribute_key] = self.__dict__[attribute_key]
@@ -626,8 +638,6 @@ class Caribic(CaribicData):
         """ Create dataframe containing all met.+ msmt. data for a substance """
         self.data[f'{subs}'] = coord_merge_substance(self, subs)
         return self
-
-
 
 # Mozart
 class Mozart(GlobalData):
