@@ -1,8 +1,8 @@
 ﻿col_name,long_name,unit,ID,source,vcoord,hcoord,var,tp_def,rel_to_tp,model,pvu,crit,var1,var2
 h_TP [km],Geopotential height of O3 tropopause according to Zahn et al. (2003),km,calc,Caribic,z,,,chem,FALSE,ECMWF,,o3,int_z_km [km],int_CARIBIC2_H_rel_TP [km]
 int_ERA5_1_5PVU_BOT [K],Potential temperature the local 1.5 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,1.5,,int_Theta [K],int_ERA5_D_1_5PVU_BOT [K]
-int_ERA5_2_0PVU_BOT [K],Potential temperature the local 12.0 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,2,,int_Theta [K],int_ERA5_D_2_0PVU_BOT [K]
-int_ERA5_3_5PVU_BOT [K],Potential temperature the local 3.5 PVU surface (ERA%) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,3.5,,int_Theta [K],int_ERA5_D_3_5PVU_BOT [K]
+int_ERA5_2_0PVU_BOT [K],Potential temperature the local 2.0 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,2,,int_Theta [K],int_ERA5_D_2_0PVU_BOT [K]
+int_ERA5_3_5PVU_BOT [K],Potential temperature the local 3.5 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,3.5,,int_Theta [K],int_ERA5_D_3_5PVU_BOT [K]
 int_ERA5_D_TROP1_PRESS,Pressure-Distance to local lapse rate tropopause (ERA5),hPa,calc,Caribic,p,,,therm,TRUE,ERA5,,,p [mbar],int_ERA5_TROP1_PRESS [hPa]
 int_ERA5_D_TROP1_THETA,THETA-Distance to local lapse rate tropopause (ERA5),K,calc,Caribic,pt,,,therm,TRUE,ERA5,,,int_Theta [K],int_ERA5_TROP1_THETA [K]
 int_p_dtrop_hpa [hPa],Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p [mbar],int_dp_dtrop_hpa [hPa]
@@ -70,24 +70,24 @@ tropop_tp_PV_i,PV tropopause level index,level,EMAC,EMAC,lev,,,dyn,FALSE,EMAC,3.
 tropop_tp_WMO,WMO tropopause pressure,hPa,EMAC,EMAC,p,,,therm,FALSE,EMAC,,,,
 tropop_tp_WMO_f,fract. of WMO-TP box in trop.,,EMAC,EMAC,,,frac,therm,FALSE,EMAC,,,,
 tropop_tp_WMO_i,WMO tropopause level index,level,EMAC,EMAC,lev,,,therm,FALSE,EMAC,,,,
-p [mbar],pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,msmt,,,,
-geometry,geometry,degrees,GHG,Caribic,,geometry,,,,msmt,,,,
-geometry.x,latitude,degrees_north,GHG,Caribic,,lat,,,,msmt,,,,
-geometry.y,longitude,degrees_east,GHG,Caribic,,lon,,,,msmt,,,,
+p [mbar],pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,MSMT,,,,
+geometry,geometry,degrees,GHG,Caribic,,geometry,,,,MSMT,,,,
+geometry.x,latitude,degrees_north,GHG,Caribic,,lat,,,,MSMT,,,,
+geometry.y,longitude,degrees_east,GHG,Caribic,,lon,,,,MSMT,,,,
 int_dp_dtrop_hpa [hPa],pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),hPa,INT,Caribic,p,,,dyn,TRUE,ECMWF,3.5,,,
 int_dp_strop_hpa [hPa],pressure difference relative to thermal tropopause from ECMWF (with g=9.81 m/s^2),hPa,INT,Caribic,p,,,therm,TRUE,ECMWF,,,,
 int_eqlat [deg],equivalent latitude in degrees north from ECMWF,degrees_north,INT,Caribic,,eql,,,,ECMWF,,,,
-int_Tpot [K],potential temperature derived from measured pressure and temperature: Tpot:=(StcAirTmp+273.15)*exp(0.2857*ln(1000/pstatic),K,INT,Caribic,pt,,,,FALSE,msmt,,,,
+int_Tpot [K],potential temperature derived from measured pressure and temperature: Tpot:=(StcAirTmp+273.15)*exp(0.2857*ln(1000/pstatic),K,INT,Caribic,pt,,,,FALSE,MSMT,,,,
 int_pt_rel_dTP_K [K],potential temperature difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),K,INT,Caribic,pt,,,dyn,TRUE,ECMWF,3.5,,,
 int_pt_rel_sTP_K [K],potential temperature difference relative to thermal tropopause from ECMWF (with g=9.81 m/s^2),K,INT,Caribic,pt,,,therm,TRUE,ECMWF,,,,
 int_PV [PVU],PV from ECMWF (integral),PVU,INT,Caribic,pv,,,,FALSE,ECMWF,,,,
 int_z_km [km],geopotential height of sample from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,,FALSE,ECMWF,,,,
 int_z_rel_dTP_km [km],geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,dyn,TRUE,ECMWF,3.5,,,
 int_z_rel_sTP_km [km],geopotential height relative to thermal tropopause from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,therm,TRUE,ECMWF,,,,
-int_h_rel_TP [km],height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,msmt,,o3,,
-int_AgeSpec_AGE [year],Mean age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mean,,,msmt,,,,
-int_AgeSpec_MEDIAN_AGE [year],Median age from age-spectrum,year,INT2,Caribic,,,aoa_med,,,msmt,,,,
-int_AgeSpec_MODE [year],Modal age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mod,,,msmt,,,,
+int_h_rel_TP [km],height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,
+int_AgeSpec_AGE [year],Mean age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mean,,,MSMT,,,,
+int_AgeSpec_MEDIAN_AGE [year],Median age from age-spectrum,year,INT2,Caribic,,,aoa_med,,,MSMT,,,,
+int_AgeSpec_MODE [year],Modal age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mod,,,MSMT,,,,
 int_ERA5_PRESS [hPa],Pressure (ERA5),hPa,INT2,Caribic,p,,,,FALSE,ERA5,,,,
 int_ERA5_TROP1_PRESS [hPa],Pressure of local lapse rate tropopause (ERA5),hPa,INT2,Caribic,p,,,therm,FALSE,ERA5,,,,
 int_ERA5_EQLAT [deg N],Equivalent latitude (ERA5),degrees_north,INT2,Caribic,,eql,,,,ERA5,,,,
@@ -99,4 +99,4 @@ int_ERA5_TROP1_THETA [K],Pot. temperature of local lapse rate tropopause (ERA5),
 int_Theta [K],Potential Temperature,K,INT2,Caribic,pt,,,,FALSE,ECMWF,,,,
 int_ToAirTmp [degC],Total Air Temperature # Celsius-temperature-scale,degC,INT2,Caribic,,,t,,,ECMWF,,,,
 int_ERA5_PV [PVU],Potential vorticity (ERA5),PVU,INT2,Caribic,pv,,,,FALSE,ERA5,,,,
-int_CARIBIC2_H_rel_TP [km],replacement for H_rel_TP,km,INT2,Caribic,z,,,,FALSE,msmt,,,,
+int_CARIBIC2_H_rel_TP [km],replacement for H_rel_TP,km,INT2,Caribic,z,,,,FALSE,MSMT,,,,
