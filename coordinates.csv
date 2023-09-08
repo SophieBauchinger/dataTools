@@ -9,8 +9,8 @@ int_p_dtrop_hpa [hPa],Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,
 int_p_strop_hpa [hPa],Pressure of thermal tropopause (ECMWF),hPa,calc,Caribic,p,,,therm,FALSE,ECMWF,,,p [mbar],int_dp_strop_hpa [hPa]
 int_pt_dTP_K [K],Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMWF) ,K,calc,Caribic,pt,,,dyn,FALSE,ECMWF,3.5,,int_Theta [K],int_pt_rel_dTP_K [K]
 int_pt_sTP_K [K],Potential temperature of thermal tropopause (ECMWF) ,K,calc,Caribic,pt,,,therm,FALSE,ECMWF,,,int_Theta [K],int_pt_rel_sTP_K [K]
-int_z_dTP_km [km],geopotential height of dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),km,calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km [km],int_z_rel_dTP_km [km]
-int_z_sTP_km [km],geopotential height of thermal tropopause from ECMWF (with g=9.81 m/s^2),km,calc,Caribic,z,,,therm,FALSE,ECMWF,,,int_z_km [km],int_z_rel_sTP_km [km]
+int_z_dTP_km [km],geopotential height of dynamical (PV=3.5PVU) tropopause from ECMWF,km,calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km [km],int_z_rel_dTP_km [km]
+int_z_sTP_km [km],geopotential height of thermal tropopause from ECMWF,km,calc,Caribic,z,,,therm,FALSE,ECMWF,,,int_z_km [km],int_z_rel_sTP_km [km]
 e5vdiff_tpot,potential temperature,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
 e5vdiff_tpot_at_fl,potential temperature at flight level,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
 ECHAM5_aclc,large scale cloud cover,,EMAC,EMAC,,,aclc,,,EMAC,,,,
@@ -74,16 +74,16 @@ p [mbar],pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,MSMT,,,,
 geometry,geometry,degrees,GHG,Caribic,,geometry,,,,MSMT,,,,
 geometry.x,latitude,degrees_north,GHG,Caribic,,lat,,,,MSMT,,,,
 geometry.y,longitude,degrees_east,GHG,Caribic,,lon,,,,MSMT,,,,
-int_dp_dtrop_hpa [hPa],pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),hPa,INT,Caribic,p,,,dyn,TRUE,ECMWF,3.5,,,
-int_dp_strop_hpa [hPa],pressure difference relative to thermal tropopause from ECMWF (with g=9.81 m/s^2),hPa,INT,Caribic,p,,,therm,TRUE,ECMWF,,,,
+int_dp_dtrop_hpa [hPa],pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,hPa,INT,Caribic,p,,,dyn,TRUE,ECMWF,3.5,,,
+int_dp_strop_hpa [hPa],pressure difference relative to thermal tropopause from ECMWF,hPa,INT,Caribic,p,,,therm,TRUE,ECMWF,,,,
 int_eqlat [deg],equivalent latitude in degrees north from ECMWF,degrees_north,INT,Caribic,,eql,,,,ECMWF,,,,
-int_Tpot [K],potential temperature derived from measured pressure and temperature: Tpot:=(StcAirTmp+273.15)*exp(0.2857*ln(1000/pstatic),K,INT,Caribic,pt,,,,FALSE,MSMT,,,,
-int_pt_rel_dTP_K [K],potential temperature difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),K,INT,Caribic,pt,,,dyn,TRUE,ECMWF,3.5,,,
-int_pt_rel_sTP_K [K],potential temperature difference relative to thermal tropopause from ECMWF (with g=9.81 m/s^2),K,INT,Caribic,pt,,,therm,TRUE,ECMWF,,,,
+int_Tpot [K],potential temperature derived from measured pressure and temperature,K,INT,Caribic,pt,,,,FALSE,MSMT,,,,
+int_pt_rel_dTP_K [K],potential temperature difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,K,INT,Caribic,pt,,,dyn,TRUE,ECMWF,3.5,,,
+int_pt_rel_sTP_K [K],potential temperature difference relative to thermal tropopause from ECMWF,K,INT,Caribic,pt,,,therm,TRUE,ECMWF,,,,
 int_PV [PVU],PV from ECMWF (integral),PVU,INT,Caribic,pv,,,,FALSE,ECMWF,,,,
 int_z_km [km],geopotential height of sample from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,,FALSE,ECMWF,,,,
-int_z_rel_dTP_km [km],geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,dyn,TRUE,ECMWF,3.5,,,
-int_z_rel_sTP_km [km],geopotential height relative to thermal tropopause from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,therm,TRUE,ECMWF,,,,
+int_z_rel_dTP_km [km],geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF,km,INT,Caribic,z,,,dyn,TRUE,ECMWF,3.5,,,
+int_z_rel_sTP_km [km],geopotential height relative to thermal tropopause from ECMWF,km,INT,Caribic,z,,,therm,TRUE,ECMWF,,,,
 int_h_rel_TP [km],height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,
 int_AgeSpec_AGE [year],Mean age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mean,,,MSMT,,,,
 int_AgeSpec_MEDIAN_AGE [year],Median age from age-spectrum,year,INT2,Caribic,,,aoa_med,,,MSMT,,,,
