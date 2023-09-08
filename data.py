@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from metpy import calc
 from metpy.units import units
 import dill
+import copy
 
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
@@ -25,7 +26,9 @@ from toolpac.conv.times import fractionalyear_to_datetime
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from dictionaries import get_col_name, substance_list, get_fct_substance, coord_dict, get_coordinates, get_coord, dict_season
+import dictionaries as dcts
+
+# from dictionaries import get_col_name, substance_list, get_fct_substance, coord_dict, get_coordinates, get_coord, dict_season, get_substances
 from tools import make_season, monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, process_emac_s4d, process_emac_s4d_s
 from tropFilter import chemical, dynamical, thermal
 
@@ -76,10 +79,10 @@ class GlobalData(object):
 
         out = type(self).__new__(self.__class__) # new class instance
         for attribute_key in self.__dict__: # copy attributes
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy() # stops self.data being overwritten
 
-        if self.source in ['Caribic', 'EMAC']:
+        if self.source in ['Caribic', 'EMAC', 'TP']:
             # Dataframes
             df_list = [k for k in self.data
                        if isinstance(self.data[k], pd.DataFrame)] # or Geodf
@@ -98,7 +101,6 @@ class GlobalData(object):
                 out.data[k] = out.data[k].sel(time=out.data[k].time.dt.year.isin(yr_list))
 
         else:
-            print(self.source)
             out.data['df'] =  out.df[out.df.index.year.isin(yr_list)].sort_index()
             if hasattr(out, 'ds'):
                 out.ds = out.ds.sel(time=yr_list)
@@ -113,7 +115,7 @@ class GlobalData(object):
         # copy everything over without changing the original class instance
         out = type(self).__new__(self.__class__)
         for attribute_key in self.__dict__:
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()
 
         if self.source in ['Caribic', 'EMAC', 'TP']:
@@ -169,13 +171,13 @@ class GlobalData(object):
         # copy everything over without changing the original class instance
         out = type(self).__new__(self.__class__)
         for attribute_key in self.__dict__:
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()
 
         if self.source != 'Caribic': 
             raise NotImplementedError('Action not yet supported for non-Caribic data')
         else:
-            eql_col = get_coord(source=self.source, model=model, hcoord='eql')
+            eql_col = dcts.get_coord(source=self.source, model=model, hcoord='eql')
             df = self.met_data.copy()
             df = df[df[eql_col] > eql_min]
             df = df[df[eql_col] < eql_max]
@@ -199,12 +201,12 @@ class GlobalData(object):
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
         1 - spring, 2 - summer, 3 - autumn, 4 - winter """
         if 'season' in self.status:
-            if self.status['season'] == dict_season()[f'name_{season}']: return self
+            if self.status['season'] == dcts.dict_season()[f'name_{season}']: return self
             else: raise Warning('Cannot select {} as already filtered for {}'.format(
-                dict_season()[f'name_{season}'], self.status['season']))
+                dcts.dict_season()[f'name_{season}'], self.status['season']))
         out = type(self).__new__(self.__class__) # new class instance
         for attribute_key in self.__dict__: # copy attributes
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
 
         if self.source in ['Caribic', 'EMAC', 'TP']:
             out.data = {} 
@@ -224,9 +226,40 @@ class GlobalData(object):
 
         else: raise Warning(f'Not implemented for {self.source}')
 
-        out.status['season'] = dict_season()[f'name_{season}']
+        out.status['season'] = dcts.dict_season()[f'name_{season}']
         return out
-        
+
+    def sel_flight(self, flights, verbose=False):
+        """ Returns Caribic object containing only data for selected flights
+            flight_list (int / list) """
+        if self.source not in ['Caribic', 'TP']: 
+            raise NotImplementedError(f'Flight selection not available for {self.source}.')
+        if isinstance(flights, int): flights = [flights]
+        # elif isinstance(flights, range): flights = list(flights)
+        invalid = [f for f in flights if f not in self.flights]
+        if len(invalid)>0 and verbose:
+            print(f'No data found for flights {invalid}. Proceeding without.')
+        flights = [f for f in flights if f in self.flights]
+
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__: # copy stuff like pfxs
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+        # very important so that self.data doesn't get overwritten
+        out.data = self.data.copy()
+
+        df_list = [k for k in self.data
+                   if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut
+        for k in df_list: # delete everything but selected flights
+            out.data[k] = out.data[k][
+                out.data[k]['Flight number'].isin(flights)]
+            out.data[k].sort_index(inplace=True)
+
+        out.flights = flights # update to chosen & available flights
+        out.years = list(set([yr for yr in out.data[k].index.year]))
+        out.years.sort(); out.flights.sort()
+
+        return out
+
 # Caribic
 class CaribicData(GlobalData):
     """ Stores relevant Caribic data
@@ -269,6 +302,7 @@ class CaribicData(GlobalData):
         if os.path.exists('misc_data\Caribic\caribic_data_dict.pkl'):
             with open('misc_data\Caribic\caribic_data_dict.pkl', 'rb') as f:
                 self.data = dill.load(f)
+            self.data = self.sel_year(*self.years).data
             
         else:
             print('Pickled data not found, calculating it anew.')
@@ -351,7 +385,7 @@ class CaribicData(GlobalData):
         """ Create dataframe with all possible coordinates but
         no measurement / substance values """
         # merge lists of coordinates for all pfxs in the object
-        coords = [y for pfx in self.pfxs for y in coord_dict(pfx)] + ['geometry', 'Flight number']
+        coords = [y for pfx in self.pfxs for y in dcts.coord_dict(pfx)] + ['geometry', 'Flight number']
         if 'GHG' in self.pfxs: 
             # copy bc don't want to overwrite data
             df = self.data['GHG'].copy() 
@@ -372,7 +406,7 @@ class CaribicData(GlobalData):
     def create_tp_coords(self):
         """ Add calculated relative / absolute tropopause values to .met_data """
         df = self.met_data.copy()
-        new_coords = get_coordinates(**{'ID':'calc', 'source':'Caribic'})
+        new_coords = dcts.get_coordinates(**{'ID':'calc', 'source':'Caribic'})
 
         for coord in new_coords:
             # met = tp + rel sooo MET - MINUS for either one
@@ -444,35 +478,6 @@ class Caribic(CaribicData):
     status: {self.status}"""
             # flights: {self.flights}
 
-    def sel_flight(self, flights, verbose=False):
-        """ Returns Caribic object containing only data for selected flights
-            flight_list (int / list) """
-        if isinstance(flights, int): flights = [flights]
-        # elif isinstance(flights, range): flights = list(flights)
-        invalid = [f for f in flights if f not in self.flights]
-        if len(invalid)>0 and verbose:
-            print(f'No data found for flights {invalid}. Proceeding without.')
-        flights = [f for f in flights if f in self.flights]
-
-        out = type(self).__new__(self.__class__) # create new class instance
-        for attribute_key in self.__dict__: # copy stuff like pfxs
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
-        # very important so that self.data doesn't get overwritten
-        out.data = self.data.copy()
-
-        df_list = [k for k in self.data
-                   if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut
-        for k in df_list: # delete everything but selected flights
-            out.data[k] = out.data[k][
-                out.data[k]['Flight number'].isin(flights)]
-            out.data[k].sort_index(inplace=True)
-
-        out.flights = flights # update to chosen & available flights
-        out.years = list(set([yr for yr in out.data[k].index.year]))
-        out.years.sort(); out.flights.sort()
-
-        return out
-
     def sel_atm_layer(self, atm_layer, **kwargs):
         """ Create Caribic object with strato / tropo sorting
         Parameters:
@@ -491,7 +496,7 @@ class Caribic(CaribicData):
         """
         out = type(self).__new__(self.__class__) # create new class instance
         for attribute_key in self.__dict__: # copy stuff like pfxs
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
 
         out.data = {k:v.copy() for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
         functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
@@ -549,7 +554,7 @@ class Caribic(CaribicData):
         """
         out = type(self).__new__(self.__class__) # create new class instance
         for attribute_key in self.__dict__: # copy stuff like pfxs
-            out.__dict__[attribute_key] = self.__dict__[attribute_key]
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
 
         # Find and filter tropospheric extreme events
         tp_def = kwargs.get('tp_def')
@@ -567,10 +572,10 @@ class Caribic(CaribicData):
             data = tropo_obj.data[pfx].sort_index()
             if 'subs' in kwargs and isinstance(kwargs['subs'], str): subs_list = [kwargs['subs']]
             elif 'subs' in kwargs and isinstance(kwargs['subs'], list): subs_list = kwargs['subs']
-            else: subs_list = substance_list(pfx)
+            else: subs_list = dcts.substance_list(pfx)
 
             for subs in subs_list:
-                try: substance = get_col_name(subs, tropo_obj.source, pfx)
+                try: substance = dcts.get_col_name(subs, tropo_obj.source, pfx)
                 except: substance = None
                 if substance not in data.columns: continue
                 time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
@@ -579,7 +584,7 @@ class Caribic(CaribicData):
                     d_mxr = data[f'd_{substance}'].tolist()
                 else: d_mxr = None # integrated values of high resolution data
 
-                func = get_fct_substance(subs)
+                func = dcts.get_fct_substance(subs)
                 # Find extreme events
                 tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
                                        direction='p', verbose=False,
@@ -594,15 +599,15 @@ class Caribic(CaribicData):
                 out.data[pfx].replace(9999, np.nan, inplace=True)
 
             # delete unfiltered data
-            drop_subs = [subs for subs in substance_list(pfx) if subs not in subs_list]
-            drop_cols = [get_col_name(subs, out.source, pfx) for subs in drop_subs]
+            drop_subs = [subs for subs in dcts.substance_list(pfx) if subs not in subs_list]
+            drop_cols = [dcts.get_col_name(subs, out.source, pfx) for subs in drop_subs]
             out.data[pfx].drop(columns = drop_cols, inplace=True)
 
         # also filter / create the substance dataframes (not elegantly)
         for subs in ['sf6', 'n2o', 'co2', 'ch4']:
             if subs in self.data and 'subs_pfx' in kwargs:
                 data = out.data[subs] = self.data[subs].copy()
-                substance = get_col_name(subs, tropo_obj.source, kwargs['subs_pfx'])
+                substance = dcts.get_col_name(subs, tropo_obj.source, kwargs['subs_pfx'])
 
                 time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
                 mxr = data[substance].tolist()
@@ -610,7 +615,7 @@ class Caribic(CaribicData):
                     d_mxr = data[f'd_{substance}'].tolist()
                 else: d_mxr = None # integrated values of high resolution data
 
-                func = get_fct_substance(subs)
+                func = dcts.get_fct_substance(subs)
                 # Find extreme events
                 tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
                                        direction='p', verbose=False,
@@ -785,9 +790,9 @@ class EMACData(GlobalData):
         ds_s['ECHAM5_height_at_fl'] = ds_s['ECHAM5_height_at_fl'].metpy.convert_units(units.km)
         ds_s['ECHAM5_height_at_fl'] = ds_s['ECHAM5_height_at_fl'].metpy.dequantify()        
 
-        new_coords = get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'not_tpress', 'var2':'not_nan'})
+        new_coords = dcts.get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'not_tpress', 'var2':'not_nan'})
         abs_coords = [c for c in new_coords if c.var2.endswith('_i')] # get eg. value of pt at tp
-        rel_coords = list(get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'tpress', 'var2':'not_nan'}) 
+        rel_coords = list(dcts.get_coordinates(**{'ID':'calc', 'source':'EMAC', 'var1':'tpress', 'var2':'not_nan'}) 
                           + [c for c in new_coords if c not in abs_coords]) # eg. pt distance to tp
 
         # copy relevant data into new dataframe
@@ -798,7 +803,7 @@ class EMACData(GlobalData):
                           v for v in ds_s.variables if v.startswith('tracer_')]
         tp_ds = ds_s[vars_at_fl].copy()
         
-        tropop_vars = [v.col_name for v in get_coordinates(**{'ID':'EMAC', 'tp_def':'not_nan'})
+        tropop_vars = [v.col_name for v in dcts.get_coordinates(**{'ID':'EMAC', 'tp_def':'not_nan'})
                        if not v.col_name.endswith(('_i', '_f')) and v.col_name in ds.variables]
         for var in tropop_vars: 
             tp_ds[var] = ds[var].copy()
@@ -887,6 +892,76 @@ class EMACData(GlobalData):
         if 'df' in self.data: 
             with open(pdir+'\df.pkl', 'wb') as f:
                 dill.dump(self.df, f)
+
+class TropopauseData(GlobalData):
+    """ Holds Caribic data and Caribic-specific EMAC Model output """
+    def __init__(self, years=range(2005, 2020), interp=True, method='n'):
+        if isinstance(years, int): years = [years]
+        super().__init__([yr for yr in years if yr >= 2000 and yr <= 2019])
+        self.source = 'TP'
+        self.data = {}
+        self.get_data()
+        # select year on this object afterwards bc otherwise interpolation is missing surrounding values
+        if interp: self.interpolate_emac(method)
+        self.data = self.sel_year(*years).data
+
+    def __repr__(self):
+        self.years.sort()
+        return f'TropopauseData object\n\
+            years: {self.years}\n\
+            status: {self.status}'
+
+    def get_data(self):
+        """ Return merged dataframe with interpolated EMAC / Caribic data """
+        caribic = Caribic()
+        emac = EMACData()
+        df_caribic = caribic.df
+        df_emac = emac.df
+        df = pd.merge( df_caribic, df_emac, how='outer', sort=True,
+                      left_index=True, right_index=True)
+        df.geometry = df_caribic.geometry.combine_first(df_emac.geometry)
+        df = df.drop(columns=['geometry_x', 'geometry_y'])
+        df['Flight number'].interpolate(method='nearest', inplace=True)
+        df['Flight number'].interpolate(inplace=True, limit_direction='both') # fill in first two timestamps too
+        df['Flight number'] = df['Flight number'].astype(int)
+        self.data['df'] = df
+        self.flights = list(set(df['Flight number']))
+        return df
+
+    @property
+    def df(self):
+        """ Allow accessing df as class attribute. """
+        return self.data['df']
+
+    def interpolate_emac(self, method, verbose=False):
+        """ Add interpolated EMAC data to joint df to match caribic timestamps.
+
+        Parameters:
+            method (str): interpolation method. Limit is set to 2 consecutive NaN values
+                'n' - nearest neighbour, 'b' - bilinear
+
+        Note: Residual NaN values in nearest because EMAC only goes to 2019.
+        Explanation on methods see at https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.interp1d.html
+        """
+        data = self.df.copy()
+        tps_emac = [i.col_name for i in dcts.get_coordinates(source='EMAC') if i.col_name in self.df.columns] + [
+            i for i in ['ECHAM5_tm1_at_fl', 'ECHAM5_tpoteq_at_fl', 'ECHAM5_press_at_fl'] if i in self.df.columns]
+        subs_emac = [i.col_name for i in dcts.get_substances(source='EMAC') if i.col_name in self.df.columns]
+
+        nan_count_i = data[tps_emac[0]].isna().value_counts().loc[True]
+        for c in tps_emac+subs_emac:
+            if method=='b': data[c].interpolate(method='linear', inplace=True, limit=2)
+            elif method=='n': data[c].interpolate(method='nearest', inplace=True, limit=2)
+            else: raise KeyError('Please choose either b-linear or n-nearest neighbour interpolation.')
+            data[c] = data[c].astype(float)
+        nan_count_f = data[tps_emac[0]].isna().value_counts().loc[True]
+
+        if verbose: print('{} NaNs in EMAC data filled using {} interpolation'.format(
+                nan_count_i-nan_count_f, 'nearest neighbour' if method=='n' else 'linear'))
+
+        self.data['df'] = data
+        self.status['interp_emac'] = True
+        return data
 
 #%% Local data
 class LocalData(object):
@@ -1045,7 +1120,7 @@ def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False
     out_dict = {}
 
     if c_pfx: pfxs = [c_pfx]
-    else: pfxs = [pfx for pfx in c_obj.pfxs if subs in substance_list(pfx)]
+    else: pfxs = [pfx for pfx in c_obj.pfxs if subs in dcts.substance_list(pfx)]
 
     if plot:
         if not as_subplot:
@@ -1056,14 +1131,14 @@ def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False
 
     for c_pfx, i in zip(pfxs, range(len(pfxs))):
         df = c_obj.data[c_pfx]
-        substance = get_col_name(subs, c_obj.source, c_pfx)
+        substance = dcts.get_col_name(subs, c_obj.source, c_pfx)
         if substance is None: continue
 
         c_obs = df[substance].values
         t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
 
         ref_df = loc_obj.df
-        ref_subs = get_col_name(subs, loc_obj.source)
+        ref_subs = dcts.get_col_name(subs, loc_obj.source)
         if ref_subs is None: raise ValueError(f'No reference data found for {subs}')
         # ignore reference data earlier and later than two years before/after msmts
         ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
