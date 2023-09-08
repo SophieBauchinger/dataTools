@@ -29,6 +29,41 @@ class TropopausePlotter(TropopauseData):
     def __init__(self, years=range(2005, 2020), interp=True, method='n'):
         super().__init__(years, interp, method)
 
+    def test_scatter(self, year=None):
+        vc = 'pt'
+        tp = get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)[0]
+        fig, axs = plt.subplots(2,2,dpi=150, figsize=(10,5))
+        fig.suptitle(f'{tp.col_name} - {tp.long_name}')
+        if year: fig.text(0.9, 0.95, f'{year}',
+                          bbox = dict(boxstyle='round', facecolor='white',
+                                      edgecolor='grey', alpha=0.5, pad=0.25))
+        for s,ax in zip([1,2,3,4], axs.flatten()):
+            if year: df_r = self.sel_year(year).sel_season(s).df
+            else: df_r = self.sel_season(s).df
+            if df_r.empty: continue
+            df_r.geometry = [Point(pt.y,pt.x) for pt in df_r.geometry]
+
+            x = np.array([df_r.geometry[i].x for i in range(len(df_r.index))])
+            y = np.array([df_r.geometry[i].y for i in range(len(df_r.index))])
+            binclassinstance = Bin_equi2d(np.nanmin(x), np.nanmax(x), 5,
+                                          np.nanmin(y), np.nanmax(y), 5)
+            out = Simple_bin_2d(df_r[tp.col_name], x, y, binclassinstance)
+
+            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+            ax.set_title(dict_season()[f'name_{s}'])
+            cmap = 'viridis_r' if tp.vcoord=='p' else 'viridis'
+
+            norm = Normalize(*vlims[vc]) # colormap normalisation
+            # df_r.plot(tp.col_name, cmap=cmap, legend=True, ax=ax)
+            img = ax.imshow(out.vmean.T, cmap = cmap, origin='lower', norm=norm,
+                        extent=[np.nanmin(x), np.nanmax(x), np.nanmin(y), np.nanmax(y)])
+            cbar = plt.colorbar(img, ax=ax, pad=0.08,
+                                orientation='vertical', extend='both') # colorbar
+            cbar.ax.set_xlabel(f'{vc} [{tp.unit}]')
+            ax.set_ylim(-90, 90); ax.set_xlim(-180, 180)
+        fig.tight_layout()
+        plt.show()
+
     def scatter_2d(self, save=False, year=None):
         """ 2D global scatter of tropopause height.
         Parameters: 
@@ -45,9 +80,9 @@ class TropopausePlotter(TropopauseData):
                                   bbox = dict(boxstyle='round', facecolor='white',
                                               edgecolor='grey', alpha=0.5, pad=0.25))
                 for s,ax in zip([1,2,3,4], axs.flatten()):
-                    if year: df_r = self.sel_season(s).df
+                    if year: df_r = self.sel_year(year).sel_season(s).df
                     else: df_r = self.sel_season(s).df
-                    if df_r.empty: pass
+                    if df_r.empty: continue
                     df_r.geometry = [Point(pt.y,pt.x) for pt in df_r.geometry]
     
                     x = np.array([df_r.geometry[i].x for i in range(len(df_r.index))])
@@ -278,10 +313,10 @@ class TropopausePlotter(TropopauseData):
 
 #%% Plotting function calls
 if __name__=='__main__':
-    tp = TropopausePlotter().sel_flight(270)
+    tp = TropopausePlotter().sel_year(2012)
     
     # Global 2D scatter of tropopause heights for all definitions
-    for year in range(2005, 2020):
+    for year in tp.years:
         tp.scatter_2d(save=False, year=year)
     
     #  Binned versus latitude
@@ -313,49 +348,3 @@ def make_gif():
                            save_all=True, duration=200, loop=0)
 # if __name__ == "__main__":
 #     make_gif()
-
-#%% Nope
-# =============================================================================
-# def plot_sorted_TP(self, df_sorted, vcoord, subs_col, ax):
-#     """ Plot strat / trop sorted data """
-#     # only take data with index that is available in df_sorted
-#     df_sorted = self.sort_tropo_strato(vcoord)
-#     
-#     df = self.df
-#     data = df[df.index.isin(df_sorted.index)]
-#     data.sort_index(inplace=True)
-# 
-#     # separate trop/strat data for any criterion
-#     tropo_col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
-#     strato_col = [col for col in df_sorted.columns if col.startswith('strato')][0]
-# 
-#     # take 'data' here because substances may not be available in df_sorted
-#     df_tropo = data[df_sorted[tropo_col] == True]
-#     df_strato = data[df_sorted[strato_col] == True]
-# 
-#     substance = subs_col
-#     if 'detr_'+substance in data.columns: substance = 'detr_'+substance
-# 
-#     # fig, ax = plt.subplots(dpi=200)
-#     # plt.title(f'{subs_col} in {vcoord}')
-#     ax.scatter(df_strato.index, df_strato[substance],
-#                 c='grey',  marker='.', zorder=0, label='strato')
-#     ax.scatter(df_tropo.index, df_tropo[substance],
-#                 c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
-# 
-#     # if popt0 is not None and popt1 is not None and (subs==crit or subs is None):
-#     #     # only plot baseline for chemical tropopause def and where crit is being plotted
-#     #     t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
-#     #     ls = 'solid'
-#     #     if not subs_pfx == c_pfx: ls = 'dashed'
-#     #     ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0),
-#     #             c='r', lw=1, ls=ls, label='initial')
-#     #     ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt1),
-#     #             c='k', lw=1, ls=ls, label='filtered')
-# 
-#     # plt.ylim(220, 340)
-# 
-#     ax.set_title(substance)
-#     ax.legend()
-#     return df_tropo, df_strato
-# =============================================================================
