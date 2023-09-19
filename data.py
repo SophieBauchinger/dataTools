@@ -29,7 +29,7 @@ from toolpac.conv.times import datetime_to_fractionalyear
 import dictionaries as dcts
 
 # from dictionaries import get_col_name, substance_list, get_fct_substance, coord_dict, get_coordinates, get_coord, dict_season, get_substances
-from tools import make_season, monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, process_emac_s4d, process_emac_s4d_s
+from tools import make_season, monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, process_emac_s4d, process_emac_s4d_s, pre_flag, conv_molarity_PartsPer
 from tropFilter import chemical, dynamical, thermal
 
 #%% GLobal data
@@ -67,6 +67,114 @@ class GlobalData(object):
         """
         return bin_2d(self, subs, **kwargs) # out_list
 
+    def detrend_substance(self, substance, loc_obj=None, degree=2, save=True, plot=False,
+                          as_subplot=False, ax=None, ID=None, note=''):
+        """ Remove linear trend of substances using free troposphere as reference.
+        (redefined from C_tools.detrend_subs)
+    
+        Parameters:
+            substance (str): substance to detrend e.g. 'sf6'
+            loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
+        """
+        if loc_obj is None:
+            try: loc_obj = Mauna_Loa(self.years, substance)
+            except: raise ValueError(f'Cannot detrend as ref. data could not be found for {substance.upper()}')
+        # out_dict = {}
+        substances = dcts.get_substances(short_name=substance)
+        dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame) and 
+                      any([s for s in substances if s.col_name in self.data[k].columns])]
+        if ID is not None: dataframes = [ID]
+    
+        if plot:
+            if not as_subplot:
+                fig, axs = plt.subplots(len(dataframes), dpi=150, figsize=(6,4*len(dataframes)), sharex=True)
+                if len(dataframes)==1: axs = [axs]
+            elif ax is None:
+                ax = plt.gca()
+    
+        for i,k in enumerate(dataframes): 
+            print(k)
+            df = self.data[k]
+            if any([True for s in substances if s.col_name in df.columns]): 
+                subs = [s for s in substances if s.col_name in df.columns][0]
+            else: print('none'); continue
+            df.dropna(axis=0, subset=[subs.col_name], inplace=True)
+            df.sort_index()
+    
+            c_obs = df[subs.col_name].values
+            t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
+    
+            ref_df = loc_obj.df
+            ref_subs = dcts.get_subs(substance=substance, ID=loc_obj.ID) # dcts.get_col_name(subs, loc_obj.source)
+            if ref_subs is None: raise ValueError(f'No reference data found for {subs}')
+            
+            # convert glob obj data to loc obs unit if units don't match 
+            if str(subs.unit) != str(ref_subs.unit):
+                # print(f'units do not match : {subs.unit} vs {ref_subs.unit}')
+                if subs.unit=='mol mol-1': c_obs = conv_molarity_PartsPer(c_obs,ref_subs.unit)
+                elif subs.unit=='pmol mol-1' and ref_subs.unit == 'ppt': pass # c_obs = conv_molarity_PartsPer(c_obs, ref_subs.unit)*1e12 #!!! BAD code
+    
+            # ignore reference data earlier and later than two years before/after msmts
+            ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
+                            : max(df.index)+dt.timedelta(356*2)]
+            ref_df.dropna(how='any', subset=ref_subs.col_name, inplace=True) # remove NaN rows
+            c_ref = ref_df[ref_subs.col_name].values
+            t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
+    
+            popt = np.polyfit(t_ref, c_ref, degree)
+            c_fit = np.poly1d(popt) # get popt, then make into fct
+    
+            detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+            c_obs_detr = c_obs - detrend_correction
+            # get variance (?) by substracting offset from 0
+            c_obs_delta = c_obs_detr - c_fit(min(t_obs))
+    
+            df_detr = pd.DataFrame({f'detr_{subs.col_name}' : c_obs_detr,
+                                     f'delta_{subs.col_name}' : c_obs_delta,
+                                     f'detrFit_{subs.col_name}' : c_fit(t_obs)},
+                                    index = df.index)
+            # maintain relationship between detr and fit columns
+            df_detr[f'detrFit_{subs.col_name}'] = df_detr[f'detrFit_{subs.col_name}'].where(
+                ~df_detr[f'detr_{subs.col_name}'].isnull(), np.nan)
+    
+            # out_dict[f'detr_{k}_{substance}'] = df_detr
+            # out_dict[f'popt_{k}_{substance}'] = popt
+    
+            if save:
+                columns = [f'detr_{subs.col_name}',
+                           f'delta_{subs.col_name}',
+                           f'detrFit_{subs.col_name}']
+    
+                # add to data, then move geometry column to the end again
+                self.data[k][columns] = df_detr[columns]
+                self.data[k]['geometry'] =  self.data[k].pop('geometry')
+    
+            if plot and not k==substance:
+                if not as_subplot: ax = axs[i]
+                # ax.annotate(f'{c_pfx} {note}', xy=(0.025, 0.925), xycoords='axes fraction',
+                #                       bbox=dict(boxstyle="round", fc="w"))
+                ax.scatter(df_detr.index, c_obs, color='orange', label='Flight data', marker='.')
+                ax.scatter(df_detr.index, c_obs_detr, color='green', label='trend removed', marker='.')
+                ax.scatter(ref_df.index, c_ref, color='gray', label='MLO data', alpha=0.4, marker='.')
+                ax.plot(df_detr.index, c_fit(t_obs), color='black', ls='dashed',
+                          label='trendline')
+                ax.set_ylabel(f'{subs.col_name}') # ; ax.set_xlabel('Time')
+                if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
+                handles, labels = ax.get_legend_handles_labels()
+                if note !='': 
+                    leg = ax.legend(title=note)
+                    leg._legend_box.align = "left"
+                else: ax.legend()
+            else: axs[i].remove()
+    
+        if plot and not as_subplot:
+            plt.suptitle('${:.2}x^2 + {:.2}x + {:.2}$'.format(*popt))
+            fig.tight_layout()
+            fig.autofmt_xdate()
+            plt.show()
+    
+        return popt
+
     def sel_year(self, *years):
         """ Returns GlobalData object containing only data for selected years
             years (int) """
@@ -100,12 +208,12 @@ class GlobalData(object):
             for k in ds_list:
                 out.data[k] = out.data[k].sel(time=out.data[k].time.dt.year.isin(yr_list))
 
-        else:
-            out.data['df'] =  out.df[out.df.index.year.isin(yr_list)].sort_index()
-            if hasattr(out, 'ds'):
-                out.ds = out.ds.sel(time=yr_list)
-            if hasattr(out, 'SF6'):
-                out.SF6 = out.SF6[out.SF6.index.years.isin(yr_list)].sort_index()
+        elif self.source == 'Mozart': # yearly data
+            for k in [k for k in self.data if isinstance(self.data[k], pd.DataFrame)]:
+                out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)].sort_index()
+            for k in [k for k in self.data if isinstance(self.data[k], xr.Dataset)]:
+                out.data[k] = out.data[k].sel(time=yr_list)
+
         yr_list.sort()
         out.years = yr_list
         return out
@@ -120,10 +228,13 @@ class GlobalData(object):
 
         if self.source in ['Caribic', 'EMAC', 'TP']:
             df_list = [k for k in self.data
-                       if isinstance(self.data[k], pd.DataFrame)] # valid for gdf
+                       if isinstance(self.data[k], geopandas.GeoDataFrame)] # valid for gdf
             for k in df_list: # delete everything that isn't the chosen lat range
                 out.data[k] = out.data[k].cx[lat_min:lat_max, -180:180]
                 out.data[k].sort_index(inplace=True)
+            for k in [k for k in self.data if k not in df_list and isinstance(self.data[k], pd.DataFrame)]:
+                indices = [index for df_indices in [out.data[k].index for k in df_list] for index in df_indices] # all indices in the geodataframes
+                out.data[k] = out.data[k].loc[out.data[k].index.isin(indices)]
 
             # update available years, flights
             if len(df_list) !=0:
@@ -260,6 +371,172 @@ class GlobalData(object):
 
         return out
 
+    def chem_df_sorted(self, **kwargs): #!!! add to create_df_sorted later 
+        """ Filter strat / trop data based on N2O mixing ratios. """
+
+        subs = dcts.get_subs('n2o', ID='GHG') #!!! can add modelled mxrs here too
+
+        dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame)]
+        if subs.col_name not in [c for k in dataframes for c in self.data[k].columns]:
+            print('Cannot find {subs.col_name} in the data.')
+
+        # substance = get_col_name(crit, glob_obj.source, ID) # get column name
+        if detr:
+            if not 'detr_'+substance in data.columns:
+                glob_obj.detrend(subs, save=True)
+            substance = 'detr_'+substance
+        df_sorted[substance] = data[substance]
+        if f'd_{substance}' in data.columns:
+            df_sorted[f'd_{substance}'] = data[f'd_{substance}']
+
+        # Calculate simple pre-flag if not in data
+        if not f'flag_{crit}' in data.columns:
+            if ref_obj is None: raise ValueError('Need to supply a ref_obj.')
+            if detr: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, ID=ID, verbose=verbose, subs_col = substance)
+            else: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, ID=ID, verbose=verbose)
+        if f'flag_{crit}' in data.columns:
+            # make part of df_sorted so that substance=nan rows get dropped
+            try: df_sorted[f'flag_{crit}'] = glob_obj.data[ID][f'flag_{crit}']
+            except: print('Pre-flagging unsuccessful, proceeding without')
+
+        df_sorted.dropna(subset=substance, inplace=True) # remove rows without data
+        df_sorted.sort_index(inplace=True)
+
+        mxr = df_sorted[substance] # measured mixing ratios
+        d_mxr = None
+        if f'd_{substance}' in df_sorted.columns: d_mxr = df_sorted[f'd_{substance}']
+        elif verbose: print(state+f'No abs. error for {crit}')
+        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
+        try: flag = df_sorted[f'flag_{crit}']
+        except: flag = None
+
+        func = get_fct_substance(crit)
+        ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
+                              flag = flag, verbose=False, plot=False,
+                              limit=0.1, direction = 'n')
+        # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
+        df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
+        df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
+
+        if plot:
+            popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
+            plot_sorted(glob_obj, df_sorted, crit, ID, popt0, ol[3], subs=subs, detr=detr, **kwargs)
+
+    def create_df_sorted(self, **kwargs): # FROM TP
+        """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria """ 
+        if self.source == 'Caribic': data = self.met_data.copy()
+        elif self.source in ['EMAC', 'TP']: data = self.df.copy()
+        else: raise NotImplementedError(f'Cannot select atmospheric layer for {self.source}')
+
+        if not 'source' in kwargs: print('source not found')
+
+        if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']: 
+            kwargs.update({'source':self.source})
+            
+        print(kwargs['source'])
+
+        if not 'tp_def' in kwargs: kwargs.update({'tp_def':'not_nan'})
+        kwargs.update({'rel_to_tp':True}) #!!! otherwise sorting is a pain in the butt. but not the final version
+        tps = dcts.get_coordinates(**kwargs)
+
+        df_sorted = pd.DataFrame(index=data.index)
+        # adding bool columns for each tp coordinate to df_sorted
+        for tp in tps:
+            # check if tropopause column in the data
+            if not tp.col_name in data.columns: 
+                print('{tp.col_name} not found. Proceeding without.')
+                continue
+
+            tp_df = data.dropna(axis=0, subset=[tp.col_name])
+
+            if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
+                tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
+            if tp.tp_def == 'cpt': # cold point TP only in the tropics
+                tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
+
+            # col names
+            tropo = 'tropo_'+tp.col_name
+            strato ='strato_'+tp.col_name
+
+            tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
+                                      tropo:pd.Series(np.nan, dtype='float')},
+                                      index=tp_df.index)
+
+            # tropo: high p (gt 0), low everything else (lt 0)
+            tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
+                        (strato, tropo)] = (False, True)
+
+            # strato: low p (lt 0), high everything else (gt 0)
+            tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
+                        (strato, tropo)] = (True, False)
+
+            # add data for current tp def to df_sorted
+            df_sorted[tropo] = tp_sorted[tropo]
+            df_sorted[strato] = tp_sorted[strato]
+
+        if 'Flight number' in data.columns: 
+            df_sorted['Flight number'] = data['Flight number'][data.index.isin(df_sorted.index)] # necessary for data selection fctns
+        return df_sorted
+
+    def sel_atm_layer(self, atm_layer, **kwargs):
+        """ Create GlobalData object with strato / tropo sorting.
+        Parameters:
+            atm_layer = 'tropo' or 'strato'
+
+            tp_def (str): 'chem', 'therm' or 'dyn'
+            crit (str): 'n2o', 'o3'
+            coord (str): 'pt', 'dp', 'z'
+            pvu (float): 1.5, 2.0, 3.5
+            limit (float): pre-flag limit for chem. TP sorting
+
+            subs (str): substance for plotting
+            c_pfx (str): 'GHG', 'INT', 'INT2'
+            verbose (bool)
+            plot (bool)
+        """
+        out = type(self).__new__(self.__class__) # create new class instance
+        for attribute_key in self.__dict__: # copy stuff like pfxs
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+
+        #!!! N2O filter special case
+        if kwargs.get('tp_def') == 'chem' and not 'ref_obj' in kwargs and kwargs['crit'] == 'n2o':
+            try: kwargs['ref_obj'] = Mauna_Loa(self.years, subs='n2o')
+            except: raise Exception('Could not generate necessary reference data for chem sorting')
+
+        else: 
+            if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']: 
+                kwargs.update({'source':self.source})
+            if not 'tp_def' in kwargs: kwargs.update({'tp_def':'not_nan'})
+            kwargs.update({'rel_to_tp':True}) #!!! otherwise sorting is a pain in the butt. but not the final version
+            
+            tp_col = dcts.get_coord(**kwargs) # checks if criteria are narrow enough
+            col = f'{atm_layer}_{tp_col}'
+            df_sorted = self.create_df_sorted(**kwargs)
+    
+        # use df_sorted to filter entire dataset
+    
+        df_list = [k for k in self.data
+                   if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut
+        for k in df_list:
+            # only keep rows that are in df_sorted, then only data in chosen atm_layer
+            out.data[k] = out.data[k][out.data[k].index.isin(df_sorted.index)]
+            out.data[k][col] = df_sorted[col] # allows Rückverfolgung of what it was sorted with
+            out.data[k] = out.data[k].dropna(axis=0, subset=[col])
+            out.data[k] = out.data[k][out.data[k][col]] # using col as mask
+        
+        if self.source=='Caribic': out.pfxs = [k for k in out.data]
+        out.status.update({atm_layer : True,
+                           'sorting_crit':tp_col})
+        return out
+
+    def sel_tropo(self, **kwargs):
+        """ Returns Caribic object containing only tropospheric data points. """
+        return self.sel_atm_layer('tropo', **kwargs)
+
+    def sel_strato(self, **kwargs):
+        """ Returns Caribic object containing only tropospheric data points. """
+        return self.sel_atm_layer('strato', **kwargs)
+
 # Caribic
 class CaribicData(GlobalData):
     """ Stores relevant Caribic data
@@ -385,7 +662,8 @@ class CaribicData(GlobalData):
         """ Create dataframe with all possible coordinates but
         no measurement / substance values """
         # merge lists of coordinates for all pfxs in the object
-        coords = [y for pfx in self.pfxs for y in dcts.coord_dict(pfx)] + ['geometry', 'Flight number']
+        coords = [y for pfx in self.pfxs for y in dcts.coord_dict(pfx)] + [
+            'p [mbar]', 'geometry', 'Flight number']
         if 'GHG' in self.pfxs: 
             # copy bc don't want to overwrite data
             df = self.data['GHG'].copy() 
@@ -476,62 +754,6 @@ class Caribic(CaribicData):
     pfxs: {self.pfxs}
     years: {self.years}
     status: {self.status}"""
-            # flights: {self.flights}
-
-    def sel_atm_layer(self, atm_layer, **kwargs):
-        """ Create Caribic object with strato / tropo sorting
-        Parameters:
-            atm_layer = 'tropo' or 'strato'
-
-            tp_def (str): 'chem', 'therm' or 'dyn'
-            crit (str): 'n2o', 'o3'
-            coord (str): 'pt', 'dp', 'z'
-            pvu (float): 1.5, 2.0, 3.5
-            limit (float): pre-flag limit for chem. TP sorting
-
-            subs (str): substance for plotting
-            c_pfx (str): 'GHG', 'INT', 'INT2'
-            verbose (bool)
-            plot (bool)
-        """
-        out = type(self).__new__(self.__class__) # create new class instance
-        for attribute_key in self.__dict__: # copy stuff like pfxs
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
-        out.data = {k:v.copy() for k,v in self.data.items() if k in self.pfxs} # only using OG msmt data
-        functions = {'chem' : chemical, 'dyn' : dynamical, 'therm' : thermal}
-
-        if not 'c_pfx' in kwargs: pfxs = set(out.data)
-        else: pfxs = [kwargs['c_pfx']]; del kwargs['c_pfx']
-
-        if kwargs.get('tp_def') == 'chem' and not 'ref_obj' in kwargs and kwargs['crit'] == 'n2o':
-            try: kwargs['ref_obj'] = Mauna_Loa(self.years, subs='n2o')
-            except: raise Exception('Could not generate necessary reference data for chem sorting')
-
-        for pfx in pfxs:
-            try: df_sorted = functions[kwargs.get('tp_def')](out, c_pfx=pfx, **kwargs)
-            except: # remove pfxs that can't be sorted
-                print(f'Sorting of {pfx} with selected TP definition unsuccessful')
-                del out.data[pfx]; continue
-
-            col = [col for col in df_sorted.columns if col.startswith(atm_layer)][0]
-            # only keep rows that are in df_sorted, then only data in chosen atm_layer
-            out.data[pfx] = out.data[pfx][out.data[pfx].index.isin(df_sorted.index)]
-            out.data[pfx][col] = df_sorted[col]
-            out.data[pfx] = out.data[pfx][out.data[pfx][col]] # using col as mask
-
-        out.pfxs = [k for k in out.data]
-        return out
-
-    def sel_tropo(self, **kwargs):
-        """ Returns Caribic object containing only tropospheric data points. """
-        self.status.update({'tropo' : True})
-        return self.sel_atm_layer('tropo', **kwargs)
-
-    def sel_strato(self, **kwargs):
-        """ Returns Caribic object containing only tropospheric data points. """
-        self.status.update({'strato' : True})
-        return self.sel_atm_layer('strato', **kwargs)
 
     def filter_extreme_events(self, **kwargs):
         """ Filter out all tropospheric extreme events.
@@ -636,12 +858,13 @@ class Caribic(CaribicData):
 
     def detrend(self, subs, **kwargs):
         """ Remove linear trend for the substance & add detr. data to all dataframes """
-        detrend_substance(self, subs, **kwargs)
+        self.detrend_substance(subs, **kwargs)
         return self
 
-    def create_substance_df(self, subs):
+    def create_substance_df(self, subs, detr=True):
         """ Create dataframe containing all met.+ msmt. data for a substance """
         self.data[f'{subs}'] = coord_merge_substance(self, subs)
+        if detr: self.detrend(subs, save=True, plot=False)
         return self
 
 # Mozart
@@ -663,8 +886,10 @@ class Mozart(GlobalData):
         super().__init__(years, grid_size)
         self.years = years
         self.source = 'Mozart'
+        self.ID = 'MZT'
         self.substance = 'SF6'
         self.v_limits = v_limits # colorbar normalisation limits
+        self.data = {}
         self.get_data()
 
     def __repr__(self):
@@ -693,12 +918,22 @@ class Mozart(GlobalData):
                                                 ds.longitude.attrs)})
             ds = ds.sortby(ds.longitude) # reorganise values
 
-        self.ds = ds
-        self.df = ds_to_gdf(self.ds)
-        try: self.SF6 = self.df['SF6']
+        self.data['ds'] = ds
+        self.data['df'] = ds_to_gdf(self.ds)
+        try: self.data['SF6'] = self.data['df']['SF6']
         except: pass
 
         return ds # xr.concat(datasets, dim = 'time')
+    
+    @property
+    def ds(self):
+        return self.data['ds']
+    @property
+    def df(self):
+        return self.data['df']
+    @property
+    def SF6(self):
+        return self.data['SF6']
 
 # EMAC
 class EMACData(GlobalData):
@@ -907,7 +1142,7 @@ class TropopauseData(GlobalData):
 
     def __repr__(self):
         self.years.sort()
-        return f'TropopauseData object\n\
+        return f'{type(self).__name__} object\n\
             years: {self.years}\n\
             status: {self.status}'
 
@@ -927,11 +1162,6 @@ class TropopauseData(GlobalData):
         self.data['df'] = df
         self.flights = list(set(df['Flight number']))
         return df
-
-    @property
-    def df(self):
-        """ Allow accessing df as class attribute. """
-        return self.data['df']
 
     def interpolate_emac(self, method, verbose=False):
         """ Add interpolated EMAC data to joint df to match caribic timestamps.
@@ -962,6 +1192,58 @@ class TropopauseData(GlobalData):
         self.data['df'] = data
         self.status['interp_emac'] = True
         return data
+
+    def sort_tropo_strato(self, vcoords=['p', 'z', 'pt']):
+        """ Returns dataframe with bool strat / trop columns for various TP definitions. """
+        data = TropopauseData().df.copy()
+        df_sorted = pd.DataFrame(index=data.index)
+        tps = dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True)
+        for tp in [tp for tp in tps if (tp.pvu in [1.5, 2.0] or tp.vcoord not in vcoords)]: # rmv 1.5 and 2.0 PVU TPs
+            tps.remove(tp)
+
+        # first create df_sorted
+        for tp in tps:
+            tp_df = data.dropna(axis=0, subset=[tp.col_name])
+
+            if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
+                tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
+            if tp.tp_def == 'cpt': # cold point TP only in the tropics
+                tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
+
+            # col names
+            tropo = 'tropo_'+tp.col_name# 'tropo_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
+            strato ='strato_'+tp.col_name # 'strato_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
+
+            tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
+                                      tropo:pd.Series(np.nan, dtype='float')},
+                                      index=tp_df.index)
+
+            # tropo: high p (gt 0), low everything else (lt 0)
+            tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
+                        (strato, tropo)] = (False, True)
+
+            # strato: low p (lt 0), high everything else (gt 0)
+            tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
+                        (strato, tropo)] = (True, False)
+
+            # add data for current tp def to df_sorted
+            df_sorted[tropo] = tp_sorted[tropo]
+            df_sorted[strato] = tp_sorted[strato]
+            
+        df_sorted['Flight number'] = self.df['Flight number'][self.df.index.isin(df_sorted.index)] # necessary for data selection fctns
+        self.data['df_sorted'] = df_sorted
+        return df_sorted
+
+    @property
+    def df(self):
+        """ Combined dataframe for Caribic and EMAC (interpolated) data. """
+        return self.data['df']
+    
+    @property
+    def df_sorted(self):
+        """ Bool dataset sorted into strato/tropo for various tropopauses. """
+        if 'df_sorted' in self.data: return self.data['df_sorted']
+        else: return self.sort_tropo_strato()
 
 #%% Local data
 class LocalData(object):
@@ -1060,6 +1342,7 @@ class Mauna_Loa(LocalData):
         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, subs)
         self.source = 'Mauna_Loa'
+        self.ID = 'MLO'
         self.substance = subs
 
         if subs in ['sf6', 'n2o']:
@@ -1094,6 +1377,7 @@ class Mace_Head(LocalData):
         super().__init__(years, data_Day, substance)
         self.years = years
         self.source = 'Mace_Head'
+        self.ID = 'MHD'
         self.substance = substance
 
         self.df = self.get_data(path)
@@ -1104,94 +1388,3 @@ class Mace_Head(LocalData):
         return f'Mace Head - {self.substance}'
 
 #%% detrending
-def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False,
-                      as_subplot=False, ax=None, c_pfx=None, note=''):
-    """ Remove linear trend of substances using free troposphere as reference.
-    (redefined from C_tools.detrend_subs)
-
-    Parameters:
-        c_obj (GlobalData/Caribic)
-        subs (str): substance to detrend e.g. 'sf6'
-        loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
-    """
-    if loc_obj is None:
-        try: loc_obj = Mauna_Loa(c_obj.years, subs)
-        except: raise ValueError(f'Cannot detrend as ref. data could not be found for {subs.upper()}')
-    out_dict = {}
-
-    if c_pfx: pfxs = [c_pfx]
-    else: pfxs = [pfx for pfx in c_obj.pfxs if subs in dcts.substance_list(pfx)]
-
-    if plot:
-        if not as_subplot:
-            fig, axs = plt.subplots(len(pfxs), dpi=250, figsize=(6,4*len(pfxs)))
-            if len(pfxs)==1: axs = [axs]
-        elif ax is None:
-            ax = plt.gca()
-
-    for c_pfx, i in zip(pfxs, range(len(pfxs))):
-        df = c_obj.data[c_pfx]
-        substance = dcts.get_col_name(subs, c_obj.source, c_pfx)
-        if substance is None: continue
-
-        c_obs = df[substance].values
-        t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
-
-        ref_df = loc_obj.df
-        ref_subs = dcts.get_col_name(subs, loc_obj.source)
-        if ref_subs is None: raise ValueError(f'No reference data found for {subs}')
-        # ignore reference data earlier and later than two years before/after msmts
-        ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
-                        : max(df.index)+dt.timedelta(356*2)]
-        ref_df.dropna(how='any', subset=ref_subs, inplace=True) # remove NaN rows
-        c_ref = ref_df[ref_subs].values
-        t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
-
-        popt = np.polyfit(t_ref, c_ref, degree)
-        c_fit = np.poly1d(popt) # get popt, then make into fct
-
-        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
-        c_obs_detr = c_obs - detrend_correction
-        # get variance (?) by substracting offset from 0
-        c_obs_delta = c_obs_detr - c_fit(min(t_obs))
-
-        df_detr = pd.DataFrame({f'detr_{substance}' : c_obs_detr,
-                                 f'delta_{substance}' : c_obs_delta,
-                                 f'detrFit_{substance}' : c_fit(t_obs)},
-                                index = df.index)
-        # maintain relationship between detr and fit columns
-        df_detr[f'detrFit_{substance}'] = df_detr[f'detrFit_{substance}'].where(
-            ~df_detr[f'detr_{substance}'].isnull(), np.nan)
-
-        out_dict[f'detr_{c_pfx}_{subs}'] = df_detr
-        out_dict[f'popt_{c_pfx}_{subs}'] = popt
-
-        if save:
-            columns = [f'detr_{substance}',
-                       f'delta_{substance}',
-                       f'detrFit_{substance}']
-
-            c_obj.data[c_pfx][columns] = df_detr[columns]
-            # move geometry column to the end again
-            c_obj.data[c_pfx]['geometry'] =  c_obj.data[c_pfx].pop('geometry')
-
-        if plot:
-            if not as_subplot: ax = axs[i]
-            # ax.annotate(f'{c_pfx} {note}', xy=(0.025, 0.925), xycoords='axes fraction',
-            #                       bbox=dict(boxstyle="round", fc="w"))
-            ax.scatter(df_detr.index, c_obs, color='orange', label='Flight data', marker='.')
-            ax.scatter(df_detr.index, c_obs_detr, color='green', label='trend removed', marker='.')
-            ax.scatter(ref_df.index, c_ref, color='gray', label='MLO data', alpha=0.4, marker='.')
-            ax.plot(df_detr.index, c_fit(t_obs), color='black', ls='dashed',
-                      label='trendline')
-            ax.set_ylabel(f'{substance}') # ; ax.set_xlabel('Time')
-            handles, labels = ax.get_legend_handles_labels()
-            leg = ax.legend(title=f'{c_pfx} {note}')
-            leg._legend_box.align = "left"
-
-    if plot and not as_subplot:
-        fig.tight_layout()
-        fig.autofmt_xdate()
-        plt.show()
-
-    return out_dict
