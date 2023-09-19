@@ -23,11 +23,14 @@ from data import TropopauseData
 world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
 vlims = {'p':(100,500), 'pt':(250, 350), 'z':(5,20)}
 
+#!!! Add disclaimer to dyn and cpt to show reduced latitude ranges 
+
 #%% Import data
 class TropopausePlotter(TropopauseData):
     """ Add plotting functionality to tropopause data objects """
-    def __init__(self, years=range(2005, 2020), interp=True, method='n'):
+    def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True):
         super().__init__(years, interp, method)
+        if df_sorted: self.sort_tropo_strato()
 
     def test_scatter(self, year=None):
         vc = 'pt'
@@ -66,9 +69,9 @@ class TropopausePlotter(TropopauseData):
 
     def scatter_2d(self, save=False, year=None):
         """ 2D global scatter of tropopause height.
-        Parameters: 
+        Parameters:
             save (bool): save plot to pdir instead of plotting
-            year (float): select single specific year to plot / save 
+            year (float): select single specific year to plot / save
         """
         pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
         for vc in ['p', 'pt', 'z']:
@@ -84,17 +87,17 @@ class TropopausePlotter(TropopauseData):
                     else: df_r = self.sel_season(s).df
                     if df_r.empty: continue
                     df_r.geometry = [Point(pt.y,pt.x) for pt in df_r.geometry]
-    
+
                     x = np.array([df_r.geometry[i].x for i in range(len(df_r.index))])
                     y = np.array([df_r.geometry[i].y for i in range(len(df_r.index))])
                     binclassinstance = Bin_equi2d(np.nanmin(x), np.nanmax(x), 5,
                                                   np.nanmin(y), np.nanmax(y), 5)
                     out = Simple_bin_2d(df_r[tp.col_name], x, y, binclassinstance)
-    
+
                     world.boundary.plot(ax=ax, color='black', linewidth=0.3)
                     ax.set_title(dict_season()[f'name_{s}'])
                     cmap = 'viridis_r' if tp.vcoord=='p' else 'viridis'
-    
+
                     norm = Normalize(*vlims[vc]) # colormap normalisation
                     # df_r.plot(tp.col_name, cmap=cmap, legend=True, ax=ax)
                     img = ax.imshow(out.vmean.T, cmap = cmap, origin='lower', norm=norm,
@@ -104,10 +107,10 @@ class TropopausePlotter(TropopauseData):
                     cbar.ax.set_xlabel(f'{vc} [{tp.unit}]')
                     ax.set_ylim(-90, 90); ax.set_xlim(-180, 180)
                 fig.tight_layout()
-                if save: 
+                if save:
                     plt.savefig(pdir+'\{}{}.png'.format(
                         tp.col_name, '_'+str(year) if year else ''))
-                    
+
                 plt.show()
                 plt.close()
 
@@ -125,23 +128,23 @@ class TropopausePlotter(TropopauseData):
         nrows = math.ceil((len(tps)+1)/4)
         fig, axs = plt.subplots(nrows, 4, dpi=150,
                                 figsize=(10,nrows*2.5), sharey=True, sharex=True)
-    
+
         for i, ax in enumerate(axs.flatten()): # hide extra plots
             if i > len(tps): ax.axis('off')
-    
+
         vcs = {'p': 'Pressure',
                'z' : 'geopotential height',
                'pt' : 'Potential Temperature'}
-    
+
         fig.suptitle('{} {} coordinates'.format(
             'Vertical extent of troposphere in' if not rel
             else 'Distance between flight track and troposphere in', vcs[vcoord]))
-    
+
         xbmin, xbmax, xbsize = -90, 90, 5
         bci = Bin_equi1d(xbmin, xbmax, xbsize)
         vmeans = pd.DataFrame(index = bci.xintm) # overall average
         vmeans_std = pd.DataFrame(index = bci.xintm) # overall average
-    
+
         for s in ([None] if not seasonal else [1,2,3,4]):
             for tp, ax in zip(tps, axs.flatten()[:len(tps)]):
                 # get data
@@ -154,7 +157,7 @@ class TropopausePlotter(TropopauseData):
                     data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
                 if tp.tp_def == 'cpt': # cold point TP only in the tropics
                     data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.x) ])]
-    
+
                 # bin using same binclassinstance as all other tropopauses
                 bin1d = Simple_bin_1d(data[tp.col_name],
                                       np.array(data.geometry.x), bci)
@@ -166,7 +169,7 @@ class TropopausePlotter(TropopauseData):
                     ax.fill_between(bin1d.xmean, bin1d.vmean-bin1d.vstdv, bin1d.vmean+bin1d.vstdv,
                                     alpha=0.3, color='#1f77b4')
                     ax.legend(loc='lower left')
-    
+
                 else: # seasonal. separate vmeans by season to calc av later
                     vmeans[tp.col_name+f'_{s}'] = bin1d.vmean
                     color = dict_season()[f'color_{s}']
@@ -178,7 +181,7 @@ class TropopausePlotter(TropopauseData):
                             bbox = dict(boxstyle='round', facecolor='white',
                                         edgecolor='grey', alpha=0.5, pad=0.25))
             ax.set_xticks([-30, 0, 30, 60, 90])
-    
+
         if not seasonal:
             # indicate average tropopause height on all plots & add xaxis label to extra plot
             average = vmeans.mean(axis=1).values
@@ -186,7 +189,7 @@ class TropopausePlotter(TropopauseData):
             for i in range(len(vmeans.index)):
                 sqrt_of_sum_of_squares = np.sqrt(np.nansum([unc**2 for unc in vmeans_std.iloc[i]])) / 2
                 vmeans['av_std'].iloc[i] = sqrt_of_sum_of_squares
-    
+
             axAv = axs.flatten()[len(tps)]
             axAv.plot(bci.xintm, average, ls='dashed', c='k', alpha=0.5,
                     zorder=1, label='Average')
@@ -194,7 +197,7 @@ class TropopausePlotter(TropopauseData):
                               average-vmeans['av_std'], average+vmeans['av_std'],
                               alpha=0.3, color='k')
             axAv.legend(loc='lower left')
-    
+
         else:
             for s in [1,2,3,4]:
                 vmeans_s = vmeans[[c for c in vmeans.columns if c.endswith(f'_{s}')]]
@@ -203,7 +206,7 @@ class TropopausePlotter(TropopauseData):
                 axAv.plot(bci.xintm, average, ls='dashed',
                           c = dict_season()[f'color_{s}'], # alpha=0.5,
                           zorder=1, label=dict_season()[f'name_{s}'])
-    
+
         # go through axes, (add average), set label
         for ax in axs.flatten()[:len(tps)+1]:
             if not seasonal:
@@ -211,15 +214,15 @@ class TropopausePlotter(TropopauseData):
             if rel: ax.hlines(0, min(bci.xintm), max(bci.xintm),
                               color='grey', zorder=2, lw=0.5, ls='dotted')
             ax.set_xlabel('Latitude [°N]')
-    
+
         if vcoord == 'p': # because sharey=True, applied for all axes
             axAv.invert_yaxis()
             axAv.set_yscale('{}'.format('symlog' if rel else 'log'))
-    
+
         for ax in [axs[0,0], axs[0,1]]: # left most
             ax.set_ylabel('{}{} [{}]'.format('$\Delta$' if tp.rel_to_tp else '',
                                              tp.vcoord, tp.unit))
-    
+
         fig.tight_layout()
         if seasonal: # add horizontal figure legend for seasons at the top
             fig.subplots_adjust(top=0.85) # add space for fig legend
@@ -228,82 +231,64 @@ class TropopausePlotter(TropopauseData):
                        bbox_to_anchor=[0.5, 0.94])
         plt.show()
         return
-
-    def sort_tropo_strato(self, substances, vcoords=['p', 'z', 'pt'], plot=True):
-        """ Returns dataframe with bool strat / trop columns """
-        data = TropopauseData().df.copy()
-        df_sorted = pd.DataFrame(index=data.index)
     
-        for subs in substances:
-            if not subs.col_name in data.columns:
+    def plot_subs_sorted(self, substances, vcoords=['p', 'pt', 'z']):
+        """ Plot timeseries of subs mixing ratios with strato / tropo colours. """
+        if not substances:
+            substances = get_substances(source='EMAC') + get_substances(source='Caribic')
+            substances = [s for s in substances if not s.col_name.startswith('d_')]
+        elif isinstance(substances, str): substances = [substances]
+        if not isinstance(substances, list): 
+            raise Warning('Cannot work like this. Pls supply substances as list.')
+
+        if 'df_sorted' in self.data: self.sort_tropo_strato()
+        df_sorted = self.df_sorted.copy()
+
+        cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
+        tps = [tp for tp in get_coordinates(tp_def='not_nan', rel_to_tp=True) if tp.col_name in cols]
+
+        for subs in substances: # new plot for each substance 
+            if not subs.col_name in self.df.columns:
                 print(f'{subs.col_name} not found in data'); pass
+            
+            # new figure for each vcoord, otherwise overloading the plots
             for vcoord in vcoords:
-                tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=True)
-                for tp in [tp for tp in tps if tp.pvu in [1.5, 2.0]]: # rmv 1.5 and 2.0 PVU TPs
-                    tps.remove(tp)
+                tps_vc = [tp for tp in tps if tp.vcoord==vcoord]
+                fig, axs = plt.subplots(math.ceil(len(tps_vc)/2), 2, dpi=200,
+                                        figsize=(7, math.ceil(len(tps_vc)/2)*2),
+                                        sharey=True, sharex=True)
+                if len(tps_vc)%2: axs.flatten()[-1].axis('off')
+                fig.suptitle(f'{subs.col_name}')
     
-                if plot: # initialise figure
-                    fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200,
-                                            figsize=(7, math.ceil(len(tps)/2)*2))
-                    if len(tps)%2: axs.flatten()[-1].axis('off')
-                    fig.suptitle(f'{subs.col_name} in sorted with TP in {vcoord}')
-    
-                for tp, ax in zip(tps, axs.flatten() if plot else [None]*len(tps)):
-                    tp_df = data.dropna(axis=0, subset=[tp.col_name])
-    
-                    if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
-                        tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
-                    if tp.tp_def == 'cpt': # cold point TP only in the tropics
-                        tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
-    
-                    # col names
-                    tropo = 'tropo_'+tp.col_name# 'tropo_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
-                    strato ='strato_'+tp.col_name # 'strato_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
-    
-                    tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
-                                              tropo:pd.Series(np.nan, dtype='float')},
-                                             index=tp_df.index)
-    
-                    # tropo: high p (gt 0), low everything else (lt 0)
-                    tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
-                                (strato, tropo)] = (False, True)
-    
-                    # strato: low p (lt 0), high everything else (gt 0)
-                    tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
-                                (strato, tropo)] = (True, False)
-    
-                    df_tropo = tp_df[tp_sorted[tropo] == True]
-                    df_strato = tp_df[tp_sorted[strato] == True]
-    
-                    if plot: # plot data
-                        # df_tropo, df_strato = plot_sorted_TP(TropopauseData(), df_sorted, vcoord, subs.col_name, ax=ax)
-                        ax.set_title(tp.col_name, fontsize=8)
-                        ax.scatter(df_strato.index, df_strato[subs.col_name],
-                                    c='grey',  marker='.', zorder=0, label='strato')
-                        ax.scatter(df_tropo.index, df_tropo[subs.col_name],
-                                    c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
-    
-                    df_sorted[tropo] = tp_sorted[tropo]
-                    df_sorted[strato] = tp_sorted[strato]
-    
-                if plot: # add legend, format axes, ...
-                    fig.autofmt_xdate()
-                    fig.tight_layout()
-                    fig.subplots_adjust(top=0.85)
-                    lines, labels = axs.flatten()[0].get_legend_handles_labels()
-                    fig.legend(lines, labels, loc='upper center', ncol=2,
-                               bbox_to_anchor=[0.5, 0.94])
-                    plt.show()
-        return df_sorted
+                for tp, ax in zip(tps_vc, axs.flatten()):
+                    tp_tropo = self.df[df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
+                    tp_strato = self.df[df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
 
-    def trop_strat_ratios(self):
+                    ax.set_title(tp.col_name, fontsize=8)
+                    ax.scatter(tp_strato.index, tp_strato[subs.col_name],
+                                c='grey',  marker='.', zorder=0, label='strato')
+                    ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
+                                c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
+
+                fig.autofmt_xdate()
+                fig.tight_layout()
+                fig.subplots_adjust(top=0.85)
+                lines, labels = axs.flatten()[0].get_legend_handles_labels()
+                fig.legend(lines, labels, loc='upper center', ncol=2,
+                           bbox_to_anchor=[0.5, 0.94])
+                plt.show()
+        return self
+
+    def show_ratios(self):
         """ Plot ratio of tropo / strato datapoints for each troposphere definition """
-        substances = get_substances(source='EMAC') + get_substances(source='Caribic')
-        substances = [s for s in substances if not s.col_name.startswith('d_')]
-    
+        if 'df_sorted' in self.data: self.sort_tropo_strato()
+        df_sorted = self.df_sorted.copy()
+
         for vcoord in ['p', 'z', 'pt']:
-            out = self.sort_tropo_strato(substances, vcoords=[vcoord], plot=False)
-            val_count = out[[c for c in out.columns if c.startswith('strato')]].apply(pd.value_counts)
+            cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
+            vc_cols = ['strato_'+tp.col_name for tp in get_coordinates(tp_def='not_nan', rel_to_tp=True, vcoord=vcoord) if tp.col_name in cols]
+            val_count = df_sorted[vc_cols].apply(pd.value_counts)
+
             plt.figure(figsize=(3,3), dpi=240)
             plt.title(f'Ratio of tropospheric / stratospheric datapoints in {vcoord}')
             for ratio, l in zip([val_count[c][0] / val_count[c][1] for c in val_count.columns], list(val_count.columns)):
@@ -313,23 +298,24 @@ class TropopausePlotter(TropopauseData):
 
 #%% Plotting function calls
 if __name__=='__main__':
-    tp = TropopausePlotter().sel_year(2012)
-    
-    # Global 2D scatter of tropopause heights for all definitions
-    for year in tp.years:
-        tp.scatter_2d(save=False, year=year)
-    
-    #  Binned versus latitude
-    for vc in ['p', 'pt', 'z']:
-        tp.tropopause_vs_latitude(vc, rel=False)
-        # tropopause_vs_latitude(vc, rel=True)
-        tp.tropopause_vs_latitude(vc, rel=False, seasonal=True)
+    tp = TropopausePlotter().sel_latitude(30, 90)
+    tp.show_ratios()
 
-    # Substances in tropopsphere / stratosphere
-    substances = get_substances(source='EMAC') + get_substances(source='Caribic')
-    substances = [s for s in substances if not s.col_name.startswith('d_')]
-    # df_sorted = sort_tropo_strato(substances)
-    tp.trop_strat_ratios()
+    # # Global 2D scatter of tropopause heights for all definitions
+    # for year in tp.years:
+    #     tp.scatter_2d(save=False, year=year)
+
+    # #  Binned versus latitude
+    # for vc in ['p', 'pt', 'z']:
+    #     tp.tropopause_vs_latitude(vc, rel=False)
+    #     # tropopause_vs_latitude(vc, rel=True)
+    #     tp.tropopause_vs_latitude(vc, rel=False, seasonal=True)
+
+    # # Substances in tropopsphere / stratosphere
+    # substances = get_substances(source='EMAC') + get_substances(source='Caribic')
+    # substances = [s for s in substances if not s.col_name.startswith('d_')]
+    # df_sorted = tp.sort_tropo_strato(substances)
+    # tp.trop_strat_ratios()
 
 #%% Animate changes over years
 def make_gif():
@@ -343,7 +329,7 @@ def make_gif():
 
             # frames = [Image.open(image) for image in glob.glob(f"{pdir}/*.JPG")]
             frame_one = frames[0]
-            frame_one.save(f'C:/Users/sophie_bauchinger/sophie_bauchinger/Figures/tp_scatter_2d_GIFs/{tp.col_name}.gif', 
+            frame_one.save(f'C:/Users/sophie_bauchinger/sophie_bauchinger/Figures/tp_scatter_2d_GIFs/{tp.col_name}.gif',
                            format="GIF", append_images=frames,
                            save_all=True, duration=200, loop=0)
 # if __name__ == "__main__":
