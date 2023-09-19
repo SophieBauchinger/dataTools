@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 import toolpac.calc.binprocessor as bp
 
-from dictionaries import get_col_name, dict_season, choose_column
-from tools import make_season, coordinate_tools
+from dictionaries import dict_season, get_subs, get_coordinates, make_coord_label
+from tools import make_season
 
 #%% Plotting Gradient by season
 # Fct definition in C_plot needed these:
@@ -40,35 +40,40 @@ from tools import make_season, coordinate_tools
     #     note (str): shown as text box on the plot
     # """
 
-def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {},
+def plot_gradient_by_season(c_obj, subs_params = {}, y_params = {},
                             detr=True, note=None, errorbars=False):
     """
-    Plotting gradient by season using 1D binned data. Detrended data used by default
-    (Inspired by C_plot.pl_gradient_by_season)
+    Plotting gradient by season using 1D binned data. Detrended data used by default.
+    (Based on C_plot.pl_gradient_by_season)
 
-    x_params (dict):
-        keys: x_pfx
+    subs_params (dict):
+        keys: short_name, ID
     y_params (dict):
-        keys: ycoord, tp_def, y_pfx, pvu
+        keys: vcoord, tp_def, ID, (pvu)
     """
-    if (not all(i in x_params.keys() for i in  ['x_pfx'])
-                or not all(i in y_params.keys() for i in ['ycoord', 'y_pfx', 'tp_def'])):
-        raise KeyError('Please supply all necessary parameters: x_pfx, (xcoord) / ycoord, tp_def, y_pfx, (pvu)')
+    if (not all(i in subs_params for i in ['short_name', 'ID'])
+                or not all(i in y_params.keys() for i in ['vcoord', 'ID', 'tp_def'])):
+        raise KeyError('Please supply all necessary parameters: subs: short_name, ID / y: vcoord, tp_def, ID, (pvu)')
+        
     if not subs in c_obj.data.keys(): c_obj.create_substance_df(subs)
     data = c_obj.data[subs]
 
     # x-axis
-    substance = get_col_name(subs, c_obj.source, x_params['x_pfx'])
+    substance = get_subs(substance=subs, ID=subs_params['ID']).col_name # subs, c_obj.source, x_params['ID'])
     if detr: # detrended data for x-axis
         substance = f'detr_{substance}'
         if not substance in data.columns:
             raise ValueError(f'Detrended data not available for {subs.upper()}')
 
     # y-axis
-    y_coord, y_label = coordinate_tools(**y_params)
+    y_coord = get_coordinates(**y_params)[0]
+    y_label = make_coord_label(y_coord)
+    y_coord = y_coord.col_name #!!! bad code
+
+    # y_coord, y_label = coordinate_tools(**y_params)
     y_bins = {'z' : 0.5, 'pt' : 10, 'p' : 40}
     if not 'y_bin' in y_params.keys():
-        y_bin = y_bins[y_params['ycoord']]
+        y_bin = y_bins[y_params['vcoord']]
     else: y_bin = y_params['y_bin']
 
     min_y, max_y = np.nanmin(data[y_coord].values), np.nanmax(data[y_coord].values)
@@ -106,7 +111,7 @@ def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {},
     plt.ylabel(y_label)
     plt.xlabel(f'{substance}')
     if detr: # remove the 'delta_' and replace with symbol
-        plt.xlabel('$\Delta $' + substance.split("_")[-1] + ' wrt. 2005')
+        plt.xlabel(substance.split("_")[-1] + ' detrended wrt. 2005')
 
     plt.legend()
     plt.show()
@@ -116,25 +121,27 @@ def plot_gradient_by_season(c_obj, subs, x_params = {}, y_params = {},
 if __name__ == '__main__':
     if False: caribic = True # BS to avoid error
 
-    yp1 = {'tp_def' : 'chem',
-           'y_pfx' : 'INT2',
-           'ycoord' : 'z'}
+    # yp1 = {'tp_def' : 'chem',
+    #        'ID' : 'INT2',
+    #        'vcoord' : 'z'}
 
     yp2 = {'tp_def' : 'therm',
-           'y_pfx' : 'INT',
-           'ycoord' : 'pt'}
+           'ID' : 'INT',
+           'vcoord' : 'pt'}
 
     yp3 = {'tp_def' : 'therm',
-           'y_pfx' : 'INT2',
-           'ycoord' : 'pt'}
+           'ID' : 'INT2',
+           'vcoord' : 'pt'}
 
     yp4 = {'tp_def' : 'dyn',
-           'y_pfx' : 'INT',
-           'ycoord' : 'pt',
+           'ID' : 'INT',
+           'vcoord' : 'pt',
            'pvu' : 3.5}
 
-    for subs in ['sf6']: #:, 'n2o', 'co2', 'ch4']:
-        for yp in [yp1, yp2, yp3, yp4]:
-            x_params = {'x_pfx' : 'GHG'}
+    for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+        caribic.detrend(subs)
+        for yp in [yp2, yp3, yp4]:
+            subs_params = {'short_name': subs, 'ID' : 'GHG'}
             y_params = yp
-            plot_gradient_by_season(caribic.sel_latitude(30, 90), subs, x_params, y_params, note='lat>30°N')
+            plot_gradient_by_season(caribic.sel_latitude(30, 90), subs_params, y_params, note='lat>30°N', detr=False)
+            plot_gradient_by_season(caribic.sel_latitude(30, 90), subs_params, y_params, note='lat>30°N', detr=True)
