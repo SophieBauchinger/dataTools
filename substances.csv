@@ -1,4 +1,4 @@
-﻿col_name,long_name,short_name,unit,ID,source,modell,function
+﻿col_name,long_name,short_name,unit,ID,source,model,function
 CH2Cl2 [ppt],CH2Cl2 (scale: SIO-14),ch2cl2,ppt,MHD,Mace_Head,msmt,
 tracer_gp_CH4_at_fl,tracer GP CH4,ch4,mol mol-1,EMAC,EMAC,EMAC,h
 CH4 [ppb],CH4 mixing ratio,ch4,ppb,GHG,Caribic,msmt,h
