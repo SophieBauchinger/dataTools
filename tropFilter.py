@@ -39,7 +39,7 @@ coordinates = {
 #%% Troposphere / Stratosphere sorting - function definitions
 
 # Sort trop / strat using mixing ratios relative to trop. background value
-def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, c_pfx = 'GHG',
+def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, ID = 'GHG',
              save=True, verbose=False, subs_col=None):
     """ Sort data into strato / tropo based on difference to ground obs.
 
@@ -51,18 +51,18 @@ def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, c_pfx = 'GHG',
         crit (str) : substance to use for flagging
         limit (float) : tracer mxr fraction below which air is classified
                         as stratospheric
-        c_pfx (str) : e.g. 'GHG', specify the caribic datasource
+        ID (str) : e.g. 'GHG', specify the caribic datasource
         save (bool): add result to glob_obj
     """
-    state = f'pre_flag: crit={crit}, c_pfx={c_pfx}\n'
+    state = f'pre_flag: crit={crit}, ID={ID}\n'
     if glob_obj.source=='Caribic':
-        df = glob_obj.data[c_pfx].copy()
+        df = glob_obj.data[ID].copy()
     else: df = glob_obj.df.copy()
     df.sort_index(inplace=True)
 
     if subs_col is not None: substance = subs_col
-    else: substance = get_col_name(crit, glob_obj.source, c_pfx)
-    if not substance: raise ValueError(state+'No {crit} data in {c_pfx}')
+    else: substance = get_col_name(crit, glob_obj.source, ID)
+    if not substance: raise ValueError(state+'No {crit} data in {ID}')
 
     fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
 
@@ -80,12 +80,12 @@ def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, c_pfx = 'GHG',
     if verbose: print('Result of pre-flagging: \n',
                       df_flag[f'flag_{crit}'].value_counts())
     if save and glob_obj.source == 'Caribic':
-        glob_obj.data[c_pfx][f'flag_{crit}'] = df_flag[f'flag_{crit}']
+        glob_obj.data[ID][f'flag_{crit}'] = df_flag[f'flag_{crit}']
 
     return df_flag
 
 # Sort trop / strat using tracer mixing ratio
-def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
+def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
              verbose = False, plot=False, limit=0.97, subs=None, **kwargs):
     """ Returns DataFrame with bool columns 'strato' and 'tropo'.
 
@@ -107,16 +107,16 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
         INT: 'o3'
         INT2: 'o3', 'n2o'
     """
-    if crit not in substance_list(c_pfx):
+    if crit not in substance_list(ID):
         default_crit = {'GHG' : 'n2o', 'INT' : 'o3', 'INT2' : 'n2o'}
-        print(f'{crit} not available in {c_pfx}, using {default_crit[c_pfx]}')
-        crit = default_crit[c_pfx]
+        print(f'{crit} not available in {ID}, using {default_crit[ID]}')
+        crit = default_crit[ID]
 
-    state = f'filter_strat_trop: crit={crit}, c_pfx={c_pfx}\n'
+    state = f'filter_strat_trop: crit={crit}, ID={ID}\n'
     tropo = f'tropo_chem_{crit}'
     strato = f'strato_chem_{crit}'
 
-    data = glob_obj.data[c_pfx].copy()
+    data = glob_obj.data[ID].copy()
     df_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
                               tropo:pd.Series(np.nan, dtype='float')},
                              index=data.index)
@@ -124,7 +124,7 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
     if crit == 'o3': # INT and INT2 have coordinates relative to O3 TP (Zahl 2003)
         cols = {'INT' : 'int_h_rel_TP [km]',
                 'INT2' : 'int_CARIBIC2_H_rel_TP [km]'}
-        col, coord = cols[c_pfx], 'z'
+        col, coord = cols[ID], 'z'
 
         df_sorted.loc[assign_t_s(data[col], 't', coord),
                     (strato, tropo)] = (False, True)
@@ -135,10 +135,10 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
         df_sorted.sort_index(inplace=True)
 
         if plot:
-            plot_sorted(glob_obj, df_sorted, crit, c_pfx, subs=subs, detr=detr, **kwargs)
+            plot_sorted(glob_obj, df_sorted, crit, ID, subs=subs, detr=detr, **kwargs)
 
-    if crit == 'n2o' and c_pfx in ['GHG', 'INT2']:
-        substance = get_col_name(crit, glob_obj.source, c_pfx) # get column name
+    if crit == 'n2o' and ID in ['GHG', 'INT2']:
+        substance = get_col_name(crit, glob_obj.source, ID) # get column name
         if detr:
             if not 'detr_'+substance in data.columns:
                 glob_obj.detrend(subs, save=True)
@@ -150,11 +150,11 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
         # Calculate simple pre-flag if not in data
         if not f'flag_{crit}' in data.columns:
             if ref_obj is None: raise ValueError('Need to supply a ref_obj.')
-            if detr: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose, subs_col = substance)
-            else: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, c_pfx=c_pfx, verbose=verbose)
+            if detr: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, ID=ID, verbose=verbose, subs_col = substance)
+            else: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, ID=ID, verbose=verbose)
         if f'flag_{crit}' in data.columns:
             # make part of df_sorted so that substance=nan rows get dropped
-            try: df_sorted[f'flag_{crit}'] = glob_obj.data[c_pfx][f'flag_{crit}']
+            try: df_sorted[f'flag_{crit}'] = glob_obj.data[ID][f'flag_{crit}']
             except: print('Pre-flagging unsuccessful, proceeding without')
 
         df_sorted.dropna(subset=substance, inplace=True) # remove rows without data
@@ -178,29 +178,29 @@ def chemical(glob_obj, crit='n2o', c_pfx='GHG', ref_obj=None, detr=True,
 
         if plot:
             popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
-            plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0, ol[3], subs=subs, detr=detr, **kwargs)
+            plot_sorted(glob_obj, df_sorted, crit, ID, popt0, ol[3], subs=subs, detr=detr, **kwargs)
 
     return df_sorted
 
 # Sort trop / strat using temperature gradient
-def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
+def thermal(glob_obj, coord='dp', ID='INT', verbose=False, plot=False,
             subs='co2', **kwargs):
     """ Sort into strat/trop depending on temperature lapse rate / gradient
 
     Parameters:
         coord (str): dp, pt, z - coordinate (rel. to tropopause)
-        c_pfx (str): INT, INT2
+        ID (str): INT, INT2
 
     Data availability:
         INT: dp, pt
         INT2: dp, pt, z
         """
-    if (c_pfx == 'INT2' and coord == 'z'):
-        print(f'{coord} not available in {c_pfx}, using pt'); coord = 'pt'
-    elif (coord not in ['dp', 'pt', 'z'] or c_pfx not in ['INT', 'INT2']):
-        raise ValueError(f'Cannot sort {c_pfx} with thermal TP with coord={coord}')
+    if (ID == 'INT2' and coord == 'z'):
+        print(f'{coord} not available in {ID}, using pt'); coord = 'pt'
+    elif (coord not in ['dp', 'pt', 'z'] or ID not in ['INT', 'INT2']):
+        raise ValueError(f'Cannot sort {ID} with thermal TP with coord={coord}')
 
-    data = glob_obj.data[c_pfx].copy()
+    data = glob_obj.data[ID].copy()
 
     tropo = f'tropo_therm_{coord}'
     strato = f'strato_therm_{coord}'
@@ -209,7 +209,7 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
                               tropo:pd.Series(np.nan, dtype='float')},
                              index=data.index)
 
-    if c_pfx == 'INT2':
+    if ID == 'INT2':
         cols  = {
             'dp' : 'int_ERA5_PRESS [hPa]',
             'dp_tp' : 'int_ERA5_TROP1_PRESS [hPa]',
@@ -222,7 +222,7 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
         df_sorted.loc[assign_t_s(data[col], 's', coordinate = coord, tp_val=data[TP]),
                     (strato, tropo)] = (True, False)
 
-    elif c_pfx == 'INT':
+    elif ID == 'INT':
         coords = {
             'dp' : 'int_dp_strop_hpa [hPa]',
             'pt' : 'int_pt_rel_sTP_K [K]',
@@ -234,33 +234,33 @@ def thermal(glob_obj, coord='dp', c_pfx='INT', verbose=False, plot=False,
                     (strato, tropo)] = (True, False)
 
     if verbose: print(df_sorted[strato].value_counts())
-    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs, **kwargs)
+    if plot: plot_sorted(glob_obj, df_sorted, coord, ID, subs=subs, **kwargs)
 
     df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
     df_sorted.sort_index(inplace=True)
     return df_sorted
 
 # Sort trop / strat using potential vorticity gradient
-def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
+def dynamical(glob_obj, pvu=3.5, coord = 'pt', ID='INT', verbose=False,
               plot=False, subs='co2', **kwargs):
     """ Sort into strat/trop depending on potential vorticity gradient / values
     Parameters:
         coord (str): dp, pt, z - coordinate (rel. to tropopause). Required for INT
         pvu (float): 1.5, 2.0, 3.5 - value of potential vorticity surface for TP. Required for INT2
-        c_pfx (str): INT, INT2
+        ID (str): INT, INT2
 
     Data availability:
         INT: coord: 'dp', 'pt', 'z' / pvu: 3.5
         INT2: coord: 'pt' / pvu: 1.5, 2.0, 3.5
     """
-    if not c_pfx in ['INT', 'INT2']:
-        raise ValueError(f'Cannot sort {c_pfx} using dynamical tropopause')
-    if c_pfx=='INT2' and pvu not in [1.5, 2.0, 3.5]:
-        raise ValueError(f'No {c_pfx} data for {pvu} pvu')
-    elif c_pfx == 'INT' and pvu != 3.5:
-        print(f'{pvu} PVU not available for {c_pfx}, using 3.5 PVU'); pvu = 3.5
+    if not ID in ['INT', 'INT2']:
+        raise ValueError(f'Cannot sort {ID} using dynamical tropopause')
+    if ID=='INT2' and pvu not in [1.5, 2.0, 3.5]:
+        raise ValueError(f'No {ID} data for {pvu} pvu')
+    elif ID == 'INT' and pvu != 3.5:
+        print(f'{pvu} PVU not available for {ID}, using 3.5 PVU'); pvu = 3.5
 
-    data = glob_obj.data[c_pfx].copy()
+    data = glob_obj.data[ID].copy()
 
     tropo = 'tropo_dyn_{}_{}'.format(coord, str(pvu).replace('.', '_'))
     strato = 'strato_dyn_{}_{}'.format(coord, str(pvu).replace('.', '_'))
@@ -269,9 +269,9 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
                             tropo:pd.Series(np.nan, dtype='float')},
                            index=data.index)
 
-    if c_pfx == 'INT2':
+    if ID == 'INT2':
         col = 'int_ERA5_D_{}PVU_BOT [K]'.format(str(pvu).replace('.', '_'))
-    if c_pfx == 'INT':
+    if ID == 'INT':
         coords = {
             'dp' : 'int_dp_dtrop_hpa [hPa]',
             'pt' : 'int_pt_rel_dTP_K [K]',
@@ -284,22 +284,22 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', c_pfx='INT', verbose=False,
                 (strato, tropo)] = (True, False)
 
     if verbose: print(df_sorted[strato].value_counts())
-    if plot: plot_sorted(glob_obj, df_sorted, coord, c_pfx, subs=subs, **kwargs)
+    if plot: plot_sorted(glob_obj, df_sorted, coord, ID, subs=subs, **kwargs)
 
     df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
     df_sorted.sort_index(inplace=True)
     return df_sorted
 
 # Plotting sorted data
-def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
+def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
                 subs=None, subs_col=None, detr=True, **kwargs):
     """ Plot strat / trop sorted data """
     # only take data with index that is available in df_sorted
     if subs in glob_obj.data.keys(): df = glob_obj.data[subs]
-    else: df = glob_obj.data[c_pfx]
+    else: df = glob_obj.data[ID]
     data = df[df.index.isin(df_sorted.index)]
 
-    # data = glob_obj.data[c_pfx][glob_obj.data[c_pfx].index.isin(df_sorted.index)]
+    # data = glob_obj.data[ID][glob_obj.data[ID].index.isin(df_sorted.index)]
     data.sort_index(inplace=True)
 
     # separate trop/strat data for any criterion
@@ -317,17 +317,17 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
         substance = get_col_name(subs, glob_obj.source, kwargs['subs_pfx'])
     else:
         if subs_col is None and subs is not None:
-            for subs_pfx in (c_pfx, 'GHG', 'INT', 'INT2'):
+            for subs_pfx in (ID, 'GHG', 'INT', 'INT2'):
                 try: substance = get_col_name(subs, glob_obj.source, subs_pfx); break
                 except: substance = None; continue
-        else: substance = subs_col; subs_pfx = c_pfx
+        else: substance = subs_col; subs_pfx = ID
     if substance is None:
-        print(f'Cannot plot {subs.upper()}, not available in {c_pfx}.'); return
+        print(f'Cannot plot {subs.upper()}, not available in {ID}.'); return
     if 'detr_'+substance in data.columns: substance = 'detr_'+substance
 
     fig, ax = plt.subplots(dpi=200)
     plt.title('{} ({}) filtered using {} ({})'.format(
-        subs.upper(), subs_pfx, [i for i in tropo_col.split('_')[1:]], c_pfx))
+        subs.upper(), subs_pfx, [i for i in tropo_col.split('_')[1:]], ID))
     ax.scatter(df_strato.index, df_strato[substance],
                 c='grey',  marker='.', zorder=0, label='strato')
     ax.scatter(df_tropo.index, df_tropo[substance],
@@ -337,7 +337,7 @@ def plot_sorted(glob_obj, df_sorted, crit, c_pfx, popt0=None, popt1=None,
         # only plot baseline for chemical tropopause def and where crit is being plotted
         t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
         ls = 'solid'
-        if not subs_pfx == c_pfx: ls = 'dashed'
+        if not subs_pfx == ID: ls = 'dashed'
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0),
                 c='r', lw=1, ls=ls, label='initial')
         ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt1),
