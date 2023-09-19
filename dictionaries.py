@@ -88,6 +88,40 @@ def get_coord(**kwargs):
         return [i.col_name for i in coordinates]
     return coordinates[0].col_name
 
+def make_coord_label(coordinates):
+    """ Returns string to be used as axis label for a specific Coordinate object. """
+    if not isinstance(coordinates, (list, set)): coordinates = [coordinates]
+    labels=[]
+    for coord in coordinates:
+        if coord.vcoord is not np.nan:
+            pv = '%s' % (f', {coord.pvu}' if coord.tp_def=='dyn' else '')
+            model = coord.model
+            # model = '%s' % (' - ECMWF' if (coordinate.ID=='INT' and coordinate.tp_def in ['dyn', 'therm']) else '')
+            # model += '%s' % (' - ERA5' if (coordinate.ID=='INT2' and coordinate.tp_def in ['dyn', 'therm']) else '')
+            tp = '%s' % (f', {coord.tp_def}' if coord.tp_def is not np.nan else '')
+            vcoord = f'$\Delta\,${coord.vcoord}' if coord.rel_to_tp else f'{coord.vcoord}'
+            if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
+            
+            label = f'{vcoord} ({model+tp+pv}) [{coord.unit}]'
+            
+        elif coord.hcoord is not np.nan:
+            if coord.hcoord == 'lat' and coord.unit=='degrees_north': 
+                label = 'Latitude [°N]'
+            elif coord.hcoord == 'lon' and coord.unit == 'degrees_east':
+                label = 'Longitude [°E]'
+            elif coord.hcoord == 'eql' and coord.unit=='degrees_north': 
+                label = f'Equivalent Latitude [°N] ({coord.model})'
+            elif coord.hcoord == 'geometry':
+                label = 'Geometry [°N, °E]'
+        
+        elif coord.var is not np.nan and coord.vcoord is np.nan:
+            print(coord)
+            label = f'{coord.var} {coord.unit}'
+        labels.append(label)
+
+    if len(coordinates)==1: return labels[0]
+    else: return labels
+
 #%% Substances
 class Substance():
     def __init__(self, col_name, **kwargs):
@@ -122,7 +156,7 @@ def get_substances(**kwargs):
     for cond in kwargs: 
         df = df[df[cond] == kwargs[cond]]
     if len(df) == 0: 
-        raise KeyError('No data found using the given specifications')
+        raise KeyError('No substance column found using the given specifications')
     df.set_index('col_name', inplace=True)
     subs_dict = df.to_dict(orient='index')
     subs = [Substance(k, **v) for k,v in subs_dict.items()]
@@ -148,11 +182,25 @@ def get_subs(substance, ID, clams=False):
     if len(subs_dict) > 1: 
         raise Warning(f'Multiple columns fulfill the conditions: {list(subs_dict)}')
         return list(subs_dict)
-    return list(subs_dict.values())[0]
+    return subs_dict[0]
 
 def get_col_name(substance, ID, clams=False):
     #TODO change source, c_pfx to ID in all other scripts
     return get_subs(substance, ID, clams).col_name
+
+def make_subs_label(substances):
+    """ Returns string to be used as axis label for a specific Coordinate object. """
+    if not isinstance(substances, (list, set)): substances = [substances]
+    labels=[]
+    for subs in substances:
+        special_names = {'ch2cl2':'CH2Cl2', 'noy':'NOy'}
+        name = '%s' % f'{subs.short_name.upper()}' if not subs.short_name in special_names else special_names[subs.short_name]
+        if name.startswith('D_'): name = 'd_'+name[2:]
+        source = '%s' % subs.source if subs.model=='msmt' else subs.model
+        label = f'{name} [{subs.unit}] ({source})'
+        labels.append(label)
+    if len(substances)==1: return labels[0]
+    else: return labels
 
 def get_fct_substance(substance, verbose=False):
     """ Returns corresponding fct from toolpac.outliers.ol_fit_functions """
