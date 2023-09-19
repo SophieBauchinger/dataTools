@@ -17,8 +17,9 @@ import copy
 from metpy.units import units
 
 import toolpac.calc.binprocessor as bp
+from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-from dictionaries import get_col_name, get_coord, get_substances
+from dictionaries import get_col_name, get_substances
 
 #TODO  Calculate some other lovely stuff from what we have in the data
 # metpy.calc.geopotential_to_height
@@ -167,7 +168,7 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     return ds[variables]
 
 #%% Data selection
-def data_selection(c_obj, flights=None, years=None, latitudes=None,
+def data_selection(glob_obj, flights=None, years=None, latitudes=None,
                    tropo=False, strato=False, extr_events=False, **kwargs):
     """ Return new Caribic instance with selection of parameters
         flights (int / list(int))
@@ -176,7 +177,7 @@ def data_selection(c_obj, flights=None, years=None, latitudes=None,
         tropo, strato, extr_events (bool)
         kwargs: e.g. tp_def, ... - for strat / trop filtering
     """
-    out = copy.deepcopy(c_obj)
+    out = copy.deepcopy(glob_obj)
     if flights is not None: out = out.sel_flight(flights)
     if years is not None: out = out.sel_year(years)
     if latitudes is not None:
@@ -237,27 +238,82 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 
     else: raise KeyError(f'Strat/Trop assignment undefined for {coordinate}')
 
-def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
-    """ Get appropriate coordinates and labels. """
+def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, ID = 'GHG',
+             save=True, verbose=False, subs_col=None):
+    """ Sort data into strato / tropo based on difference to ground obs.
 
-    y_coord = get_coord({'ID':y_pfx, 'vcoord':ycoord, 'tp_def':tp_def, 'pvu':pvu})
-        # y_pfx, ycoord, tp_def, pvu)
+    Returns dataframe containing index and strato/tropo/pre_flag columns
 
-    pv = '%s' % (f', {pvu}' if tp_def=='dyn' else '')
-    model = '%s' % (' - ECMWF' if (y_pfx=='INT' and tp_def in ['dyn', 'therm']) else '')
-    model += '%s' % (' - ERA5' if (y_pfx=='INT2' and tp_def in ['dyn', 'therm']) else '')
-    y_labels = {'z' : f'$\Delta$z ({tp_def+pv+model}) [km]',
-                'pt' : f'$\Delta\Theta$ ({tp_def+pv+model}) [K]',
-                'dp' : f'$\Delta$p ({tp_def+pv+model}) [hPa]'}
-    y_label = y_labels[ycoord]
+    Parameters:
+        glob_obj (GlobalData) : msmt data to be sorted into stratr / trop air
+        ref_obj (LocalData) : reference data to use for filtering (background)
+        crit (str) : substance to use for flagging
+        limit (float) : tracer mxr fraction below which air is classified
+                        as stratospheric
+        ID (str) : e.g. 'GHG', specify the caribic datasource
+        save (bool): add result to glob_obj
+    """
+    state = f'pre_flag: crit={crit}, ID={ID}\n'
+    if glob_obj.source=='Caribic':
+        df = glob_obj.data[ID].copy()
+    else: df = glob_obj.df.copy()
+    df.sort_index(inplace=True)
 
-    # x coordinate = equivalent latitude
-    if xcoord is not None:
-        x_coord = get_coord(**{'ID':x_pfx, 'hcoord':xcoord})# get_h_coord(x_pfx, xcoord)
-        x_label = 'Eq. latitude (%s) ' % ('ECMWF' if x_pfx=='INT' else 'ERA5') + '[°N]'
-        return y_coord, y_label, x_coord, x_label
+    if subs_col is not None: substance = subs_col
+    else: substance = get_col_name(crit, glob_obj.source, ID)
+    if not substance: raise ValueError(state+'No {crit} data in {ID}')
 
-    return y_coord, y_label
+    fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
+
+    df_flag = pd.DataFrame({f'strato_{crit}':np.nan,
+                            f'tropo_{crit}':np.nan},
+                           index=df.index)
+
+    t_obs_tot = np.array(dt_to_fy(df_flag.index, method='exact'))
+    df_flag.loc[df[substance] < limit * fit(t_obs_tot),
+           (f'strato_chem_{crit}', f'tropo_chem_{crit}')] = (True, False)
+
+    df_flag[f'flag_{crit}'] = 0
+    df_flag.loc[df_flag[f'strato_chem_{crit}'] == True, f'flag_{crit}'] = 1
+
+    if verbose: print('Result of pre-flagging: \n',
+                      df_flag[f'flag_{crit}'].value_counts())
+    if save and glob_obj.source == 'Caribic':
+        glob_obj.data[ID][f'flag_{crit}'] = df_flag[f'flag_{crit}']
+
+    return df_flag
+
+def conv_molarity_PartsPer(x, unit):
+    """ Convert molarity (mol/mol) to given unit (eg. ppb). """
+    factor = {'ppm' : 1e6, # per million
+               'ppb' : 1e9, # per billion
+               'ppt' : 1e12, # per trillion
+               'ppq' : 1e15, # per quadrillion
+               }
+    # n2o: 300 ppb, 3e-7 mol/mol
+    return x*factor[unit]
+    
+# def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
+#     """ Get appropriate coordinates and labels. """
+
+#     y_coord = get_coord({'ID':y_pfx, 'vcoord':ycoord, 'tp_def':tp_def, 'pvu':pvu})
+#         # y_pfx, ycoord, tp_def, pvu)
+
+#     pv = '%s' % (f', {pvu}' if tp_def=='dyn' else '')
+#     model = '%s' % (' - ECMWF' if (y_pfx=='INT' and tp_def in ['dyn', 'therm']) else '')
+#     model += '%s' % (' - ERA5' if (y_pfx=='INT2' and tp_def in ['dyn', 'therm']) else '')
+#     y_labels = {'z' : f'$\Delta$z ({tp_def+pv+model}) [km]',
+#                 'pt' : f'$\Delta\Theta$ ({tp_def+pv+model}) [K]',
+#                 'dp' : f'$\Delta$p ({tp_def+pv+model}) [hPa]'}
+#     y_label = y_labels[ycoord]
+
+#     # x coordinate = equivalent latitude
+#     if xcoord is not None:
+#         x_coord = get_coord(**{'ID':x_pfx, 'hcoord':xcoord})# get_h_coord(x_pfx, xcoord)
+#         x_label = 'Eq. latitude (%s) ' % ('ECMWF' if x_pfx=='INT' else 'ERA5') + '[°N]'
+#         return y_coord, y_label, x_coord, x_label
+
+#     return y_coord, y_label
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_merge_substance(c_obj, subs, save=True, detr=True):
