@@ -128,3 +128,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 misc_data/emac_ds.nc
+.idea/inspectionProfiles/profiles_settings.xml
+.gitignore
+.idea/vcs.xml
+.gitignore
+.idea/misc.xml
+.idea/iau-caribic.iml
+.idea/modules.xml
