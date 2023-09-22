@@ -19,8 +19,8 @@ from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch
 
-from tools import monthly_mean
-from dictionaries import get_col_name, get_vlims, get_default_unit, substance_list
+import tools
+import dictionaries as dcts
 
 # supress a gui backend userwarning, not really advisible
 import warnings; warnings.filterwarnings("ignore", category=UserWarning,
@@ -38,7 +38,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
     """
     if glob_obj.source=='Caribic':
         if c_pfx: pfxs = [c_pfx]
-        else: pfxs = [p for p in glob_obj.pfxs if subs in substance_list(p)]
+        else: pfxs = [p for p in glob_obj.pfxs if subs in dcts.substance_list(p)]
 
         ax = None
         if ax is None:
@@ -49,8 +49,8 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
         for pfx, ax in zip(pfxs, axs.flatten()):
             df = glob_obj.data[pfx]
 
-            if subs in substance_list(pfx): 
-                substance = get_col_name(subs, glob_obj.source, pfx)
+            if subs in dcts.substance_list(pfx): 
+                substance = dcts.get_col_name(subs, glob_obj.source, pfx)
                 if detr and 'detr'+substance not in df.columns:
                     glob_obj.detrend(subs)
                 if detr: substance = 'detr_' + substance
@@ -59,7 +59,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
                 continue
 
             if single_yr is not None: df = df[df.index.year == single_yr]
-            df_mm = monthly_mean(df).dropna()
+            df_mm = tools.monthly_mean(df).dropna()
 
             # Plot mixing ratio msmts and monthly mean
             ymin = np.nanmin(df[substance])
@@ -67,8 +67,8 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
 
             cmap = plt.cm.viridis_r
             extend = 'neither'
-            vmin = np.nanmin([ymin, get_vlims(subs)[0]])
-            vmax = np.nanmax([ymax, get_vlims(subs)[1]])
+            vmin = np.nanmin([ymin, dcts.get_vlims(subs)[0]])
+            vmax = np.nanmax([ymax, dcts.get_vlims(subs)[1]])
             norm = Normalize(vmin, vmax)
 
             # ax.set_title(f'{glob_obj.source} {substance} measurements')
@@ -97,7 +97,7 @@ def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
             fig.autofmt_xdate(); plt.show()
 
     elif glob_obj.source=='Mozart':
-        substance = get_col_name(subs, glob_obj.source)
+        substance = dcts.get_col_name(subs, glob_obj.source)
         pl = plot_binned_1d(glob_obj, subs, single_yr)
         return pl
 
@@ -130,9 +130,9 @@ def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False,
         
                     cmap = plt.cm.viridis_r
                     vmin = np.nanmin([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean),
-                                      get_vlims(subs)[0]])
+                                      dcts.get_vlims(subs)[0]])
                     vmax = np.nanmax([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean),
-                                      get_vlims(subs)[1]])
+                                      dcts.get_vlims(subs)[1]])
                     norm = Normalize(vmin, vmax) # colormap normalisation for chosen vlims
 
                     axs[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
@@ -140,13 +140,13 @@ def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False,
                     axs[0].scatter(out_x.xintm, out_x.vmean, # plot across latitude
                                   c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
                     axs[0].set_xlabel('Latitude [deg]') # ; plt.xlim(out_x.xbmin, out_x.xbmax)
-                    axs[0].set_ylabel(f'{get_col_name(subs, glob_obj.source, pfx)}')
+                    axs[0].set_ylabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
         
                     axs[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
                     axs[1].scatter(out_y.xintm, out_y.vmean, # plot across longitude
                                   c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
                     axs[1].set_xlabel('Longitude [deg]') # ; plt.xlim(out_y.xbmin, out_y.xbmax)
-                    axs[1].set_ylabel(f'{get_col_name(subs, glob_obj.source, pfx)}')
+                    axs[1].set_ylabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
         
                     fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = axs[1])
                     plt.show()
@@ -162,7 +162,7 @@ def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False,
             for out_x, out_y, year in zip(out_x_list, out_y_list, glob_obj.years):
                 ax[0].plot(out_x.xintm, out_x.vmean, label=year)#, c = cmap(norm(year)))
                 ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-                ax[0].set_ylabel(f'{get_col_name(subs, glob_obj.source, pfx)}')
+                ax[0].set_ylabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
     
                 ax[1].plot(out_y.xintm, out_y.vmean, label=year)# , c = cmap(norm(year)))
                 ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
@@ -222,7 +222,7 @@ def plot_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=
                        extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
     
             cbar = plt.colorbar(img, ax=ax, pad=0.08, orientation='vertical') # colorbar
-            cbar.ax.set_xlabel(f'{get_col_name(subs, glob_obj.source, pfx)}')
+            cbar.ax.set_xlabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
     
             ax.set_title(f'{yr}')
             ax.set_xlabel('Longitude [°E]'); ax.set_xlim(-180,180)
@@ -272,8 +272,8 @@ def lonlat_1d(mzt_obj, subs='sf6',
 # Caribic
 def caribic_1d(c_obj, c_pfx, subs):
     df = c_obj.data[c_pfx]
-    substance = get_col_name(subs, c_obj.source, c_pfx)
-    df_mm = monthly_mean(df).notna()
+    substance = dcts.get_col_name(subs, c_obj.source, c_pfx)
+    df_mm = tools.monthly_mean(df).notna()
 
     # Plot mixing ratio msmts and monthly mean
     fig, ax = plt.subplots(dpi=250)
@@ -283,8 +283,8 @@ def caribic_1d(c_obj, c_pfx, subs):
 
     cmap = plt.cm.viridis_r
     extend = 'neither'
-    vmin = np.nanmin([ymin, get_vlims(subs)[0]])
-    vmax = np.nanmax([ymax, get_vlims(subs)[1]])
+    vmin = np.nanmin([ymin, dcts.get_vlims(subs)[0]])
+    vmax = np.nanmax([ymax, dcts.get_vlims(subs)[1]])
     norm = Normalize(vmin, vmax)
 
     plt.scatter(df.index, df[substance],
@@ -320,12 +320,12 @@ def local(loc_obj, substance=None, greyscale=False, v_limits = (None,None)):
     else: colors = {'msmts':plt.cm.viridis_r, 'day': plt.cm.viridis_r}
 
     if not substance: substance = loc_obj.substance
-    col_name = get_col_name(substance, loc_obj.source)
+    col_name = dcts.get_col_name(substance, loc_obj.source)
     if all(isinstance(i, (int, float)) for i in v_limits):
         vmin, vmax = v_limits
-    else: vmin, vmax = get_vlims(substance) # default values 
+    else: vmin, vmax = dcts.get_vlims(substance) # default values 
     norm = Normalize(vmin, vmax)
-    dflt_unit = get_default_unit(substance)
+    dflt_unit = dcts.get_default_unit(substance)
 
     # Plot all available info on one graph
     fig, ax = plt.subplots(figsize = (5,3.5), dpi=250)

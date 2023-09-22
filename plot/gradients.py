@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 import toolpac.calc.binprocessor as bp
 
-from dictionaries import dict_season, get_subs, get_coordinates, make_coord_label
-from tools import make_season
+import tools
+import dictionaries as dcts
 
 #%% Plotting Gradient by season
 # Fct definition in C_plot needed these:
@@ -59,15 +59,15 @@ def plot_gradient_by_season(c_obj, subs_params = {}, y_params = {},
     data = c_obj.data[subs]
 
     # x-axis
-    substance = get_subs(substance=subs, ID=subs_params['ID']).col_name # subs, c_obj.source, x_params['ID'])
+    substance = dcts.get_subs(substance=subs, ID=subs_params['ID']).col_name # subs, c_obj.source, x_params['ID'])
     if detr: # detrended data for x-axis
         substance = f'detr_{substance}'
         if not substance in data.columns:
             raise ValueError(f'Detrended data not available for {subs.upper()}')
 
     # y-axis
-    y_coord = get_coordinates(**y_params)[0]
-    y_label = make_coord_label(y_coord)
+    y_coord = dcts.get_coordinates(**y_params)[0]
+    y_label = dcts.make_coord_label(y_coord)
     y_coord = y_coord.col_name #!!! bad code
 
     # y_coord, y_label = coordinate_tools(**y_params)
@@ -80,7 +80,7 @@ def plot_gradient_by_season(c_obj, subs_params = {}, y_params = {},
     nbins = (max_y - min_y) / y_bin
     y_array = min_y + np.arange(nbins) * y_bin + y_bin * 0.5
 
-    data['season'] = make_season(data.index.month) # 1 = spring etc
+    data['season'] = tools.make_season(data.index.month) # 1 = spring etc
     out_dict = {}
     fig, ax = plt.subplots(dpi=200)
     for s in set(data['season'].tolist()):
@@ -95,13 +95,13 @@ def plot_gradient_by_season(c_obj, subs_params = {}, y_params = {},
         vmean = np.array([vmean[i] if vcount[i] >= 5
                           else np.nan for i in range(len(vmean))])
 
-        plt.plot(vmean, y_array, '-', marker='o', c=dict_season()[f'color_{s}'],
-                 label=dict_season()[f'name_{s}'])
+        plt.plot(vmean, y_array, '-', marker='o', c=dcts.dict_season()[f'color_{s}'],
+                 label=dcts.dict_season()[f'name_{s}'])
 
         if errorbars: # add error bars
             vstdv = (out_dict[f'bin1d_{s}']).vstdv
             plt.errorbar(vmean, y_array, None, vstdv,
-                         c=dict_season()[f'color_{s}'], elinewidth=0.5)
+                         c=dcts.dict_season()[f'color_{s}'], elinewidth=0.5)
 
     plt.tick_params(direction='in', top=True, right=True)
     if note: plt.annotate(note, xy=(0.025, 0.925), xycoords='axes fraction',
