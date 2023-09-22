@@ -286,42 +286,54 @@ class TropopausePlotter(TropopauseData):
 
     def show_ratios(self, as_subplot=False, ax=None, single_tp_def=None):
         """ Plot ratio of tropo / strato datapoints on a horizontal bar plot """
-        if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
-        df_sorted = self.df_sorted.copy()
-        columns = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
-        tps = [dcts.get_coord(col_name = c) for c in columns 
-               if c in [c.col_name for c in dcts.get_coordinates()
-                        if c.tp_def not in ['combo', 'cpt']]]
+        # if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
+        # df_sorted = self.df_sorted.copy()
+        
+        tropo_counts = self.calc_ratios() # dataframe
 
+        ratios = tropo_counts.loc['ratios']
+        tropo_counts.drop(index='ratios', inplace=True)
+        n_values = [tropo_counts[i].loc[True] + tropo_counts[i].loc[False] 
+                    for i in tropo_counts.columns]
+
+        bar_labels = ['{:.2f}'.format(r) for r in ratios]
+        # bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in zip(ratios, n_values)]
+
+        # find coordinates for each column
+        tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
+               if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
         # create pseudo coordinate for n2o filter
-        subses = [dcts.get_subs(col_name=c) for c in columns if c in [s.col_name for s in dcts.get_substances()]]
+        subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
         subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
         tps = tps + subs_tps
 
+        # make sure cols and labels are related 
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
+                                        for tp in tps]))
+        # ratios = [trop_counts[c][0] / trop_counts[c][1] for c in trop_counts.columns]
+
         tp_defs = set([tp.tp_def for tp in tps]) if single_tp_def is None else [single_tp_def]
-        
+
+        if not as_subplot: 
+            fig, ax = plt.subplots(dpi=240)
+        ax.set_title('Ratio of tropospheric / stratospheric datapoints in Caribic-2')
+
         for tp_def in tp_defs:
             current_tps = [tp for tp in tps if tp.tp_def==tp_def]
-            
             # make sure cols and labels are related 
-            cols, labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
+            cols, labels = map(list, zip(*[(tp.col_name, dcts.make_coord_label(tp)) 
                                             for tp in current_tps]))
-        
-            val_count = df_sorted[cols].apply(pd.value_counts)
-        
-            if not as_subplot: 
-                fig, ax = plt.subplots(figsize=(4,3), dpi=240)
-            ax.set_title('Ratio of tropospheric / stratospheric datapoints in Caribic-2')
+            current_ratios = ratios[cols]
 
-            ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
-            bars = ax.barh(labels, ratios)
-            bar_labels = ['{:.2f}'.format(r) for r in ratios]
+            bars = ax.barh(labels, current_ratios)
+            bar_labels = ['{:.2f}'.format(r) for r in current_ratios]
             
             ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
             ax.set_xlim(0,4.5)#max(ratios)*1.2)
-            if not as_subplot: 
-                plt.show()
-            
+
+        if not as_subplot: 
+            plt.show()
+
         def show_ratios_seasonal(self, ax_subplot=False, ax=None, single_tp_def=None):
             if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
             df_sorted = self.df_sorted.copy()
@@ -337,63 +349,72 @@ class TropopausePlotter(TropopauseData):
 
             tp_defs = set([tp.tp_def for tp in tps]) if single_tp_def is None else [single_tp_def]
 
-            for season in tp_defs:
+            # for season in tp_defs:
                 
                 
-                current_tps = [tp for tp in tps if tp.tp_def==tp_def]
+            #     current_tps = [tp for tp in tps if tp.tp_def==tp_def]
                 
-                # make sure cols and labels are related 
-                cols, labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
-                                                for tp in current_tps]))
+            #     # make sure cols and labels are related 
+            #     cols, labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
+            #                                     for tp in current_tps]))
             
-                val_count = df_sorted[cols].apply(pd.value_counts)
+            #     val_count = df_sorted[cols].apply(pd.value_counts)
             
-                if not as_subplot: 
-                    fig, ax = plt.subplots(figsize=(4,3), dpi=240)
-                ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in Caribic-2')
+            #     if not as_subplot: 
+            #         fig, ax = plt.subplots(figsize=(4,3), dpi=240)
+            #     ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in Caribic-2')
                 
-                ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
-                bars = ax.barh(labels, ratios)
+            #     ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
+            #     bars = ax.barh(labels, ratios)
 
-                bar_labels = ['{:.2f}'.format(r,nr) for r, nr in 
-                              zip(ratios, [val_count[i].sum() for i in val_count.columns])]
+            #     bar_labels = ['{:.2f}'.format(r,nr) for r, nr in 
+            #                   zip(ratios, [val_count[i].sum() for i in val_count.columns])]
 
-                # bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in 
-                #               zip(ratios, [val_count[i].sum() for i in val_count.columns])]
+            #     # bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in 
+            #     #               zip(ratios, [val_count[i].sum() for i in val_count.columns])]
                 
-                ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
-                # ax.bar_label(bars, ratios, fmt='%.3g', padding=1, label_type='edge')
+            #     ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
+            #     # ax.bar_label(bars, ratios, fmt='%.3g', padding=1, label_type='edge')
                 
-                ax.set_xlim(0,4.5)#max(ratios)*1.2)
-                # ax.vlines(1, labels[0], labels[-1], color='k', ls='dashed', lw=0.5)
-                # plt.axvspan(0.995, 1.005, facecolor='k', alpha=0.7)
-                if not as_subplot: 
-                    plt.show()
+            #     ax.set_xlim(0,4.5)#max(ratios)*1.2)
+            #     # ax.vlines(1, labels[0], labels[-1], color='k', ls='dashed', lw=0.5)
+            #     # plt.axvspan(0.995, 1.005, facecolor='k', alpha=0.7)
+            #     if not as_subplot: 
+            #         plt.show()
+
+tp = TropopauseData()
+for season in [1,2,3,4]:
+    tp_seas = tp.sel_season(season)
+    fig,ax=plt.subplots(figsize=(8,8),dpi=250)
+    fig.suptitle(dcts.dict_season()[f'name_{season}'])
+    tpp = TropopausePlotter(tp_inst=tp_seas)
+    tpp.show_ratios(as_subplot=True, ax=ax)
+    fig.show()
 
 #%%
-if False: df_sorted = ''; tps=''
+# if False: df_sorted = ''; tps=''
 
-# for vcoord in set([tp.vcoord for tp in tps]):
+# # for vcoord in set([tp.vcoord for tp in tps]):
+# #     cols, labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
+# #                                     for tp in tps if tp.vcoord==vcoord]))
+# for tp_def in set([tp.tp_def for tp in tps]):
+#     # make sure cols and labels are related 
 #     cols, labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
-#                                     for tp in tps if tp.vcoord==vcoord]))
-for tp_def in set([tp.tp_def for tp in tps]):
-    # make sure cols and labels are related 
-    cols, labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
-                                    for tp in tps if tp.tp_def==tp_def]))
+#                                     for tp in tps if tp.tp_def==tp_def]))
 
-    val_count = df_sorted[cols].apply(pd.value_counts)
+#     val_count = df_sorted[cols].apply(pd.value_counts)
 
-    fig, ax = plt.subplots(figsize=(4,3), dpi=240)
-    ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {tp_def}')
+#     fig, ax = plt.subplots(figsize=(4,3), dpi=240)
+#     ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {tp_def}')
     
-    ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
-    bars = ax.barh(labels, ratios)
-    ax.bar_label(bars, fmt='%.3g', padding=1)
-    ax.set_xlim(0,3.5)#max(ratios)*1.2)
-    print(*bars)
-    # ax.vlines(1, labels[0], labels[-1], color='k', ls='dashed', lw=0.5)
-    # plt.axvspan(0.995, 1.005, facecolor='k', alpha=0.7)
-    plt.show()
+#     ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
+#     bars = ax.barh(labels, ratios)
+#     ax.bar_label(bars, fmt='%.3g', padding=1)
+#     ax.set_xlim(0,3.5)#max(ratios)*1.2)
+#     print(*bars)
+#     # ax.vlines(1, labels[0], labels[-1], color='k', ls='dashed', lw=0.5)
+#     # plt.axvspan(0.995, 1.005, facecolor='k', alpha=0.7)
+#     plt.show()
 
 #%% N2O filter
 def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
