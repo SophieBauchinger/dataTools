@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Wed Aug  9 16:58:43 2023
 
 Plot tropopause heights n stuff from different data sources

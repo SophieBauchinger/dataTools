@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Thu May 11 13:22:38 2023
 
 Defines different plotting possibilities for objects of the type GlobalData

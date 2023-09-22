@@ -1,6 +1,6 @@
 # # -*- coding: utf-8 -*-
 # """
-# @Author: Sophie Bauchimger, IAU
+# @Author: Sophie Bauchinger, IAU
 # @Date: Fri Apr 28 09:58:15 2023
 
 # Remove linear trend of substances using free troposphere as reference.

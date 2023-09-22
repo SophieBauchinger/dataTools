@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Mon Feb 13 14:46:39 2023
 
 """

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Fri Apr 28 14:13:28 2023
 
 Defines classes used as basis for data structures

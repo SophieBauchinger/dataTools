@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Thu Apr 27 15:56:59 2023
 
 Main script for Caribic measurement analysis routine.

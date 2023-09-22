@@ -3,7 +3,7 @@
 
 OUTDATED. NEW VERSION SEE filter_outliers
 
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Tue Apr 11 09:28:22 2023
 
 Filtering data into tropospheric and stratospheric air

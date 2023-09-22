@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """ Collection of dictionaries and look-up tables for air sample analysis.
 
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Tue May  9 15:39:11 2023
 
 substance_list: Get all available substances for different datasets

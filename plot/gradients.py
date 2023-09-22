@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Fri Apr 28 14:13:28 2023
 
 Plotting of gradients - wants detrended data, sorted into atmos. layers

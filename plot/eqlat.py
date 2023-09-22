@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Tue Jun  6 13:59:31 2023
 
 Showing mixing ratios per season on a plot of coordinate relative to the

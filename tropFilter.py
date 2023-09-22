@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Wed Jul  5 14:41:45 2023
 
 Filtering of data in tropospheric / stratospheric origin depending on TP definition

@@ -2,7 +2,7 @@
 """
 Line plots of Caribic, Mauna Loa, Mace Head datapoints. Data and monthly mean.
 
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Mon Feb 13 11:51:02 2023
 
 """

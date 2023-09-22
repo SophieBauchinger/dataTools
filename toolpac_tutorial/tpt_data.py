@@ -2,7 +2,7 @@
 """
 Simple examples on reading data from CARIBIC, NOAA, AGAGE and MOZART files
 
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: Mon Feb 13 11:51:02 2023
 
 """
