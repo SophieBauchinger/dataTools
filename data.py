@@ -452,10 +452,10 @@ class GlobalData(object):
         #     plot_sorted(self, df_sorted, 'n2o', ID, popt0, ol[3], subs=subs.col_name,
         #                 subs_col=subs.col_name if not kwargs.get('detr') else 'detr_'+subs.col_name, 
         #                 **kwargs)
-
+        df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
-    def create_df_sorted(self, **kwargs): # FROM TP
+    def create_df_sorted(self, **kwargs):
         """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
         If no kwargs are specified, df_sorted is calculated for all possible definitons
         df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
@@ -512,6 +512,7 @@ class GlobalData(object):
                         (strato, tropo)] = (True, False)
 
             # # add data for current tp def to df_sorted
+            tp_sorted = tp_sorted.convert_dtypes()
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
             
@@ -519,9 +520,40 @@ class GlobalData(object):
             # df_sorted[strato] = df_sorted[strato] # .astype(bool)
             # ^ warning that those operations can turn nan values into false positives...
 
+        df_sorted = df_sorted.convert_dtypes()
         if kwargs.get('save'): self.data['df_sorted'] = df_sorted
 
         return df_sorted
+
+    def calc_ratios(self):
+        """ Calculate ratio of tropospheric / stratospheric datapoints. 
+
+        Returns: 
+            ratio_dict (dict): { label : (ratio, val_number) }
+        """
+        if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
+        df_sorted = self.df_sorted.copy()
+        columns = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
+        tps = [dcts.get_coord(col_name = c) for c in columns 
+               if c in [c.col_name for c in dcts.get_coordinates()
+                        if c.tp_def not in ['combo', 'cpt']]]
+
+        # create pseudo coordinate for n2o filter
+        subses = [dcts.get_subs(col_name=c) for c in columns if c in [s.col_name for s in dcts.get_substances()]]
+        subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
+        tps = tps + subs_tps
+
+        ratio_dict = {}
+        # make sure cols and labels are related 
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
+                                        for tp in tps]))
+        val_count = df_sorted[cols].apply(pd.value_counts)
+        ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
+        bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in zip(ratios, [val_count[i].sum() for i in val_count.columns])]
+
+        ratio_dict.update({label:(r,n) for label,r,n in zip(tp_labels, ratios, [val_count[i].sum() for i in val_count.columns])})
+
+        return ratio_dict
 
     @property
     def df_sorted(self):
@@ -1093,7 +1125,7 @@ class EMAC(GlobalData):
 # Caribic and EMAC
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
-    def __init__(self, years=range(2005, 2020), interp=True, method='n'):
+    def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if yr >= 2000 and yr <= 2019])
         self.source = 'TP'
@@ -1102,6 +1134,12 @@ class TropopauseData(GlobalData):
         # select year on this object afterwards bc otherwise interpolation is missing surrounding values
         if interp: self.interpolate_emac(method)
         self.data = self.sel_year(*years).data
+        
+        if df_sorted: 
+            try: 
+                with open('misc_data/tpdata_df_sorted.pkl', 'rb') as f:
+                    self.data['df_sorted'] = dill.load(f)
+            except: self.create_df_sorted(save=True)
 
     def __repr__(self):
         self.years.sort()
@@ -1158,44 +1196,45 @@ class TropopauseData(GlobalData):
 
     def sort_tropo_strato(self, vcoords=('p', 'z', 'pt')):
         """ Returns dataframe with bool strat / trop columns for various TP definitions. """
-        data = TropopauseData().df.copy()
-        df_sorted = pd.DataFrame(index=data.index)
-        tps = dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True)
-        for tp in [tp for tp in tps if (tp.pvu in [1.5, 2.0] or tp.vcoord not in vcoords)]: # rmv 1.5 and 2.0 PVU TPs
-            tps.remove(tp)
+        return self.df_sorted
+        # data = TropopauseData().df.copy()
+        # df_sorted = pd.DataFrame(index=data.index)
+        # tps = dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True)
+        # for tp in [tp for tp in tps if (tp.pvu in [1.5, 2.0] or tp.vcoord not in vcoords)]: # rmv 1.5 and 2.0 PVU TPs
+        #     tps.remove(tp)
 
-        # first create df_sorted
-        for tp in tps:
-            tp_df = data.dropna(axis=0, subset=[tp.col_name])
+        # # first create df_sorted
+        # for tp in tps:
+        #     tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
-            if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
-                tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
-            if tp.tp_def == 'cpt': # cold point TP only in the tropics
-                tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
+        #     if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
+        #         tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
+        #     if tp.tp_def == 'cpt': # cold point TP only in the tropics
+        #         tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
 
-            # col names
-            tropo = 'tropo_'+tp.col_name# 'tropo_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
-            strato ='strato_'+tp.col_name # 'strato_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
+        #     # col names
+        #     tropo = 'tropo_'+tp.col_name# 'tropo_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
+        #     strato ='strato_'+tp.col_name # 'strato_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
 
-            tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
-                                      tropo:pd.Series(np.nan, dtype='float')},
-                                      index=tp_df.index)
+        #     tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
+        #                               tropo:pd.Series(np.nan, dtype='float')},
+        #                               index=tp_df.index)
 
-            # tropo: high p (gt 0), low everything else (lt 0)
-            tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
-                        (strato, tropo)] = (False, True)
+        #     # tropo: high p (gt 0), low everything else (lt 0)
+        #     tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
+        #                 (strato, tropo)] = (False, True)
 
-            # strato: low p (lt 0), high everything else (gt 0)
-            tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
-                        (strato, tropo)] = (True, False)
+        #     # strato: low p (lt 0), high everything else (gt 0)
+        #     tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
+        #                 (strato, tropo)] = (True, False)
 
-            # add data for current tp def to df_sorted
-            df_sorted[tropo] = tp_sorted[tropo]
-            df_sorted[strato] = tp_sorted[strato]
+        #     # add data for current tp def to df_sorted
+        #     df_sorted[tropo] = tp_sorted[tropo]
+        #     df_sorted[strato] = tp_sorted[strato]
             
-        df_sorted['Flight number'] = self.df['Flight number'][self.df.index.isin(df_sorted.index)] # necessary for data selection fctns
-        self.data['df_sorted'] = df_sorted
-        return df_sorted
+        # df_sorted['Flight number'] = self.df['Flight number'][self.df.index.isin(df_sorted.index)] # necessary for data selection fctns
+        # self.data['df_sorted'] = df_sorted
+        # return df_sorted
 
     @property
     def df(self):
@@ -1206,7 +1245,7 @@ class TropopauseData(GlobalData):
     def df_sorted(self):
         """ Bool dataset sorted into strato/tropo for various tropopauses. """
         if 'df_sorted' in self.data: return self.data['df_sorted']
-        else: return self.sort_tropo_strato()
+        else: return self.create_df_sorted(save=True)
 
 # Mozart
 class Mozart(GlobalData):
