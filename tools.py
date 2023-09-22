@@ -284,28 +284,6 @@ def conv_molarity_PartsPer(x, unit):
     # n2o: 300 ppb, 3e-7 mol/mol
     return x*factor[unit]
     
-# def coordinate_tools(tp_def, y_pfx, ycoord, pvu=3.5, xcoord=None, x_pfx='INT2'):
-#     """ Get appropriate coordinates and labels. """
-
-#     y_coord = get_coord({'ID':y_pfx, 'vcoord':ycoord, 'tp_def':tp_def, 'pvu':pvu})
-#         # y_pfx, ycoord, tp_def, pvu)
-
-#     pv = '%s' % (f', {pvu}' if tp_def=='dyn' else '')
-#     model = '%s' % (' - ECMWF' if (y_pfx=='INT' and tp_def in ['dyn', 'therm']) else '')
-#     model += '%s' % (' - ERA5' if (y_pfx=='INT2' and tp_def in ['dyn', 'therm']) else '')
-#     y_labels = {'z' : f'$\Delta$z ({tp_def+pv+model}) [km]',
-#                 'pt' : f'$\Delta\Theta$ ({tp_def+pv+model}) [K]',
-#                 'dp' : f'$\Delta$p ({tp_def+pv+model}) [hPa]'}
-#     y_label = y_labels[ycoord]
-
-#     # x coordinate = equivalent latitude
-#     if xcoord is not None:
-#         x_coord = get_coord(**{'ID':x_pfx, 'hcoord':xcoord})# get_h_coord(x_pfx, xcoord)
-#         x_label = 'Eq. latitude (%s) ' % ('ECMWF' if x_pfx=='INT' else 'ERA5') + '[°N]'
-#         return y_coord, y_label, x_coord, x_label
-
-#     return y_coord, y_label
-
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_merge_substance(c_obj, subs, save=True, detr=True):
     """ Insert msmt data into full coordinate df from coord_merge() """

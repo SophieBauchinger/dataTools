@@ -6,37 +6,25 @@
 Main script for Caribic measurement analysis routine.
 
 Tropopause definitions: 
-    - dynamical: ideal > 30°
-    - chemical: any lat
-    - thermal (WMO): best < 30°
-    - coldpoint: only < 30°
+    - dynamical: > 30°
+    - chemical
+    - thermal (WMO): preferentially < 30°
+    - coldpoint: < 30°
 
 Substances in Caribic data:
 'GHG':    ['ch4', 'co2',        'n2o', 'sf6']
 'INT':    ['ch4', 'co2', 'co' ,             'o3' , 'noy', 'no' , 'h2o']
 'INT2':   ['ch4', 'co2', 'co' , 'n2o',      'o3' , 'noy', 'no' , 'h2o', 'f11', 'f12']
 
-Met / Reanalysis data for Caribic-2:
-    'Flight number',
-     'p [mbar]',
-     'geometry'
-     'int_z_km [km]',
-     'int_eqlat [deg]',
-     'int_ERA5_EQLAT [deg N]',
-     'int_ERA5_PRESS [hPa]',
-     'int_ERA5_PV [PVU]',
-     'int_ERA5_TEMP [K]',
+
 
 """
-import dill
-from os.path import exists
-from os import remove
 import matplotlib.pyplot as plt
 
-from data import Caribic, Mozart, EMACData
-from groundbased import Mauna_Loa, Mace_Head
+from data import Caribic, Mozart, EMAC, TropopauseData, Mauna_Loa, Mace_Head
+import dictionaries as dcts
 from lags import calc_time_lags
-from dictionaries import substance_list, get_tp_params
+#from dictionaries import substance_list, get_tp_params
 
 # from data import detrend_substance
 import plot.data
@@ -46,23 +34,24 @@ from plot.gradients import plot_gradient_by_season
 # from tools import data_selection
 
 #%% Get Data
-year_range = range(1980, 2021)
+# year_range = range(1980, 2021)
 
-mlo_data = {subs : Mauna_Loa(year_range, subs=subs) for subs
-            in substance_list('MLO')}
+mlo_data = {subs : Mauna_Loa(subs=subs) for subs
+            in dcts.substance_list('MLO')}
 mhd = Mace_Head() # only 2012 data available
-mzt = Mozart(year_range) # only available up to 2008
+mzt = Mozart() # only available up to 2008
 caribic = Caribic()
-emac = EMACData()
+emac = EMAC()
+tp = TropopauseData()
 
 #%% Tropopause definitions
-tp_param_dicts = get_tp_params() # ^ for tropopause / stratosphere sorting
+tp_param_dicts = dcts.get_tp_params() # ^ for tropopause / stratosphere sorting
 for tp_params in tp_param_dicts:
     caribic.filter_extreme_events(**tp_params, plot=True)
 
 #%% Plot data
 for pfx in caribic.pfxs: # scatter plots of all caribic data
-    substs = [x for x in substance_list(pfx)
+    substs = [x for x in dcts.substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     f, axs = plt.subplots(int(len(substs)/2), 2,
                           figsize=(10,len(substs)*1.5), dpi=200)
@@ -74,13 +63,13 @@ for pfx in caribic.pfxs: # scatter plots of all caribic data
     plt.show()
 
 for pfx in caribic.pfxs: # lon/lat plots of all caribic data
-    substs = [x for x in substance_list(pfx)
+    substs = [x for x in dcts.substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     for subs in substs:
         plot.data.plot_binned_1d(caribic, subs=subs, c_pfx=pfx, single_graph=True)
 
 for pfx in caribic.pfxs: # maps of all caribic data
-    substs = [x for x in substance_list(pfx)
+    substs = [x for x in dcts.substance_list(pfx)
               if x not in ['f11', 'f12', 'no', 'noy', 'o3', 'h2o']]
     for subs in substs:
         plot.data.plot_binned_2d(caribic, subs=subs, c_pfx=pfx)
@@ -120,7 +109,7 @@ for subs in ['sf6', 'n2o', 'co2', 'ch4']:
 
 #%% Plot gradients
 for pfx in ['INT2']:# caribic.pfxs:
-    for subs in substance_list(pfx):
+    for subs in dcts.substance_list(pfx):
         plot_gradient_by_season(caribic, subs, 'INT2', tp='pvu', pvu = 2.0)
 
 #%% Filter tropospheric / stratospheric data points based on
@@ -136,7 +125,7 @@ for pfx in ['INT2']:# caribic.pfxs:
 
 # Baseline Filter on tropospheric datasets
 for pfx in ['GHG', 'INT', 'INT2']:
-    for subs in substance_list(pfx):
+    for subs in dcts.substance_list(pfx):
         f, axs = plt.subplots(1, 3, figsize=(10, 4), dpi=200)
         for tp_def, ax in zip(['chem', 'therm', 'dyn'], axs.flatten()):
             pass # baseline_filter(caribic, subs=subs, c_pfx=pfx, tp_def=tp_def, ax=ax)
