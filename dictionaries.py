@@ -87,7 +87,7 @@ def get_coord(**kwargs):
     if len(coordinates) > 1: 
         raise Warning(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
         return [i.col_name for i in coordinates]
-    return coordinates[0].col_name
+    return coordinates[0]
 
 def make_coord_label(coordinates):
     """ Returns string to be used as axis label for a specific Coordinate object. """
@@ -164,7 +164,7 @@ def get_substances(**kwargs):
     return subs
 
 def substance_list(ID):
-    """ Returns lsit of available substances for a specific datset as short name """
+    """ Returns list of available substances for a specific datset as short name """
     df = substance_df()
     if ID not in df.ID.values: 
         raise KeyError(f'Unable to provide subs list for {ID}')
@@ -178,12 +178,12 @@ def get_subs(substance, ID, clams=False, **kwargs):
     conditions = {'short_name' : substance, 'ID' : ID}
     if ID=='INT2' and substance not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
         conditions.update({'model' : 'CLAMS' if clams else 'msmt'})
-    subs_dict = get_substances(**conditions)
+    substances = get_substances(**conditions)
    
-    if len(subs_dict) > 1: 
-        raise Warning(f'Multiple columns fulfill the conditions: {list(subs_dict)}')
-        return list(subs_dict)
-    return subs_dict[0]
+    if len(substances) > 1: 
+        raise Warning(f'Multiple columns fulfill the conditions: {substances}')
+        return list(substances)
+    return substances[0]
 
 def get_col_name(substance, ID, clams=False):
     #TODO change source, c_pfx to ID in all other scripts

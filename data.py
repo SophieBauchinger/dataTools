@@ -282,7 +282,7 @@ class GlobalData(object):
         if self.source != 'Caribic': 
             raise NotImplementedError('Action not yet supported for non-Caribic data')
         else:
-            eql_col = dcts.get_coord(source=self.source, model=model, hcoord='eql')
+            eql_col = dcts.get_coord(source=self.source, model=model, hcoord='eql').col_name
             df = self.met_data.copy()
             df = df[df[eql_col] > eql_min]
             df = df[df[eql_col] < eql_max]
@@ -567,7 +567,7 @@ class GlobalData(object):
             kwargs.update({'rel_to_tp':True})
             if kwargs.get('tp_def')=='chem' and not 'vcoord' in kwargs: 
                 kwargs.update({'vcoord':'z'})
-            # tp_col = dcts.get_coord(**kwargs) # checks if criteria are narrow enough
+            # tp_col = dcts.get_coord(**kwargs).col_name # checks if criteria are narrow enough
 
         # col = '{}_{}'.format(atm_layer, tp_col)
         df_sorted = self.create_df_sorted(**kwargs) # should result in col being created
@@ -1222,7 +1222,7 @@ class Mozart(GlobalData):
         y: arr, longitude (remapped to +-180 deg)
     """
 
-    def __init__(self, years, grid_size=5, v_limits=None):
+    def __init__(self, years=range(1980, 2021), grid_size=5, v_limits=None):
         """ Initialise Mozart object """
         super().__init__(years, grid_size)
         self.years = years
@@ -1368,7 +1368,7 @@ class LocalData(object):
 
 class Mauna_Loa(LocalData):
     """ Mauna Loa data, plotting, averaging """
-    def __init__(self, years, subs='sf6', data_Day = False,
+    def __init__(self, years=range(1980, 2021), subs='sf6', data_Day = False,
                  path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, subs)
