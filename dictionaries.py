@@ -96,14 +96,15 @@ def make_coord_label(coordinates):
     for coord in coordinates:
         if coord.vcoord is not np.nan:
             pv = '%s' % (f', {coord.pvu}' if coord.tp_def=='dyn' else '')
-            model = coord.model
+            crit = '%s' % (f', {coord.crit}' if coord.tp_def=='chem' else '')
+            model = coord.model # if not coord.tp_def=='chem' else ''
             # model = '%s' % (' - ECMWF' if (coordinate.ID=='INT' and coordinate.tp_def in ['dyn', 'therm']) else '')
             # model += '%s' % (' - ERA5' if (coordinate.ID=='INT2' and coordinate.tp_def in ['dyn', 'therm']) else '')
             tp = '%s' % (f', {coord.tp_def}' if coord.tp_def is not np.nan else '')
             vcoord = f'$\Delta\,${coord.vcoord}' if coord.rel_to_tp else f'{coord.vcoord}'
             if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
             
-            label = f'{vcoord} ({model+tp+pv}) [{coord.unit}]'
+            label = f'{vcoord} ({model+tp+pv+crit}) [{coord.unit}]'
             
         elif coord.hcoord is not np.nan:
             if coord.hcoord == 'lat' and coord.unit=='degrees_north': 
@@ -173,13 +174,21 @@ def substance_list(ID):
         df = df[[not name.startswith('d_') for name in df['short_name']]]
     return set(df['short_name'])
 
-def get_subs(substance, ID, clams=False, **kwargs):
+def get_subs(*args, **kwargs):
     """ Return single Substance object with the given specifications """
-    conditions = {'short_name' : substance, 'ID' : ID}
-    if ID=='INT2' and substance not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
-        conditions.update({'model' : 'CLAMS' if clams else 'msmt'})
-    substances = get_substances(**conditions)
-   
+    for i,arg in enumerate(args): # substance, ID, clams 
+        pot_args = ['substance', 'ID', 'clams']
+        kwargs.update({pot_args[i]:arg})
+    if not 'short_name' in kwargs and 'substance' in kwargs: 
+        kwargs.update({'short_name':kwargs.pop('substance')})
+    if not 'model' in kwargs and 'clams' in kwargs:
+        kwargs.update({'model':'CLAMS' if kwargs.pop('clams') else 'msmt'})
+
+    # conditions = {'short_name' : substance, 'ID' : ID}
+    # if kwargs.get('ID')=='INT2' and kwargs.get('substance') not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
+    #     if not 'model' in kwargs: 
+    #         kwargs.update({'model' : 'CLAMS' if kwargs.get('clams') else 'msmt'})
+    substances = get_substances(**kwargs)
     if len(substances) > 1: 
         raise Warning(f'Multiple columns fulfill the conditions: {substances}')
         return list(substances)
