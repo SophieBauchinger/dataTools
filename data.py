@@ -527,33 +527,19 @@ class GlobalData(object):
 
     def calc_ratios(self):
         """ Calculate ratio of tropospheric / stratospheric datapoints. 
-
-        Returns: 
-            ratio_dict (dict): { label : (ratio, val_number) }
+        Returns a dataframe with counts and ratios for True / False values 
         """
-        if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
-        df_sorted = self.df_sorted.copy()
-        columns = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
-        tps = [dcts.get_coord(col_name = c) for c in columns 
-               if c in [c.col_name for c in dcts.get_coordinates()
-                        if c.tp_def not in ['combo', 'cpt']]]
-
-        # create pseudo coordinate for n2o filter
-        subses = [dcts.get_subs(col_name=c) for c in columns if c in [s.col_name for s in dcts.get_substances()]]
-        subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
-        tps = tps + subs_tps
-
-        ratio_dict = {}
-        # make sure cols and labels are related 
-        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
-                                        for tp in tps]))
-        val_count = df_sorted[cols].apply(pd.value_counts)
-        ratios = [val_count[c][0] / val_count[c][1] for c in val_count.columns]
-        bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in zip(ratios, [val_count[i].sum() for i in val_count.columns])]
-
-        ratio_dict.update({label:(r,n) for label,r,n in zip(tp_labels, ratios, [val_count[i].sum() for i in val_count.columns])})
-
-        return ratio_dict
+        tr_cols = [c for c in self.df_sorted.columns if c.startswith('tropo_')]
+        tropo_counts = self.df_sorted[tr_cols].apply(pd.value_counts)
+        tropo_counts.rename(columns={c:c[6:] for c in tropo_counts.columns}, inplace=True)
+        
+        ratio_df = pd.DataFrame(columns=tropo_counts.columns, index=['ratios'])
+        
+        ratios = [tropo_counts[c][True] / tropo_counts[c][False] for c in tropo_counts.columns]
+        ratio_df.loc['ratios'] = ratios
+        
+        tropo_counts = pd.concat([tropo_counts, ratio_df])
+        return tropo_counts
 
     @property
     def df_sorted(self):
