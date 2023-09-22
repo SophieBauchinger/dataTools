@@ -27,10 +27,7 @@ from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
 import dictionaries as dcts
-
-# from dictionaries import get_col_name, substance_list, get_fct_substance, coord_dict, get_coordinates, get_coord, dict_season, get_substances
-from tools import make_season, monthly_mean, daily_mean, ds_to_gdf, rename_columns, bin_1d, bin_2d, coord_merge_substance, process_emac_s4d, process_emac_s4d_s, pre_flag, conv_molarity_PartsPer
-from tropFilter import chemical, dynamical, thermal
+import tools
 
 #%% GLobal data
 class GlobalData(object):
@@ -56,7 +53,7 @@ class GlobalData(object):
             substance (str): e.g. 'sf6'
             single_yr (int): if specified, use only data for that year
         """
-        return bin_1d(self, subs, **kwargs) # out_x_list, out_y_list
+        return tools.bin_1d(self, subs, **kwargs) # out_x_list, out_y_list
 
     def binned_2d(self, subs, **kwargs):
         """
@@ -65,7 +62,7 @@ class GlobalData(object):
             substance (str): if None, uses default substance for the object
             single_yr (int): if specified, uses only data for that year
         """
-        return bin_2d(self, subs, **kwargs) # out_list
+        return tools.bin_2d(self, subs, **kwargs) # out_list
 
     def detrend_substance(self, substance, loc_obj=None, degree=2, save=True, plot=False,
                           as_subplot=False, ax=None, ID=None, note=''):
@@ -77,14 +74,14 @@ class GlobalData(object):
             loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
         """
         if loc_obj is None:
-            try: loc_obj = Mauna_Loa(self.years, substance)
+            try: loc_obj = Mauna_Loa(range(min(self.years)-2, max(self.years)+2), substance)
             except: raise ValueError(f'Cannot detrend as ref. data could not be found for {substance.upper()}')
-        # out_dict = {}
+
         substances = dcts.get_substances(short_name=substance)
         dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame) and 
                       any([s for s in substances if s.col_name in self.data[k].columns])]
         if ID is not None: dataframes = [ID]
-    
+
         if plot:
             if not as_subplot:
                 fig, axs = plt.subplots(len(dataframes), dpi=150, figsize=(6,4*len(dataframes)), sharex=True)
@@ -105,14 +102,14 @@ class GlobalData(object):
             t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
     
             ref_df = loc_obj.df
-            ref_subs = dcts.get_subs(substance=substance, ID=loc_obj.ID) # dcts.get_col_name(subs, loc_obj.source)
+            ref_subs = dcts.get_subs(substance=substance, ID=loc_obj.ID)
             if ref_subs is None: raise ValueError(f'No reference data found for {subs}')
             
             # convert glob obj data to loc obs unit if units don't match 
             if str(subs.unit) != str(ref_subs.unit):
                 # print(f'units do not match : {subs.unit} vs {ref_subs.unit}')
-                if subs.unit=='mol mol-1': c_obs = conv_molarity_PartsPer(c_obs,ref_subs.unit)
-                elif subs.unit=='pmol mol-1' and ref_subs.unit == 'ppt': pass # c_obs = conv_molarity_PartsPer(c_obs, ref_subs.unit)*1e12 #!!! BAD code
+                if subs.unit=='mol mol-1': c_obs = tools.conv_molarity_PartsPer(c_obs,ref_subs.unit)
+                elif subs.unit=='pmol mol-1' and ref_subs.unit == 'ppt': pass
     
             # ignore reference data earlier and later than two years before/after msmts
             ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
@@ -136,10 +133,7 @@ class GlobalData(object):
             # maintain relationship between detr and fit columns
             df_detr[f'detrFit_{subs.col_name}'] = df_detr[f'detrFit_{subs.col_name}'].where(
                 ~df_detr[f'detr_{subs.col_name}'].isnull(), np.nan)
-    
-            # out_dict[f'detr_{k}_{substance}'] = df_detr
-            # out_dict[f'popt_{k}_{substance}'] = popt
-    
+
             if save:
                 columns = [f'detr_{subs.col_name}',
                            f'delta_{subs.col_name}',
@@ -165,7 +159,7 @@ class GlobalData(object):
                     leg = ax.legend(title=note)
                     leg._legend_box.align = "left"
                 else: ax.legend()
-            else: axs[i].remove()
+            elif plot: axs[i].remove()
     
         if plot and not as_subplot:
             plt.suptitle('${:.2}x^2 + {:.2}x + {:.2}$'.format(*popt))
@@ -326,7 +320,7 @@ class GlobalData(object):
                        if isinstance(self.data[k], pd.DataFrame)] # or Geodf
             for k in df_list: # only take data from chosen years
                 out.data[k] = self.data[k].copy()
-                out.data[k]['season'] = make_season(out.data[k].index.month)
+                out.data[k]['season'] = tools.make_season(out.data[k].index.month)
                 out.data[k] = out.data[k].loc[out.data[k]['season'] == season]
                 out.data[k] = out.data[k].drop(columns=['season'])
                 out.data[k].sort_index(inplace=True)
@@ -371,46 +365,76 @@ class GlobalData(object):
 
         return out
 
-    def chem_df_sorted(self, **kwargs): #!!! add to create_df_sorted later 
+    def n2o_filter(self, **kwargs):
         """ Filter strat / trop data based on N2O mixing ratios. """
+        if self.source not in ['Caribic', 'TP', 'EMAC']: 
+            raise NotImplementedError(f'N2O sorting not avilable for {self.source}')
 
-        subs = dcts.get_subs('n2o', ID='GHG') #!!! can add modelled mxrs here too
+        loc_obj = Mauna_Loa(self.years, 'n2o') if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
+
+        if 'ID' in kwargs: 
+            ID = kwargs.pop('ID')
+        elif 'GHG' in self.data or dcts.get_subs('n2o', ID='GHG').col_name in self.df.columns: 
+            ID = 'GHG'
+        elif self.source=='TP' and not dcts.get_subs('n2o', ID='GHG').col_name in self.df.columns:
+            raise Warning('Please specify an ID to narrow down which data to use for the N2O filter.')
+        else: 
+            ID = self.source if not hasattr(self, 'ID') else self.ID
+
+        if 'crit' in kwargs: del kwargs['crit'] # needs to be n2o anyway & duplicated otherwise
+
+        subs = dcts.get_subs('n2o', ID=ID)
+        ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID) # dcts.get_col_name(subs, loc_obj.source)
+
+        if kwargs.get('detr'): self.detrend_substance(subs.short_name, save=True)
 
         dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame)]
         if subs.col_name not in [c for k in dataframes for c in self.data[k].columns]:
-            print('Cannot find {subs.col_name} in the data.')
+            print('Cannot find {subs.col_name} anywhere in the data.')
 
-        # substance = get_col_name(crit, glob_obj.source, ID) # get column name
-        if detr:
-            if not 'detr_'+substance in data.columns:
-                glob_obj.detrend(subs, save=True)
-            substance = 'detr_'+substance
-        df_sorted[substance] = data[substance]
-        if f'd_{substance}' in data.columns:
-            df_sorted[f'd_{substance}'] = data[f'd_{substance}']
+        # find the dataframe that has the column in it
+        if self.source=='Caribic': data = self.data[ID]
+        else: data = self.df
+        
+        if subs.col_name not in data.columns: 
+            raise Warning(f'Could not find {subs.col_name} in {ID} data.')
 
-        # Calculate simple pre-flag if not in data
-        if not f'flag_{crit}' in data.columns:
-            if ref_obj is None: raise ValueError('Need to supply a ref_obj.')
-            if detr: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, ID=ID, verbose=verbose, subs_col = substance)
-            else: pre_flag(glob_obj, ref_obj=ref_obj, crit=crit, ID=ID, verbose=verbose)
-        if f'flag_{crit}' in data.columns:
-            # make part of df_sorted so that substance=nan rows get dropped
-            try: df_sorted[f'flag_{crit}'] = glob_obj.data[ID][f'flag_{crit}']
-            except: print('Pre-flagging unsuccessful, proceeding without')
+        print('N2O sorting')
 
-        df_sorted.dropna(subset=substance, inplace=True) # remove rows without data
+        df_sorted = pd.DataFrame(index=data.index)
+        if'Flight number' in data.columns: df_sorted['Flight number'] = data['Flight number']
+        df_sorted[subs.col_name] = data[subs.col_name]
+
+        if f'd_{subs.col_name}' in data.columns:
+            df_sorted[f'd_{subs.col_name}'] = data[f'd_{subs.col_name}']
+        if f'detr_{subs.col_name}' in data.columns: 
+            df_sorted[f'detr_{subs.col_name}'] = data[f'detr_{subs.col_name}']
+
         df_sorted.sort_index(inplace=True)
+        df_sorted.dropna(subset=[subs.col_name], inplace=True)
 
-        mxr = df_sorted[substance] # measured mixing ratios
-        d_mxr = None
-        if f'd_{substance}' in df_sorted.columns: d_mxr = df_sorted[f'd_{substance}']
-        elif verbose: print(state+f'No abs. error for {crit}')
-        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
-        try: flag = df_sorted[f'flag_{crit}']
-        except: flag = None
+        mxr = df_sorted[subs.col_name] # measured mixing ratios
+        d_mxr = None if not f'd_{subs.col_name}' in df_sorted.columns else df_sorted[f'd_{subs.col_name}']
+        t_obs_tot = np.array(datetime_to_fractionalyear(df_sorted.index, method='exact'))
 
-        func = get_fct_substance(crit)
+        # Check if units of data and reference data match, if not change data
+        if str(subs.unit) != str(ref_subs.unit):
+            print(f'Note units do not match: {subs.unit} vs {ref_subs.unit}')
+            if subs.unit=='mol mol-1': 
+                mxr = tools.conv_molarity_PartsPer(mxr,ref_subs.unit)
+                if d_mxr is not None: d_mxr = tools.conv_molarity_PartsPer(d_mxr,ref_subs.unit)
+            elif subs.unit=='pmol mol-1' and ref_subs.unit == 'ppt': pass
+            else: raise NotImplementedError('No conversion between {subs.unit} and {ref_subs.unit}')
+
+        # Calculate simple pre-flag 
+        df_flag = tools.pre_flag(mxr, loc_obj.df[ref_subs.col_name], 'n2o', **kwargs)
+        flag = df_flag['flag_n2o'] if 'flag_n2o' in df_flag.columns else None
+
+        strato = f'strato_{subs.col_name}'
+        tropo = f'tropo_{subs.col_name}'
+
+        func = dcts.get_fct_substance('n2o')
+
         ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
                               flag = flag, verbose=False, plot=False,
                               limit=0.1, direction = 'n')
@@ -418,35 +442,52 @@ class GlobalData(object):
         df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
         df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
 
-        if plot:
-            popt0 = fit_data(func, t_obs_tot, mxr, d_mxr)
-            plot_sorted(glob_obj, df_sorted, crit, ID, popt0, ol[3], subs=subs, detr=detr, **kwargs)
+        df_sorted.drop(columns=[s for s in df_sorted.columns 
+                                if s in [subs.col_name, 'd_'+subs.col_name]], 
+                       inplace=True)
+
+        # best to leave this out otherwise we'll have circular imports
+        # if kwargs.get('plot'):# and self.source=='Caribic':
+        #     popt0 = outliers.fit_data(func, t_obs_tot, mxr, d_mxr)
+        #     plot_sorted(self, df_sorted, 'n2o', ID, popt0, ol[3], subs=subs.col_name,
+        #                 subs_col=subs.col_name if not kwargs.get('detr') else 'detr_'+subs.col_name, 
+        #                 **kwargs)
+
+        return df_sorted
 
     def create_df_sorted(self, **kwargs): # FROM TP
-        """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria """ 
+        """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
+        If no kwargs are specified, df_sorted is calculated for all possible definitons
+        df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
+        """ 
         if self.source == 'Caribic': data = self.met_data.copy()
         elif self.source in ['EMAC', 'TP']: data = self.df.copy()
-        else: raise NotImplementedError(f'Cannot select atmospheric layer for {self.source}')
-
-        if not 'source' in kwargs: print('source not found')
+        else: raise NotImplementedError(f'Cannot select sort {self.source} data per atmospheric layer.')
 
         if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']: 
-            kwargs.update({'source':self.source})
-            
-        print(kwargs['source'])
+            kwargs.update({'source':self.source}) # for finding coords
 
         if not 'tp_def' in kwargs: kwargs.update({'tp_def':'not_nan'})
-        kwargs.update({'rel_to_tp':True}) #!!! otherwise sorting is a pain in the butt. but not the final version
-        tps = dcts.get_coordinates(**kwargs)
 
-        df_sorted = pd.DataFrame(index=data.index)
+        if 'Flight number' in data.columns: 
+            df_sorted = pd.DataFrame(data['Flight number'], index=data.index)
+        else: df_sorted = pd.DataFrame(index=data.index)
+
+        if kwargs.get('tp_def') in ['not_nan', 'chem'] and not kwargs.get('crit')=='o3' and self.source in ['Caribic', 'TP', 'EMAC']: 
+            df_sorted = pd.concat([df_sorted, self.n2o_filter(**kwargs)], axis=1)
+
+        if kwargs.get('rel_to_tp') is False: 
+            print('Note: Using relative instead of absolute values for TP sorting.')            
+        kwargs.update({'rel_to_tp':True})
+        tps = dcts.get_coordinates(**kwargs) if not (kwargs.get('tp_def')=='chem' and kwargs.get('crit')=='n2o') else []
+
         # adding bool columns for each tp coordinate to df_sorted
         for tp in tps:
             # check if tropopause column in the data
             if not tp.col_name in data.columns: 
-                print('{tp.col_name} not found. Proceeding without.')
+                print(f'Note: {tp.col_name} not found. Proceeding without.')
                 continue
-
+            print('TP sorting: ', tp)
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
             if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
@@ -458,8 +499,8 @@ class GlobalData(object):
             tropo = 'tropo_'+tp.col_name
             strato ='strato_'+tp.col_name
 
-            tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
-                                      tropo:pd.Series(np.nan, dtype='float')},
+            tp_sorted = pd.DataFrame({strato:pd.Series(np.nan),
+                                      tropo:pd.Series(np.nan)},
                                       index=tp_df.index)
 
             # tropo: high p (gt 0), low everything else (lt 0)
@@ -470,13 +511,23 @@ class GlobalData(object):
             tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
                         (strato, tropo)] = (True, False)
 
-            # add data for current tp def to df_sorted
+            # # add data for current tp def to df_sorted
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
+            
+            # df_sorted[tropo] = df_sorted[tropo] #.astype(bool)
+            # df_sorted[strato] = df_sorted[strato] # .astype(bool)
+            # ^ warning that those operations can turn nan values into false positives...
 
-        if 'Flight number' in data.columns: 
-            df_sorted['Flight number'] = data['Flight number'][data.index.isin(df_sorted.index)] # necessary for data selection fctns
+        if kwargs.get('save'): self.data['df_sorted'] = df_sorted
+
         return df_sorted
+
+    @property
+    def df_sorted(self):
+        """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
+        self.data['df_sorted'] = self.create_df_sorted()
+        return self.data['df_sorted']
 
     def sel_atm_layer(self, atm_layer, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
@@ -498,35 +549,54 @@ class GlobalData(object):
         for attribute_key in self.__dict__: # copy stuff like pfxs
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
 
-        #!!! N2O filter special case
-        if kwargs.get('tp_def') == 'chem' and not 'ref_obj' in kwargs and kwargs['crit'] == 'n2o':
-            try: kwargs['ref_obj'] = Mauna_Loa(self.years, subs='n2o')
-            except: raise Exception('Could not generate necessary reference data for chem sorting')
+        if kwargs.get('tp_def')=='chem' and not 'crit' in kwargs: 
+            raise KeyError('Please specify a crit for chemical tropopause filtering')
 
+        if kwargs.get('tp_def')=='chem' and kwargs.get('crit')=='n2o':
+            # N2O filter special case
+            pass
+            # ID = self.ID if not self.source in ['Caribic', 'TP'] else 'GHG'
+            # tp_col = dcts.get_subs(substance=kwargs.get('crit'), ID=ID).col_name
         else: 
+            # all other cases
             if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']: 
                 kwargs.update({'source':self.source})
             if not 'tp_def' in kwargs: kwargs.update({'tp_def':'not_nan'})
-            kwargs.update({'rel_to_tp':True}) #!!! otherwise sorting is a pain in the butt. but not the final version
-            
-            tp_col = dcts.get_coord(**kwargs) # checks if criteria are narrow enough
-            col = f'{atm_layer}_{tp_col}'
-            df_sorted = self.create_df_sorted(**kwargs)
-    
-        # use df_sorted to filter entire dataset
-    
+            if kwargs.get('rel_to_tp') is False: 
+                print('Note: using the relative coordinate for sorting anyway.')
+            kwargs.update({'rel_to_tp':True})
+            if kwargs.get('tp_def')=='chem' and not 'vcoord' in kwargs: 
+                kwargs.update({'vcoord':'z'})
+            # tp_col = dcts.get_coord(**kwargs) # checks if criteria are narrow enough
+
+        # col = '{}_{}'.format(atm_layer, tp_col)
+        df_sorted = self.create_df_sorted(**kwargs) # should result in col being created
+        col = [c for c in df_sorted if c.startswith(atm_layer)][0]
+        tp_col = col[col.find('_')+1:]
+        print(col, tp_col)
+        
+        if not col in df_sorted.columns: 
+            raise Warning(f'{col} not found in df_sorted:\n{df_sorted}')
+        
+        # Filter all dataframes to only include indices in df_sorted
         df_list = [k for k in self.data
                    if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut
         for k in df_list:
-            # only keep rows that are in df_sorted, then only data in chosen atm_layer
             out.data[k] = out.data[k][out.data[k].index.isin(df_sorted.index)]
-            out.data[k][col] = df_sorted[col] # allows Rückverfolgung of what it was sorted with
+            out.data[k][col] = df_sorted[col] 
             out.data[k] = out.data[k].dropna(axis=0, subset=[col])
             out.data[k] = out.data[k][out.data[k][col]] # using col as mask
+            del out.data[k][col]
         
-        if self.source=='Caribic': out.pfxs = [k for k in out.data]
-        out.status.update({atm_layer : True,
-                           'sorting_crit':tp_col})
+        if self.source=='Caribic': 
+            out.pfxs = [k for k in out.data if k in self.pfxs]
+
+        out.status.update({atm_layer : True})
+        # update object status
+        if 'TP filter' in out.status: 
+            out.status['TP filter'] = (out.status['TP filter'], tp_col)
+        else: out.status['TP filter'] = tp_col
+
         return out
 
     def sel_tropo(self, **kwargs):
@@ -536,6 +606,71 @@ class GlobalData(object):
     def sel_strato(self, **kwargs):
         """ Returns Caribic object containing only tropospheric data points. """
         return self.sel_atm_layer('strato', **kwargs)
+
+    def filter_extreme_events(self, **kwargs):
+        """ Filter out all tropospheric extreme events.
+
+        Returns new Caribic object where tropospheric extreme events have been removed.
+        Result depends on tropopause definition for trop / strat sorting.
+
+        Parameters:
+            filter_type (str): 'chem', 'therm' or 'dyn'
+
+            crit (str): 'n2o', 'o3'
+            coord (str): 'pt', 'dp', 'z'
+            pvu (float): 1.5, 2.0, 3.5
+            limit (float): pre-flag limit for chem. TP sorting
+
+            subs (str): substance for plotting
+            c_pfx (str): 'GHG', 'INT', 'INT2'
+            verbose (bool)
+            plot (bool)
+        """
+        if self.status.get('tropo') is not None: 
+            out = copy.deepcopy(self)
+        elif self.status.get('strato'):
+            raise Warning('Cannot filter extreme events in purely stratospheric dataset')
+        else: out = self.sel_tropo(**kwargs)
+        out.data = {k:v for k,v in self.data.items() if not k in ['sf6', 'n2o', 'ch4', 'co2']}
+
+        for k in out.data:
+            if not isinstance(out.data[k], pd.DataFrame) or k=='met_data': continue
+            data = out.data[k].sort_index()
+            
+            for column in data.columns:
+                # coordinates
+                if column in [c.col_name for c in dcts.get_coordinates()]+['Flight number']: continue
+                if column in [c.col_name+'_at_fl' for c in dcts.get_coordinates()]: continue
+                if column.startswith('d_'): continue
+                # substances
+                elif column in [s.col_name for s in dcts.get_substances() 
+                                if not s.short_name.startswith('d_')]:
+                    substance = column
+                    time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
+                    mxr = data[substance].tolist()
+                    if f'd_{substance}' in data.columns:
+                        d_mxr = data[f'd_{substance}'].tolist()
+                    else: d_mxr = None # integrated values of high resolution data
+
+                    func = dcts.get_fct_substance(dcts.get_substances(col_name=substance)[0].short_name)
+                    # Find extreme events
+                    plot = False if not 'plot' in kwargs else kwargs.get('plot')
+                    tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
+                                           direction='p', verbose=False,
+                                           plot=plot, limit=0.1, ctrl_plots=False)
+
+                    # Set rows that were flagged as extreme events to 9999, then nan
+                    for c in [c for c in data.columns if substance in c]: # all related columns
+                        data.loc[(flag != 0 for flag in tmp[0]), column] = 9999
+                    out.data[k].update(data) # essential to update before setting to nan
+                    out.data[k].replace(9999, np.nan, inplace=True)
+
+                else:
+                    print(f'Cannot filter {column}, removing it from the dataframe')
+                    out.data[k].drop(columns=[column], inplace=True)
+
+        out.status.update({'EE_filter' : True})
+        return out
 
 # Caribic
 class CaribicData(GlobalData):
@@ -550,7 +685,7 @@ class CaribicData(GlobalData):
         flights (list of int)
     """
 
-    def __init__(self, years=range(2005, 2021), pfxs=['GHG', 'INT', 'INT2'],
+    def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
                  grid_size=5, verbose=False):
         """ Initialise CaribicData object by reading in data """
         # no caribic data before 2005, takes too long to check so cheesing it
@@ -612,7 +747,7 @@ class CaribicData(GlobalData):
                         df_flight.insert(0, 'Flight number',
                                        [flight_nr for i in range(df_flight.shape[0])])
     
-                        col_dict, col_dict_rev = rename_columns(f_data.VNAME)
+                        col_dict, col_dict_rev = tools.rename_columns(f_data.VNAME)
                         # set names to the short version including unit
                         df_flight.rename(columns = col_dict_rev, inplace=True)
                         df_yr = pd.concat([df_yr, df_flight])
@@ -751,120 +886,14 @@ class Caribic(CaribicData):
 
     def __repr__(self):
         return f"""Caribic object 
-    pfxs: {self.pfxs}
+    data: {self.pfxs}
     years: {self.years}
     status: {self.status}"""
 
-    def filter_extreme_events(self, **kwargs):
-        """ Filter out all tropospheric extreme events.
-
-        Returns new Caribic object where trop. extreme events have been removed.
-        Result depends on tropopause definition for trop / strat sorting.
-
-        Parameters:
-            filter_type (str): 'chem', 'therm' or 'dyn'
-
-            crit (str): 'n2o', 'o3'
-            coord (str): 'pt', 'dp', 'z'
-            pvu (float): 1.5, 2.0, 3.5
-            limit (float): pre-flag limit for chem. TP sorting
-
-            subs (str): substance for plotting
-            c_pfx (str): 'GHG', 'INT', 'INT2'
-            verbose (bool)
-            plot (bool)
-        """
-        out = type(self).__new__(self.__class__) # create new class instance
-        for attribute_key in self.__dict__: # copy stuff like pfxs
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
-        # Find and filter tropospheric extreme events
-        tp_def = kwargs.get('tp_def')
-        if tp_def == 'chem' and 'ref_obj' not in kwargs:
-            kwargs['ref_obj'] = Mauna_Loa(self.years, 'n2o')
-        if tp_def in ['dyn', 'therm'] and 'c_pfx' not in kwargs:
-            raise Exception('Please supply a pfx to choose data source for TP sorting.')
-        tropo_obj = self.sel_tropo(**kwargs)
-        out.pfxs = tropo_obj.pfxs # only take trop. sorted pfx data
-        out.data = {k:v.copy() for k,v in self.data.items() if k in tropo_obj.pfxs} # only using OG msmt data
-
-        #!!! use subs data if available. Need to make a decision on which subs data to use though ?
-
-        for pfx in tropo_obj.pfxs:
-            data = tropo_obj.data[pfx].sort_index()
-            if 'subs' in kwargs and isinstance(kwargs['subs'], str): subs_list = [kwargs['subs']]
-            elif 'subs' in kwargs and isinstance(kwargs['subs'], list): subs_list = kwargs['subs']
-            else: subs_list = dcts.substance_list(pfx)
-
-            for subs in subs_list:
-                try: substance = dcts.get_col_name(subs, tropo_obj.source, pfx)
-                except: substance = None
-                if substance not in data.columns: continue
-                time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-                mxr = data[substance].tolist()
-                if f'd_{substance}' in data.columns:
-                    d_mxr = data[f'd_{substance}'].tolist()
-                else: d_mxr = None # integrated values of high resolution data
-
-                func = dcts.get_fct_substance(subs)
-                # Find extreme events
-                tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
-                                       direction='p', verbose=False,
-                                       plot=False, limit=0.1, ctrl_plots=False)
-
-                subs_cols = [c for c in data.columns if substance in c] # detrended etc
-
-                # Set rows that were flagged as extreme events to 9999, then nan
-                for c in subs_cols:
-                    data.loc[(flag != 0 for flag in tmp[0]), c] = 9999
-                out.data[pfx].update(data) # essential to update before setting to nan
-                out.data[pfx].replace(9999, np.nan, inplace=True)
-
-            # delete unfiltered data
-            drop_subs = [subs for subs in dcts.substance_list(pfx) if subs not in subs_list]
-            drop_cols = [dcts.get_col_name(subs, out.source, pfx) for subs in drop_subs]
-            out.data[pfx].drop(columns = drop_cols, inplace=True)
-
-        # also filter / create the substance dataframes (not elegantly)
-        for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-            if subs in self.data and 'subs_pfx' in kwargs:
-                data = out.data[subs] = self.data[subs].copy()
-                substance = dcts.get_col_name(subs, tropo_obj.source, kwargs['subs_pfx'])
-
-                time = np.array(datetime_to_fractionalyear(data.index, method='exact'))
-                mxr = data[substance].tolist()
-                if f'd_{substance}' in data.columns:
-                    d_mxr = data[f'd_{substance}'].tolist()
-                else: d_mxr = None # integrated values of high resolution data
-
-                func = dcts.get_fct_substance(subs)
-                # Find extreme events
-                tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None, # here
-                                       direction='p', verbose=False,
-                                       plot=False, limit=0.1, ctrl_plots=False)
-                subs_cols = [c for c in data.columns if substance in c] # include detr etc
-                for c in subs_cols:
-                    data.loc[(flag != 0 for flag in tmp[0]), substance] = 9999
-                out.data[subs].update(data)
-                out.data[subs].replace(9999, np.nan, inplace=True)
-
-            elif subs in self.data:
-                try: out.create_substance_df(subs)
-                except: print(f'Failed trying to create substance df for {subs}')
-
-        self.status.update({'filter' : (kwargs)})
-
-        return out
-
-    def detrend(self, subs, **kwargs):
-        """ Remove linear trend for the substance & add detr. data to all dataframes """
-        self.detrend_substance(subs, **kwargs)
-        return self
-
-    def create_substance_df(self, subs, detr=True):
+    def create_substance_df(self, subs, detr=False):
         """ Create dataframe containing all met.+ msmt. data for a substance """
-        self.data[f'{subs}'] = coord_merge_substance(self, subs)
-        if detr: self.detrend(subs, save=True, plot=False)
+        self.data[f'{subs}'] = tools.coord_merge_substance(self, subs)
+        if detr: self.detrend_substance(subs, save=True, plot=False)
         return self
 
 # Mozart
@@ -919,7 +948,7 @@ class Mozart(GlobalData):
             ds = ds.sortby(ds.longitude) # reorganise values
 
         self.data['ds'] = ds
-        self.data['df'] = ds_to_gdf(self.ds)
+        self.data['df'] = tools.ds_to_gdf(self.ds)
         try: self.data['SF6'] = self.data['df']['SF6']
         except: pass
 
@@ -942,6 +971,7 @@ class EMACData(GlobalData):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if yr >= 2000 and yr <= 2019])
         self.source = 'EMAC'
+        self.ID = 'EMAC'
         self.pdir = '{}'.format(r'E:/MODELL/EMAC/TPChange/' if pdir is None else pdir)
         self.get_data(years, s4d, s4d_s, tp, df)
 
@@ -977,12 +1007,12 @@ class EMACData(GlobalData):
             if s4d: # preprocess: process_s4d
                 fnames = self.pdir + "s4d_CARIBIC/*bCARIB2.nc"
                 # extract data, each file goes through preprocess first to filter variables & convert units
-                with xr.open_mfdataset(fnames, preprocess=partial(process_emac_s4d), mmap=False) as ds:
+                with xr.open_mfdataset(fnames, preprocess=partial(tools.process_emac_s4d), mmap=False) as ds:
                     self.data['s4d'] = ds
             if s4d_s: # preprocess: process_s4d_s
                 fnames_s = self.pdir + "s4d_subsam_CARIBIC/*bCARIB2_s.nc"
                 # extract data, each file goes through preprocess first to filter variables
-                with xr.open_mfdataset(fnames_s, preprocess=partial(process_emac_s4d_s), mmap=False) as ds:
+                with xr.open_mfdataset(fnames_s, preprocess=partial(tools.process_emac_s4d_s), mmap=False) as ds:
                     self.data['s4d_s'] = ds
             if tp: self.create_tp()
             if tp and df: self.create_df()
@@ -1193,7 +1223,7 @@ class TropopauseData(GlobalData):
         self.status['interp_emac'] = True
         return data
 
-    def sort_tropo_strato(self, vcoords=['p', 'z', 'pt']):
+    def sort_tropo_strato(self, vcoords=('p', 'z', 'pt')):
         """ Returns dataframe with bool strat / trop columns for various TP definitions. """
         data = TropopauseData().df.copy()
         df_sorted = pd.DataFrame(index=data.index)
@@ -1354,7 +1384,7 @@ class Mauna_Loa(LocalData):
             if data_Day: # user input saying if daily data should exist
                 fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
                 self.df_Day = self.get_data(path_dir + fname_Day)
-                try: self.df_monthly_mean = monthly_mean(self.df_Day)
+                try: self.df_monthly_mean = tools.monthly_mean(self.df_Day)
                 except: pass
 
         elif subs in ['co2', 'ch4', 'co']:
@@ -1371,7 +1401,7 @@ class Mauna_Loa(LocalData):
 
 class Mace_Head(LocalData):
     """ Mauna Loa data, plotting, averaging """
-    def __init__(self, years=[2012], substance='sf6', data_Day = False,
+    def __init__(self, years=(2012), substance='sf6', data_Day = False,
                  path =  r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\MHD-medusa_2012.dat'):
         """ Initialise Mace Head with (daily and) monthly data in dataframes """
         super().__init__(years, data_Day, substance)
@@ -1381,8 +1411,8 @@ class Mace_Head(LocalData):
         self.substance = substance
 
         self.df = self.get_data(path)
-        self.df_Day = daily_mean(self.df)
-        self.df_monthly_mean = monthly_mean(self.df)
+        self.df_Day = tools.daily_mean(self.df)
+        self.df_monthly_mean = tools.monthly_mean(self.df)
 
     def __repr__(self):
         return f'Mace Head - {self.substance}'
