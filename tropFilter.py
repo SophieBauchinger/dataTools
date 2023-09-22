@@ -21,8 +21,10 @@ from toolpac.outliers import outliers
 from toolpac.outliers.outliers import fit_data
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-from tools import get_lin_fit, assign_t_s
-from dictionaries import get_fct_substance, get_col_name, substance_list
+import tools
+import dictionaries as dcts
+
+# from tools import get_lin_fit, assign_t_s
 
 filter_types = {
     'chem' : ['n2o', 'o3'], # 'crit'
@@ -61,10 +63,10 @@ def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, ID = 'GHG',
     df.sort_index(inplace=True)
 
     if subs_col is not None: substance = subs_col
-    else: substance = get_col_name(crit, glob_obj.source, ID)
+    else: substance = dcts.get_col_name(crit, glob_obj.source, ID)
     if not substance: raise ValueError(state+'No {crit} data in {ID}')
 
-    fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
+    fit = tools.get_lin_fit(ref_obj.df, dcts.get_col_name(crit, ref_obj.source))
 
     df_flag = pd.DataFrame({f'strato_{crit}':np.nan,
                             f'tropo_{crit}':np.nan},
@@ -107,7 +109,7 @@ def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
         INT: 'o3'
         INT2: 'o3', 'n2o'
     """
-    if crit not in substance_list(ID):
+    if crit not in dcts.substance_list(ID):
         default_crit = {'GHG' : 'n2o', 'INT' : 'o3', 'INT2' : 'n2o'}
         print(f'{crit} not available in {ID}, using {default_crit[ID]}')
         crit = default_crit[ID]
@@ -126,9 +128,9 @@ def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
                 'INT2' : 'int_CARIBIC2_H_rel_TP [km]'}
         col, coord = cols[ID], 'z'
 
-        df_sorted.loc[assign_t_s(data[col], 't', coord),
+        df_sorted.loc[tools.assign_t_s(data[col], 't', coord),
                     (strato, tropo)] = (False, True)
-        df_sorted.loc[assign_t_s(data[col], 's', coord),
+        df_sorted.loc[tools.assign_t_s(data[col], 's', coord),
                     (strato, tropo)] = (True, False)
 
         df_sorted.dropna(subset=tropo, inplace=True) # remove rows without data
@@ -138,7 +140,7 @@ def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
             plot_sorted(glob_obj, df_sorted, crit, ID, subs=subs, detr=detr, **kwargs)
 
     if crit == 'n2o' and ID in ['GHG', 'INT2']:
-        substance = get_col_name(crit, glob_obj.source, ID) # get column name
+        substance = dcts.get_col_name(crit, glob_obj.source, ID) # get column name
         if detr:
             if not 'detr_'+substance in data.columns:
                 glob_obj.detrend(subs, save=True)
@@ -168,7 +170,7 @@ def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
         try: flag = df_sorted[f'flag_{crit}']
         except: flag = None
 
-        func = get_fct_substance(crit)
+        func = dcts.get_fct_substance(crit)
         ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
                               flag = flag, verbose=False, plot=False,
                               limit=0.1, direction = 'n')
@@ -217,9 +219,9 @@ def thermal(glob_obj, coord='dp', ID='INT', verbose=False, plot=False,
             'pt_tp' : 'int_ERA5_TROP1_THETA [K]'}
         col, TP = cols[coord], cols[f'{coord}_tp']
 
-        df_sorted.loc[assign_t_s(data[col], 't', coordinate = coord, tp_val=data[TP]),
+        df_sorted.loc[tools.assign_t_s(data[col], 't', coordinate = coord, tp_val=data[TP]),
                     (strato, tropo)] = (False, True)
-        df_sorted.loc[assign_t_s(data[col], 's', coordinate = coord, tp_val=data[TP]),
+        df_sorted.loc[tools.assign_t_s(data[col], 's', coordinate = coord, tp_val=data[TP]),
                     (strato, tropo)] = (True, False)
 
     elif ID == 'INT':
@@ -228,9 +230,9 @@ def thermal(glob_obj, coord='dp', ID='INT', verbose=False, plot=False,
             'pt' : 'int_pt_rel_sTP_K [K]',
             'z' : 'int_z_rel_sTP_km [km]'}
         col = coords[coord]
-        df_sorted.loc[assign_t_s(data[col], 't', coord),
+        df_sorted.loc[tools.assign_t_s(data[col], 't', coord),
                     (strato, tropo)] = (False, True)
-        df_sorted.loc[assign_t_s(data[col], 's', coord),
+        df_sorted.loc[tools.assign_t_s(data[col], 's', coord),
                     (strato, tropo)] = (True, False)
 
     if verbose: print(df_sorted[strato].value_counts())
@@ -278,9 +280,9 @@ def dynamical(glob_obj, pvu=3.5, coord = 'pt', ID='INT', verbose=False,
             'z' : 'int_z_rel_dTP_km [km]'}
         col = coords[coord]
 
-    df_sorted.loc[assign_t_s(data[col], 't', coord),
+    df_sorted.loc[tools.assign_t_s(data[col], 't', coord),
                 (strato, tropo)] = (False, True)
-    df_sorted.loc[assign_t_s(data[col], 's', coord),
+    df_sorted.loc[tools.assign_t_s(data[col], 's', coord),
                 (strato, tropo)] = (True, False)
 
     if verbose: print(df_sorted[strato].value_counts())
@@ -296,7 +298,8 @@ def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
     """ Plot strat / trop sorted data """
     # only take data with index that is available in df_sorted
     if subs in glob_obj.data.keys(): df = glob_obj.data[subs]
-    else: df = glob_obj.data[ID]
+    elif glob_obj.source=='Caribic': df = glob_obj.data[ID]
+    else: df = glob_obj.df
     data = df[df.index.isin(df_sorted.index)]
 
     # data = glob_obj.data[ID][glob_obj.data[ID].index.isin(df_sorted.index)]
@@ -314,20 +317,19 @@ def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
 
     if 'subs_pfx' in kwargs.keys():
         subs_pfx = kwargs['subs_pfx']
-        substance = get_col_name(subs, glob_obj.source, kwargs['subs_pfx'])
+        substance = dcts.get_col_name(subs, glob_obj.source, kwargs['subs_pfx'])
     else:
         if subs_col is None and subs is not None:
             for subs_pfx in (ID, 'GHG', 'INT', 'INT2'):
-                try: substance = get_col_name(subs, glob_obj.source, subs_pfx); break
+                try: substance = dcts.get_col_name(subs, glob_obj.source, subs_pfx); break
                 except: substance = None; continue
         else: substance = subs_col; subs_pfx = ID
     if substance is None:
-        print(f'Cannot plot {subs.upper()}, not available in {ID}.'); return
+        print(f'Cannot plot {subs}, not available in {ID}.'); return
     if 'detr_'+substance in data.columns: substance = 'detr_'+substance
 
     fig, ax = plt.subplots(dpi=200)
-    plt.title('{} ({}) filtered using {} ({})'.format(
-        subs.upper(), subs_pfx, [i for i in tropo_col.split('_')[1:]], ID))
+    plt.title(f'{crit} filter on {ID} data')
     ax.scatter(df_strato.index, df_strato[substance],
                 c='grey',  marker='.', zorder=0, label='strato')
     ax.scatter(df_tropo.index, df_tropo[substance],
@@ -338,9 +340,9 @@ def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
         t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
         ls = 'solid'
         if not subs_pfx == ID: ls = 'dashed'
-        ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt0),
+        ax.plot(df_sorted.index, dcts.get_fct_substance(crit)(t_obs_tot-2005, *popt0),
                 c='r', lw=1, ls=ls, label='initial')
-        ax.plot(df_sorted.index, get_fct_substance(crit)(t_obs_tot-2005, *popt1),
+        ax.plot(df_sorted.index, dcts.get_fct_substance(crit)(t_obs_tot-2005, *popt1),
                 c='k', lw=1, ls=ls, label='filtered')
 
     # plt.ylim(220, 340)
