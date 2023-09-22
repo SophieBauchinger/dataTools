@@ -35,7 +35,7 @@ class TropopausePlotter(TropopauseData):
 
     def test_scatter(self, year=None):
         vc = 'pt'
-        tp = get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)[0]
+        tp = dcts.get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)[0]
         fig, axs = plt.subplots(2,2,dpi=150, figsize=(10,5))
         fig.suptitle(f'{tp.col_name} - {tp.long_name}')
         if year: fig.text(0.9, 0.95, f'{year}',
@@ -54,7 +54,7 @@ class TropopausePlotter(TropopauseData):
             out = Simple_bin_2d(df_r[tp.col_name], x, y, binclassinstance)
 
             world.boundary.plot(ax=ax, color='black', linewidth=0.3)
-            ax.set_title(dict_season()[f'name_{s}'])
+            ax.set_title(dcts.dict_season()[f'name_{s}'])
             cmap = 'viridis_r' if tp.vcoord=='p' else 'viridis'
 
             norm = Normalize(*vlims[vc]) # colormap normalisation
@@ -76,7 +76,7 @@ class TropopausePlotter(TropopauseData):
         """
         pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
         for vc in ['p', 'pt', 'z']:
-            tps = get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)
+            tps = dcts.get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)
             for tp in tps:
                 fig, axs = plt.subplots(2,2,dpi=150, figsize=(10,5))
                 fig.suptitle(f'{tp.col_name} - {tp.long_name}')
@@ -96,7 +96,7 @@ class TropopausePlotter(TropopauseData):
                     out = Simple_bin_2d(df_r[tp.col_name], x, y, binclassinstance)
 
                     world.boundary.plot(ax=ax, color='black', linewidth=0.3)
-                    ax.set_title(dict_season()[f'name_{s}'])
+                    ax.set_title(dcts.dict_season()[f'name_{s}'])
                     cmap = 'viridis_r' if tp.vcoord=='p' else 'viridis'
 
                     norm = Normalize(*vlims[vc]) # colormap normalisation
@@ -122,7 +122,7 @@ class TropopausePlotter(TropopauseData):
             rel (bool): vertical coordinate relative to CARIBIC flight track
             seasonal (bool): separate data into seasons
         """
-        tps = get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=rel)
+        tps = dcts.get_coordinates(vcoord=vcoord, tp_def='not_nan', rel_to_tp=rel)
         for tp in [tp for tp in tps if tp.pvu in [1.5, 2.0]]: # rmv 1.5 and 2.0 PVU TPs
             tps.remove(tp)
         tps.sort(key=lambda x: x.col_name)
@@ -173,8 +173,8 @@ class TropopausePlotter(TropopauseData):
 
                 else: # seasonal. separate vmeans by season to calc av later
                     vmeans[tp.col_name+f'_{s}'] = bin1d.vmean
-                    color = dict_season()[f'color_{s}']
-                    ax.plot(bin1d.xmean, bin1d.vmean, color=color, label=dict_season()[f'name_{s}'])
+                    color = dcts.dict_season()[f'color_{s}']
+                    ax.plot(bin1d.xmean, bin1d.vmean, color=color, label=dcts.dict_season()[f'name_{s}'])
                     ax.text(0.05, 0.05,
                             '{}_{}{}'.format(tp.model, tp.tp_def,
                                              '_'+str(tp.pvu) if tp.tp_def=='dyn' else ''),
@@ -205,8 +205,8 @@ class TropopausePlotter(TropopauseData):
                 average = vmeans_s.mean(axis=1).values
                 axAv = axs.flatten()[len(tps)]
                 axAv.plot(bci.xintm, average, ls='dashed',
-                          c = dict_season()[f'color_{s}'], # alpha=0.5,
-                          zorder=1, label=dict_season()[f'name_{s}'])
+                          c = dcts.dict_season()[f'color_{s}'], # alpha=0.5,
+                          zorder=1, label=dcts.dict_season()[f'name_{s}'])
 
         # go through axes, (add average), set label
         for ax in axs.flatten()[:len(tps)+1]:
@@ -236,17 +236,17 @@ class TropopausePlotter(TropopauseData):
     def plot_subs_sorted(self, substances, vcoords=['p', 'pt', 'z']):
         """ Plot timeseries of subs mixing ratios with strato / tropo colours. """
         if not substances:
-            substances = get_substances(source='EMAC') + get_substances(source='Caribic')
+            substances = dcts.get_substances(source='EMAC') + dcts.get_substances(source='Caribic')
             substances = [s for s in substances if not s.col_name.startswith('d_')]
         elif isinstance(substances, str): substances = [substances]
         if not isinstance(substances, list): 
             raise Warning('Cannot work like this. Pls supply substances as list.')
 
-        if 'df_sorted' in self.data: self.sort_tropo_strato()
+        if 'df_sorted' in self.data: self.create_df_sorted()
         df_sorted = self.df_sorted.copy()
 
         cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
-        tps = [tp for tp in get_coordinates(tp_def='not_nan', rel_to_tp=True) if tp.col_name in cols]
+        tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True) if tp.col_name in cols]
 
         for subs in substances: # new plot for each substance 
             if not subs.col_name in self.df.columns:
@@ -282,12 +282,15 @@ class TropopausePlotter(TropopauseData):
 
     def show_ratios(self):
         """ Plot ratio of tropo / strato datapoints for each troposphere definition """
-        if 'df_sorted' in self.data: self.sort_tropo_strato()
+        if not 'df_sorted' in self.data: self.create_df_sorted()
         df_sorted = self.df_sorted.copy()
+        cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
+        tps = [dcts.get_coordinates(col_name = c) for c in cols]
+        
 
         for vcoord in ['p', 'z', 'pt']:
             cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
-            vc_cols = ['strato_'+tp.col_name for tp in get_coordinates(tp_def='not_nan', rel_to_tp=True, vcoord=vcoord) if tp.col_name in cols]
+            vc_cols = ['strato_'+tp.col_name for tp in dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True, vcoord=vcoord) if tp.col_name in cols]
             val_count = df_sorted[vc_cols].apply(pd.value_counts)
 
             plt.figure(figsize=(3,3), dpi=240)
