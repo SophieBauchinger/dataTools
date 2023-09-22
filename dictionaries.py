@@ -57,6 +57,7 @@ def get_coordinates(**kwargs):
     Exclusion conditions need to have 'not_' prefix """
     df = coordinate_df()
     for cond, val in kwargs.items():
+        if cond not in df.columns: continue
         # keep only rows where all conditions are fulfilled
         if not str(val).startswith('not_') and not str(val) == 'nan': 
             df = df[df[cond] == kwargs[cond]]
@@ -80,8 +81,8 @@ def coord_dict(*IDs):
     return [y.col_name for id in IDs for y in get_coordinates(**{'ID':id})]
 
 def get_coord(**kwargs):
-    if not any(v in kwargs for v in ['vcoord', 'hcoord', 'var']):
-        raise KeyError('Please supply at least one of vcoord, hcoord, var.')
+    # if not any(v in kwargs for v in ['vcoord', 'hcoord', 'var']):
+    #     raise KeyError('Please supply at least one of vcoord, hcoord, var.')
     coordinates = get_coordinates(**kwargs) # dict i:Coordinate
     if len(coordinates) > 1: 
         raise Warning(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
@@ -172,7 +173,7 @@ def substance_list(ID):
         df = df[[not name.startswith('d_') for name in df['short_name']]]
     return set(df['short_name'])
 
-def get_subs(substance, ID, clams=False):
+def get_subs(substance, ID, clams=False, **kwargs):
     """ Return single Substance object with the given specifications """
     conditions = {'short_name' : substance, 'ID' : ID}
     if ID=='INT2' and substance not in ['f11', 'f12', 'n2o', 'no', 'noy']: 
