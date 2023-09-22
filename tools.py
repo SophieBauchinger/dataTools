@@ -19,11 +19,7 @@ from metpy.units import units
 import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-from dictionaries import get_col_name, get_substances
-
-#TODO  Calculate some other lovely stuff from what we have in the data
-# metpy.calc.geopotential_to_height
-# use indices in emac column data to calculate eg. pt at TP in EMAC 
+import dictionaries as dcts
 
 #%% Data extraction
 def monthly_mean(df, first_of_month=True):
@@ -143,7 +139,7 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
                           if v.startswith('tropop_') and not v.endswith('_f')
                           and not any([x in v for x in ['_clim', 'pblh']])])
     if incl_subs:
-        tracers = get_substances(**{'ID':'EMAC'})
+        tracers = dcts.get_substances(**{'ID':'EMAC'})
         tracers_at_fl = [t+'_at_fl' for t in tracers]
         variables.extend([v for v in ds.variables if 
                           (v in tracers or v in tracers_at_fl) ])
@@ -195,17 +191,6 @@ def data_selection(glob_obj, flights=None, years=None, latitudes=None,
     return out
 
 #%% Data Handling
-def get_lin_fit(df, substance='N2OcatsMLOm', degree=2): # previously get_mlo_fit
-    """ Given one year of reference data, find the fit parameters for
-    the substance (col name) """
-    df.dropna(how='any', subset=substance, inplace=True)
-    year, month = df.index.year, df.index.month
-    t_ref = year + (month - 0.5) / 12 # obtain frac year for middle of the month
-    mxr_ref = df[substance].values
-    fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
-    print(f'Fit parameters obtained: {fit}')
-    return fit
-
 def make_season(month):
     """ If given array of months, return integer representation of seasons
     1 - spring, 2 - summer, 3 - autumn, 4 - winter """
@@ -238,49 +223,55 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 
     else: raise KeyError(f'Strat/Trop assignment undefined for {coordinate}')
 
-def pre_flag(glob_obj, ref_obj, crit='n2o', limit = 0.97, ID = 'GHG',
-             save=True, verbose=False, subs_col=None):
+def get_lin_fit(series, degree=2): # previously get_mlo_fit
+    """ Given one year of reference data, find the fit parameters for
+    the substance (col name) """
+    
+    # popt = np.polyfit(t_ref, c_ref, degree)
+    # c_fit = np.poly1d(popt) # get popt, then make into fct
+
+    # detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+    # c_obs_detr = c_obs - detrend_correction
+    # # get variance (?) by substracting offset from 0
+    # c_obs_delta = c_obs_detr - c_fit(min(t_obs))
+    
+    
+    # df.dropna(how='any', subset=substance, inplace=True)
+    year, month = series.index.year, series.index.month
+    t_ref = year + (month - 0.5) / 12 # obtain frac year for middle of the month
+    mxr_ref = series.values
+    fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
+    print(f'Fit parameters obtained: {fit}')
+    return fit
+
+def pre_flag(data_arr, ref_arr, crit='n2o', limit = 0.97, **kwargs):
     """ Sort data into strato / tropo based on difference to ground obs.
 
     Returns dataframe containing index and strato/tropo/pre_flag columns
 
     Parameters:
-        glob_obj (GlobalData) : msmt data to be sorted into stratr / trop air
-        ref_obj (LocalData) : reference data to use for filtering (background)
+        data_arr (pd.Series) : msmt data to be sorted into stratr / trop air
+        ref_arr (pd.Series) : reference data to use for filtering (background)
         crit (str) : substance to use for flagging
         limit (float) : tracer mxr fraction below which air is classified
                         as stratospheric
-        ID (str) : e.g. 'GHG', specify the caribic datasource
-        save (bool): add result to glob_obj
     """
-    state = f'pre_flag: crit={crit}, ID={ID}\n'
-    if glob_obj.source=='Caribic':
-        df = glob_obj.data[ID].copy()
-    else: df = glob_obj.df.copy()
-    df.sort_index(inplace=True)
+    data_arr.sort_index(inplace=True)
+    df_flag = pd.DataFrame({f'strato_{data_arr.name}':np.nan,
+                            f'tropo_{data_arr.name}':np.nan},
+                           index=data_arr.index)
 
-    if subs_col is not None: substance = subs_col
-    else: substance = get_col_name(crit, glob_obj.source, ID)
-    if not substance: raise ValueError(state+'No {crit} data in {ID}')
-
-    fit = get_lin_fit(ref_obj.df, get_col_name(crit, ref_obj.source))
-
-    df_flag = pd.DataFrame({f'strato_{crit}':np.nan,
-                            f'tropo_{crit}':np.nan},
-                           index=df.index)
-
+    fit = get_lin_fit(ref_arr)
     t_obs_tot = np.array(dt_to_fy(df_flag.index, method='exact'))
-    df_flag.loc[df[substance] < limit * fit(t_obs_tot),
-           (f'strato_chem_{crit}', f'tropo_chem_{crit}')] = (True, False)
+    df_flag.loc[data_arr < limit * fit(t_obs_tot),
+           (f'strato_{data_arr.name}', f'tropo_{data_arr.name}')] = (True, False)
 
     df_flag[f'flag_{crit}'] = 0
-    df_flag.loc[df_flag[f'strato_chem_{crit}'] == True, f'flag_{crit}'] = 1
+    df_flag.loc[df_flag[f'strato_{data_arr.name}'] == True, f'flag_{crit}'] = 1
 
-    if verbose: print('Result of pre-flagging: \n',
-                      df_flag[f'flag_{crit}'].value_counts())
-    if save and glob_obj.source == 'Caribic':
-        glob_obj.data[ID][f'flag_{crit}'] = df_flag[f'flag_{crit}']
-
+    if kwargs.get('verbose'): 
+        print('Result of pre-flagging: \n',
+              df_flag[f'flag_{crit}'].value_counts())
     return df_flag
 
 def conv_molarity_PartsPer(x, unit):
@@ -326,8 +317,8 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
         try: c_obj.detrend(subs) # add detrended data to all dataframes
         except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
 
-    subs_cols = get_substances(short_name=subs, source=c_obj.source)
-    subs_cols.update(get_substances(short_name='d_'+subs, source=c_obj.source))
+    subs_cols = dcts.get_substances(short_name=subs, source=c_obj.source)
+    subs_cols.update(dcts.get_substances(short_name='d_'+subs, source=c_obj.source))
 
     for pfx in c_obj.pfxs:
         data = c_obj.data[pfx].sort_index()
@@ -346,7 +337,7 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
 #%% Binning of global data sets
 def bin_prep(glob_obj, subs, **kwargs):
     c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
-    substance = get_col_name(subs, glob_obj.source, c_pfx)
+    substance = dcts.get_col_name(subs, glob_obj.source, c_pfx)
 
     if kwargs.get('single_yr') is not None:
         years = [int(kwargs.get('single_yr'))]
