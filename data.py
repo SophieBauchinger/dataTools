@@ -896,76 +896,8 @@ class Caribic(CaribicData):
         if detr: self.detrend_substance(subs, save=True, plot=False)
         return self
 
-# Mozart
-class Mozart(GlobalData):
-    """ Stores relevant Mozart data
-
-    Class attributes:
-        years: arr
-        source: str
-        substance: str
-        ds: xarray DataFrame
-        df: Pandas GeoDataFrame
-        x: arr, latitude
-        y: arr, longitude (remapped to +-180 deg)
-    """
-
-    def __init__(self, years, grid_size=5, v_limits=None):
-        """ Initialise Mozart object """
-        super().__init__(years, grid_size)
-        self.years = years
-        self.source = 'Mozart'
-        self.ID = 'MZT'
-        self.substance = 'SF6'
-        self.v_limits = v_limits # colorbar normalisation limits
-        self.data = {}
-        self.get_data()
-
-    def __repr__(self):
-        return f'Mozart data, subs = {self.substance}'
-
-    def get_data(self, remap_lon=True, verbose=False,
-                 fname = r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
-        """ Create dataset from given file
-
-        if remap_lon, longitude is remapped to ±180 degrees
-        """
-        with xr.open_dataset(fname) as ds:
-            ds = ds.isel(level=27)
-        try: ds = ds.sel(time = self.years)
-        except: # keep only data for specified years
-            ds = xr.concat([ds.sel(time=y) for y in self.years
-                            if y in ds.time], dim='time')
-            if verbose: print(f'No data found for \
-                              {[y for y in self.years if y not in ds.time]} \
-                              in {self.source}')
-            self.years = [y for y in ds.time.values] # only include act. available years
-
-        if remap_lon: # set longitudes between 180 and 360 to start at -180 towards 0
-            new_lon = (((ds.longitude.data + 180) % 360) - 180)
-            ds = ds.assign_coords({'longitude':('longitude', new_lon,
-                                                ds.longitude.attrs)})
-            ds = ds.sortby(ds.longitude) # reorganise values
-
-        self.data['ds'] = ds
-        self.data['df'] = tools.ds_to_gdf(self.ds)
-        try: self.data['SF6'] = self.data['df']['SF6']
-        except: pass
-
-        return ds # xr.concat(datasets, dim = 'time')
-    
-    @property
-    def ds(self):
-        return self.data['ds']
-    @property
-    def df(self):
-        return self.data['df']
-    @property
-    def SF6(self):
-        return self.data['SF6']
-
 # EMAC
-class EMACData(GlobalData):
+class EMAC(GlobalData):
     """ Data class holding information on Caribic-specific EMAC Model output """
     def __init__(self, years=range(2005, 2020), s4d=True, s4d_s=True, tp=True, df=True, pdir=None):
         if isinstance(years, int): years = [years]
@@ -1158,6 +1090,7 @@ class EMACData(GlobalData):
             with open(pdir+'\df.pkl', 'wb') as f:
                 dill.dump(self.df, f)
 
+# Caribic and EMAC
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
     def __init__(self, years=range(2005, 2020), interp=True, method='n'):
@@ -1179,7 +1112,7 @@ class TropopauseData(GlobalData):
     def get_data(self):
         """ Return merged dataframe with interpolated EMAC / Caribic data """
         caribic = Caribic()
-        emac = EMACData()
+        emac = EMAC()
         df_caribic = caribic.df
         df_emac = emac.df
         df = pd.merge( df_caribic, df_emac, how='outer', sort=True,
@@ -1274,6 +1207,74 @@ class TropopauseData(GlobalData):
         """ Bool dataset sorted into strato/tropo for various tropopauses. """
         if 'df_sorted' in self.data: return self.data['df_sorted']
         else: return self.sort_tropo_strato()
+
+# Mozart
+class Mozart(GlobalData):
+    """ Stores relevant Mozart data
+
+    Class attributes:
+        years: arr
+        source: str
+        substance: str
+        ds: xarray DataFrame
+        df: Pandas GeoDataFrame
+        x: arr, latitude
+        y: arr, longitude (remapped to +-180 deg)
+    """
+
+    def __init__(self, years, grid_size=5, v_limits=None):
+        """ Initialise Mozart object """
+        super().__init__(years, grid_size)
+        self.years = years
+        self.source = 'Mozart'
+        self.ID = 'MZT'
+        self.substance = 'SF6'
+        self.v_limits = v_limits # colorbar normalisation limits
+        self.data = {}
+        self.get_data()
+
+    def __repr__(self):
+        return f'Mozart data, subs = {self.substance}'
+
+    def get_data(self, remap_lon=True, verbose=False,
+                 fname = r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
+        """ Create dataset from given file
+
+        if remap_lon, longitude is remapped to ±180 degrees
+        """
+        with xr.open_dataset(fname) as ds:
+            ds = ds.isel(level=27)
+        try: ds = ds.sel(time = self.years)
+        except: # keep only data for specified years
+            ds = xr.concat([ds.sel(time=y) for y in self.years
+                            if y in ds.time], dim='time')
+            if verbose: print(f'No data found for \
+                              {[y for y in self.years if y not in ds.time]} \
+                              in {self.source}')
+            self.years = [y for y in ds.time.values] # only include act. available years
+
+        if remap_lon: # set longitudes between 180 and 360 to start at -180 towards 0
+            new_lon = (((ds.longitude.data + 180) % 360) - 180)
+            ds = ds.assign_coords({'longitude':('longitude', new_lon,
+                                                ds.longitude.attrs)})
+            ds = ds.sortby(ds.longitude) # reorganise values
+
+        self.data['ds'] = ds
+        self.data['df'] = tools.ds_to_gdf(self.ds)
+        try: self.data['SF6'] = self.data['df']['SF6']
+        except: pass
+
+        return ds # xr.concat(datasets, dim = 'time')
+    
+    @property
+    def ds(self):
+        return self.data['ds']
+    @property
+    def df(self):
+        return self.data['df']
+    @property
+    def SF6(self):
+        return self.data['SF6']
 
 #%% Local data
 class LocalData(object):
@@ -1416,5 +1417,3 @@ class Mace_Head(LocalData):
 
     def __repr__(self):
         return f'Mace Head - {self.substance}'
-
-#%% detrending
