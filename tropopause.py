@@ -284,7 +284,7 @@ class TropopausePlotter(TropopauseData):
                 plt.show()
         return self
 
-    def show_ratios(self, as_subplot=False, ax=None, single_tp_def=None):
+    def show_ratios(self, as_subplot=False, ax=None, single_tp_def=None, group=True):
         """ Plot ratio of tropo / strato datapoints on a horizontal bar plot """
         # if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
         # df_sorted = self.df_sorted.copy()
@@ -304,32 +304,55 @@ class TropopausePlotter(TropopauseData):
                if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
         # create pseudo coordinate for n2o filter
         subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
-        subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
+        subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False', pvu=np.nan) for subs in subses]
         tps = tps + subs_tps
 
         # make sure cols and labels are related 
         cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
                                         for tp in tps]))
-        # ratios = [trop_counts[c][0] / trop_counts[c][1] for c in trop_counts.columns]
-
-        tp_defs = set([tp.tp_def for tp in tps]) if single_tp_def is None else [single_tp_def]
 
         if not as_subplot: 
             fig, ax = plt.subplots(dpi=240)
         ax.set_title('Ratio of tropospheric / stratospheric datapoints in Caribic-2')
 
+        tp_defs = set([tp.tp_def for tp in tps]) if single_tp_def is None else [single_tp_def]
         for tp_def in tp_defs:
             current_tps = [tp for tp in tps if tp.tp_def==tp_def]
-            # make sure cols and labels are related 
-            cols, labels = map(list, zip(*[(tp.col_name, dcts.make_coord_label(tp)) 
-                                            for tp in current_tps]))
-            current_ratios = ratios[cols]
-
-            bars = ax.barh(labels, current_ratios)
-            bar_labels = ['{:.2f}'.format(r) for r in current_ratios]
             
-            ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
-            ax.set_xlim(0,4.5)#max(ratios)*1.2)
+            if group: 
+                current_tps = [tp for tp in tps if tp.pvu not in [1.5, 2.0]] # not good results
+                for model in set([tp.model for tp in current_tps]):
+                    # average ratios for model over vcoords
+                    
+                    
+                    tps_model = [tp for tp in current_tps if tp.model==model]
+                    cols = [tp.col_name for tp in tps_model]
+                    # cols, labels = map(list, zip(*[(tp.col_name, dcts.make_coord_label(tp)) 
+                    #                                 for tp in current_tps]))
+                    ratio_tpdef_model = np.nanmean(ratios[cols])
+                    print(ratio_tpdef_model)
+                    label = f'{model}, {tp_def}' + f', {tps_model[0].crit}' if tp_def=='chem' else ''
+
+                    bars = ax.barh([label], [ratio_tpdef_model])#, hatch=hatches)
+                    bar_labels = ['{:.2f}'.format(r) for r in [ratio_tpdef_model]]
+                    
+                    ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
+                    ax.set_xlim(0,max(ratios)*1.2) #4.5)
+                    
+            else: 
+                # make sure cols and labels are related 
+                cols, labels = map(list, zip(*[(tp.col_name, dcts.make_coord_label(tp)) 
+                                                for tp in current_tps]))
+                current_ratios = ratios[cols]
+    
+                # hatch_dict = {'ERA5':'/', 'EMAC':'.', 'MSMT':'', 'ECMWF':'o'}
+                # hatches = [hatch_dict[tp.model] for tp,l in zip(current_tps, labels)]
+                
+                bars = ax.barh(labels, current_ratios)#, hatch=hatches)
+                bar_labels = ['{:.2f}'.format(r) for r in current_ratios]
+                
+                ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
+                ax.set_xlim(0,max(ratios)*1.2) #4.5)
 
         if not as_subplot: 
             plt.show()
@@ -350,7 +373,6 @@ class TropopausePlotter(TropopauseData):
             tp_defs = set([tp.tp_def for tp in tps]) if single_tp_def is None else [single_tp_def]
 
             # for season in tp_defs:
-                
                 
             #     current_tps = [tp for tp in tps if tp.tp_def==tp_def]
                 
@@ -381,14 +403,26 @@ class TropopausePlotter(TropopauseData):
             #     # plt.axvspan(0.995, 1.005, facecolor='k', alpha=0.7)
             #     if not as_subplot: 
             #         plt.show()
+            return self
 
+#%%
 tp = TropopauseData()
+
 for season in [1,2,3,4]:
     tp_seas = tp.sel_season(season)
     fig,ax=plt.subplots(figsize=(8,8),dpi=250)
     fig.suptitle(dcts.dict_season()[f'name_{season}'])
     tpp = TropopausePlotter(tp_inst=tp_seas)
-    tpp.show_ratios(as_subplot=True, ax=ax)
+    tpp.show_ratios(as_subplot=True, ax=ax, single_tp_def='dyn')
+    fig.show()
+
+#%%
+fig,axs=plt.subplots(2,2,figsize=(12,12),dpi=250, sharey=True)
+for season, ax in zip([1,2,3,4], axs.flatten()):
+    tp_seas = tp.sel_season(season)
+    tpp = TropopausePlotter(tp_inst=tp_seas)
+    tpp.show_ratios(as_subplot=True, ax=ax)#, single_tp_def='dyn')
+    ax.set_title(dcts.dict_season()[f'name_{season}'])
     fig.show()
 
 #%%
