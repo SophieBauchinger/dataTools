@@ -750,27 +750,25 @@ class CaribicData(GlobalData):
             self.data['met_data'] = self.coord_combo() # reference for met data for all msmts
             self.create_tp_coords()
 
-    def get_data(self, verbose=False):
+    def get_data(self, verbose=False, recalculate=False):
         """
-        If Caribic: Create geopandas df from data files for all available substances
+        Create geopandas df from data files for all available substances.
+
             get all files starting with prefixes in c_pfxs - each in one dataframe
             lon / lat data is put into a geometry column
             Index is set to datetime of the sampling / modeled times
             a column with flight number is created
-
-        If Mozart: Create dataset from given file
-            if remap_lon, longiture is remapped to ±180 degrees
         """
         self.data = {} # easiest way of keeping info which file the data comes from
         parent_dir = r'E:\CARIBIC\Caribic2data'
 
-        if os.path.exists('misc_data\Caribic\caribic_data_dict.pkl'):
+        if not recalculate and os.path.exists('misc_data\Caribic\caribic_data_dict.pkl'):
             with open('misc_data\Caribic\caribic_data_dict.pkl', 'rb') as f:
                 self.data = dill.load(f)
             self.data = self.sel_year(*self.years).data
             
         else:
-            print('Pickled data not found, calculating it anew.')
+            print('Importing Caribic Data from remote files.')
             for pfx in self.pfxs: # can include different prefixes here too
                 gdf_pfx = geopandas.GeoDataFrame()
                 for yr in self.years:
@@ -1320,21 +1318,20 @@ class Mozart(GlobalData):
             ds = ds.sortby(ds.longitude) # reorganise values
 
         self.data['ds'] = ds
-        self.data['df'] = tools.ds_to_gdf(self.ds)
+        df = tools.ds_to_gdf(self.ds)
+        df.rename(columns={'SF6' : 'SF6_MZT'}, inplace=True)
+        self.data['df'] = df
         try: self.data['SF6'] = self.data['df']['SF6']
         except: pass
 
         return ds # xr.concat(datasets, dim = 'time')
     
     @property
-    def ds(self):
-        return self.data['ds']
+    def ds(self): return self.data['ds']
     @property
-    def df(self):
-        return self.data['df']
+    def df(self): return self.data['df']
     @property
-    def SF6(self):
-        return self.data['SF6']
+    def SF6(self): return self.data['SF6']
 
 #%% Local data
 class LocalData(object):
@@ -1343,122 +1340,113 @@ class LocalData(object):
         self.years = years
         self.substance = substance.upper()
         self.source = None
+        self.data = {}
 
     def get_data(self, path):
         """ Create dataframe from file """
-        if not os.path.exists(path): print(f'File {path} does not exists.'); return pd.DataFrame() # empty dataframe
+        if not os.path.exists(path): 
+            print(f'Path {path} does not exists.')
 
-        if self.source=='Mauna_Loa':
-            header_lines = 0 # counter for lines in header
-            with open(path) as f:
-                for line in f:
-                    if line.startswith('#'): header_lines += 1
-                    else: title = line.split(); break # first non-header line has column names
-
-            with open(path) as f: # get units from 2nd to last line of header
-                if self.substance=='co': # get col names from last line
-                    # print(f.readlines()[header_lines-1])
-                    self.description = f.readlines()[header_lines-1]
-                    title = self.description.split()[2:]
-                else: self.description = f.readlines()[header_lines-2]
-
-            mlo_data = np.genfromtxt(path, skip_header=header_lines)
-            df = pd.DataFrame(mlo_data, columns=title, dtype=float)
-
-            # get names of year and month column (depends on substance)
-            if self.data_format == 'CATS':
-                yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
-                mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
-            elif self.data_format == 'ccgg': yr_col = 'year'; mon_col = 'month'
-
-            # keep only specified years
-            df = df.loc[df[yr_col] > min(self.years)-1].loc[df[yr_col] < max(self.years)+1].reset_index()
-
-            if any('catsMLOday' in s for s in df.columns): # check if data has day column
-                day_col = [x for x in df.columns if 'catsMLOday' in x][0]
-                time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
-                df = df.drop(day_col, axis=1) # get rid of day column
-            else: time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])] # choose middle of month for monthly data
-
-            if self.data_format == 'CATS': df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
-            elif self.data_format == 'ccgg' and self.substance !='co':
-                filter_cols = ['index', 'site_code', 'year', 'month', 'day', 'hour', 'minute', 'second', 'time_decimal', 'latitude', 'longitude', 'altitude', 'elevation', 'intake_height', 'qcflag']
-                df.drop(filter_cols, axis=1, inplace=True)
-                unit_dic = {'co2':'[ppm]', 'ch4' : '[ppb]'}
-                df.rename(columns = {'value' : f'{self.substance} {unit_dic[self.substance]}', 'value_std_dev' : f'{self.substance}_std_dev {unit_dic[self.substance]}'}, inplace=True)
-
-            elif self.data_format == 'ccgg' and self.substance == 'co':
-                filter_cols = ['index', 'site', 'year', 'month']
-                df.drop(filter_cols, axis=1, inplace=True)
-                df.dropna(how='any', subset='value', inplace=True)
-                unit_dic = {'co':'[ppb]'}
-                df.rename(columns = {'value' : f'{self.substance} {unit_dic[self.substance]}'}, inplace=True)
-
-            df.astype(float)
-            df['Date_Time'] = time
-            df.set_index('Date_Time', inplace=True) # make the datetime object the new index
-            if self.data_format == 'CATS':
-                try: df.dropna(how='any', subset=str(self.substance.upper()+'catsMLOm'), inplace=True)
-                except: print('didnt drop NA. ', str(self.substance.upper()+'catsMLOm'))
-            if self.data_format == 'ccgg' and self.substance !='co':
-                df.replace([-999.999, -999.99, -99.99, -9], np.nan, inplace=True)
-                df.dropna(how='any', subset=f'{self.substance} {unit_dic[self.substance]}', inplace=True)
-            return df
-
-        elif self.source == 'Mace_Head': # make col names with space (like caribic)
-            header_lines = 0
-            with open(path) as f:
-                for i, line in enumerate(f):
-                    if line.split()[0] == 'unit:':
-                        unit = line.split()
-                        title = list(f)[0].split() # takes next row for some reason
-                        header_lines = i+2; break
-            column_headers = [name.lower() + " [" + u + "]" for name, u in zip(title, unit)] # eg. 'SF6 [ppt]'
-
-            mhd_data = np.genfromtxt(path, skip_header=header_lines)
-
-            df = pd.DataFrame(mhd_data, columns=column_headers, dtype=float)
-            df = df.replace(0, np.nan) # replace 0 with nan for statistics
-            df = df.drop(df.iloc[:, :7], axis=1) # drop unnecessary time columns
-            df = df.astype(float)
-
-            df['Date_Time'] = fractionalyear_to_datetime(mhd_data[:,0])
-            df.set_index('Date_Time', inplace=True) # new index is datetime
-            return df
+    @property
+    def df(self):
+        if 'df' in self.data: return self.data['df']#
+        else: 
+            try: return self.get_data()
+            except: raise Warning('Cannot. ')
 
 class Mauna_Loa(LocalData):
     """ Mauna Loa data, plotting, averaging """
-    def __init__(self, years=range(1980, 2021), subs='sf6', data_Day = False,
+    def __init__(self, subs='sf6', years=range(1980, 2021), data_Day = False,
                  path_dir =  r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
         """ Initialise Mauna Loa with (daily and) monthly data in dataframes """
-        super().__init__(years, data_Day, subs)
+        super().__init__(years=years, substance=subs)
         self.source = 'Mauna_Loa'
         self.ID = 'MLO'
         self.substance = subs
-
-        if subs in ['sf6', 'n2o']:
-            self.data_format = 'CATS'
-            fname_MM = r'\mlo_{}_MM.dat'.format(self.substance.upper())
-            self.df = self.get_data(path_dir+fname_MM)
-
-            self.df_monthly_mean = self.df_Day = pd.DataFrame() # create empty df
-            if data_Day: # user input saying if daily data should exist
-                fname_Day = r'\mlo_{}_Day.dat'.format(self.substance.upper())
-                self.df_Day = self.get_data(path_dir + fname_Day)
-                try: self.df_monthly_mean = tools.monthly_mean(self.df_Day)
-                except: pass
-
-        elif subs in ['co2', 'ch4', 'co']:
-            self.data_format = 'ccgg'
-            fname = r'\{}_mlo_surface-insitu_1_ccgg_MonthlyData.txt'.format(
-                self.substance)
-            if subs=='co': fname = r'\co_mlo_surface-flask_1_ccgg_month.txt'
-            self.df = self.get_data(path_dir+fname)
-
-        else: raise KeyError(f'Mauna Loa data not available for {subs.upper()}')
+        self.path = path_dir
+        self.get_data()
+        if data_Day: self.get_data(data_Day)
 
     def __repr__(self):
         return f'Mauna Loa  - {self.substance}'
+    
+    def get_data(self, data_Day=False):
+        """ Import data from Mauna Loa files - difference types for different substances """
+        self.data_format = 'CATS' if self.substance in ['sf6', 'n2o'] else 'ccgg'
+
+        # get correct path for the chosen substance 
+        if data_Day and self.substance != 'sf6': 
+            raise Warning('Daily data only available for sf6 from Mauna Loa. ')
+        if self.substance in ['sf6', 'n2o']:
+            path = self.path + r'\mlo_{}_{}.dat'.format(self.substance.upper(), 'Day' if data_Day else 'MM')
+        elif self.substance=='co': 
+            path = self.path + r'\co_mlo_surface-flask_1_ccgg_month.txt'
+        elif self.substance in ['co2', 'ch4']:
+            path = self.path + r'\{}_mlo_surface-insitu_1_ccgg_MonthlyData.txt'.format(self.substance)
+        else: raise KeyError(f'Please choose another substance, {self.substance} not available')
+
+        # 'ch4', 'co', 'co2' : 1st line has header_lines
+        if self.data_format == 'ccgg': 
+            with open(path) as f:
+                header_lines = int(f.readline().split(' ')[-1].strip())
+                title = f.readlines()[header_lines-2].split()
+                if title[0].startswith('#'): title = title[2:] # CO data
+
+        elif self.data_format == 'CATS':
+            header_lines = 0
+            with open(path) as f: 
+                for line in f: 
+                    if line.startswith('#'): header_lines += 1
+                    else: title = line.split(); break
+        
+        mlo_data = np.genfromtxt(path, skip_header=header_lines)
+        
+        df = pd.DataFrame(mlo_data, columns=title, dtype=float)
+
+        # get names of year and month column (depends on substance)
+        if self.data_format == 'CATS':
+            yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
+            mon_col = [x for x in df.columns if 'catsMLOmon' in x][0]
+        elif self.data_format == 'ccgg': yr_col = 'year'; mon_col = 'month'
+
+        # keep only specified years
+        df = df.loc[df[yr_col] > min(self.years)-1].loc[df[yr_col] < max(self.years)+1].reset_index()
+
+        if any('catsMLOday' in s for s in df.columns): # check if data has day column
+            day_col = [x for x in df.columns if 'catsMLOday' in x][0]
+            time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
+            df = df.drop(day_col, axis=1) # get rid of day column
+        else: 
+            time = [dt.datetime(int(y), int(m), 15) for y, m in zip(df[yr_col], df[mon_col])] # choose middle of month for monthly data
+
+        if self.data_format == 'CATS': 
+            df = df.drop(df.iloc[:, :3], axis=1) # get rid of now unnecessary time data
+
+        elif self.data_format == 'ccgg':
+            filter_cols = [c for c in df.columns if c not in ['value', 'value_std_dev']]
+            df.drop(filter_cols, axis=1, inplace=True)
+            df.dropna(how='any', subset='value', inplace=True)
+            df.rename(columns = {'value' : f'{self.substance}_{self.ID}', 'value_std_dev' : f'{self.substance}_std_dev_{self.ID}'}, inplace=True)
+            
+        df.astype(float)
+        df['Date_Time'] = time
+        df.set_index('Date_Time', inplace=True) # make the datetime object the new index
+        if self.data_format == 'CATS':
+            try: df.dropna(how='any', subset=str(self.substance.upper()+'catsMLOm'), inplace=True)
+            except: print('didnt drop NA. ', str(self.substance.upper()+'catsMLOm'))
+        if self.data_format == 'ccgg' and self.substance !='co':
+            df.replace([-999.999, -999.99, -99.99, -9], np.nan, inplace=True)
+            # df.dropna(how='any', subset=f'{self.substance} {unit_dic[self.substance]}', inplace=True)
+            df.dropna(how='any', subset=f'{self.substance}_{self.ID}', inplace=True)
+
+        if not data_Day: 
+            self.data['df'] = df
+            self.data['dict'] = {k:dcts.get_subs(col_name=k) for k in df.columns 
+                                 if k in [s.col_name for s in dcts.get_substances()]}
+        else: 
+            self.data['df_day'] = df
+
+        return df
 
 class Mace_Head(LocalData):
     """ Mauna Loa data, plotting, averaging """
@@ -1470,10 +1458,46 @@ class Mace_Head(LocalData):
         self.source = 'Mace_Head'
         self.ID = 'MHD'
         self.substance = substance
+        self.path = path
 
-        self.df = self.get_data(path)
-        self.df_Day = tools.daily_mean(self.df)
-        self.df_monthly_mean = tools.monthly_mean(self.df)
+        self.data = {}
+        self.data['df_Day'] = tools.daily_mean(self.df)
+        self.data['df_monthly_mean'] = tools.monthly_mean(self.df)
 
     def __repr__(self):
         return f'Mace Head - {self.substance}'
+    
+    @property
+    def df(self):
+        if 'df' in self.data: return self.data['df']
+        else: return self.get_data()
+    
+    def get_data(self):
+        """ Import data from path definitey in init """
+        if not hasattr(self, 'data'): self.data = {}
+        header_lines = 0
+        with open(self.path) as f:
+            for i, line in enumerate(f):
+                if line.split()[0] == 'unit:':
+                    unit = line.split()
+                    title = list(f)[0].split() # takes row below units, which is chill
+                    header_lines = i+2; break
+        
+        column_dict = {f'{name}_{self.ID}' : dcts.Substance(
+            col_name=f'{name}_{self.ID}', ID=self.ID, short_name=name.lower(), unit=u) 
+            for name, u in zip(title, unit) if name.lower() in dcts.substance_list(self.ID)}
+        self.data['dict'] = column_dict
+        
+        mhd_data = np.genfromtxt(self.path, skip_header=header_lines)
+
+        df = pd.DataFrame(mhd_data, columns=[f'{name}_{self.ID}' for name in title], dtype=float)
+        df = df.replace(0, np.nan) # replace 0 with nan for statistics
+        df = df.drop(df.iloc[:, :7], axis=1) # drop unnecessary time columns
+        df = df.astype(float)
+
+        df['Date_Time'] = fractionalyear_to_datetime(mhd_data[:,0])
+        df.set_index('Date_Time', inplace=True) # new index is datetime
+        
+        self.data['df'] = df
+        
+        return df
