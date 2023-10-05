@@ -45,6 +45,7 @@ class GlobalData(object):
         self.grid_size = grid_size
         self.status = {} # use this dict to keep track of changes made to data
         self.source = None
+        self.data = {}
 
     def binned_1d(self, subs, **kwargs):
         """
@@ -74,7 +75,7 @@ class GlobalData(object):
             loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
         """
         if loc_obj is None:
-            try: loc_obj = Mauna_Loa(range(min(self.years)-2, max(self.years)+2), substance)
+            try: loc_obj = Mauna_Loa(substance, range(min(self.years)-2, max(self.years)+2))
             except: raise ValueError(f'Cannot detrend as ref. data could not be found for {substance.upper()}')
 
         substances = dcts.get_substances(short_name=substance)
@@ -370,7 +371,7 @@ class GlobalData(object):
         if self.source not in ['Caribic', 'TP', 'EMAC']: 
             raise NotImplementedError(f'N2O sorting not avilable for {self.source}')
 
-        loc_obj = Mauna_Loa(self.years, 'n2o') if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
+        loc_obj = Mauna_Loa('n2o', self.years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
 
         if 'ID' in kwargs: 
             ID = kwargs.pop('ID')
@@ -446,12 +447,6 @@ class GlobalData(object):
                                 if s in [subs.col_name, 'd_'+subs.col_name]], 
                        inplace=True)
 
-        # best to leave this out otherwise we'll have circular imports
-        # if kwargs.get('plot'):# and self.source=='Caribic':
-        #     popt0 = outliers.fit_data(func, t_obs_tot, mxr, d_mxr)
-        #     plot_sorted(self, df_sorted, 'n2o', ID, popt0, ol[3], subs=subs.col_name,
-        #                 subs_col=subs.col_name if not kwargs.get('detr') else 'detr_'+subs.col_name, 
-        #                 **kwargs)
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
@@ -474,7 +469,10 @@ class GlobalData(object):
         else: df_sorted = pd.DataFrame(index=data.index)
 
         if kwargs.get('tp_def') in ['not_nan', 'chem'] and not kwargs.get('crit')=='o3' and self.source in ['Caribic', 'TP', 'EMAC']: 
-            df_sorted = pd.concat([df_sorted, self.n2o_filter(**kwargs)], axis=1)
+            n2o_sorted =  self.n2o_filter(**kwargs)
+            if 'Flight numnber' in n2o_sorted.columns:
+                n2o_sorted.drop(columns=['Flight number'], inplace=True)
+            df_sorted = pd.concat([df_sorted,n2o_sorted], axis=1)
 
         if kwargs.get('rel_to_tp') is False: 
             print('Note: Using relative instead of absolute values for TP sorting.')            
@@ -490,10 +488,10 @@ class GlobalData(object):
             print('TP sorting: ', tp)
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
-            if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
-                tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
+            if tp.tp_def == 'dyn': # dynamic TP only outside the tropics - latitude filter
+                tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.y) ])]
             if tp.tp_def == 'cpt': # cold point TP only in the tropics
-                tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
+                tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.y) ])]
 
             # col names
             tropo = 'tropo_'+tp.col_name
@@ -579,7 +577,7 @@ class GlobalData(object):
     @property
     def df_sorted(self):
         """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
-        self.data['df_sorted'] = self.create_df_sorted()
+        self.data['df_sorted'] = self.create_df_sorted(save=True)
         return self.data['df_sorted']
 
     def sel_atm_layer(self, atm_layer, **kwargs):
@@ -726,7 +724,7 @@ class GlobalData(object):
         return out
 
 # Caribic
-class CaribicData(GlobalData):
+class Caribic(GlobalData):
     """ Stores relevant Caribic data
 
     Class attributes:
@@ -739,16 +737,26 @@ class CaribicData(GlobalData):
     """
 
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
-                 grid_size=5, verbose=False):
+                 grid_size=5, verbose=False, recalculate=False):
         """ Initialise CaribicData object by reading in data """
         # no caribic data before 2005, takes too long to check so cheesing it
         super().__init__([yr for yr in years if yr > 2004], grid_size)
         self.source = 'Caribic'
         self.pfxs = pfxs
-        self.get_data(verbose=verbose) # creates self.data dictionary
+        self.get_data(verbose=verbose, recalculate=recalculate) # creates self.data dictionary
         if not 'met_data' in self.data: 
             self.data['met_data'] = self.coord_combo() # reference for met data for all msmts
             self.create_tp_coords()
+        
+        for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+            if subs not in self.data: 
+                self.create_substance_df(subs)
+
+    def __repr__(self):
+        return f"""Caribic object 
+    data: {self.pfxs}
+    years: {self.years}
+    status: {self.status}"""
 
     def get_data(self, verbose=False, recalculate=False):
         """
@@ -762,11 +770,11 @@ class CaribicData(GlobalData):
         self.data = {} # easiest way of keeping info which file the data comes from
         parent_dir = r'E:\CARIBIC\Caribic2data'
 
-        if not recalculate and os.path.exists('misc_data\Caribic\caribic_data_dict.pkl'):
-            with open('misc_data\Caribic\caribic_data_dict.pkl', 'rb') as f:
+        if not recalculate and os.path.exists('misc_data\caribic_data_dict.pkl'):
+            with open('misc_data\caribic_data_dict.pkl', 'rb') as f:
                 self.data = dill.load(f)
             self.data = self.sel_year(*self.years).data
-            
+
         else:
             print('Importing Caribic Data from remote files.')
             for pfx in self.pfxs: # can include different prefixes here too
@@ -798,15 +806,17 @@ class CaribicData(GlobalData):
                         df_flight.insert(0, 'Flight number',
                                        [flight_nr for i in range(df_flight.shape[0])])
     
-                        col_dict, col_dict_rev = tools.rename_columns(f_data.VNAME)
-                        # set names to the short version including unit
-                        df_flight.rename(columns = col_dict_rev, inplace=True)
+                        col_dict, rename_dict = tools.rename_columns(f_data.VNAME)
+                        # set names to their short version
+                        df_flight.rename(columns = rename_dict, inplace=True)
                         df_yr = pd.concat([df_yr, df_flight])
     
                     # Convert longitude and latitude into geometry objects
-                    geodata = [Point(lat, lon) for lon, lat in zip(
-                        df_yr['lon [deg]'],
-                        df_yr['lat [deg]'])]
+                    geodata = [Point(lon, lat) for lon, lat in zip(
+                        df_yr['lon'], df_yr['lat'])]
+                    # geodata = [Point(lat, lon) for lon, lat in zip(
+                    #     df_yr['lon'],
+                    #     df_yr['lat'])]
                     gdf_yr = geopandas.GeoDataFrame(df_yr, geometry=geodata)
     
                     # Drop cols which are saved within datetime, geometry
@@ -819,17 +829,17 @@ class CaribicData(GlobalData):
     
                     gdf_pfx = pd.concat([gdf_pfx, gdf_yr])
                     if pfx=='GHG': # rmv case-sensitive distinction in cols 
-                        cols = ['SF6 [ppt]', 'CH4 [ppb]', 'CO2 [ppm]', 'N2O [ppb]']
+                        cols = ['SF6', 'CH4', 'CO2', 'N2O']
                         for col in cols+['d_'+c for c in cols]:
                             if col.lower() in gdf_pfx.columns:
                                 gdf_pfx[col] = gdf_pfx[col].combine_first(gdf_pfx[col.lower()])
                                 gdf_pfx.drop(columns=col.lower(), inplace=True)
                     if pfx=='INT': 
-                        gdf_pfx.drop(columns=['int_acetone [ppt]',
-                                              'int_acetonitrile [ppt]'], inplace=True)
+                        gdf_pfx.drop(columns=['int_acetone',
+                                              'int_acetonitrile'], inplace=True)
                     if pfx=='INT2': 
-                        gdf_pfx.drop(columns=['int_CARIBIC2_Ac [pptV]',
-                                              'int_CARIBIC2_AN [pptV]'], inplace=True)
+                        gdf_pfx.drop(columns=['int_CARIBIC2_Ac',
+                                              'int_CARIBIC2_AN'], inplace=True)
     
                 if gdf_pfx.empty: print("Data extraction unsuccessful. \
                                         Please check your input data"); return
@@ -849,7 +859,7 @@ class CaribicData(GlobalData):
         no measurement / substance values """
         # merge lists of coordinates for all pfxs in the object
         coords = [y for pfx in self.pfxs for y in dcts.coord_dict(pfx)] + [
-            'p [mbar]', 'geometry', 'Flight number']
+            'p', 'geometry', 'Flight number']
         if 'GHG' in self.pfxs: 
             # copy bc don't want to overwrite data
             df = self.data['GHG'].copy() 
@@ -861,9 +871,9 @@ class CaribicData(GlobalData):
                 axis=1, inplace=True) # remove non-met / non-coord data
     
         # reorder columns
-        self.data['met_data'] = df[list(['Flight number', 'p [mbar]']
+        self.data['met_data'] = df[list(['Flight number', 'p']
                                     + [col for col in df.columns
-                                       if col not in ['Flight number', 'p [mbar]', 'geometry']]
+                                       if col not in ['Flight number', 'p', 'geometry']]
                                     + ['geometry'])]
         return self.data['met_data']
 
@@ -897,6 +907,12 @@ class CaribicData(GlobalData):
         self.data['df'] = df
         return df
 
+    def create_substance_df(self, subs, detr=False):
+        """ Create dataframe containing all met.+ msmt. data for a substance """
+        self.data[f'{subs}'] = tools.coord_merge_substance(self, subs)
+        if detr: self.detrend_substance(subs, save=True, plot=False)
+        return self
+
     @property
     def GHG(self):
         if 'GHG' in self.data: return self.data['GHG']
@@ -926,26 +942,12 @@ class CaribicData(GlobalData):
             try: return self.create_df()
             except: raise Warning('Dataframe \'df\' not available')
 
-class Caribic(CaribicData):
-    def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
-                 grid_size=5, verbose=False):
-        """ Initialise Caribic object with substance-specific dataframes. """
-        super().__init__(years, pfxs, grid_size, verbose)
-        for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-            if subs not in self.data: 
-                self.create_substance_df(subs)
+# class Caribic(CaribicData):
+#     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
+#                  grid_size=5, verbose=False):
+#         """ Initialise Caribic object with substance-specific dataframes. """
+#         super().__init__(years, pfxs, grid_size, verbose)
 
-    def __repr__(self):
-        return f"""Caribic object 
-    data: {self.pfxs}
-    years: {self.years}
-    status: {self.status}"""
-
-    def create_substance_df(self, subs, detr=False):
-        """ Create dataframe containing all met.+ msmt. data for a substance """
-        self.data[f'{subs}'] = tools.coord_merge_substance(self, subs)
-        if detr: self.detrend_substance(subs, save=True, plot=False)
-        return self
 
 # EMAC
 class EMAC(GlobalData):
@@ -964,29 +966,28 @@ class EMAC(GlobalData):
             years: {self.years}\n\
             status: {self.status}'
 
-    def get_data(self, years, s4d, s4d_s, tp, df):
+    def get_data(self, years, s4d, s4d_s, tp, df, recalculate=False):
         """ Preprocess EMAC model output and create datasets """
-        self.data = {}
-        try:
-            if s4d:
-                with xr.open_dataset(r'misc_data\emac_ds.nc', mmap=False) as ds:
-                    self.data['s4d'] = ds
-            if s4d_s:
-                with xr.open_dataset(r'misc_data\emac_ds_s.nc', mmap=False) as ds_s:
-                    self.data['s4d_s'] = ds_s
-            if tp:
-                if os.path.exists(r'misc_data\emac_tp.nc'):
-                    with xr.open_dataset(r'misc_data\emac_tp.nc', mmap=False) as tp:
-                        self.data['tp'] = tp
-                else: self.create_tp()
-            if df:
-                if os.path.exists(r'misc_data\emac_df.pkl'):
-                    with open('misc_data\emac_df.pkl', 'rb') as f:
-                            self.data['df'] = dill.load(f)
-                elif tp: self.create_df() 
+        if not recalculate: 
+                if s4d:
+                    with xr.open_dataset(r'misc_data\emac_ds.nc', mmap=False) as ds:
+                        self.data['s4d'] = ds
+                if s4d_s:
+                    with xr.open_dataset(r'misc_data\emac_ds_s.nc', mmap=False) as ds_s:
+                        self.data['s4d_s'] = ds_s
+                if tp:
+                    if os.path.exists(r'misc_data\emac_tp.nc'):
+                        with xr.open_dataset(r'misc_data\emac_tp.nc', mmap=False) as tp:
+                            self.data['tp'] = tp
+                    else: self.create_tp()
+                if df:
+                    if os.path.exists(r'misc_data\emac_df.pkl'):
+                        with open('misc_data\emac_df.pkl', 'rb') as f:
+                                self.data['df'] = dill.load(f)
+                    elif tp: self.create_df() 
 
-        except:
-            print('No premade files found. Calculating it anew')
+        else: 
+            # print('No premade files found. Calculating it anew')
             if s4d: # preprocess: process_s4d
                 fnames = self.pdir + "s4d_CARIBIC/*bCARIB2.nc"
                 # extract data, each file goes through preprocess first to filter variables & convert units
@@ -1091,8 +1092,10 @@ class EMAC(GlobalData):
         df = dataset.to_dataframe()
         # drop rows without geodata
         df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
-        geodata = [Point(lat, lon) for lat, lon in zip(
-            df['latitude'], df['longitude'])]
+        # geodata = [Point(lat, lon) for lat, lon in zip(
+        #     df['latitude'], df['longitude'])]
+        geodata = [Point(lon, lat) for lon, lat in zip(
+            df['longitude'], df['latitude'])]
         df.drop(['longitude', 'latitude'], axis=1, inplace=True)
         df.index = df.index.round('S')
         self.data['df'] = geopandas.GeoDataFrame(df, geometry=geodata)
@@ -1175,6 +1178,7 @@ class TropopauseData(GlobalData):
         df = pd.merge( df_caribic, df_emac, how='outer', sort=True,
                       left_index=True, right_index=True)
         df.geometry = df_caribic.geometry.combine_first(df_emac.geometry)
+
         df = df.drop(columns=['geometry_x', 'geometry_y'])
         df['Flight number'].interpolate(method='nearest', inplace=True)
         df['Flight number'].interpolate(inplace=True, limit_direction='both') # fill in first two timestamps too
@@ -1216,44 +1220,6 @@ class TropopauseData(GlobalData):
     def sort_tropo_strato(self, vcoords=('p', 'z', 'pt')):
         """ Returns dataframe with bool strat / trop columns for various TP definitions. """
         return self.df_sorted
-        # data = TropopauseData().df.copy()
-        # df_sorted = pd.DataFrame(index=data.index)
-        # tps = dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True)
-        # for tp in [tp for tp in tps if (tp.pvu in [1.5, 2.0] or tp.vcoord not in vcoords)]: # rmv 1.5 and 2.0 PVU TPs
-        #     tps.remove(tp)
-
-        # # first create df_sorted
-        # for tp in tps:
-        #     tp_df = data.dropna(axis=0, subset=[tp.col_name])
-
-        #     if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
-        #         tp_df = tp_df[np.array([(i>30 or i<-30) for i in np.array(tp_df.geometry.x) ])]
-        #     if tp.tp_def == 'cpt': # cold point TP only in the tropics
-        #         tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.x) ])]
-
-        #     # col names
-        #     tropo = 'tropo_'+tp.col_name# 'tropo_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
-        #     strato ='strato_'+tp.col_name # 'strato_%s%s_%s' % (tp.tp_def, '_'+f'{tp.pvu}' if tp.tp_def == 'dyn' else '', tp.vcoord)
-
-        #     tp_sorted = pd.DataFrame({strato:pd.Series(np.nan, dtype='float'),
-        #                               tropo:pd.Series(np.nan, dtype='float')},
-        #                               index=tp_df.index)
-
-        #     # tropo: high p (gt 0), low everything else (lt 0)
-        #     tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord=='p' else tp_df[tp.col_name].lt(0),
-        #                 (strato, tropo)] = (False, True)
-
-        #     # strato: low p (lt 0), high everything else (gt 0)
-        #     tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord=='p' else tp_df[tp.col_name].gt(0),
-        #                 (strato, tropo)] = (True, False)
-
-        #     # add data for current tp def to df_sorted
-        #     df_sorted[tropo] = tp_sorted[tropo]
-        #     df_sorted[strato] = tp_sorted[strato]
-            
-        # df_sorted['Flight number'] = self.df['Flight number'][self.df.index.isin(df_sorted.index)] # necessary for data selection fctns
-        # self.data['df_sorted'] = df_sorted
-        # return df_sorted
 
     @property
     def df(self):

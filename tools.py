@@ -78,13 +78,36 @@ def ds_to_gdf(ds, source='Mozart'):
 
     return gdf
 
-class AMES_variable():
-    def __init__(self, short_name, long_name=None, unit=None):
-        self.short_name = short_name
-        self.long_name = long_name
-        self.unit = unit
-    def __repr__(self):
-        return f'{self.short_name} [{self.unit}] ({self.long_name})'
+# class AMES_variable():
+#     def __init__(self, short_name, long_name=None, unit=None):
+#         self.short_name = short_name
+#         self.long_name = long_name
+#         self.unit = unit
+#     def __repr__(self):
+#         return f'{self.short_name} [{self.unit}] ({self.long_name})'
+
+# def rename_columns(columns):
+#     """ Create dictionary relating column name with AMES_variable object
+
+#     Relate dataframe column name with all information in
+
+#     Get new column names and col_name_dict for AMES data structure.
+#     Get only short name + unit; Save description in dict
+#     Standardise names via case changes
+#     """
+#     col_dict = {}
+#     for x in columns:
+#         short_name = x.split(";")[0].strip()
+#         if len(x.split(';')) >= 3:
+#             long_name = x.split(";")[1].strip()
+#             unit = x[x.find('[')+1:x.find(']')]
+#             variable = AMES_variable(short_name, long_name, unit) # store info
+#         else:
+#             variable = AMES_variable(x.split(';')[0])
+#         col_dict.update({short_name : variable})
+
+#     col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
+#     return col_dict, col_dict_rev
 
 def rename_columns(columns):
     """ Create dictionary relating column name with AMES_variable object
@@ -96,28 +119,29 @@ def rename_columns(columns):
     Standardise names via case changes
     """
     col_dict = {}
+    rename_dict = {}
     for x in columns:
-        short_name = x.split(";")[0].strip()
-        if len(x.split(';')) >= 3:
-            long_name = x.split(";")[1].strip()
-            unit = x[x.find('[')+1:x.find(']')]
-            variable = AMES_variable(short_name, long_name, unit) # store info
+        if len(x.split(';')) == 3:
+            col_name, long_name, unit = [i.strip() for i in x.split(';')]
         else:
-            variable = AMES_variable(x.split(';')[0])
-        col_dict.update({short_name : variable})
+            col_name = x.split(";")[0].strip()
 
-    col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
-    return col_dict, col_dict_rev
+        rename_dict.update({x : col_name})
+        if col_name in [i.col_name for i in dcts.get_coordinates()]:
+            coord = dcts.get_coord(col_name=col_name) # store info
+            col_dict.update({col_name : coord})
+
+    return col_dict, rename_dict
 
 def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Choose which variables to keep when importing EMAC data .
 
-    Parameters: 
-        ds: currrent xarray dataset 
-        inlc_subs (bool): keep tracer substances 
+    Parameters:
+        ds: currrent xarray dataset
+        inlc_subs (bool): keep tracer substances
         incl_model (bool): keep modelled meteorological data
         incl_tropop (bool): keep tropopause-relevant variabels
-    
+
     Variable description:
         time - datetime [ns]
         tlon - track longitude [degrees_east]
@@ -131,21 +155,21 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """
     variables = ['time', 'tlon', 'lev', 'tlat', 'tpress', 'tps']
     if incl_model:
-        variables.extend([v for v in ds.variables 
+        variables.extend([v for v in ds.variables
                           if v.startswith(('ECHAM5_', 'e5vdiff_tpot'))
                           and not v.endswith(('m1', 'aclc'))])
     if incl_tropop:
-        variables.extend([v for v in ds.variables 
+        variables.extend([v for v in ds.variables
                           if v.startswith('tropop_') and not v.endswith('_f')
                           and not any([x in v for x in ['_clim', 'pblh']])])
     if incl_subs:
         tracers = dcts.get_substances(**{'ID':'EMAC'})
         tracers_at_fl = [t+'_at_fl' for t in tracers]
-        variables.extend([v for v in ds.variables if 
+        variables.extend([v for v in ds.variables if
                           (v in tracers or v in tracers_at_fl) ])
     # only keep specified variables
     ds = ds[variables]
-    for var in ds.variables: # streamline units 
+    for var in ds.variables: # streamline units
         if hasattr(ds[var], 'units'):
             if ds[var].units == 'Pa': ds[var] = ds[var].metpy.convert_units(units.hPa)
             elif ds[var].units == 'm': ds[var] = ds[var].metpy.convert_units(units.km)
@@ -153,11 +177,11 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     # if either lon or lat are nan, drop that timestamp
     ds = ds.dropna(subset=['tlon', 'tlat'], how='any', dim='time')
     ds = ds.rename({'tlon':'longitude', 'tlat':'latitude'})
-    ds['time'] = ds.time.dt.round('S') # rmvs floating pt errors 
+    ds['time'] = ds.time.dt.round('S') # rmvs floating pt errors
     return ds
 
 def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
-    """ Keep only variables that depend only on time and are available in 
+    """ Keep only variables that depend only on time and are available in
     subsampled data """
     ds = process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
@@ -226,7 +250,7 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 def get_lin_fit(series, degree=2): # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
     the substance (col name) """
-    
+
     # popt = np.polyfit(t_ref, c_ref, degree)
     # c_fit = np.poly1d(popt) # get popt, then make into fct
 
@@ -234,8 +258,8 @@ def get_lin_fit(series, degree=2): # previously get_mlo_fit
     # c_obs_detr = c_obs - detrend_correction
     # # get variance (?) by substracting offset from 0
     # c_obs_delta = c_obs_detr - c_fit(min(t_obs))
-    
-    
+
+
     # df.dropna(how='any', subset=substance, inplace=True)
     year, month = series.index.year, series.index.month
     t_ref = year + (month - 0.5) / 12 # obtain frac year for middle of the month
@@ -269,7 +293,7 @@ def pre_flag(data_arr, ref_arr, crit='n2o', limit = 0.97, **kwargs):
     df_flag[f'flag_{crit}'] = 0
     df_flag.loc[df_flag[f'strato_{data_arr.name}'] == True, f'flag_{crit}'] = 1
 
-    if kwargs.get('verbose'): 
+    if kwargs.get('verbose'):
         print('Result of pre-flagging: \n',
               df_flag[f'flag_{crit}'].value_counts())
     return df_flag
@@ -283,7 +307,7 @@ def conv_molarity_PartsPer(x, unit):
                }
     # n2o: 300 ppb, 3e-7 mol/mol
     return x*factor[unit]
-    
+
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_merge_substance(c_obj, subs, save=True, detr=True):
     """ Insert msmt data into full coordinate df from coord_merge() """
