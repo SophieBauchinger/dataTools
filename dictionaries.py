@@ -124,6 +124,52 @@ def make_coord_label(coordinates):
     if len(coordinates)==1: return labels[0]
     else: return labels
 
+# legacy
+def get_tp_params(tp_def=None, ID=None, crit=None, vcoord=None, pvu=None):
+    """ Return a list of all TP params possible given the constraints """
+    #TODO implement EMAC tropopauses in here!! 
+    c_keys = ['tp_def', 'ID', 'crit']
+    c1 = {k:v for k,v in zip(c_keys, ['chem', 'GHG', 'n2o'])}
+    c2 = {k:v for k,v in zip(c_keys, ['chem', 'INT', 'o3'])}
+    c3 = {k:v for k,v in zip(c_keys, ['chem', 'INT2', 'n2o'])}
+    c4 = {k:v for k,v in zip(c_keys, ['chem', 'INT2', 'o3'])}
+
+    t_keys = ['tp_def', 'ID', 'vcoord']
+    t1 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'dp'])}
+    t2 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'pt'])}
+    t3 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'z'])}
+    t4 = {k:v for k,v in zip(t_keys, ['therm', 'INT2', 'dp'])}
+    t5 = {k:v for k,v in zip(t_keys, ['therm', 'INT2', 'pt'])}
+
+    d_keys = ['tp_def', 'ID', 'vcoord', 'pvu']
+    d1 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 1.5])}
+    d2 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 2.0])}
+    d3 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 3.5])}
+    d4 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'dp', 3.5])}
+    d5 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'pt', 3.5])}
+    d6 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'z',  3.5])}
+
+    # de_keys = ['tp_def', 'coord']
+    # de1 = {k:v for k,v in zip(de_keys, ['dyn', 'p'])}
+    # de2 = {k:v for k,v in zip(de_keys, ['therm', 'p'])}
+    # de3 = {k:v for k,v in zip(de_keys, ['cpt', 'p'])}
+
+    param_dicts = [
+        c1, c2, c3, c4,
+        t1, t2, t3, t4, t5,
+        d1, d2, d3, d4, d5, d6]
+
+    for var in [tp_def, ID, crit, vcoord, pvu]: # e.g. 'therm'
+        if var is not None:
+            param_dicts = [d for d in param_dicts if var in d.values()]
+
+    if len(param_dicts)==0:
+        given_params = ''.join([f"{name} ({val}), " for name, val in zip(['tp_def', 'ID', 'crit', 'coord', 'pvu'],
+                            [tp_def, ID, crit, vcoord, pvu]) if val is not None])
+        raise KeyError(f'No TP params with the following constraints: {given_params}')
+
+    return param_dicts
+
 #%% Substances
 class Substance():
     def __init__(self, col_name, **kwargs):
@@ -232,57 +278,19 @@ def get_fct_substance(substance, verbose=False):
         if verbose: print(f'No default fctn for {substance}. Using simple harmonic')
         return fct.simple
 
-def get_tp_params(tp_def=None, ID=None, crit=None, vcoord=None, pvu=None):
-    """ Return a list of all TP params possible given the constraints """
-    #TODO implement EMAC tropopauses in here!! 
-    c_keys = ['tp_def', 'ID', 'crit']
-    c1 = {k:v for k,v in zip(c_keys, ['chem', 'GHG', 'n2o'])}
-    c2 = {k:v for k,v in zip(c_keys, ['chem', 'INT', 'o3'])}
-    c3 = {k:v for k,v in zip(c_keys, ['chem', 'INT2', 'n2o'])}
-    c4 = {k:v for k,v in zip(c_keys, ['chem', 'INT2', 'o3'])}
-
-    t_keys = ['tp_def', 'ID', 'vcoord']
-    t1 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'dp'])}
-    t2 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'pt'])}
-    t3 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'z'])}
-    t4 = {k:v for k,v in zip(t_keys, ['therm', 'INT2', 'dp'])}
-    t5 = {k:v for k,v in zip(t_keys, ['therm', 'INT2', 'pt'])}
-
-    d_keys = ['tp_def', 'ID', 'vcoord', 'pvu']
-    d1 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 1.5])}
-    d2 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 2.0])}
-    d3 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 3.5])}
-    d4 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'dp', 3.5])}
-    d5 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'pt', 3.5])}
-    d6 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'z',  3.5])}
-
-    # de_keys = ['tp_def', 'coord']
-    # de1 = {k:v for k,v in zip(de_keys, ['dyn', 'p'])}
-    # de2 = {k:v for k,v in zip(de_keys, ['therm', 'p'])}
-    # de3 = {k:v for k,v in zip(de_keys, ['cpt', 'p'])}
-
-    param_dicts = [
-        c1, c2, c3, c4,
-        t1, t2, t3, t4, t5,
-        d1, d2, d3, d4, d5, d6]
-
-    for var in [tp_def, ID, crit, vcoord, pvu]: # e.g. 'therm'
-        if var is not None:
-            param_dicts = [d for d in param_dicts if var in d.values()]
-
-    if len(param_dicts)==0:
-        given_params = ''.join([f"{name} ({val}), " for name, val in zip(['tp_def', 'ID', 'crit', 'coord', 'pvu'],
-                            [tp_def, ID, crit, vcoord, pvu]) if val is not None])
-        raise KeyError(f'No TP params with the following constraints: {given_params}')
-
-    return param_dicts
-
+#%% Misc
 def dict_season():
     """ Use to get name_s, color_s for season s"""
     return {'name_1': 'Spring (MAM)', 'name_2': 'Summer (JJA)',
             'name_3': 'Autumn (SON)', 'name_4': 'Winter (DJF)',
             'color_1': 'blue', 'color_2': 'orange',
             'color_3': 'green', 'color_4': 'red'}
+
+def dict_tps():
+    """ Get color etc for tropopause definitions """
+    return {'color_chem' : '#1f77b4',
+            'color_therm' : '#ff7f0e',
+            'color_dyn' : '#2ca02c'}
 
 def get_vlims(substance):
     """ Get default limits for colormaps per substance """
