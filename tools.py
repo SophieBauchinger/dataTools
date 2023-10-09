@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
+""" Auxiliary functions for data extraction and handling.
+
 @Author: Sophie Bauchinger, IAU
 @Date: Fri Apr 28 09:51:49 2023
-
-Auxiliary functions:
-    monthly_mean(df), daily_mean(df), ds_to_gdf(ds)
-    rename_columns(columns) - for caribic data extraction
 
 """
 import numpy as np
@@ -77,37 +74,6 @@ def ds_to_gdf(ds, source='Mozart'):
     gdf.index = gdf.index.floor('S') # remove micro/nanoseconds
 
     return gdf
-
-# class AMES_variable():
-#     def __init__(self, short_name, long_name=None, unit=None):
-#         self.short_name = short_name
-#         self.long_name = long_name
-#         self.unit = unit
-#     def __repr__(self):
-#         return f'{self.short_name} [{self.unit}] ({self.long_name})'
-
-# def rename_columns(columns):
-#     """ Create dictionary relating column name with AMES_variable object
-
-#     Relate dataframe column name with all information in
-
-#     Get new column names and col_name_dict for AMES data structure.
-#     Get only short name + unit; Save description in dict
-#     Standardise names via case changes
-#     """
-#     col_dict = {}
-#     for x in columns:
-#         short_name = x.split(";")[0].strip()
-#         if len(x.split(';')) >= 3:
-#             long_name = x.split(";")[1].strip()
-#             unit = x[x.find('[')+1:x.find(']')]
-#             variable = AMES_variable(short_name, long_name, unit) # store info
-#         else:
-#             variable = AMES_variable(x.split(';')[0])
-#         col_dict.update({short_name : variable})
-
-#     col_dict_rev = {v.short_name:f'{k} [{v.unit}]' for k,v in col_dict.items()}
-#     return col_dict, col_dict_rev
 
 def rename_columns(columns):
     """ Create dictionary relating column name with AMES_variable object
@@ -250,17 +216,6 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 def get_lin_fit(series, degree=2): # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
     the substance (col name) """
-
-    # popt = np.polyfit(t_ref, c_ref, degree)
-    # c_fit = np.poly1d(popt) # get popt, then make into fct
-
-    # detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
-    # c_obs_detr = c_obs - detrend_correction
-    # # get variance (?) by substracting offset from 0
-    # c_obs_delta = c_obs_detr - c_fit(min(t_obs))
-
-
-    # df.dropna(how='any', subset=substance, inplace=True)
     year, month = series.index.year, series.index.month
     t_ref = year + (month - 0.5) / 12 # obtain frac year for middle of the month
     mxr_ref = series.values
@@ -305,7 +260,7 @@ def conv_molarity_PartsPer(x, unit):
                'ppt' : 1e12, # per trillion
                'ppq' : 1e15, # per quadrillion
                }
-    # n2o: 300 ppb, 3e-7 mol/mol
+    # e.g. n2o: 300 ppb, 3e-7 mol/mol
     return x*factor[unit]
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
