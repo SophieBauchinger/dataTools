@@ -89,7 +89,7 @@ def get_coord(**kwargs):
         return [i.col_name for i in coordinates]
     return coordinates[0]
 
-def make_coord_label(coordinates):
+def make_coord_label(coordinates, filter_label=False):
     """ Returns string to be used as axis label for a specific Coordinate object. """
     if not isinstance(coordinates, (list, set)): coordinates = [coordinates]
     labels=[]
@@ -105,6 +105,7 @@ def make_coord_label(coordinates):
             if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
             
             label = f'{vcoord} ({model+tp+pv+crit}) [{coord.unit}]'
+            if filter_label: label = f'{model+tp+pv+crit} ({vcoord})'
             
         elif coord.hcoord is not np.nan:
             if coord.hcoord == 'lat' and coord.unit=='degrees_north': 
@@ -303,6 +304,25 @@ def get_vlims(substance):
     try: v_lims = v_limits[substance.lower()]
     except: v_lims = (np.nan, np.nan); print('no default v_lims found')
     return v_lims
+
+def note_dict(fig_or_ax, x=None, y=None, s=None):
+    """ Return default arguments & bbox dictionary for adding notes to plots. """
+    try: transform = fig_or_ax.transAxes
+    except: transform = fig_or_ax.transFigure
+
+    bbox_defaults = dict(edgecolor='lightgrey', 
+                         facecolor='lightcyan', 
+                         boxstyle='round')
+
+    note_dict = dict(x = x if x else 0.97,
+                     y = y if y else 0.97,
+                     horizontalalignment='right', 
+                     verticalalignment='center_baseline', 
+                     transform = transform, 
+                     bbox = bbox_defaults)
+    if s: note_dict.update(dict(s=s))
+
+    return note_dict
 
 #%% Input choice and validation
 def validated_input(prompt, choices):
