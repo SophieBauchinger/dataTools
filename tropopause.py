@@ -14,7 +14,6 @@ from shapely.geometry import Point
 from matplotlib.colors import Normalize
 from PIL import Image
 import glob
-import dill
 
 from toolpac.calc.binprocessor import Bin_equi1d, Simple_bin_1d, Bin_equi2d, Simple_bin_2d
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
@@ -120,7 +119,7 @@ class TropopausePlotter(TropopauseData):
                 plt.show()
                 plt.close()
 
-    def tropopause_vs_latitude(self, vcoord, rel, seasonal=False):
+    def tropopause_vs_latitude(self, vcoord, rel, seasonal=False, note=''):
         """ Plots tropopause height over latitude
         Parameters:
             vcoord (str): vertical coordinate indicating tropopause extent
@@ -145,6 +144,10 @@ class TropopausePlotter(TropopauseData):
         fig.suptitle('{} {} coordinates'.format(
             'Vertical extent of troposphere in' if not rel
             else 'Distance between flight track and troposphere in', vcs[vcoord]))
+        
+        if note: 
+            fig.subplots_adjust(top=0.85)
+            fig.text(s=note, **dcts.note_dict(fig, x=0.98, y=0.94))
 
         xbmin, xbmax, xbsize = -90, 90, 5
         bci = Bin_equi1d(xbmin, xbmax, xbsize)
@@ -234,7 +237,7 @@ class TropopausePlotter(TropopauseData):
             fig.subplots_adjust(top=0.85) # add space for fig legend
             lines, labels = axs.flatten()[0].get_legend_handles_labels()
             fig.legend(lines, labels, loc='upper center', ncol=4,
-                       bbox_to_anchor=[0.5, 0.94])
+                bbox_to_anchor=[0.5, 0.94])
         plt.show()
         return
     
@@ -251,7 +254,7 @@ class TropopausePlotter(TropopauseData):
         df_sorted = self.df_sorted.copy()
 
         cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
-        tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True) if tp.col_name in cols]
+        tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan') if tp.col_name in cols]
 
         for subs in substances: # new plot for each substance 
             if not subs.col_name in self.df.columns:
@@ -260,6 +263,7 @@ class TropopausePlotter(TropopauseData):
             # new figure for each vcoord, otherwise overloading the plots
             for vcoord in vcoords:
                 tps_vc = [tp for tp in tps if tp.vcoord==vcoord]
+                if len(tps_vc)==0: continue
                 fig, axs = plt.subplots(math.ceil(len(tps_vc)/2), 2, dpi=200,
                                         figsize=(7, math.ceil(len(tps_vc)/2)*2),
                                         sharey=True, sharex=True)
@@ -270,7 +274,7 @@ class TropopausePlotter(TropopauseData):
                     tp_tropo = self.df[df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
                     tp_strato = self.df[df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
 
-                    ax.set_title(tp.col_name, fontsize=8)
+                    ax.set_title(dcts.make_coord_label(tp, filter_label=True), fontsize=8)
                     ax.scatter(tp_strato.index, tp_strato[subs.col_name],
                                 c='grey',  marker='.', zorder=0, label='strato')
                     ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
@@ -278,7 +282,7 @@ class TropopausePlotter(TropopauseData):
 
                 fig.autofmt_xdate()
                 fig.tight_layout()
-                fig.subplots_adjust(top=0.85)
+                fig.subplots_adjust(top = 0.8 + math.ceil(len(tps_vc))/150)
                 lines, labels = axs.flatten()[0].get_legend_handles_labels()
                 fig.legend(lines, labels, loc='upper center', ncol=2,
                            bbox_to_anchor=[0.5, 0.94])
@@ -286,7 +290,7 @@ class TropopausePlotter(TropopauseData):
         return self
 
     def show_ratios(self, as_subplot=False, ax=None, single_tp_def=None, group_vc=False,
-                    unity_line=False, minimise_tps=False, **tp_kwargs):
+                    unity_line=True, minimise_tps=False, note='', **tp_kwargs):
         """ Plot ratio of tropo / strato datapoints on a horizontal bar plot """
         tropo_counts = self.calc_ratios(group_vc=group_vc) # dataframe
 
@@ -313,19 +317,19 @@ class TropopausePlotter(TropopauseData):
                 if not tp.vcoord=='pt': tp_to_remove.append(tp)
             for tp in tp_to_remove: tps.remove(tp)
         
-        # create pseudo coordinate for n2o filter
-        subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
-        subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
+        # create pseudo coordinate for n2o filter -> already in tps now
+        # subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
+        # subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
 
-        for k,v in tp_kwargs.items(): # filter tps according to specifications
-            tps = [tp for tp in tps if v in tp.__dict__.values()]
-            subs_tps = [tp for tp in subs_tps if v in tp.__dict__.values()]
-        tps = tps + subs_tps
+        # for k,v in tp_kwargs.items(): # filter tps according to specifications
+        #     tps = [tp for tp in tps if v in tp.__dict__.values()]
+        #     subs_tps = [tp for tp in subs_tps if v in tp.__dict__.values()]
+        # tps = tps + subs_tps
 
         if len(tps)==0: raise Exception('No tps found that fit the criteria.')
 
         # make sure cols and labels are related 
-        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp)) 
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp, filter_label=True)) 
                                         for tp in tps]))
 
         if not as_subplot: 
@@ -334,14 +338,15 @@ class TropopausePlotter(TropopauseData):
 
         tp_defs = set([tp.tp_def for tp in tps]) if single_tp_def is None else [single_tp_def]
         # ax.grid(True, axis='x', c='k', alpha=0.3)
-        ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
-        ax.set_axisbelow(True)
+        if unity_line: 
+            ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
+            ax.set_axisbelow(True)
 
         for tp_def in tp_defs:
             color = dcts.dict_tps()[f'color_{tp_def}']
             current_tps = [tp for tp in tps if tp.tp_def==tp_def]
             # make sure cols and labels are related 
-            cols, labels = map(list, zip(*[(tp.col_name, dcts.make_coord_label(tp)) 
+            cols, labels = map(list, zip(*[(tp.col_name, dcts.make_coord_label(tp, filter_label=True)) 
                                             for tp in current_tps]))
             current_ratios = ratios[cols]
             
@@ -362,17 +367,18 @@ class TropopausePlotter(TropopauseData):
             ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
             ax.set_xlim(0,3) # np.nanmax(ratios)*1.2) #4.5)
 
+        if note: ax.text(s=note, **dcts.note_dict(ax))
+
         if not as_subplot: 
             fig.tight_layout()
             plt.show()
 
-
-    def show_ratios_seasonal(self, **tp_kwargs):
+    def show_ratios_seasonal(self, note='', **tp_kwargs):
         """ Create 2x2 plot for all trop/strat ratios per season """
         fig, axs = plt.subplots(2,2, figsize=(12,12), dpi=350, sharey=True, sharex=True)
         fig.suptitle('Ratio of tropospheric / stratospheric datapoints', fontsize=20)
         for season, ax in zip([1,2,3,4], axs.flatten()):
-            self.sel_season(season).show_ratios(as_subplot=True, ax=ax, **tp_kwargs)
+            self.sel_season(season).show_ratios(as_subplot=True, ax=ax, note=note, **tp_kwargs)
             ax.set_title(dcts.dict_season()[f'name_{season}'])
         fig.tight_layout()
         plt.show()
@@ -438,8 +444,8 @@ def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
 
 #%% Plotting function calls
 if __name__=='__main__':
-    tp = TropopauseData()
-    tpp_extratropics = TropopausePlotter(tp_inst=tp).sel_latitude(30, 90)
+    tpause = TropopauseData()
+    tpp_extratropics = TropopausePlotter(tp_inst=tpause).sel_latitude(30, 90)
     tpp_extratropics.show_ratios()
 
     # # Global 2D scatter of tropopause heights for all definitions
