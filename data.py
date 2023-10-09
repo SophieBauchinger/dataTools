@@ -367,7 +367,7 @@ class GlobalData(object):
         return out
 
     def n2o_filter(self, **kwargs):
-        """ Filter strat / trop data based on N2O mixing ratios. """
+        """ Filter strat / trop data based on specific column of N2O mixing ratios. """
         if self.source not in ['Caribic', 'TP', 'EMAC']: 
             raise NotImplementedError(f'N2O sorting not avilable for {self.source}')
 
@@ -400,7 +400,7 @@ class GlobalData(object):
         if subs.col_name not in data.columns: 
             raise Warning(f'Could not find {subs.col_name} in {ID} data.')
 
-        print('N2O sorting')
+        print(f'N2O sorting: {subs} ')
 
         df_sorted = pd.DataFrame(index=data.index)
         if'Flight number' in data.columns: df_sorted['Flight number'] = data['Flight number']
@@ -420,7 +420,7 @@ class GlobalData(object):
 
         # Check if units of data and reference data match, if not change data
         if str(subs.unit) != str(ref_subs.unit):
-            print(f'Note units do not match: {subs.unit} vs {ref_subs.unit}')
+            if kwargs.get('verbose'): print(f'Note units do not match: {subs.unit} vs {ref_subs.unit}')
             if subs.unit=='mol mol-1': 
                 mxr = tools.conv_molarity_PartsPer(mxr,ref_subs.unit)
                 if d_mxr is not None: d_mxr = tools.conv_molarity_PartsPer(d_mxr,ref_subs.unit)
@@ -440,8 +440,11 @@ class GlobalData(object):
                               flag = flag, verbose=False, plot=False,
                               limit=0.1, direction = 'n')
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
-        df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
-        df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
+        df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
+        df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
+        
+        # df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
+        # df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
 
         df_sorted.drop(columns=[s for s in df_sorted.columns 
                                 if s in [subs.col_name, 'd_'+subs.col_name]], 
@@ -450,42 +453,51 @@ class GlobalData(object):
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
-    def create_df_sorted(self, **kwargs):
+    def create_df_sorted(self, save=True, **kwargs):
         """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
         If no kwargs are specified, df_sorted is calculated for all possible definitons
         df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
         """ 
-        if self.source == 'Caribic': data = self.met_data.copy()
-        elif self.source in ['EMAC', 'TP']: data = self.df.copy()
-        else: raise NotImplementedError(f'Cannot select sort {self.source} data per atmospheric layer.')
+        if self.source in ['Caribic', 'EMAC', 'TP']:
+            data = self.df.copy()
+        else: raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
+        # create df_sorted with flight number if available 
+        df_sorted = pd.DataFrame(data['Flight number'] if 'Flight number' in data.columns else None, 
+                                 index=data.index)
 
+        # apply necessary changes to kwargs to only get appropriate tps
         if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']: 
-            kwargs.update({'source':self.source}) # for finding coords
+            kwargs.update({'source' : self.source})
+        if not 'tp_def' in kwargs: kwargs.update({'tp_def' : 'not_nan'}) # rmv irrelevant stuff
+        if not 'vcoord' in kwargs: kwargs.update({'vcoord' : 'not_nan'}) # rmv var='frac' 
 
-        if not 'tp_def' in kwargs: kwargs.update({'tp_def':'not_nan'})
-
-        if 'Flight number' in data.columns: 
-            df_sorted = pd.DataFrame(data['Flight number'], index=data.index)
-        else: df_sorted = pd.DataFrame(index=data.index)
-
-        if kwargs.get('tp_def') in ['not_nan', 'chem'] and not kwargs.get('crit')=='o3' and self.source in ['Caribic', 'TP', 'EMAC']: 
-            n2o_sorted =  self.n2o_filter(**kwargs)
-            if 'Flight numnber' in n2o_sorted.columns:
-                n2o_sorted.drop(columns=['Flight number'], inplace=True)
-            df_sorted = pd.concat([df_sorted,n2o_sorted], axis=1)
-
-        if kwargs.get('rel_to_tp') is False: 
-            print('Note: Using relative instead of absolute values for TP sorting.')            
-        kwargs.update({'rel_to_tp':True})
-        tps = dcts.get_coordinates(**kwargs) if not (kwargs.get('tp_def')=='chem' and kwargs.get('crit')=='n2o') else []
+        tps = dcts.get_coordinates(**kwargs)
+        tps = [tp for tp in tps 
+               if (not tp.tp_def in ['combo', 'cpt']
+                   and not tp.vcoord == 'lev')]
 
         # adding bool columns for each tp coordinate to df_sorted
-        for tp in tps:
-            # check if tropopause column in the data
+        for tp in [tp for tp in tps if tp.crit=='n2o']: # N2O filter
+            n2o_sorted =  self.n2o_filter(**tp.__dict__)
+            if 'Flight number' in n2o_sorted.columns:
+                n2o_sorted.drop(columns=['Flight number'], inplace=True) # del duplicate col
+            df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
+        
+        for tp in [tp for tp in tps if not tp.crit=='n2o']:
+            # All other tropopause definitions
             if not tp.col_name in data.columns: 
-                print(f'Note: {tp.col_name} not found. Proceeding without.')
-                continue
-            print('TP sorting: ', tp)
+                print(f'Note: {tp.col_name} not found, continuing.'); continue
+            
+            if not tp.rel_to_tp: # if rel_to_tp coordinate exists, take that one and remove the other one
+                coord_dct = {k:v for k,v in tp.__dict__.items() 
+                             if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu']}
+                try: 
+                    rel_coord = dcts.get_coord(**coord_dct, rel_to_tp=True)
+                    if rel_coord.col_name in data.columns: 
+                        tps.remove(tp); continue # skip current tp if it exists as relative too
+                except: print('Using non-relative TP: ', tp)
+                
+            if kwargs.get('verbose'): print('TP sorting: ', tp)
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
             if tp.tp_def == 'dyn': # dynamic TP only outside the tropics - latitude filter
@@ -493,7 +505,7 @@ class GlobalData(object):
             if tp.tp_def == 'cpt': # cold point TP only in the tropics
                 tp_df = tp_df[np.array([(i<30 and i>-30) for i in np.array(tp_df.geometry.y) ])]
 
-            # col names
+            # define new column names
             tropo = 'tropo_'+tp.col_name
             strato ='strato_'+tp.col_name
 
@@ -513,14 +525,9 @@ class GlobalData(object):
             tp_sorted = tp_sorted.convert_dtypes()
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
-            
-            # df_sorted[tropo] = df_sorted[tropo] #.astype(bool)
-            # df_sorted[strato] = df_sorted[strato] # .astype(bool)
-            # ^ warning that those operations can turn nan values into false positives...
 
         df_sorted = df_sorted.convert_dtypes()
-        if kwargs.get('save'): self.data['df_sorted'] = df_sorted
-
+        if save: self.data['df_sorted'] = df_sorted
         return df_sorted
 
     def calc_ratios(self, group_vc=False):
@@ -544,6 +551,7 @@ class GlobalData(object):
             # make coordinates so that grouping by model is possible
             tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
                    if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
+            
             # create pseudo coordinate for n2o filter
             subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
             subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
@@ -577,7 +585,8 @@ class GlobalData(object):
     @property
     def df_sorted(self):
         """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
-        self.data['df_sorted'] = self.create_df_sorted(save=True)
+        if not 'df_sorted' in self.data: 
+            self.create_df_sorted(save=True)
         return self.data['df_sorted']
 
     def sel_atm_layer(self, atm_layer, **kwargs):
