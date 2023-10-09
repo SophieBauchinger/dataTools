@@ -19,6 +19,23 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 import dictionaries as dcts
 
 #%% Data extraction
+def yearly_mean(df):
+    """ Return the yearly mean and min/max values of all columns in a dataframe """
+    cols = [c for c in df.columns if c in [s.col_name for s in dcts.get_substances()]]
+    df = df[cols]
+
+    df_mean = df.groupby(pd.PeriodIndex(df.index, freq="Y")).mean(numeric_only=True)
+    df_mean = df_mean.rename(columns = {c : 'mean_'+c for c in df_mean.columns})
+
+    df_min = df.groupby(pd.PeriodIndex(df.index, freq="Y")).min(numeric_only=True)
+    df_min = df_min.rename(columns = {c : 'min_'+c for c in df_min.columns})
+
+    df_max = df.groupby(pd.PeriodIndex(df.index, freq="Y")).max(numeric_only=True)
+    df_max = df_max.rename(columns = {c : 'max_'+c for c in df_max.columns})
+    
+    df = pd.concat([df_mean, df_min, df_max], axis=1)
+    return df
+
 def monthly_mean(df, first_of_month=True):
     """
     Returns dataframe with monthly averages of all values
