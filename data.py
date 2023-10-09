@@ -609,53 +609,41 @@ class GlobalData(object):
         for attribute_key in self.__dict__: # copy stuff like pfxs
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
 
-        if kwargs.get('tp_def')=='chem' and not 'crit' in kwargs: 
-            raise KeyError('Please specify a crit for chemical tropopause filtering')
-
-        if kwargs.get('tp_def')=='chem' and kwargs.get('crit')=='n2o':
-            # N2O filter special case
-            pass
-            # ID = self.ID if not self.source in ['Caribic', 'TP'] else 'GHG'
-            # tp_col = dcts.get_subs(substance=kwargs.get('crit'), ID=ID).col_name
-        else: 
-            # all other cases
-            if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']: 
+        try: dcts.get_coord(**kwargs)
+        except: 
+            if self.source in ['Caribic', 'EMAC']:
                 kwargs.update({'source':self.source})
-            if not 'tp_def' in kwargs: kwargs.update({'tp_def':'not_nan'})
-            if kwargs.get('rel_to_tp') is False: 
-                print('Note: using the relative coordinate for sorting anyway.')
-            kwargs.update({'rel_to_tp':True})
-            if kwargs.get('tp_def')=='chem' and not 'vcoord' in kwargs: 
-                kwargs.update({'vcoord':'z'})
-            # tp_col = dcts.get_coord(**kwargs).col_name # checks if criteria are narrow enough
 
-        # col = '{}_{}'.format(atm_layer, tp_col)
-        df_sorted = self.create_df_sorted(**kwargs) # should result in col being created
-        col = [c for c in df_sorted if c.startswith(atm_layer)][0]
-        tp_col = col[col.find('_')+1:]
-        print(col, tp_col)
-        
-        if not col in df_sorted.columns: 
-            raise Warning(f'{col} not found in df_sorted:\n{df_sorted}')
-        
+        finally: 
+            try: tp = dcts.get_coord(**kwargs)
+            except: 
+                if not 'rel_to_tp' in kwargs: 
+                    kwargs.update({'rel_to_tp':True})
+                tp = dcts.get_coord(**kwargs)
+
+        if not 'df_sorted' in self.data: 
+            df_sorted = self.create_df_sorted(save=False, **kwargs)
+        else: df_sorted = self.df_sorted
+
+        if f'{atm_layer}_{tp.col_name}' not in df_sorted: 
+            raise Exception(f'Could not find {tp.col_name} in df_sorted.')
+
+        atm_layer_col = f'{atm_layer}_{tp.col_name}'
+
         # Filter all dataframes to only include indices in df_sorted
         df_list = [k for k in self.data
                    if isinstance(self.data[k], pd.DataFrame)] # list of all datasets to cut
         for k in df_list:
-            out.data[k] = out.data[k][out.data[k].index.isin(df_sorted.index)]
-            out.data[k][col] = df_sorted[col] 
-            out.data[k] = out.data[k].dropna(axis=0, subset=[col])
-            out.data[k] = out.data[k][out.data[k][col]] # using col as mask
-            del out.data[k][col]
-        
+            out.data[k] = out.data[k][df_sorted[atm_layer_col]]
+
         if self.source=='Caribic': 
             out.pfxs = [k for k in out.data if k in self.pfxs]
 
-        out.status.update({atm_layer : True})
         # update object status
+        out.status.update({atm_layer : True})
         if 'TP filter' in out.status: 
-            out.status['TP filter'] = (out.status['TP filter'], tp_col)
-        else: out.status['TP filter'] = tp_col
+            out.status['TP filter'] = (out.status['TP filter'], atm_layer_col)
+        else: out.status['TP filter'] = atm_layer_col
 
         return out
 
