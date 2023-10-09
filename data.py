@@ -128,100 +128,103 @@ class GlobalData(object):
             substance (str): substance to detrend e.g. 'sf6'
             loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
         """
+        # Prepare reference data
         if loc_obj is None:
             try: loc_obj = Mauna_Loa(substance, range(min(self.years)-2, max(self.years)+2))
             except: raise ValueError(f'Cannot detrend as ref. data could not be found for {substance.upper()}')
 
+        ref_df = loc_obj.df
+        ref_subs = dcts.get_subs(substance=substance, ID=loc_obj.ID)
+        if ref_subs is None: raise ValueError(f'No reference data found for {substance.short_name}')
+        # ignore reference data earlier and later than two years before/after msmts
+        # ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
+        #                 : max(df.index)+dt.timedelta(356*2)]
+        ref_df.dropna(how='any', subset=ref_subs.col_name, inplace=True) # remove NaN rows
+        c_ref = ref_df[ref_subs.col_name].values
+        t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
+
+        popt = np.polyfit(t_ref, c_ref, degree)
+        c_fit = np.poly1d(popt) # get popt, then make into fct
+
+
+        # Prepare data to be detrended
         substances = dcts.get_substances(short_name=substance)
-        dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame) and 
-                      any([s for s in substances if s.col_name in self.data[k].columns])]
         if ID is not None: dataframes = [ID]
+        else: dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame) and 
+                            any([s for s in substances if s.col_name in self.data[k].columns])]
+        subs_cols = set([c for k in dataframes for c in self.data[k].columns 
+                  if c in [s.col_name for s in substances]])
+
+        df_detr = pd.DataFrame()
+
+        for i,k in enumerate(dataframes): # go through each dataframe and detrend
+            df = self.data[k].copy()
+            for subs in [s for s in substances if s.col_name in df.columns]:
+                df.dropna(axis=0, subset=[subs.col_name], inplace=True)
+                df.sort_index()
+                c_obs = df[subs.col_name].values
+                t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
+                
+                # convert glob obj data to loc obs unit if units don't match 
+                if str(subs.unit) != str(ref_subs.unit):
+                    # print(f'units do not match : {subs.unit} vs {ref_subs.unit}')
+                    if subs.unit=='mol mol-1': c_obs = tools.conv_molarity_PartsPer(c_obs,ref_subs.unit)
+                    elif subs.unit=='pmol mol-1' and ref_subs.unit == 'ppt': pass
+        
+                detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+                c_obs_detr = c_obs - detrend_correction
+                # get variance (?) by substracting offset from 0
+                c_obs_delta = c_obs_detr - c_fit(min(t_obs))
+        
+                df_detr_subs = pd.DataFrame({f'init_{subs.col_name}' : c_obs, 
+                                             f'detr_{subs.col_name}' : c_obs_detr,
+                                             f'delta_{subs.col_name}' : c_obs_delta,
+                                             f'detrFit_{subs.col_name}' : c_fit(t_obs)},
+                                            index = df.index)
+                # maintain relationship between detr and fit columns
+                df_detr_subs[f'detrFit_{subs.col_name}'] = df_detr_subs[f'detrFit_{subs.col_name}'].where(
+                    ~df_detr_subs[f'detr_{subs.col_name}'].isnull(), np.nan)
+                
+                if save:
+                    columns = [f'detr_{subs.col_name}',
+                               f'delta_{subs.col_name}',
+                               f'detrFit_{subs.col_name}']
+        
+                    # add to data, then move geometry column to the end again
+                    self.data[k][columns] = df_detr_subs[columns]
+                    self.data[k]['geometry'] =  self.data[k].pop('geometry')
+
+                df_detr = pd.concat([df_detr, df_detr_subs])
 
         if plot:
+            substances = [dcts.get_subs(col_name = s) for s in subs_cols 
+                         if 'detr_'+s in df_detr.columns]
             if not as_subplot:
-                fig, axs = plt.subplots(len(dataframes), dpi=150, figsize=(6,4*len(dataframes)), sharex=True)
-                if len(dataframes)==1: axs = [axs]
+                fig, axs = plt.subplots(len(substances), dpi=150, figsize=(6,4*len(substances)), sharex=True)
             elif ax is None:
                 ax = plt.gca()
-    
-        for i,k in enumerate(dataframes): 
-            print(k)
-            df = self.data[k]
-            if any([True for s in substances if s.col_name in df.columns]): 
-                subs = [s for s in substances if s.col_name in df.columns][0]
-            else: print('none'); continue
-            df.dropna(axis=0, subset=[subs.col_name], inplace=True)
-            df.sort_index()
-    
-            c_obs = df[subs.col_name].values
-            t_obs =  np.array(datetime_to_fractionalyear(df.index, method='exact'))
-    
-            ref_df = loc_obj.df
-            ref_subs = dcts.get_subs(substance=substance, ID=loc_obj.ID)
-            if ref_subs is None: raise ValueError(f'No reference data found for {subs}')
-            
-            # convert glob obj data to loc obs unit if units don't match 
-            if str(subs.unit) != str(ref_subs.unit):
-                # print(f'units do not match : {subs.unit} vs {ref_subs.unit}')
-                if subs.unit=='mol mol-1': c_obs = tools.conv_molarity_PartsPer(c_obs,ref_subs.unit)
-                elif subs.unit=='pmol mol-1' and ref_subs.unit == 'ppt': pass
-    
-            # ignore reference data earlier and later than two years before/after msmts
-            ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
-                            : max(df.index)+dt.timedelta(356*2)]
-            ref_df.dropna(how='any', subset=ref_subs.col_name, inplace=True) # remove NaN rows
-            c_ref = ref_df[ref_subs.col_name].values
-            t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
-    
-            popt = np.polyfit(t_ref, c_ref, degree)
-            c_fit = np.poly1d(popt) # get popt, then make into fct
-    
-            detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
-            c_obs_detr = c_obs - detrend_correction
-            # get variance (?) by substracting offset from 0
-            c_obs_delta = c_obs_detr - c_fit(min(t_obs))
-    
-            df_detr = pd.DataFrame({f'detr_{subs.col_name}' : c_obs_detr,
-                                     f'delta_{subs.col_name}' : c_obs_delta,
-                                     f'detrFit_{subs.col_name}' : c_fit(t_obs)},
-                                    index = df.index)
-            # maintain relationship between detr and fit columns
-            df_detr[f'detrFit_{subs.col_name}'] = df_detr[f'detrFit_{subs.col_name}'].where(
-                ~df_detr[f'detr_{subs.col_name}'].isnull(), np.nan)
-
-            if save:
-                columns = [f'detr_{subs.col_name}',
-                           f'delta_{subs.col_name}',
-                           f'detrFit_{subs.col_name}']
-    
-                # add to data, then move geometry column to the end again
-                self.data[k][columns] = df_detr[columns]
-                self.data[k]['geometry'] =  self.data[k].pop('geometry')
-    
-            if plot and not k==substance:
+            for i, subs in enumerate(substances): 
                 if not as_subplot: ax = axs[i]
-                # ax.annotate(f'{c_pfx} {note}', xy=(0.025, 0.925), xycoords='axes fraction',
-                #                       bbox=dict(boxstyle="round", fc="w"))
-                ax.scatter(df_detr.index, c_obs, color='orange', label='Flight data', marker='.')
-                ax.scatter(df_detr.index, c_obs_detr, color='green', label='trend removed', marker='.')
-                ax.scatter(ref_df.index, c_ref, color='gray', label='MLO data', alpha=0.4, marker='.')
-                ax.plot(df_detr.index, c_fit(t_obs), color='black', ls='dashed',
-                          label='trendline')
-                ax.set_ylabel(f'{subs.col_name}') # ; ax.set_xlabel('Time')
-                if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
+                ax.scatter(df_detr.index, df_detr['init_'+subs.col_name], label='Flight data',
+                           color='orange', marker='.')
+                ax.scatter(df_detr.index, df_detr['detr_'+subs.col_name], label='trend removed',
+                           color='green', marker='.')
+                ax.scatter(ref_df.index, c_ref, label='MLO data', 
+                           color='gray', alpha=0.4, marker='.')
+
+                df_detr.sort_index()
+                t_obs =  np.array(datetime_to_fractionalyear(df_detr.index, method='exact'))
+                ax.plot(df_detr.index, c_fit(t_obs), label='trendline',
+                        color='black', ls='dashed')
+
+                ax.set_ylabel(dcts.make_subs_label(subs)) # ; ax.set_xlabel('Time')
+                # if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
                 handles, labels = ax.get_legend_handles_labels()
                 if note !='': 
                     leg = ax.legend(title=note)
                     leg._legend_box.align = "left"
                 else: ax.legend()
-            elif plot: axs[i].remove()
-    
-        if plot and not as_subplot:
-            plt.suptitle('${:.2}x^2 + {:.2}x + {:.2}$'.format(*popt))
-            fig.tight_layout()
-            fig.autofmt_xdate()
-            plt.show()
-    
+
         return popt
 
     def sel_year(self, *years):
