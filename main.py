@@ -24,7 +24,6 @@ import matplotlib.pyplot as plt
 from data import Caribic, Mozart, EMAC, TropopauseData, Mauna_Loa, Mace_Head
 import dictionaries as dcts
 from lags import calc_time_lags
-#from dictionaries import substance_list, get_tp_params
 
 # from data import detrend_substance
 import plot.data

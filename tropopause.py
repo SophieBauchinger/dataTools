@@ -238,16 +238,16 @@ class TropopausePlotter(TropopauseData):
         plt.show()
         return
     
-    def plot_subs_sorted(self, substances, vcoords=['p', 'pt', 'z']):
+    def plot_subs_sorted(self, substances, vcoords=['p', 'pt', 'z', 'mxr']):
         """ Plot timeseries of subs mixing ratios with strato / tropo colours. """
         if not substances:
             substances = dcts.get_substances(source='EMAC') + dcts.get_substances(source='Caribic')
             substances = [s for s in substances if not s.col_name.startswith('d_')]
-        elif isinstance(substances, str): substances = [substances]
+        elif isinstance(substances, dcts.Substance): substances = [substances]
         if not isinstance(substances, list): 
             raise Warning('Cannot work like this. Pls supply substances as list.')
 
-        if not 'df_sorted' in self.data: self.create_df_sorted()
+        if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
         df_sorted = self.df_sorted.copy()
 
         cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]

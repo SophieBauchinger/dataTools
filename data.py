@@ -1,9 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
+""" Class definitions for data import and analysis from various sources.
+
 @Author: Sophie Bauchinger, IAU
 @Date: Fri Apr 28 14:13:28 2023
 
-Defines classes used as basis for data structures
+Classes: 
+    # GlobalData
+    Caribic
+    EMAC
+    TropopauseData
+    Mozart
+    
+    # LocalData
+    Mauna_Loa
+    Mace_Head
 """
 import datetime as dt
 import geopandas
@@ -29,12 +39,56 @@ from toolpac.conv.times import datetime_to_fractionalyear
 import dictionaries as dcts
 import tools
 
+# TODO: fix the underlying problem in toolpac rather than just suppressing stuff
+import warnings
+from pandas.errors import SettingWithCopyWarning
+warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
+
 #%% GLobal data
 class GlobalData(object):
-    """
-    Global data that can be averaged on longitude / latitude grid
-    Choose years, size of the grid and adjust the colormap settings
-    """
+    """ Contains global datasets with longitude/latitude for each datapoint. 
+    
+    Attributes: 
+        years (list) : years included in the stored data 
+        source (str) : source of the input data, e.g. 'Caribic'
+        grid_size (int) : default grid size for binning
+        status (dict) : stores information on operations that change the stored data
+    
+    Methods: 
+        binned_1d(subs, **kwargs)
+            Bin substance data over latitude 
+        binned_2d(subs, **kwargs)
+            Bin substance data on a longitude/latitude grid
+        detrend_substance(substance, ...)
+            Remove linear from substance data wrt. Mauna Loa, then add to data
+        
+        sel_year(*years)
+            Remove all data not in the chosen years
+        sel_latitude(lat_min, lat_max)
+            Remove all data not in the chosen latitude range
+        sel_eqlat(eql_min, eql_max)
+            Remove all data not in the chosen equivalent latitude range
+        sel_season(season)
+            Remove all data not in the chosen season
+        sel_flight(flights)
+            Remove all data that is not from the chosen flight numbers
+        
+        n2o_filter(**kwargs)
+            Use N2O data to create strat/trop reference for data
+        create_df_sorted(**kwargs)
+            Use all chosen tropopause definitions to create strat/trop reference
+        calc_ratios(group_vc=False)
+            Calculate ratio of trop/strat datapoints
+        sel_atm_layer(atm_layer, **kwargs)
+            Remove all data not in the chosen atmospheric layer (tropo/strato)
+        sel_tropo()
+            Remove all stratospheric datapoints
+        sel_strato()
+            Remove all tropospheric datapoints
+        filter_extreme_events(**kwargs)
+            Filter for tropospheric data, then remove extreme events
+        
+    """ 
     def __init__(self, years, grid_size=5):
         """
         years: array or list of integers
@@ -552,6 +606,8 @@ class GlobalData(object):
             tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
                    if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
             
+            
+            
             # create pseudo coordinate for n2o filter
             subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
             subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for subs in subses]
@@ -722,22 +778,35 @@ class GlobalData(object):
 
 # Caribic
 class Caribic(GlobalData):
-    """ Stores relevant Caribic data
+    """ Stores all available information from Caribic datafiles and allows further analysis. 
 
-    Class attributes:
-        pfxs (list of str): prefixes, e.g. GHG, INT, INT2
-        data (dict):
-            {pfx} : DataFrame
-            {pfx}_dict : dictionary (col_name_now : col_name_original)
-        years (list of int)
-        flights (list of int)
+    Attributes: 
+        pfxs (List[str]) : Prefixes of stored Caribic data files 
+        
+    Methods: 
+        coord_combo()
+            Create met_data from available meteorological data
+        create_tp_coordinates()
+            Calculate tropopause height etc. from avialable met data 
+        create_substance_df(detr=False):
+            Combine met_data with all substance info, optionally incl. detrended
+        
     """
 
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
                  grid_size=5, verbose=False, recalculate=False):
-        """ Initialise CaribicData object by reading in data """
+        """ Constructs attributes for Caribic object and creates data dictionary. 
+        
+        Parameters: 
+            years (List[int]) : import data only for selected years
+            pfxs (List[str]) : prefixes of Caribic files to import
+            grid_size (int) : grid size in degrees to use for binning
+            verbose (bool) : print additional debugging information 
+            recalculate (bool) : get data from precombined file or parent directory
+        """
         # no caribic data before 2005, takes too long to check so cheesing it
         super().__init__([yr for yr in years if yr > 2004], grid_size)
+
         self.source = 'Caribic'
         self.pfxs = pfxs
         self.get_data(verbose=verbose, recalculate=recalculate) # creates self.data dictionary
@@ -750,19 +819,16 @@ class Caribic(GlobalData):
                 self.create_substance_df(subs)
 
     def __repr__(self):
-        return f"""Caribic object 
+        return f"""{self.__class__}
     data: {self.pfxs}
     years: {self.years}
     status: {self.status}"""
 
     def get_data(self, verbose=False, recalculate=False):
-        """
-        Create geopandas df from data files for all available substances.
-
-            get all files starting with prefixes in c_pfxs - each in one dataframe
-            lon / lat data is put into a geometry column
-            Index is set to datetime of the sampling / modeled times
-            a column with flight number is created
+        """ Imports Caribic data in the form of geopandas dataframes. 
+        
+        Returns data dictionary containing dataframes for each file source and 
+        dictionaries relating column names with Coordinate / Substance instances. 
         """
         self.data = {} # easiest way of keeping info which file the data comes from
         parent_dir = r'E:\CARIBIC\Caribic2data'
@@ -850,6 +916,8 @@ class Caribic(GlobalData):
 
         self.flights = list(set(pd.concat(
             [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
+
+        return self.data
 
     def coord_combo(self):
         """ Create dataframe with all possible coordinates but
@@ -939,16 +1007,16 @@ class Caribic(GlobalData):
             try: return self.create_df()
             except: raise Warning('Dataframe \'df\' not available')
 
-# class Caribic(CaribicData):
-#     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
-#                  grid_size=5, verbose=False):
-#         """ Initialise Caribic object with substance-specific dataframes. """
-#         super().__init__(years, pfxs, grid_size, verbose)
-
-
 # EMAC
 class EMAC(GlobalData):
-    """ Data class holding information on Caribic-specific EMAC Model output """
+    """ Data class holding information on Caribic-specific EMAC Model output.
+    
+    Methods: 
+        create_tp()
+            Create dataset with tropopause relevant parameters
+        create_df()
+            Create pandas dataframe from time-dependent data
+    """
     def __init__(self, years=range(2005, 2020), s4d=True, s4d_s=True, tp=True, df=True, pdir=None):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if yr >= 2000 and yr <= 2019])
@@ -1141,16 +1209,15 @@ class EMAC(GlobalData):
             with open(pdir+'\df.pkl', 'wb') as f:
                 dill.dump(self.df, f)
 
-# Caribic and EMAC
+# Combine Caribic and EMAC
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
     def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if yr >= 2000 and yr <= 2019])
         self.source = 'TP'
-        self.data = {}
         self.get_data()
-        # select year on this object afterwards bc otherwise interpolation is missing surrounding values
+        # NB select year on this object afterwards bc otherwise interpolation is missing surrounding values
         if interp: self.interpolate_emac(method)
         self.data = self.sel_year(*years).data
         
@@ -1162,9 +1229,9 @@ class TropopauseData(GlobalData):
 
     def __repr__(self):
         self.years.sort()
-        return f'{type(self).__name__} object\n\
-            years: {self.years}\n\
-            status: {self.status}'
+        return f'{self.__class__}\n\
+    years: {self.years}\n\
+    status: {self.status}'
 
     def get_data(self):
         """ Return merged dataframe with interpolated EMAC / Caribic data """
