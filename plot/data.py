@@ -7,10 +7,13 @@ Defines different plotting possibilities for objects of the type GlobalData
 or LocalData as defined in data_classes
 
 """
+import sys
+if not '..' in sys.path: sys.path.append('..')
 import datetime as dt
 import geopandas
 import numpy as np
 from calendar import monthrange
+import math
 
 # import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -23,84 +26,77 @@ import tools
 import dictionaries as dcts
 
 # supress a gui backend userwarning, not really advisible
-import warnings; warnings.filterwarnings("ignore", category=UserWarning,
-                                         module='matplotlib')
+import warnings; warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 # ignore warning for np.nanmin / np.nanmax for all-nan sclice
 warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
 #%% GlobalData
-def scatter_global(glob_obj, subs, single_yr=None, verbose=False,
-                   c_pfx=None, as_subplot=False, ax=None, detr=False):
-    """
+def scatter_global(glob_obj, detr=False, colorful=False, note='', **subs_kwargs):
+                   # single_yr=None, verbose=False,
+                   # ID=None, as_subplot=False, ax=None, detr=False, **subs_kwargs):
+    """ 
     Default plotting of scatter values for global data
-    
     If as_subplot, plots scatterplot onto given axis (ax)
     """
-    if glob_obj.source=='Caribic':
-        if c_pfx: pfxs = [c_pfx]
-        else: pfxs = [p for p in glob_obj.pfxs if subs in dcts.substance_list(p)]
+    data = glob_obj.df
+    df_mm = tools.monthly_mean(data)
+    substances = [dcts.get_subs(col_name=c) for c in data.columns
+                  if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)] 
+                  and not c.startswith('d_')]
 
-        ax = None
-        if ax is None:
-            fig, axs = plt.subplots(len(pfxs), 1, dpi=250, 
-                                    figsize=(8, 3*len(pfxs)), squeeze=False)
-        else: axs = np.array(ax)
+    for substance in substances: 
+        col = substance.col_name
+        if detr and 'detr'+col not in data.columns:
+            try: 
+                glob_obj.detrend_substance(substance.short_name)
+                data = glob_obj.df
+                df_mm = tools.monthly_mean(data)
+                if 'detr_'+col in data.columns: 
+                    col = 'detr_' + col
+            except: print(f'Could not detrend {substance.short_name}')
 
-        for pfx, ax in zip(pfxs, axs.flatten()):
-            df = glob_obj.data[pfx]
+        fig, ax = plt.subplots(dpi=250, figsize=(8,4))
+        # Plot mixing ratio msmts and monthly mean
+        ymin = np.nanmin(data[col])
+        ymax = np.nanmax(data[col])
 
-            if subs in dcts.substance_list(pfx): 
-                substance = dcts.get_col_name(subs, glob_obj.source, pfx)
-                if detr and 'detr'+substance not in df.columns:
-                    glob_obj.detrend(subs)
-                if detr: substance = 'detr_' + substance
-            else: 
-                if verbose: print(f'No {substance} values to plot in {pfx}')
-                continue
-
-            if single_yr is not None: df = df[df.index.year == single_yr]
-            df_mm = tools.monthly_mean(df).dropna()
-
-            # Plot mixing ratio msmts and monthly mean
-            ymin = np.nanmin(df[substance])
-            ymax = np.nanmax(df[substance])
-
+        if colorful:
             cmap = plt.cm.viridis_r
             extend = 'neither'
-            vmin = np.nanmin([ymin, dcts.get_vlims(subs)[0]])
-            vmax = np.nanmax([ymax, dcts.get_vlims(subs)[1]])
+            vmin = np.nanmin([ymin, dcts.get_vlims(substance.short_name)[0]])
+            vmax = np.nanmax([ymax, dcts.get_vlims(substance.short_name)[1]])
             norm = Normalize(vmin, vmax)
+    
+        ax.scatter(data.index, data[col],
+                   label='Mixing ratio',
+                   marker='.', zorder=1, 
+                   c = data[col] if colorful else 'grey',
+                   alpha=1 if colorful else 0.4,
+                   cmap = cmap if colorful else None, 
+                   norm = norm if colorful else None)
 
-            # ax.set_title(f'{glob_obj.source} {substance} measurements')
-            # ax.annotate(f'{pfx}')
-            ax.scatter(df.index, df[substance],
-                        label=f'{substance.upper()} \
-                                {min(df.index.year), max(df.index.year)}',
-                        marker='x', zorder=1, c = df[substance],
-                        cmap = cmap, norm = norm)
-            
-            # plot monthly mean on top of the data
-            ax.plot(df_mm.index, df_mm[substance], c='k', lw=0.1, zorder=2)
-            for i, mean in enumerate(df_mm[substance]):
-                y,m = df_mm.index[i].year, df_mm.index[i].month
-                xmin = dt.datetime(y, m, 1),
-                xmax = dt.datetime(y, m, monthrange(y, m)[1])
-                ax.hlines(mean, xmin, xmax, color='black',
-                          linestyle='dashed', zorder=2)
+        if colorful:
+            cbar = plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
+            cbar.ax.set_xlabel(f'{substance.short_name} [{substance.unit}]')
 
-            plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
-            ax.set_ylabel(f'{substance}')
-            # ax.set_ylim(ymin-0.15, ymax+0.15)
-            ax.legend([], [], title=f'{pfx}')
-        if 'fig' in locals(): 
-            fig.tight_layout(pad=3.0)
-            fig.autofmt_xdate(); plt.show()
+        # plot monthly mean on top of the data
+        ax.plot(df_mm.index, df_mm[col], label = 'monthly mean',
+                color='k' if colorful else 'g', lw=0.5, zorder=2)
 
-    elif glob_obj.source=='Mozart':
-        substance = dcts.get_col_name(subs, glob_obj.source)
-        pl = plot_binned_1d(glob_obj, subs, single_yr)
-        return pl
+        for i, mean in enumerate(df_mm[col]):
+            y,m = df_mm.index[i].year, df_mm.index[i].month
+            xmin = dt.datetime(y, m, 1),
+            xmax = dt.datetime(y, m, monthrange(y, m)[1])
+            ax.hlines(mean, xmin, xmax, color = 'k' if colorful else 'g', 
+                      linestyle='-', zorder=2)
 
+        ax.set_ylabel(dcts.make_subs_label(substance))
+        ax.legend()#title=None if not note else note)
+
+        fig.tight_layout(pad=3.0)
+        fig.autofmt_xdate()
+        plt.show()
+    
 def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False, 
                           single_graph=False, c_pfx=None, ax=None):
     """
