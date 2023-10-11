@@ -250,11 +250,16 @@ def make_subs_label(substances):
     if not isinstance(substances, (list, set)): substances = [substances]
     labels=[]
     for subs in substances:
-        special_names = {'ch2cl2':'CH2Cl2', 'noy':'NOy'}
+        special_names = {'ch2cl2':'CH$_2$Cl$_2$', 'noy':'NO$_y$', 'f11':'F11', 'f12':'F12'}
         name = '%s' % f'{subs.short_name.upper()}' if not subs.short_name in special_names else special_names[subs.short_name]
+        if not subs.short_name in special_names: 
+            name = ''.join(f"$_{i}$" if i.isdigit() else i for i in name)
         if name.startswith('D_'): name = 'd_'+name[2:]
-        source = '%s' % subs.source if subs.model=='msmt' else subs.model
-        label = f'{name} [{subs.unit}] ({source})'
+        source = '%s' % subs.source if subs.model=='MSMT' else subs.model
+        if len(get_substances(short_name=subs.short_name, source=subs.source, model=subs.model))>1: 
+            source += f' - {subs.ID}'
+        unit = subs.unit if not subs.unit=='mol mol-1' else '$mol/mol$'
+        label = f'{name} [{unit}] ({source})'
         labels.append(label)
     if len(substances)==1: return labels[0]
     else: return labels

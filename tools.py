@@ -280,6 +280,15 @@ def conv_molarity_PartsPer(x, unit):
     # e.g. n2o: 300 ppb, 3e-7 mol/mol
     return x*factor[unit]
 
+def conv_PartsPer_molarity(x, unit):
+    """ Convert x from [unit] to molarity (mol/mol) """
+    factor = {'ppm' : 1e-6, # per million
+               'ppb' : 1e-9, # per billion
+               'ppt' : 1e-12, # per trillion
+               'ppq' : 1e-15, # per quadrillion
+               }
+    return x*factor[unit]
+
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 def coord_merge_substance(c_obj, subs, save=True, detr=True):
     """ Insert msmt data into full coordinate df from coord_merge() """
@@ -309,26 +318,26 @@ def coord_merge_substance(c_obj, subs, save=True, detr=True):
     return df
 
 #%% Binning of global data sets
-def bin_prep(glob_obj, subs, **kwargs):
-    c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
-    substance = dcts.get_col_name(subs, glob_obj.source, c_pfx)
+# def bin_prep(glob_obj, subs, **kwargs):
+#     c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
+#     substance = dcts.get_col_name(subs, glob_obj.source, c_pfx)
 
-    if kwargs.get('single_yr') is not None:
-        years = [int(kwargs.get('single_yr'))]
-    else: years = glob_obj.years
+#     if kwargs.get('single_yr') is not None:
+#         years = [int(kwargs.get('single_yr'))]
+#     else: years = glob_obj.years
 
-    # for Caribic, need to choose the df
-    if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
-    else: df = glob_obj.df
+#     # for Caribic, need to choose the df
+#     if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
+#     else: df = glob_obj.df
 
-    if kwargs.get('detr') is True:
-        if not 'detr_'+substance in df.columns:
-            glob_obj.detrend(subs)
-        substance = 'detr_' + substance
+#     if kwargs.get('detr') is True:
+#         if not 'detr_'+substance in df.columns:
+#             glob_obj.detrend(subs)
+#         substance = 'detr_' + substance
 
-    print(substance)
+#     print(substance)
 
-    return substance, years, df
+#     return substance, years, df
 
 def bin_1d(glob_obj, subs, **kwargs):
     """ Returns 1D binned objects for each year as lists (lat / lon)
@@ -342,7 +351,8 @@ def bin_1d(glob_obj, subs, **kwargs):
     Returns:
         out_x_list, out_y_list: lists of Bin1D objects binned along x / y
     """
-    substance, years, df = bin_prep(glob_obj, subs, **kwargs)
+    # df = glob_obj.df
+    substance = subs.col_name
 
     if kwargs.get('xbinlimits') is not None: # not equidistant binning
         x_binclassinstance = bp.Bin_notequi1d(kwargs.get('xbinlimits'))
@@ -350,8 +360,8 @@ def bin_1d(glob_obj, subs, **kwargs):
         y_binclassinstance = bp.Bin_notequi1d(kwargs.get('ybinlimits'))
 
     out_x_list, out_y_list = [], []
-    for yr in years: # loop through available years
-        df_yr = df[df.index.year == yr]
+    for yr in glob_obj.years: # loop through available years
+        df_yr = glob_obj.df[glob_obj.df.index.year == yr]
 
         x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
         if kwargs.get('xbinlimits') is None: # equidistant binning
@@ -380,11 +390,11 @@ def bin_2d(glob_obj, subs, **kwargs):
         substance (str): if None, uses default substance for the object
         single_yr (int): if specified, uses only data for that year
     """
-    substance, years, df = bin_prep(glob_obj, subs, **kwargs)
+    substance = subs.col_name
 
     out_list = []
-    for yr in years: # loop through available years if possible
-        df_yr = df[df.index.year == yr]
+    for yr in glob_obj.years: # loop through available years if possible
+        df_yr = glob_obj.df[glob_obj.df.index.year == yr]
 
         xbinlimits = kwargs.get('xbinlimits')
         ybinlimits = kwargs.get('ybinlimits')

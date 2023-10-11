@@ -17,10 +17,13 @@ import math
 
 # import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.patheffects as mpe
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch
+from mpl_toolkits.axes_grid1 import AxesGrid
 
 import tools
 import dictionaries as dcts
@@ -30,14 +33,23 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning, module=
 # ignore warning for np.nanmin / np.nanmax for all-nan sclice
 warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
+vlims = { # optimised for Caribic measurements from 2005 to 2020
+    'co' : (15, 250),
+    'o3' : ( 0.0, 1000),
+    'h2o' : ( 0.0, 1000),
+    'no'  : (0.0, 0.6),
+    'noy' : ( 0.0, 6),
+    'co2' : ( 370, 420),
+    'ch4' : ( 1650, 1970),
+    'f11' : ( 130, 250),
+    'f12' : ( 400, 540),
+    'n2o' : ( 290, 330),
+    'sf6' : ( 5.5, 10),
+    }
+
 #%% GlobalData
-def scatter_global(glob_obj, detr=False, colorful=False, note='', **subs_kwargs):
-                   # single_yr=None, verbose=False,
-                   # ID=None, as_subplot=False, ax=None, detr=False, **subs_kwargs):
-    """ 
-    Default plotting of scatter values for global data
-    If as_subplot, plots scatterplot onto given axis (ax)
-    """
+def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwargs):
+    """ Scatter plots of timeseries data incl. monthly averages of chosen substances. """
     data = glob_obj.df
     df_mm = tools.monthly_mean(data)
     substances = [dcts.get_subs(col_name=c) for c in data.columns
@@ -46,6 +58,7 @@ def scatter_global(glob_obj, detr=False, colorful=False, note='', **subs_kwargs)
 
     for substance in substances: 
         col = substance.col_name
+        
         if detr and 'detr'+col not in data.columns:
             try: 
                 glob_obj.detrend_substance(substance.short_name)
@@ -56,79 +69,111 @@ def scatter_global(glob_obj, detr=False, colorful=False, note='', **subs_kwargs)
             except: print(f'Could not detrend {substance.short_name}')
 
         fig, ax = plt.subplots(dpi=250, figsize=(8,4))
-        # Plot mixing ratio msmts and monthly mean
-        ymin = np.nanmin(data[col])
-        ymax = np.nanmax(data[col])
-
+        if note: ax.text(**dcts.note_dict(ax, s=note, y=0.075))
+        
+        # Plot mixing ratios x
         if colorful:
             cmap = plt.cm.viridis_r
             extend = 'neither'
-            vmin = np.nanmin([ymin, dcts.get_vlims(substance.short_name)[0]])
-            vmax = np.nanmax([ymax, dcts.get_vlims(substance.short_name)[1]])
+            vmin, vmax = vlims.get(substance.short_name)
+            if 'mol' in substance.unit: 
+                ref_unit = dcts.get_substances(short_name=substance.short_name, source='Caribic')[0].unit
+                vmin = tools.conv_PartsPer_molarity(vmin, ref_unit)
+                vmax = tools.conv_PartsPer_molarity(vmax, ref_unit)
             norm = Normalize(vmin, vmax)
-    
+        
         ax.scatter(data.index, data[col],
-                   label='Mixing ratio',
-                   marker='.', zorder=1, 
+                   #label='Mixing ratio',
+                   marker='.',  s = 4, zorder=1,
                    c = data[col] if colorful else 'grey',
                    alpha=1 if colorful else 0.4,
                    cmap = cmap if colorful else None, 
                    norm = norm if colorful else None)
 
         if colorful:
-            cbar = plt.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = ax, extend=extend)
-            cbar.ax.set_xlabel(f'{substance.short_name} [{substance.unit}]')
+            cbar = plt.colorbar(sm(norm=norm, cmap=cmap), aspect=30, ax = ax, 
+                                extend=extend, orientation='vertical',
+                                label = f'{substance.short_name.upper()} [{substance.unit}]')
+            # cbar.ax.set_xlabel(substance.unit, fontsize=8)
 
-        # plot monthly mean on top of the data
-        ax.plot(df_mm.index, df_mm[col], label = 'monthly mean',
-                color='k' if colorful else 'g', lw=0.5, zorder=2)
+        ax.set_ylabel(dcts.make_subs_label(substance))
+        ax.set_xlabel('Time')
+
+        if len(glob_obj.years)>3: 
+            ax.xaxis.set_major_locator(mdates.YearLocator())
+        elif len(glob_obj.years)==1:
+            ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+        else:
+            ax.xaxis.set_minor_locator(mdates.MonthLocator(interval=1))
+
+        # Plot monthly means on top of the data
+        outline = mpe.withStroke(linewidth=2, foreground='white')
+        line, = ax.plot(df_mm.index + dt.timedelta(days=15), df_mm[col], 
+                path_effects=[outline],
+                label = 'Monthly mean', 
+                color='k' if colorful else 'g', 
+                lw=0.7, zorder=2)
 
         for i, mean in enumerate(df_mm[col]):
             y,m = df_mm.index[i].year, df_mm.index[i].month
             xmin = dt.datetime(y, m, 1),
             xmax = dt.datetime(y, m, monthrange(y, m)[1])
             ax.hlines(mean, xmin, xmax, color = 'k' if colorful else 'g', 
-                      linestyle='-', zorder=2)
+                      linestyle='-', zorder=2,
+                      path_effects=[outline])
 
-        ax.set_ylabel(dcts.make_subs_label(substance))
-        ax.legend()#title=None if not note else note)
-
+        ax.legend()
         fig.tight_layout(pad=3.0)
         fig.autofmt_xdate()
         plt.show()
     
-def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False, 
-                          single_graph=False, c_pfx=None, ax=None):
+def plot_binned_1d(glob_obj, plot_mean=False, single_yr=None, 
+                   single_graph=False, ax=None, detr=False, 
+                   **subs_kwargs):
+        # glob_obj, subs, single_yr=None, plot_mean=False, detr=False, 
+        #                   single_graph=False, c_pfx=None, ax=None):
     """
     Plots 1D averaged values over latitude / longitude including colormap
     Parameters:
-        substance (str): if None, plots default substance for the object
         single_yr (int): if specified, plots only data for that year
         plot_mean (bool): plot the overall average over all years
         single_graph (bool): choose whether to plot all years on one graph
     """
-    if single_yr is not None: years = [int(single_yr)]
-    else: years = glob_obj.years
-    
-    if c_pfx is not None: pfxs = [c_pfx]
-    else: pfxs = glob_obj.pfxs
-    for pfx in pfxs:
-        out_x_list, out_y_list = glob_obj.binned_1d(subs, c_pfx = pfx, 
-                                                    single_yr = single_yr, detr=detr)
+    # if single_yr is not None: 
+    #     glob_obj = glob_obj.sel_year(single_yr)
+    data = glob_obj.df
+    substances = [dcts.get_subs(col_name=c) for c in data.columns
+                  if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)] 
+                  and not c.startswith('d_')]
+
+    for substance in substances: # for year in glob_obj.years
+        col = substance.col_name
+        
+        if detr and 'detr'+col not in data.columns:
+            try: 
+                glob_obj.detrend_substance(substance.short_name)
+                data = glob_obj.df
+                if 'detr_'+col in data.columns: 
+                    col = 'detr_' + col
+            except: print(f'Could not detrend {substance.short_name}')
+        
+        out_x_list, out_y_list = glob_obj.binned_1d(substance)
+        
         if not single_graph:
             # Plot mixing ratios averages over lats / lons for each year separately
-            for out_x, out_y, year in zip(out_x_list, out_y_list, years):
+            for out_x, out_y, year in zip(out_x_list, out_y_list, glob_obj.years):
                 if not all(np.isnan(out_x.vmean)) and not all(np.isnan(out_y.vmean)):
                     if ax is None: 
                         fig, axs = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-                        fig.suptitle(f'{glob_obj.source} ({pfx}) {subs.upper()} for {year}. Gridsize={glob_obj.grid_size}')
+                        fig.suptitle(f'{dcts.make_subs_label(substance)} for {year}. Gridsize={glob_obj.grid_size}')
                     else: axs = [ax]
         
                     cmap = plt.cm.viridis_r
-                    vmin = np.nanmin([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean),
-                                      dcts.get_vlims(subs)[0]])
-                    vmax = np.nanmax([np.nanmin(out_x.vmean), np.nanmin(out_y.vmean),
-                                      dcts.get_vlims(subs)[1]])
+                    vmin, vmax = vlims.get(substance.short_name)
+                    if 'mol' in substance.unit: 
+                        ref_unit = dcts.get_substances(short_name=substance.short_name, source='Caribic')[0].unit
+                        vmin = tools.conv_PartsPer_molarity(vmin, ref_unit)
+                        vmax = tools.conv_PartsPer_molarity(vmax, ref_unit)
                     norm = Normalize(vmin, vmax) # colormap normalisation for chosen vlims
 
                     axs[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw = 0.5)
@@ -136,13 +181,13 @@ def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False,
                     axs[0].scatter(out_x.xintm, out_x.vmean, # plot across latitude
                                   c = out_x.vmean, cmap = cmap, norm = norm, zorder=2)
                     axs[0].set_xlabel('Latitude [deg]') # ; plt.xlim(out_x.xbmin, out_x.xbmax)
-                    axs[0].set_ylabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
+                    axs[0].set_ylabel(dcts.make_subs_label(substance))
         
                     axs[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw = 0.5)
                     axs[1].scatter(out_y.xintm, out_y.vmean, # plot across longitude
                                   c = out_y.vmean, cmap = cmap, norm = norm, zorder=2)
                     axs[1].set_xlabel('Longitude [deg]') # ; plt.xlim(out_y.xbmin, out_y.xbmax)
-                    axs[1].set_ylabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
+                    axs[1].set_ylabel(dcts.make_subs_label(substance))
         
                     fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = axs[1])
                     plt.show()
@@ -151,14 +196,12 @@ def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False,
         if single_graph:
             # Plot averaged mixing ratios for all years on one graph
             fig, ax = plt.subplots(dpi=300, ncols=2, sharey=True, figsize=(8,3.5))
-            fig.suptitle(f'{glob_obj.source} ({pfx}) {subs.upper()} for \
-                         {glob_obj.years[0]} - {glob_obj.years[-1]}. \
-                             Gridsize={glob_obj.grid_size}')
+            fig.suptitle(f'{dcts.make_subs_label(substance)} for {glob_obj.years[0]} - {glob_obj.years[-1]}')
     
             for out_x, out_y, year in zip(out_x_list, out_y_list, glob_obj.years):
                 ax[0].plot(out_x.xintm, out_x.vmean, label=year)#, c = cmap(norm(year)))
                 ax[0].set_xlabel('Latitude [deg]'); plt.xlim(out_x.xbmin, out_x.xbmax)
-                ax[0].set_ylabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
+                ax[0].set_ylabel(dcts.make_subs_label(substance))
     
                 ax[1].plot(out_y.xintm, out_y.vmean, label=year)# , c = cmap(norm(year)))
                 ax[1].set_xlabel('Longitude [deg]'); plt.xlim(out_y.xbmin, out_y.xbmax)
@@ -175,58 +218,92 @@ def plot_binned_1d(glob_obj, subs, single_yr=None, plot_mean=False, detr=False,
             plt.legend(reversed(handles), reversed(labels),
                        bbox_to_anchor=(1,1), loc='upper left')
             plt.show()
-        return
 
-def plot_binned_2d(glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
+def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
+    # glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
     """
     Create a 2D plot of binned mixing ratios for each available year on a grid.
     Parameters:
-        substance (str)
+        substance (dcts.Substance instance)
         single_yr (int): if specified, plots only data for the chosen year
     """
-    if c_pfx is not None: pfxs = [c_pfx]
-    else: pfxs = glob_obj.pfxs
-    for pfx in pfxs:
-        if single_yr is not None:
-            years = [int(single_yr)]
-            # squeeze=False so that axs is still an array
-            fig, axs = plt.subplots(dpi=300, figsize=(10,5), squeeze=False)
-        else:
-            if not years: years = glob_obj.years
-            if len(years) <= 3:
-                fig, axs = plt.subplots(len(years), 1, dpi=300,
-                                        figsize=(8, 3*len(years)))
-            elif len(years) > 3:
-                fig, axs = plt.subplots(int(len(years)/3), 3, dpi=300,
-                                        figsize=(20, max(len(years), 5)))
-    
-        out_list = glob_obj.binned_2d(subs, single_yr=single_yr, c_pfx=pfx, detr=detr)
-    
-        plt.suptitle(f'{glob_obj.source} ({pfx}) {subs.upper()} mixing ratio measurements. Gridsize={glob_obj.grid_size}', size=25)
+    data = glob_obj.df
+    substances = [dcts.get_subs(col_name=c) for c in data.columns
+                  if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)] 
+                  and not c.startswith('d_')]
+
+    for substance in substances: # for year in glob_obj.years
+        col = substance.col_name
+        
+        if detr and 'detr'+col not in data.columns:
+            try: 
+                glob_obj.detrend_substance(substance.short_name)
+                data = glob_obj.df
+                if 'detr_'+col in data.columns: 
+                    col = 'detr_' + col
+            except: print(f'Could not detrend {substance.short_name}')
+
+        nplots = len(glob_obj.years)
+        nrows = nplots if nplots<=4 else math.ceil(nplots/3)
+        ncols = 1 if nplots<=4 else 3
+        
+        fig = plt.figure(dpi=200, 
+                         figsize=(6*ncols, 3*nrows))
+        grid = AxesGrid(fig, 111,  # similar to subplot(142)
+                    nrows_ncols=(nrows, ncols),
+                    axes_pad=0.4,
+                    share_all=True,
+                    label_mode="all",
+                    cbar_location="bottom",
+                    cbar_mode="single",
+                    )
+
+        # fig, axs = plt.subplots(nrows, ncols,
+        #                         dpi=200,figsize=(6*ncols, 3*nrows), squeeze=False)
+        if nplots>=4: 
+            qual = 'measured' if substance.model=='MSMT' else 'modeled'
+            fig.suptitle(f'Global {qual} mixing ratios of {dcts.make_subs_label(substance)}', fontsize=25)
+            plt.subplots_adjust(top=0.96)
+
+        out_list = glob_obj.binned_2d(substance)
+            
         cmap = plt.cm.viridis_r # create colormap
-        vmin = np.nanmin([np.nanmin(out.vmean) for out in out_list])
-        vmax = np.nanmax([np.nanmax(out.vmean) for out in out_list])
-        # vmin = get_vlims(subs)[0]
-        # vmax = get_vlims(subs)[1]
-    
+        vmin, vmax = vlims.get(substance.short_name)
+        if 'mol' in substance.unit: 
+            ref_unit = dcts.get_substances(short_name=substance.short_name, source='Caribic')[0].unit
+            vmin = tools.conv_PartsPer_molarity(vmin, ref_unit)
+            vmax = tools.conv_PartsPer_molarity(vmax, ref_unit)    
         norm = Normalize(vmin, vmax) # normalise color map to set limits
         world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
     
-        for out, ax, yr in zip(out_list, axs.flatten(), years):
+        for i, (out, ax, yr) in enumerate(zip(out_list, grid, glob_obj.years)):
             world.boundary.plot(ax=ax, color='black', linewidth=0.3)
-            img = ax.imshow(out.vmean, cmap = cmap, norm=norm, origin='lower',
-                       extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
+            img = ax.imshow(out.vmean.T, cmap = cmap, norm=norm, origin='lower',
+                       extent=[out.xbmin, out.xbmax, out.ybmin, out.ybmax])
     
-            cbar = plt.colorbar(img, ax=ax, pad=0.08, orientation='vertical') # colorbar
-            cbar.ax.set_xlabel(f'{dcts.get_col_name(subs, glob_obj.source, pfx)}')
-    
-            ax.set_title(f'{yr}')
-            ax.set_xlabel('Longitude [°E]'); ax.set_xlim(-180,180)
-            ax.set_ylabel('Latitude [°N]'); ax.set_ylim(-60,100)
-    
-        plt.tight_layout()
+            # ax.set_title(f'{yr}')#, weight='bold')
+            ax.text(**dcts.note_dict(ax, 0.13, 0.1, f'{yr}'),  weight='bold')
+            ax.set_xlim(-180,180); ax.set_ylim(-60,100)
+            
+            # label outer plot axes
+            if grid._get_col_row(i)[0] == 0:
+                ax.set_ylabel('Latitude [°N]')
+            if grid._get_col_row(i)[0] == ncols: 
+                ax.set_xlabel('Longitude [°E]')
+
+        for i, ax in enumerate(grid): # hide extra plots
+            if i >= nplots: ax.axis('off')
+            # ax.label_outer()
+        
+        # cbar = plt.colorbar(img, fig.add_axes([0.05, 0.98, 0.95, 0.05], box_aspect=0.05),
+        #                     aspect=10, pad=0.1, orientation='horizontal') # colorbar
+
+        cbar = grid.cbar_axes[0].colorbar(img)
+        cbar.ax.tick_params(labelsize=15, which='both')
+        # cbar.ax.minorticks_on()
+        cbar.ax.set_xlabel(dcts.make_subs_label(substance), fontsize=15)
+        # fig.tight_layout()
         plt.show()
-        return
 
 # Mozart
 def lonlat_1d(mzt_obj, subs='sf6',

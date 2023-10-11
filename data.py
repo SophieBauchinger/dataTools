@@ -105,8 +105,7 @@ class GlobalData(object):
         """
         Returns 1D binned objects for each year as lists (lat / lon)
         Parameters:
-            substance (str): e.g. 'sf6'
-            single_yr (int): if specified, use only data for that year
+            subs (Substance): dcts.Substance instance
         """
         return tools.bin_1d(self, subs, **kwargs) # out_x_list, out_y_list
 
@@ -114,8 +113,7 @@ class GlobalData(object):
         """
         Returns 2D binned object for each year as a list
         Parameters:
-            substance (str): if None, uses default substance for the object
-            single_yr (int): if specified, uses only data for that year
+            subs (Substance): dcts.Substance instance
         """
         return tools.bin_2d(self, subs, **kwargs) # out_list
 
@@ -746,8 +744,8 @@ class GlobalData(object):
             
             for column in data.columns:
                 # coordinates
-                if column in [c.col_name for c in dcts.get_coordinates()]+['Flight number']: continue
-                if column in [c.col_name+'_at_fl' for c in dcts.get_coordinates()]: continue
+                if column in [c.col_name for c in dcts.get_coordinates(vcoord='not_mxr')]+['Flight number']: continue
+                if column in [c.col_name+'_at_fl' for c in dcts.get_coordinates(vcoord='not_mxr')]: continue
                 if column.startswith('d_'): continue
                 # substances
                 elif column in [s.col_name for s in dcts.get_substances() 
