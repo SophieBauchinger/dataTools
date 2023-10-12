@@ -21,7 +21,7 @@ Substances in Caribic data:
 """
 import matplotlib.pyplot as plt
 
-from data import Caribic, Mozart, EMAC, TropopauseData, Mauna_Loa, Mace_Head
+from data import Caribic, Mozart, EMAC, TropopauseData, MaunaLoa, MaceHead
 import dictionaries as dcts
 from lags import calc_time_lags
 
@@ -35,9 +35,8 @@ from plot.gradients import plot_gradient_by_season
 #%% Get Data
 # year_range = range(1980, 2021)
 
-mlo_data = {subs : Mauna_Loa(subs=subs) for subs
-            in dcts.substance_list('MLO')}
-mhd = Mace_Head() # only 2012 data available
+mlo = MaunaLoa()
+mhd = MaceHead() # only 2012 data available
 mzt = Mozart() # only available up to 2008
 caribic = Caribic()
 emac = EMAC()
@@ -81,30 +80,30 @@ for yr_range in yr_ranges:
 
 plot.data.lonlat_1d(mzt, 'sf6', single_yr = 2005)
 
-for subs, mlo_obj in mlo_data.items():
-    plot.data.local(mlo_obj, subs)
+# for subs, mlo_obj in mlo_data.items():
+#     plot.data.local(mlo_obj, subs)
 
 plot.data.local(mhd, 'sf6')
 
 #%% Time lags - lags are added to dictionary caribic.lags as lags_pfx : dataframe
 lag_plot= False
 
-calc_time_lags(caribic, mlo_data['sf6'], range(2005, 2020),
-               substance = 'sf6', plot_all=lag_plot)
-calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020),
-               substance = 'n2o', pfx='INT2', plot_all=lag_plot)
+# calc_time_lags(caribic, mlo_data['sf6'], range(2005, 2020),
+#                substance = 'sf6', plot_all=lag_plot)
+# calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020),
+#                substance = 'n2o', pfx='INT2', plot_all=lag_plot)
 
-calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020),
-               substance = 'n2o', plot_all=lag_plot)
-calc_time_lags(caribic, mlo_data['co2'], range(2005, 2020),
-               substance = 'co2', pfx='INT2', plot_all=lag_plot)
+# calc_time_lags(caribic, mlo_data['n2o'], range(2005, 2020),
+#                substance = 'n2o', plot_all=lag_plot)
+# calc_time_lags(caribic, mlo_data['co2'], range(2005, 2020),
+#                substance = 'co2', pfx='INT2', plot_all=lag_plot)
 
 # to delete the newly created attributes may use
 # del caribic.data['lag_GHG'] etc
 
 #%% Detrend
-for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-    caribic.detrend(subs, mlo_data[subs])
+# for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+#     caribic.detrend(subs, mlo_data[subs])
 
 #%% Plot gradients
 for pfx in ['INT2']:# caribic.pfxs:

@@ -351,8 +351,9 @@ def bin_1d(glob_obj, subs, **kwargs):
     Returns:
         out_x_list, out_y_list: lists of Bin1D objects binned along x / y
     """
-    # df = glob_obj.df
     substance = subs.col_name
+    if kwargs.get('detr') and 'detr_'+substance in glob_obj.df.columns:
+        substance = 'detr_'+substance
 
     if kwargs.get('xbinlimits') is not None: # not equidistant binning
         x_binclassinstance = bp.Bin_notequi1d(kwargs.get('xbinlimits'))
@@ -391,6 +392,11 @@ def bin_2d(glob_obj, subs, **kwargs):
         single_yr (int): if specified, uses only data for that year
     """
     substance = subs.col_name
+    if kwargs.get('detr'):
+        if 'detr_'+substance in glob_obj.df.columns:
+            substance = 'detr_'+substance
+        else:
+            print(f'detr_{substance} not found in {glob_obj.source} dataframe.')
 
     out_list = []
     for yr in glob_obj.years: # loop through available years if possible

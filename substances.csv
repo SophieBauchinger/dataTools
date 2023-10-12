@@ -1,43 +1,42 @@
 ﻿col_name,long_name,short_name,unit,ID,source,model,function
 CH4,CH4 mixing ratio,ch4,ppb,GHG,Caribic,MSMT,h
 tracer_gp_CH4_at_fl,tracer GP CH4,ch4,mol mol-1,EMAC,EMAC,EMAC,h
+int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h
+int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INT2,Caribic,CLAMS,h
+int_CARIBIC2_CH4,replacement for CH4,ch4,ppbV,INT2,Caribic,MSMT,h
+int_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INT,Caribic,MSMT,h
+int_CLaMS_CO,CO (CLaMS),co,ppb,INT2,Caribic,CLAMS,q
+int_CARIBIC2_CO,Carbon monoxide mixing ratio,co,ppbv,INT2,Caribic,MSMT,q
 CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h
+int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h
+int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INT2,Caribic,CLAMS,h
+tracer_gp_CO2_at_fl,tracer GP CO2,co2,mol mol-1,EMAC,EMAC,EMAC,h
+int_CARIBIC2_CO2,replacement for CO2,co2,ppmV,INT2,Caribic,MSMT,h
 d_CH4,absolute precision of CH4,d_ch4,ppb,GHG,Caribic,MSMT,
 d_CO2,absolute precision of CO2,d_co2,ppm,GHG,Caribic,MSMT,
 d_N2O,absolute precision of N2O,d_n2o,ppb,GHG,Caribic,MSMT,
 d_SF6,absolute precision of SF6,d_sf6,ppt,GHG,Caribic,MSMT,
-N2O,N2O mixing ratio,n2o,ppb,GHG,Caribic,MSMT,s
-SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q
-int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h
-int_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INT,Caribic,MSMT,h
-tracer_gp_CO2_at_fl,tracer GP CO2,co2,mol mol-1,EMAC,EMAC,EMAC,h
-int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h
-int_H2O_gas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INT,Caribic,MSMT,
-int_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INT,Caribic,MSMT,
-int_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INT,Caribic,MSMT,
-int_O3,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INT,Caribic,MSMT,
-int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INT2,Caribic,CLAMS,h
-int_CARIBIC2_CH4,replacement for CH4,ch4,ppbV,INT2,Caribic,MSMT,h
-int_CLaMS_CO,CO (CLaMS),co,ppb,INT2,Caribic,CLAMS,q
-int_CARIBIC2_CO,Carbon monoxide mixing ratio,co,ppbv,INT2,Caribic,MSMT,q
-int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INT2,Caribic,CLAMS,h
-N2OcatsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_n2o,ppb,MLO,Mauna_Loa,MSMT,
-N2OcatsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_n2o,ppb,MLO,Mauna_Loa,MSMT,
-int_CARIBIC2_CO2,replacement for CO2,co2,ppmV,INT2,Caribic,MSMT,h
-SF6catsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_sf6,ppt,MLO,Mauna_Loa,MSMT,
-SF6catsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_sf6,ppt,MLO,Mauna_Loa,MSMT,
 int_CLaMS_F11,F11 (CLaMS),f11,ppt,INT2,Caribic,CLAMS,
 int_CLaMS_F12,F12 (CLaMS),f12,ppt,INT2,Caribic,CLAMS,
+int_H2O_gas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INT,Caribic,MSMT,
 int_CLaMS_H2O,H2O  (CLaMS),h2o,ppm,INT2,Caribic,CLAMS,
 int_CARIBIC2_H2Ogas,gaseous H2O volume mixing ratio,h2o,ppmv,INT2,Caribic,MSMT,
+N2OcatsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_n2o,ppb,MLO,Mauna_Loa,MSMT,
+N2OcatsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_n2o,ppb,MLO,Mauna_Loa,MSMT,
+N2O,N2O mixing ratio,n2o,ppb,GHG,Caribic,MSMT,s
+SF6catsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_sf6,ppt,MLO,Mauna_Loa,MSMT,
+SF6catsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_sf6,ppt,MLO,Mauna_Loa,MSMT,
 int_CLaMS_N2O,N2O (CLaMS),n2o,ppb,INT2,Caribic,CLAMS,s
-tracer_gp_N2O_at_fl,tracer GP N2O,n2o,mol mol-1,EMAC,EMAC,EMAC,s
+int_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INT,Caribic,MSMT,
 int_CARIBIC2_NO,NO volume mixing ratio,no,ppbv,INT2,Caribic,MSMT,
+int_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INT,Caribic,MSMT,
 int_CARIBIC2_NOy,NOy volume mixing ratio,noy,ppbv,INT2,Caribic,MSMT,
-N2OcatsMLOm,"Nitrous Oxide (N2O) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: NOAA 2006A",n2o,ppb,MLO,Mauna_Loa,MSMT,s
+tracer_gp_N2O_at_fl,tracer GP N2O,n2o,mol mol-1,EMAC,EMAC,EMAC,s
+int_O3,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INT,Caribic,MSMT,
 int_CLaMS_O3,O3 (CLaMS),o3,ppb,INT2,Caribic,CLAMS,
+N2OcatsMLOm,"Nitrous Oxide (N2O) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: NOAA 2006A",n2o,ppb,MLO,Mauna_Loa,MSMT,s
 int_CARIBIC2_Ozone,replacement for Ozone,o3,ppbV,INT2,Caribic,MSMT,
-CH2Cl2,CH2Cl2 (scale: SIO-14),ch2cl2,ppt,MHD,Mace_Head,MSMT,
+SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q
 SF6_MDH,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q
 tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,
 ch4_MLO,measured_mole_fraction_of_ch4_in_dry_air,ch4,ppb,MLO,Mauna_Loa,MSMT,h

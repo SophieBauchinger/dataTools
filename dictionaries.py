@@ -85,7 +85,7 @@ def get_coord(**kwargs):
     #     raise KeyError('Please supply at least one of vcoord, hcoord, var.')
     coordinates = get_coordinates(**kwargs) # dict i:Coordinate
     if len(coordinates) > 1: 
-        raise Warning(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
+        raise ValueError(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
         return [i.col_name for i in coordinates]
     return coordinates[0]
 
@@ -245,7 +245,7 @@ def get_col_name(substance, ID, clams=False):
     #TODO change source, c_pfx to ID in all other scripts
     return get_subs(substance, ID, clams).col_name
 
-def make_subs_label(substances):
+def make_subs_label(substances, name_only=False):
     """ Returns string to be used as axis label for a specific Coordinate object. """
     if not isinstance(substances, (list, set)): substances = [substances]
     labels=[]
@@ -260,7 +260,9 @@ def make_subs_label(substances):
             source += f' - {subs.ID}'
         unit = subs.unit if not subs.unit=='mol mol-1' else '$mol/mol$'
         label = f'{name} [{unit}] ({source})'
-        labels.append(label)
+        if name_only: labels.append(name)
+        else: labels.append(label)
+    
     if len(substances)==1: return labels[0]
     else: return labels
 
