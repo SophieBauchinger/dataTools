@@ -20,6 +20,7 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
 import dictionaries as dcts
 from data import TropopauseData
+import tools
 
 world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
 vlims = {'p':(100,500), 'pt':(300, 400), 'z':(7.5,17.5)}
@@ -71,7 +72,7 @@ class TropopausePlotter(TropopauseData):
         fig.tight_layout()
         plt.show()
 
-    def scatter_2d(self, save=False, year=None):
+    def scatter_2d(self, savefig=False, year=None):
         """ 2D global scatter of tropopause height.
         Parameters:
             save (bool): save plot to pdir instead of plotting
@@ -112,7 +113,7 @@ class TropopausePlotter(TropopauseData):
                     cbar.ax.set_xlabel(f'{vc} [{tp.unit}]')
                     ax.set_ylim(-90, 90); ax.set_xlim(-180, 180)
                 fig.tight_layout()
-                if save:
+                if savefig:
                     plt.savefig(pdir+'\{}{}.png'.format(
                         tp.col_name, '_'+str(year) if year else ''))
 
@@ -137,13 +138,13 @@ class TropopausePlotter(TropopauseData):
         for i, ax in enumerate(axs.flatten()): # hide extra plots
             if i > len(tps): ax.axis('off')
 
-        vcs = {'p': 'Pressure',
-               'z' : 'geopotential height',
-               'pt' : 'Potential Temperature'}
+        vcoord_names = {'p': 'Pressure',
+                        'z' : 'Geopotential Height',
+                        'pt' : 'Potential Temperature'}
 
-        fig.suptitle('{} {} coordinates'.format(
+        fig.suptitle('{} {}'.format(
             'Vertical extent of troposphere in' if not rel
-            else 'Distance between flight track and troposphere in', vcs[vcoord]))
+            else 'Distance between flight track and troposphere in', vcoord_names[vcoord]))
         
         if note: 
             fig.subplots_adjust(top=0.85)
@@ -163,13 +164,13 @@ class TropopausePlotter(TropopauseData):
                 # prep data: only take tps in ranges they make sense in
                 if not tp.col_name in data.columns: pass
                 if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
-                    data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.x) ])]
+                    data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.y) ])]
                 if tp.tp_def == 'cpt': # cold point TP only in the tropics
-                    data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.x) ])]
+                    data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.y) ])]
 
                 # bin using same binclassinstance as all other tropopauses
                 bin1d = Simple_bin_1d(data[tp.col_name],
-                                      np.array(data.geometry.x), bci)
+                                      np.array(data.geometry.y), bci)
                 if not seasonal:
                     vmeans[tp.col_name] = bin1d.vmean
                     vmeans_std[tp.col_name+'_std'] = bin1d.vstdv
@@ -308,14 +309,15 @@ class TropopausePlotter(TropopauseData):
                         if c.tp_def not in ['combo', 'cpt']]]
         
         if minimise_tps:
+            tps = tools.minimise_tps(tps)
             # check if coord exists with pt, remove if it does 
-            tp_to_remove = []
-            for tp in tps:
-                try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
-                                    pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
-                except: continue
-                if not tp.vcoord=='pt': tp_to_remove.append(tp)
-            for tp in tp_to_remove: tps.remove(tp)
+            # tp_to_remove = []
+            # for tp in tps:
+            #     try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
+            #                         pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
+            #     except: continue
+            #     if not tp.vcoord=='pt': tp_to_remove.append(tp)
+            # for tp in tp_to_remove: tps.remove(tp)
         
         # create pseudo coordinate for n2o filter -> already in tps now
         # subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if c in [s.col_name for s in dcts.get_substances()]]
