@@ -10,7 +10,6 @@ import datetime as dt
 import pandas as pd
 import geopandas
 from shapely.geometry import Point
-import copy
 from metpy.units import units
 
 import toolpac.calc.binprocessor as bp
@@ -171,34 +170,35 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     return ds[variables]
 
 #%% Data selection
-def data_selection(glob_obj, flights=None, years=None, latitudes=None,
-                   tropo=False, strato=False, extr_events=False, **kwargs):
-    """ Return new Caribic instance with selection of parameters
-        flights (int / list(int))
-        years (int / list(int))
-        latitudes (tuple): lat_min, lat_max
-        tropo, strato, extr_events (bool)
-        kwargs: e.g. tp_def, ... - for strat / trop filtering
-    """
-    out = copy.deepcopy(glob_obj)
-    if flights is not None: out = out.sel_flight(flights)
-    if years is not None: out = out.sel_year(years)
-    if latitudes is not None:
-        out = out.sel_latitude(*latitudes)
-        out.status.update({'latitudes' : latitudes})
-    if strato:
-        out = out.sel_strato(**kwargs)
-        out.status.update({'strato' : True})
-    if tropo:
-        out = out.sel_tropo(**kwargs)
-        out.status.update({'tropo' : True})
-    if extr_events:
-        out = out.filter_extreme_events(**kwargs)
-        out.status.update({'no_ee' : True})
-    return out
+# import copy
+# def data_selection(glob_obj, flights=None, years=None, latitudes=None,
+#                    tropo=False, strato=False, extr_events=False, **kwargs):
+#     """ Return new Caribic instance with selection of parameters
+#         flights (int / list(int))
+#         years (int / list(int))
+#         latitudes (tuple): lat_min, lat_max
+#         tropo, strato, extr_events (bool)
+#         kwargs: e.g. tp_def, ... - for strat / trop filtering
+#     """
+#     out = copy.deepcopy(glob_obj)
+#     if flights is not None: out = out.sel_flight(flights)
+#     if years is not None: out = out.sel_year(years)
+#     if latitudes is not None:
+#         out = out.sel_latitude(*latitudes)
+#         out.status.update({'latitudes' : latitudes})
+#     if strato:
+#         out = out.sel_strato(**kwargs)
+#         out.status.update({'strato' : True})
+#     if tropo:
+#         out = out.sel_tropo(**kwargs)
+#         out.status.update({'tropo' : True})
+#     if extr_events:
+#         out = out.filter_extreme_events(**kwargs)
+#         out.status.update({'no_ee' : True})
+#     return out
 
 #%% Data Handling
-def make_season(month):
+def make_season(month) -> np.array:
     """ If given array of months, return integer representation of seasons
     1 - spring, 2 - summer, 3 - autumn, 4 - winter """
     season = len(month)*[None]
@@ -209,7 +209,7 @@ def make_season(month):
         elif m in [12, 1, 2]:   season[i] = 4 # winter
     return season
 
-def assign_t_s(df, TS, coordinate, tp_val=0):
+def assign_t_s(df, TS, coordinate, tp_val=0) -> pd.Series:
     """ Returns the bool series of t / s after applying appropriate comparison for a chosen vcoord.
 
     Parameters:
@@ -230,7 +230,7 @@ def assign_t_s(df, TS, coordinate, tp_val=0):
 
     else: raise KeyError(f'Strat/Trop assignment undefined for {coordinate}')
 
-def get_lin_fit(series, degree=2): # previously get_mlo_fit
+def get_lin_fit(series, degree=2) -> np.array: # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
     the substance (col name) """
     year, month = series.index.year, series.index.month
@@ -240,7 +240,7 @@ def get_lin_fit(series, degree=2): # previously get_mlo_fit
     print(f'Fit parameters obtained: {fit}')
     return fit
 
-def pre_flag(data_arr, ref_arr, crit='n2o', limit = 0.97, **kwargs):
+def pre_flag(data_arr, ref_arr, crit='n2o', limit = 0.97, **kwargs) -> pd.DataFrame:
     """ Sort data into strato / tropo based on difference to ground obs.
 
     Returns dataframe containing index and strato/tropo/pre_flag columns
@@ -289,61 +289,56 @@ def conv_PartsPer_molarity(x, unit):
                }
     return x*factor[unit]
 
+def minimise_tps(tps) -> list:
+    """ Remove unnecessary tropopause coordinates from a list. """
+        # check if coord exists with pt, remove if it does 
+    tp_to_remove = []
+    for tp in tps:
+        try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
+                            pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
+        except: continue
+        if not tp.vcoord=='pt': tp_to_remove.append(tp)
+    for tp in tp_to_remove: tps.remove(tp)
+    return tps
+
+
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
-def coord_merge_substance(c_obj, subs, save=True, detr=True):
-    """ Insert msmt data into full coordinate df from coord_merge() """
-    # create reference df if it doesn't exist
-    if not 'met_data' in dir(c_obj): df = c_obj.coord_combo()
-    else: df = c_obj.met_data.copy()
+# def coord_merge_substance(c_obj, subs, save=True, detr=True):
+#     """ Insert msmt data into full coordinate df from coord_merge() """
+#     # create reference df if it doesn't exist
+#     if not 'met_data' in dir(c_obj): df = c_obj.coord_combo()
+#     else: df = c_obj.met_data.copy()
 
-    if detr:
-        try: c_obj.detrend(subs) # add detrended data to all dataframes
-        except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
+#     if detr:
+#         try: c_obj.detrend(subs) # add detrended data to all dataframes
+#         except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
 
-    subs_cols = dcts.get_substances(short_name=subs, source=c_obj.source)
-    subs_cols.update(dcts.get_substances(short_name='d_'+subs, source=c_obj.source))
+#     subs_cols = dcts.get_substances(short_name=subs, source=c_obj.source)
+#     subs_cols.update(dcts.get_substances(short_name='d_'+subs, source=c_obj.source))
 
-    for pfx in c_obj.pfxs:
-        data = c_obj.data[pfx].sort_index()
-        cols = [k for k,v in subs_cols.items() if v.ID == pfx and v.col_name in data.columns]
-        df = df.join(data[cols])
+#     for pfx in c_obj.pfxs:
+#         data = c_obj.data[pfx].sort_index()
+#         cols = [k for k,v in subs_cols.items() if v.ID == pfx and v.col_name in data.columns]
+#         df = df.join(data[cols])
 
-    # Reorder columns to match initial dataframes & put substance to front
-    df = df[list(['Flight number', 'p [mbar]'] + cols
-                 + [c for c in df.columns if c not in
-                    list(['Flight number', 'p [mbar]', 'geometry']+cols)]
-                 + ['geometry'])]
+#     # Reorder columns to match initial dataframes & put substance to front
+#     df = df[list(['Flight number', 'p [mbar]'] + cols
+#                  + [c for c in df.columns if c not in
+#                     list(['Flight number', 'p [mbar]', 'geometry']+cols)]
+#                  + ['geometry'])]
 
-    df.dropna(subset = subs_cols, how='all', inplace=True) # drop rows without any subs data
-    return df
+#     df.dropna(subset = subs_cols, how='all', inplace=True) # drop rows without any subs data
+#     return df
 
 #%% Binning of global data sets
-# def bin_prep(glob_obj, subs, **kwargs):
-#     c_pfx = kwargs.get('c_pfx') # only for caribic data; otherwise None
-#     substance = dcts.get_col_name(subs, glob_obj.source, c_pfx)
 
-#     if kwargs.get('single_yr') is not None:
-#         years = [int(kwargs.get('single_yr'))]
-#     else: years = glob_obj.years
-
-#     # for Caribic, need to choose the df
-#     if glob_obj.source == 'Caribic': df = glob_obj.data[c_pfx]
-#     else: df = glob_obj.df
-
-#     if kwargs.get('detr') is True:
-#         if not 'detr_'+substance in df.columns:
-#             glob_obj.detrend(subs)
-#         substance = 'detr_' + substance
-
-#     print(substance)
-
-#     return substance, years, df
-
-def bin_1d(glob_obj, subs, **kwargs):
-    """ Returns 1D binned objects for each year as lists (lat / lon)
+def bin_1d(glob_obj, subs, **kwargs) -> (list, list):
+    """ 
+    Returns 1D binned objects for each year as lists (lat / lon)
 
     Parameters:
-        subs (str): e.g. 'sf6'.
+        subs (dictionaries.Substance) 
+
     Optional parameters:
         c_pfx (str): caribic file pfx, required for caribic data
         single_yr (int): if specified, use only data for that specific year
@@ -355,38 +350,38 @@ def bin_1d(glob_obj, subs, **kwargs):
     if kwargs.get('detr') and 'detr_'+substance in glob_obj.df.columns:
         substance = 'detr_'+substance
 
-    if kwargs.get('xbinlimits') is not None: # not equidistant binning
-        x_binclassinstance = bp.Bin_notequi1d(kwargs.get('xbinlimits'))
-    if kwargs.get('ybinlimits') is not None:
-        y_binclassinstance = bp.Bin_notequi1d(kwargs.get('ybinlimits'))
-
-    out_x_list, out_y_list = [], []
+    out_lat_list, out_lon_list = [], []
     for yr in glob_obj.years: # loop through available years
         df_yr = glob_obj.df[glob_obj.df.index.year == yr]
 
-        x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
-        if kwargs.get('xbinlimits') is None: # equidistant binning
-            xbmin, xbmax = min(x), max(x)
-            x_binclassinstance = bp.Bin_equi1d(xbmin, xbmax, glob_obj.grid_size)
-        out_x = bp.Simple_bin_1d(df_yr[substance], x, x_binclassinstance)
-        out_x.__dict__.update(x_binclassinstance.__dict__)
+        lat = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lat
+        if kwargs.get('lat_binlimits'):
+            lat_binclassinstance = bp.Bin_notequi1d(kwargs.get('lat_binlimits'))
+        else: 
+            lat_bmin, lat_bmax = np.nanmin(lat), np.nanmax(lat)
+            lat_binclassinstance = bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size)
+        out_lat = bp.Simple_bin_1d(df_yr[substance], lat, lat_binclassinstance)
+        out_lat.__dict__.update(lat_binclassinstance.__dict__)
 
-        y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-        if kwargs.get('ybinlimits') is None:
-            ybmin, ybmax = min(y), max(y)
-            y_binclassinstance = bp.Bin_equi1d(ybmin, ybmax, glob_obj.grid_size)
-        out_y = bp.Simple_bin_1d(df_yr[substance], y, y_binclassinstance)
-        out_y.__dict__.update(y_binclassinstance.__dict__)
+        lon = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lon
+        if kwargs.get('lon_binlimits'):
+            lon_binclassinstance = bp.Bin_notequi1d(kwargs.get('lon_binlimits'))
+        else: 
+            lon_bmin, lon_bmax = np.nanmin(lon), np.nanmax(lon)
+            lon_binclassinstance = bp.Bin_equi1d(lon_bmin, lon_bmax, glob_obj.grid_size)
+        out_lon = bp.Simple_bin_1d(df_yr[substance], lon, lon_binclassinstance )
+        out_lon.__dict__.update(lon_binclassinstance.__dict__)
 
-        if not all(np.isnan(out_x.vmean)) or all(np.isnan(out_y.vmean)):
-            out_x_list.append(out_x); out_y_list.append(out_y)
+        if not all(np.isnan(out_lat.vmean)) or all(np.isnan(out_lon.vmean)):
+            out_lat_list.append(out_lat); out_lon_list.append(out_lon)
         else: print(f'everything is nan for {yr}')
 
-    return out_x_list, out_y_list
+    return out_lat_list, out_lon_list
 
-def bin_2d(glob_obj, subs, **kwargs):
+def bin_2d(glob_obj, subs, **kwargs) -> list:
     """
     Returns 2D binned object for each year as a list
+
     Parameters:
         substance (str): if None, uses default substance for the object
         single_yr (int): if specified, uses only data for that year
@@ -402,23 +397,22 @@ def bin_2d(glob_obj, subs, **kwargs):
     for yr in glob_obj.years: # loop through available years if possible
         df_yr = glob_obj.df[glob_obj.df.index.year == yr]
 
-        xbinlimits = kwargs.get('xbinlimits')
-        ybinlimits = kwargs.get('ybinlimits')
-
-        x = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lat
-        if xbinlimits is None:
+        lat = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lat
+        lat_binlimits = kwargs.get('lat_binlimits')
+        if lat_binlimits is None:
             # use equidistant binning if not specified else
-            xbmin, xbmax = min(x), max(x)
-            xbinlimits = list(bp.Bin_equi1d(xbmin, xbmax, glob_obj.grid_size).xbinlimits)
+            lat_bmin, lat_bmax = np.nanmin(lat), np.nanmax(lat)
+            lat_binlimits = list(bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size).xbinlimits)
 
-        y = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))]) # lon
-        if ybinlimits is None:
-            ybmin, ybmax = min(y), max(y)
-            ybinlimits = list(bp.Bin_equi1d(ybmin, ybmax, glob_obj.grid_size).xbinlimits)
+        lon = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))]) # lon
+        lon_binlimits = kwargs.get('lon_binlimits')
+        if lon_binlimits is None:
+            lon_bmin, lon_bmax = np.nanmin(lon), np.nanmax(lon)
+            lon_binlimits = list(bp.Bin_equi1d(lon_bmin, lon_bmax, glob_obj.grid_size).xbinlimits)
 
         # create binclassinstance that's valid for both equi and nonequi
-        binclassinstance = bp.Bin_notequi2d(xbinlimits, ybinlimits)
-        out = bp.Simple_bin_2d(np.array(df_yr[substance]), x, y, binclassinstance)
+        binclassinstance = bp.Bin_notequi2d(lat_binlimits, lon_binlimits)
+        out = bp.Simple_bin_2d(np.array(df_yr[substance]), lat, lon, binclassinstance)
         out.__dict__.update(binclassinstance.__dict__)
 
         out_list.append(out)

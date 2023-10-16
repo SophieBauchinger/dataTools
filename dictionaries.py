@@ -57,7 +57,8 @@ def get_coordinates(**kwargs):
     Exclusion conditions need to have 'not_' prefix """
     df = coordinate_df()
     for cond, val in kwargs.items():
-        if cond not in df.columns: continue
+        if cond not in df.columns: 
+            print(f'{cond} not recognised as valid coordinate qualifier. ')
         # keep only rows where all conditions are fulfilled
         if not str(val).startswith('not_') and not str(val) == 'nan': 
             df = df[df[cond] == kwargs[cond]]
@@ -198,18 +199,24 @@ def substance_df():
     substances['function'] = [fctn_dict.get(f) for f in substances['function']]
     return substances
 
-def get_substances(**kwargs):
-    """ Return dictionary of col_name:Substance for all items were conditions are met """
+def get_substances(**kwargs) -> list('Substance'):
+    """ Return list of Substance for all items conditions are met for. """
     df = substance_df()
     # keep only rows where all conditions are fulfilled
     for cond in kwargs: 
-        df = df[df[cond] == kwargs[cond]]
+        if cond not in df.columns:
+            print(f'{cond} not recognised as valid substance qualifier.')
+        else: df = df[df[cond] == kwargs[cond]]
     if len(df) == 0: 
         raise KeyError('No substance column found using the given specifications')
     df.set_index('col_name', inplace=True)
     subs_dict = df.to_dict(orient='index')
     subs = [Substance(k, **v) for k,v in subs_dict.items()]
     return subs
+
+def get_subs_columns(**kwargs) -> list[str]:
+    """ Returns list of col names that conditions are met for. """
+    return [s.col_name for s in get_substances(**kwargs)]
 
 def substance_list(ID):
     """ Returns list of available substances for a specific datset as short name """
@@ -245,7 +252,7 @@ def get_col_name(substance, ID, clams=False):
     #TODO change source, c_pfx to ID in all other scripts
     return get_subs(substance, ID, clams).col_name
 
-def make_subs_label(substances, name_only=False):
+def make_subs_label(substances, name_only=False, detr=False):
     """ Returns string to be used as axis label for a specific Coordinate object. """
     if not isinstance(substances, (list, set)): substances = [substances]
     labels=[]
@@ -261,7 +268,7 @@ def make_subs_label(substances, name_only=False):
         unit = subs.unit if not subs.unit=='mol mol-1' else '$mol/mol$'
         label = f'{name} [{unit}] ({source})'
         if name_only: labels.append(name)
-        else: labels.append(label)
+        else: labels.append(label if not detr else f'{label} detrended wrt. MLO 2005. ')
     
     if len(substances)==1: return labels[0]
     else: return labels
@@ -285,6 +292,28 @@ def get_fct_substance(substance, verbose=False):
     except:
         if verbose: print(f'No default fctn for {substance}. Using simple harmonic')
         return fct.simple
+
+def get_default_vlims(subs_short, detr=False):
+    vlims = {  # optimised for Caribic measurements from 2005 to 2020
+        'co': (15, 250),
+        'o3': (0.0, 1000),
+        'h2o': (0.0, 1000),
+        'no': (0.0, 0.6),
+        'noy': (0.0, 6),
+        'co2': (370, 420),
+        'ch4': (1650, 1970),
+        'f11': (130, 250),
+        'f12': (400, 540),
+        'n2o': (290, 330),
+        'sf6': (5.5, 10),
+    }
+    
+    vlims_detr = {
+        'sf6': (5.5, 6.5),
+        }
+    
+    try: return vlims[subs_short] if not detr else vlims[subs_short]
+    except: raise KeyError(f'No default vlims for {subs_short} set. ')
 
 #%% Misc
 def dict_season():
