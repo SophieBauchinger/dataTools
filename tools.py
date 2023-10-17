@@ -170,32 +170,39 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     return ds[variables]
 
 #%% Data selection
-# import copy
-# def data_selection(glob_obj, flights=None, years=None, latitudes=None,
-#                    tropo=False, strato=False, extr_events=False, **kwargs):
-#     """ Return new Caribic instance with selection of parameters
-#         flights (int / list(int))
-#         years (int / list(int))
-#         latitudes (tuple): lat_min, lat_max
-#         tropo, strato, extr_events (bool)
-#         kwargs: e.g. tp_def, ... - for strat / trop filtering
-#     """
-#     out = copy.deepcopy(glob_obj)
-#     if flights is not None: out = out.sel_flight(flights)
-#     if years is not None: out = out.sel_year(years)
-#     if latitudes is not None:
-#         out = out.sel_latitude(*latitudes)
-#         out.status.update({'latitudes' : latitudes})
-#     if strato:
-#         out = out.sel_strato(**kwargs)
-#         out.status.update({'strato' : True})
-#     if tropo:
-#         out = out.sel_tropo(**kwargs)
-#         out.status.update({'tropo' : True})
-#     if extr_events:
-#         out = out.filter_extreme_events(**kwargs)
-#         out.status.update({'no_ee' : True})
-#     return out
+def minimise_tps(tps) -> list:
+    """ Returns a reduced list of tropopause coordinates.
+    
+    1. Remove vcoords != pt if tp exists with pt
+    2. remove all cpt, combo tp
+    3. remove all ECMWF tps 
+    4. Remove modelled N2O tp
+    5. Remove 1.5 PVU ERA5 dyn tp
+    6. Remove non-relative tps if relative exists
+    """
+    # check if coord exists with pt, remove if it does 
+    tp_to_remove = []
+    
+    for tp in tps: # 1
+        try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
+                            pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
+        except: continue
+        if not tp.vcoord=='pt': tp_to_remove.append(tp)
+    
+    [tp_to_remove.append(tp) for tp in tps if tp.tp_def in ['cpt', 'combo']] # 2
+    [tp_to_remove.append(tp) for tp in tps if tp.model in ['ECMWF', 'EMAC']] # 3
+    [tp_to_remove.append(tp) for tp in tps 
+         if tp.col_name in [tp.col_name for tp in dcts.get_coordinates(tp_def='chem', crit='n2o', model='not_MSMT')]] # 4
+    [tp_to_remove.append(tp) for tp in tps if tp.pvu==1.5] # 5
+    
+    for tp in tps: # 1
+        try: dcts.get_coord(rel_to_tp=True, model=tp.model, tp_def=tp.tp_def, 
+                            pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)
+        except: continue
+        if tp.rel_to_tp is False: tp_to_remove.append(tp)
+    tps = tps.copy()
+    for tp in set(tp_to_remove): tps.remove(tp)
+    return tps
 
 #%% Data Handling
 def make_season(month) -> np.array:
@@ -289,17 +296,7 @@ def conv_PartsPer_molarity(x, unit):
                }
     return x*factor[unit]
 
-def minimise_tps(tps) -> list:
-    """ Remove unnecessary tropopause coordinates from a list. """
-        # check if coord exists with pt, remove if it does 
-    tp_to_remove = []
-    for tp in tps:
-        try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
-                            pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
-        except: continue
-        if not tp.vcoord=='pt': tp_to_remove.append(tp)
-    for tp in tp_to_remove: tps.remove(tp)
-    return tps
+
 
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
