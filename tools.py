@@ -178,11 +178,11 @@ def minimise_tps(tps) -> list:
     3. remove all ECMWF tps 
     4. Remove modelled N2O tp
     5. Remove 1.5 PVU ERA5 dyn tp
-    6. Remove non-relative tps if relative exists
+    6. Remove non-relative tps if relative exists in tps
     """
     # check if coord exists with pt, remove if it does 
     tp_to_remove = []
-    
+
     for tp in tps: # 1
         try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
                             pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
@@ -194,14 +194,18 @@ def minimise_tps(tps) -> list:
     [tp_to_remove.append(tp) for tp in tps 
          if tp.col_name in [tp.col_name for tp in dcts.get_coordinates(tp_def='chem', crit='n2o', model='not_MSMT')]] # 4
     [tp_to_remove.append(tp) for tp in tps if tp.pvu==1.5] # 5
-    
-    for tp in tps: # 1
-        try: dcts.get_coord(rel_to_tp=True, model=tp.model, tp_def=tp.tp_def, 
-                            pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)
+
+    for tp in tps: # 6 
+        try: 
+            rel_tp = dcts.get_coord(rel_to_tp=True, model=tp.model, tp_def=tp.tp_def, 
+                           pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)
         except: continue
-        if tp.rel_to_tp is False: tp_to_remove.append(tp)
+        if (any(tp.col_name == rel_tp.col_name for tp in tps) 
+            and tp.rel_to_tp is False): 
+                tp_to_remove.append(tp)
     tps = tps.copy()
     for tp in set(tp_to_remove): tps.remove(tp)
+    tps.sort(key=lambda x: x.col_name)
     return tps
 
 #%% Data Handling

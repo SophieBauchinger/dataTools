@@ -43,9 +43,10 @@ emac = EMAC()
 tp = TropopauseData()
 
 #%% Tropopause definitions
-tp_param_dicts = dcts.get_tp_params() # ^ for tropopause / stratosphere sorting
-for tp_params in tp_param_dicts:
-    caribic.filter_extreme_events(**tp_params, plot=True)
+tps = dcts.get_coordinates(tp_def='not_nan')
+for tp in tps:
+    if 'tropo_'+tp.col_name in caribic.df_sorted.columns: 
+        caribic.filter_extreme_events(**tp.__dict__)
 
 #%% Plot data
 for pfx in caribic.pfxs: # scatter plots of all caribic data

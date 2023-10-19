@@ -126,51 +126,23 @@ def make_coord_label(coordinates, filter_label=False):
     if len(coordinates)==1: return labels[0]
     else: return labels
 
-# legacy
-def get_tp_params(tp_def=None, ID=None, crit=None, vcoord=None, pvu=None):
-    """ Return a list of all TP params possible given the constraints """
-    #TODO implement EMAC tropopauses in here!! 
-    c_keys = ['tp_def', 'ID', 'crit']
-    c1 = {k:v for k,v in zip(c_keys, ['chem', 'GHG', 'n2o'])}
-    c2 = {k:v for k,v in zip(c_keys, ['chem', 'INT', 'o3'])}
-    c3 = {k:v for k,v in zip(c_keys, ['chem', 'INT2', 'n2o'])}
-    c4 = {k:v for k,v in zip(c_keys, ['chem', 'INT2', 'o3'])}
-
-    t_keys = ['tp_def', 'ID', 'vcoord']
-    t1 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'dp'])}
-    t2 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'pt'])}
-    t3 = {k:v for k,v in zip(t_keys, ['therm', 'INT', 'z'])}
-    t4 = {k:v for k,v in zip(t_keys, ['therm', 'INT2', 'dp'])}
-    t5 = {k:v for k,v in zip(t_keys, ['therm', 'INT2', 'pt'])}
-
-    d_keys = ['tp_def', 'ID', 'vcoord', 'pvu']
-    d1 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 1.5])}
-    d2 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 2.0])}
-    d3 = {k:v for k,v in zip(d_keys, ['dyn', 'INT2', 'pt', 3.5])}
-    d4 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'dp', 3.5])}
-    d5 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'pt', 3.5])}
-    d6 = {k:v for k,v in zip(d_keys, ['dyn', 'INT', 'z',  3.5])}
-
-    # de_keys = ['tp_def', 'coord']
-    # de1 = {k:v for k,v in zip(de_keys, ['dyn', 'p'])}
-    # de2 = {k:v for k,v in zip(de_keys, ['therm', 'p'])}
-    # de3 = {k:v for k,v in zip(de_keys, ['cpt', 'p'])}
-
-    param_dicts = [
-        c1, c2, c3, c4,
-        t1, t2, t3, t4, t5,
-        d1, d2, d3, d4, d5, d6]
-
-    for var in [tp_def, ID, crit, vcoord, pvu]: # e.g. 'therm'
-        if var is not None:
-            param_dicts = [d for d in param_dicts if var in d.values()]
-
-    if len(param_dicts)==0:
-        given_params = ''.join([f"{name} ({val}), " for name, val in zip(['tp_def', 'ID', 'crit', 'coord', 'pvu'],
-                            [tp_def, ID, crit, vcoord, pvu]) if val is not None])
-        raise KeyError(f'No TP params with the following constraints: {given_params}')
-
-    return param_dicts
+def get_default_bsize(short_coord):
+    """ Returns default bin size when given abbreviation for coordinate. """
+    bsizes_dict = {
+        'pt': 10,
+        'p' : 25, 
+        'z' : 0.5,
+        'mxr' : 5, # n2o
+        'eqpt' : 5,
+        'eqlat' : 5, 
+        'lat' : 10, 
+        'lon' : 10, 
+        }
+    
+    try: 
+        return bsizes_dict[short_coord]
+    except: 
+        raise KeyError(f'Cannot find default bin size for {short_coord}')
 
 #%% Substances
 class Substance():
@@ -259,6 +231,7 @@ def make_subs_label(substances, name_only=False, detr=False):
     for subs in substances:
         special_names = {'ch2cl2':'CH$_2$Cl$_2$', 'noy':'NO$_y$', 'f11':'F11', 'f12':'F12'}
         name = '%s' % f'{subs.short_name.upper()}' if not subs.short_name in special_names else special_names[subs.short_name]
+        if name.startswith('DETR_'): name = name[5:]
         if not subs.short_name in special_names: 
             name = ''.join(f"$_{i}$" if i.isdigit() else i for i in name)
         if name.startswith('D_'): name = 'd_'+name[2:]
@@ -268,7 +241,7 @@ def make_subs_label(substances, name_only=False, detr=False):
         unit = subs.unit if not subs.unit=='mol mol-1' else '$mol/mol$'
         label = f'{name} [{unit}] ({source})'
         if name_only: labels.append(name)
-        else: labels.append(label if not detr else f'{label} detrended wrt. MLO 2005. ')
+        else: labels.append(label if not subs.detr else f'{label} detrended wrt. MLO 2005')
     
     if len(substances)==1: return labels[0]
     else: return labels
@@ -293,7 +266,7 @@ def get_fct_substance(substance, verbose=False):
         if verbose: print(f'No default fctn for {substance}. Using simple harmonic')
         return fct.simple
 
-def get_default_vlims(subs_short, detr=False):
+def get_default_vlims(subs_short):
     vlims = {  # optimised for Caribic measurements from 2005 to 2020
         'co': (15, 250),
         'o3': (0.0, 1000),
@@ -306,14 +279,36 @@ def get_default_vlims(subs_short, detr=False):
         'f12': (400, 540),
         'n2o': (290, 330),
         'sf6': (5.5, 10),
+        
+        'detr_sf6': (5.5, 6.5),
     }
     
-    vlims_detr = {
-        'sf6': (5.5, 6.5),
+    try: return vlims[subs_short]
+    except: raise KeyError(f'No default vlims for {subs_short}. ')
+
+def get_default_varibility_vlims(subs_short, atm_layer):
+    variability_tropo = {
+        'detr_sf6' : (0.05, 0.15),
+        'detr_n2o' : (0.8, 1.8),
+        'detr_co'  : (16, 30),
+        'detr_co2' : (2.0, 3.0),
+        'detr_ch4' : (16, 26),
         }
-    
-    try: return vlims[subs_short] if not detr else vlims[subs_short]
-    except: raise KeyError(f'No default vlims for {subs_short} set. ')
+
+    variability_strato = {
+        'detr_sf6' : (0.05, 0.3),
+        'detr_n2o' : (5.1, 13),
+        'detr_co'  : (10, 26),
+        'detr_co2' : (1.2, 1.8),
+        'detr_ch4' : (30, 60),
+        }
+
+    try: 
+        if atm_layer=='tropo':
+            return variability_tropo[subs_short]
+        if atm_layer=='strato':
+            return variability_strato[subs_short]
+    except: raise KeyError(f'No default varibility vlims for {subs_short} in {atm_layer}. ')
 
 #%% Misc
 def dict_season():

@@ -91,7 +91,7 @@ class GlobalData():
             Filter for tropospheric data, then remove extreme events
     """
 
-    def __init__(self, years, grid_size=5):
+    def __init__(self, years, grid_size=5, count_limit=5):
         """
         years: array or list of integers
         grid_size: int
@@ -99,6 +99,7 @@ class GlobalData():
         """
         self.years = years
         self.grid_size = grid_size
+        self.count_limit = count_limit
         self.status = {}  # use this dict to keep track of changes made to data
         self.source = self.ID = None
         self.data = {}
@@ -232,6 +233,18 @@ class GlobalData():
 
         return df_detr, popt
 
+    def detrend_all(self, verbose=False): 
+        """ Add detrended data wherever possible for all available substances. """
+        substances = [dcts.get_subs(col_name = col) for col in self.df.columns 
+                      if col in [s.col_name for s in dcts.get_substances()
+                                 if not s.short_name.startswith(('detr_', 'd_'))]]
+        detr_subs = set([s.short_name for s in substances 
+                         if any(subs.ID in ['MLO'] for subs 
+                                in dcts.get_substances(short_name=s.short_name))])
+        for subs in detr_subs: 
+            if verbose: print(f'Detrending all {subs} data. ')
+            self.detrend_substance(subs, loc_obj=None, ID=None, save=True, plot=False)
+
     def sel_subset(self, **kwargs):
         """ Allows making multiple selections at once. 
 
@@ -267,8 +280,8 @@ class GlobalData():
         
         return out 
         
-    def sel_year(self, *years):
-        """ Returns GlobalData object containing only data for selected years (int) """
+    def sel_year(self, *years: int):
+        """ Returns GlobalData object containing only data for selected years. """
 
         # input validation, choose only years that are actually available
         yr_list = [yr for yr in years if yr in self.years]
@@ -310,7 +323,7 @@ class GlobalData():
         out.years = yr_list
         return out
 
-    def sel_latitude(self, lat_min, lat_max):
+    def sel_latitude(self, lat_min: float, lat_max: float):
         """ Returns GlobalData object containing only data for selected latitudes """
         # copy everything over without changing the original class instance
         out = type(self).__new__(self.__class__)
@@ -372,7 +385,7 @@ class GlobalData():
 
         return out
 
-    def sel_eqlat(self, eql_min, eql_max, model='ERA5'):
+    def sel_eqlat(self, eql_min: float, eql_max: float, model='ERA5'):
         """ Returns GlobalData object containing only data for selected equivalent latitudes """
         # copy everything over without changing the original class instance
         out = type(self).__new__(self.__class__)
@@ -380,7 +393,7 @@ class GlobalData():
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()
 
-        if self.source != 'Caribic':
+        if self.source not in ['Caribic', 'TP']:
             raise NotImplementedError('Action not yet supported for non-Caribic data')
         eql_col = dcts.get_coord(source=self.source, model=model, hcoord='eql').col_name
         df = self.data['met_data'].copy()
@@ -403,7 +416,7 @@ class GlobalData():
 
         return out
 
-    def sel_season(self, season):
+    def sel_season(self, season: int):
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
         
         Parameters: 
@@ -550,9 +563,6 @@ class GlobalData():
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
         df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
         df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
-
-        # df_sorted.loc[(flag != 0 for flag in ol[0]), (strato, tropo)] = (True, False)
-        # df_sorted.loc[(flag == 0 for flag in ol[0]), (strato, tropo)] = (False, True)
 
         df_sorted.drop(columns=[s for s in df_sorted.columns
                                 if s in [subs.col_name, 'd_' + subs.col_name]],
@@ -704,7 +714,7 @@ class GlobalData():
             self.create_df_sorted(save=True)
         return self.data['df_sorted']
 
-    def sel_atm_layer(self, atm_layer, **kwargs):
+    def sel_atm_layer(self, atm_layer: str, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
 
         Parameters:
@@ -874,13 +884,16 @@ class Caribic(GlobalData):
             if subs not in self.data:
                 self.create_substance_df(subs)
 
+        if input('Detrend all? [Y/N] ').upper()=='Y': 
+            self.detrend_all()
+
     def __repr__(self):
         return f"""{self.__class__}
     data: {self.pfxs}
     years: {self.years}
     status: {self.status}"""
 
-    def get_year_data(self, pfx, yr, parent_dir, verbose) -> pd.DataFrame:
+    def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> pd.DataFrame:
         """ Data import for a single year """
         if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
             # removes current year from class attribute if there's no data
@@ -1118,7 +1131,7 @@ class EMAC(GlobalData):
             years: {self.years}\n\
             status: {self.status}'
 
-    def get_data(self, years, s4d, s4d_s, tp, df, recalculate=False) -> dict:
+    def get_data(self, years, s4d: bool, s4d_s: bool, tp: bool, df: bool, recalculate=False) -> dict:
         """ Preprocess EMAC model output and create datasets """
         if not recalculate:
             if s4d:
@@ -1343,6 +1356,9 @@ class TropopauseData(GlobalData):
             finally:
                 self.create_df_sorted(save=True)
 
+        if input('Detrend all? [Y/N] ').upper()=='Y': 
+            self.detrend_all()
+
     def __repr__(self):
         self.years.sort()
         return f'{self.__class__}\n\
@@ -1367,7 +1383,7 @@ class TropopauseData(GlobalData):
         self.flights = list(set(df['Flight number']))
         return df
 
-    def interpolate_emac(self, method, verbose=False) -> dict:
+    def interpolate_emac(self, method: str, verbose=False) -> dict:
         """ Add interpolated EMAC data to joint df to match caribic timestamps.
 
         Parameters:
@@ -1559,7 +1575,7 @@ class MaunaLoa(LocalData):
     def __repr__(self):
         return f'Mauna Loa - {self.substances}'
 
-    def get_data(self, path_dir, data_D=False):
+    def get_data(self, path_dir: str, data_D=False):
         """ Add data for all substances in the given directory to data dictionary. """
         for subs in self.substances:
             self.data[subs] = self.get_subs_data(path_dir, subs, freq='M')
@@ -1571,7 +1587,7 @@ class MaunaLoa(LocalData):
                     continue
         return self
 
-    def get_subs_data(self, path_dir, subs, freq='M') -> pd.DataFrame:
+    def get_subs_data(self, path_dir: str, subs: dcts.Substance, freq='M') -> pd.DataFrame:
         """ Import data from Mauna Loa files.
 
         Parameters:

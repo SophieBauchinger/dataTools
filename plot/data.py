@@ -21,8 +21,6 @@ from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch
 import numpy as np
 
-from toolpac.calc import binprocessor as bp
-
 import geopandas
 from mpl_toolkits.axes_grid1 import AxesGrid
 
