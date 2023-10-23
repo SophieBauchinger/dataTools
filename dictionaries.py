@@ -266,8 +266,9 @@ def get_fct_substance(substance, verbose=False):
         if verbose: print(f'No default fctn for {substance}. Using simple harmonic')
         return fct.simple
 
-def get_default_vlims(subs_short):
-    vlims = {  # optimised for Caribic measurements from 2005 to 2020
+def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple: 
+    """ Default colormap normalisation limits for substance mixing ratio or variability. """
+    vlims_mxr = {  # optimised for Caribic measurements from 2005 to 2020
         'co': (15, 250),
         'o3': (0.0, 1000),
         'h2o': (0.0, 1000),
@@ -279,15 +280,23 @@ def get_default_vlims(subs_short):
         'f12': (400, 540),
         'n2o': (290, 330),
         'sf6': (5.5, 10),
-        
+
         'detr_sf6': (5.5, 6.5),
     }
     
-    try: return vlims[subs_short]
-    except: raise KeyError(f'No default vlims for {subs_short}. ')
+    if bin_attr=='vmean': 
+        try: return vlims_mxr[subs_short]
+        except: raise KeyError(f'No default vlims for {subs_short}. ')
 
-def get_default_varibility_vlims(subs_short, atm_layer):
-    variability_tropo = {
+    vlims_stdv_total = {
+        'detr_sf6' : (0, 0.3),
+        'detr_n2o' : (0, 13),
+        'detr_co'  : (10, 30),
+        'detr_co2' : (0.8, 3.0),
+        'detr_ch4' : (16, 60),
+        }
+
+    vlims_stdv_tropo = {
         'detr_sf6' : (0.05, 0.15),
         'detr_n2o' : (0.8, 1.8),
         'detr_co'  : (16, 30),
@@ -295,20 +304,23 @@ def get_default_varibility_vlims(subs_short, atm_layer):
         'detr_ch4' : (16, 26),
         }
 
-    variability_strato = {
+    vlims_stdv_strato = {
         'detr_sf6' : (0.05, 0.3),
         'detr_n2o' : (5.1, 13),
         'detr_co'  : (10, 26),
         'detr_co2' : (1.2, 1.8),
         'detr_ch4' : (30, 60),
         }
-
-    try: 
-        if atm_layer=='tropo':
-            return variability_tropo[subs_short]
-        if atm_layer=='strato':
-            return variability_strato[subs_short]
-    except: raise KeyError(f'No default varibility vlims for {subs_short} in {atm_layer}. ')
+    
+    if bin_attr=='vstdv':
+        if not atm_layer: 
+            return vlims_stdv_total[subs_short]
+        elif atm_layer=='tropo': 
+            return vlims_stdv_tropo[subs_short]
+        elif atm_layer=='strato':
+            return vlims_stdv_strato[subs_short]
+        else: 
+            raise KeyError(f'No default vlims for {subs_short} STDV in {atm_layer}')
 
 #%% Misc
 def dict_season():
@@ -324,17 +336,17 @@ def dict_tps():
             'color_therm' : '#ff7f0e',
             'color_dyn' : '#2ca02c'}
 
-def get_vlims(substance):
-    """ Get default limits for colormaps per substance """
-    v_limits = {
-        'sf6': (6,9),
-        'n2o': (310,340),
-        'co2': (320,380),
-        'ch4': (1600,1950),
-        'co' : (50, 160)}
-    try: v_lims = v_limits[substance.lower()]
-    except: v_lims = (np.nan, np.nan); print('no default v_lims found')
-    return v_lims
+# def get_vlims(substance):
+#     """ Get default limits for colormaps per substance """
+#     v_limits = {
+#         'sf6': (6,9),
+#         'n2o': (310,340),
+#         'co2': (320,380),
+#         'ch4': (1600,1950),
+#         'co' : (50, 160)}
+#     try: v_lims = v_limits[substance.lower()]
+#     except: v_lims = (np.nan, np.nan); print('no default v_lims found')
+#     return v_lims
 
 def note_dict(fig_or_ax, x=None, y=None, s=None):
     """ Return default arguments & bbox dictionary for adding notes to plots. """
