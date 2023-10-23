@@ -16,6 +16,7 @@ import matplotlib.gridspec as gridspec
 from mpl_toolkits.axes_grid1 import AxesGrid
 from PIL import Image
 import glob
+import cmasher as cmr
 
 import toolpac.calc.dev_binprocessor as bp
 # from toolpac.calc.binprocessor import Bin_equi1d, Simple_bin_1d, Bin_equi2d, Simple_bin_2d
@@ -488,7 +489,7 @@ def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
 #%% Variability
 
 variability_tropo = {
-    'detr_sf6' : (0.05, 0.15),
+    'detr_sf6' : (0.05, 0.17),
     'detr_n2o' : (0.8, 1.8),
     'detr_co'  : (16, 30),
     'detr_co2' : (2.0, 3.0),
@@ -526,7 +527,7 @@ def plot_stdev_2d(glob_obj, detr=False,
 
         fig = plt.figure(dpi=100, figsize=(6 * ncols, 3 * nrows))
 
-        grid = AxesGrid(fig, 111,  # similar to subplot(142)
+        grid = AxesGrid(fig, 111, # similar to subplot(142)
                         nrows_ncols=(nrows, ncols),
                         axes_pad=0.4,
                         share_all=True,
@@ -659,70 +660,15 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     middle_ax = plt.subplot(gs[2, 0:])
     middle_ax.axis('off')
 
-    ax_tropo1 = axs[0,0]
-    ax_tropo2 = axs[0,1]
-    [ax.remove() for ax in axs[1, 0:]]
-    cax_t = plt.subplot(gs[1, 0:])
-
-    ax_strato1 = axs[3,0]
-    ax_strato2 = axs[3,1]
-    [ax.remove() for ax in  axs[4, 0:]]
-    cax_s = plt.subplot(gs[4, 0:])
-
-    # Plot TROPOSPHERE
-    # -------------------------------------------------------------------------
-    if substance.short_name in variability_tropo: 
-        vmin = variability_tropo[substance.short_name][0]
-        vmax = variability_tropo[substance.short_name][1]
-    else: 
-        vmin, vmax = np.nanmin(tropo_stdevs), np.nanmax(tropo_stdevs)
-    norm = Normalize(vmin, vmax)  # normalise color map to set limits
-    tropo_cmap = plt.cm.YlOrBr  # create colormap
-    ax_tropo1.set_title(f'Tropospheric variability of {dcts.make_subs_label(substance)}{note}', fontsize=14)
-
-    img = ax_tropo1.matshow(tropo_stdevs, alpha=0.75,
-                     extent = [lat_bmin, lat_bmax,
-                               0, len(tps)*pixels],
-                     cmap = tropo_cmap, norm=norm)
-    ax_tropo1.set_yticks(yticks, labels=tp_labels)
-    ax_tropo1.set_xticks(xticks, loc='bottom')
-    ax_tropo1.tick_params(axis='x', top=False, labeltop=False, labelbottom=True)
-    ax_tropo1.set_xlabel('Latitude [°N]')
-
-    for label in ax_tropo1.get_yticklabels():
-        label.set_verticalalignment('bottom')
-
-    ax_tropo1.grid('both')
-    # ax1.set_xlim(-40, 90)
-
-    # add numeric values
-    for j,x in enumerate(xticks[:-1]):
-        for i,y in enumerate(yticks):
-            value = tropo_stdevs[i,j]
-            if str(value) != 'nan':
-                ax_tropo1.text(x+0.5*glob_obj.grid_size,
-                        y+0.5*pixels,
-                        '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
-                        va='center', ha='center')
-    cbar = plt.colorbar(img, cax=cax_t, orientation='horizontal')
-    cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
-
-    # Tropopsphere average variability
-    img = ax_tropo2.matshow(np.array([tropo_av_stdevs]).T, alpha=0.75,
-                     extent = [0, glob_obj.grid_size,
-                               0, len(tps)*pixels],
-                     cmap = tropo_cmap, norm=norm)
-
-    for i,y in enumerate(yticks): 
-        value = tropo_av_stdevs[i]
-        if str(value) != 'nan':
-            ax_tropo2.text(0.5*glob_obj.grid_size,
-                    y+0.5*pixels,
-                    '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
-                    va='center', ha='center')
-
-    ax_tropo2.set_xlabel('Average')
-    ax_tropo2.tick_params(axis='both', bottom=False, top=False, labeltop=False, left=False, labelleft=False)
+    ax_strato1 = axs[0,0]
+    ax_strato2 = axs[0,1]
+    [ax.remove() for ax in  axs[1, 0:]]
+    cax_s = plt.subplot(gs[1, 0:])
+    
+    ax_tropo1 = axs[3,0]
+    ax_tropo2 = axs[3,1]
+    [ax.remove() for ax in axs[4, 0:]]
+    cax_t = plt.subplot(gs[4, 0:])
 
     # Plot STRATOSPHERE
     # -------------------------------------------------------------------------
@@ -760,6 +706,10 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
                         va='center', ha='center')
     cbar = plt.colorbar(img, cax=cax_s, orientation='horizontal')
     cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
+    # make sure vmin and vmax are shown as colorbar ticks
+    cbar_vals = cbar.get_ticks()
+    cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
+    cbar.set_ticks(cbar_vals)
 
     # Stratosphere average variability
     img = ax_strato2.matshow(np.array([strato_av_stdevs]).T, alpha=0.75,
@@ -776,8 +726,67 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     ax_strato2.tick_params(axis='both', bottom=False, top=False, labeltop=False, left=False, labelleft=False)
     ax_strato2.set_xlabel('Average')
 
+    # Plot TROPOSPHERE
     # -------------------------------------------------------------------------
+    if substance.short_name in variability_tropo: 
+        vmin = variability_tropo[substance.short_name][0]
+        vmax = variability_tropo[substance.short_name][1]
+    else: 
+        vmin, vmax = np.nanmin(tropo_stdevs), np.nanmax(tropo_stdevs)
+    norm = Normalize(vmin, vmax)  # normalise color map to set limits
+    tropo_cmap = cmr.get_sub_cmap('YlOrBr', 0, 0.75) # create colormap
+    ax_tropo1.set_title(f'Tropospheric variability of {dcts.make_subs_label(substance)}{note}', fontsize=14)
 
+    img = ax_tropo1.matshow(tropo_stdevs, alpha=0.75,
+                     extent = [lat_bmin, lat_bmax,
+                               0, len(tps)*pixels],
+                     cmap = tropo_cmap, norm=norm)
+    ax_tropo1.set_yticks(yticks, labels=tp_labels)
+    ax_tropo1.set_xticks(xticks, loc='bottom')
+    ax_tropo1.tick_params(axis='x', top=False, labeltop=False, labelbottom=True)
+    ax_tropo1.set_xlabel('Latitude [°N]')
+
+    for label in ax_tropo1.get_yticklabels():
+        label.set_verticalalignment('bottom')
+
+    ax_tropo1.grid('both')
+    # ax1.set_xlim(-40, 90)
+
+    # add numeric values
+    for j,x in enumerate(xticks[:-1]):
+        for i,y in enumerate(yticks):
+            value = tropo_stdevs[i,j]
+            if str(value) != 'nan':
+                ax_tropo1.text(x+0.5*glob_obj.grid_size,
+                        y+0.5*pixels,
+                        '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
+                        va='center', ha='center')
+    cbar = plt.colorbar(img, cax=cax_t, orientation='horizontal')
+    cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
+    # make sure vmin and vmax are shown as colorbar ticks
+    cbar_vals = cbar.get_ticks()
+    cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
+    cbar.set_ticks(cbar_vals)
+    
+    # Tropopsphere average variability
+    img = ax_tropo2.matshow(np.array([tropo_av_stdevs]).T, alpha=0.75,
+                     extent = [0, glob_obj.grid_size,
+                               0, len(tps)*pixels],
+                     cmap = tropo_cmap, norm=norm)
+
+    for i,y in enumerate(yticks): 
+        value = tropo_av_stdevs[i]
+        if str(value) != 'nan':
+            ax_tropo2.text(0.5*glob_obj.grid_size,
+                    y+0.5*pixels,
+                    '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
+                    va='center', ha='center')
+
+
+    ax_tropo2.set_xlabel('Average')
+    ax_tropo2.tick_params(axis='both', bottom=False, top=False, labeltop=False, left=False, labelleft=False)
+
+    # -------------------------------------------------------------------------
     fig.tight_layout()
     fig.subplots_adjust(top=0.8)
 
@@ -796,7 +805,6 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
     for subs in substances:
         matrix_plot_stdev_subs(glob_obj, subs,  note=note, minimise_tps=minimise_tps,
                                    atm_layer=atm_layer, savefig=savefig)
-
 
 #%% Plotting function calls
 # if __name__=='__main__':
