@@ -335,7 +335,7 @@ class GlobalData():
             df_list = [k for k in self.data
                        if isinstance(self.data[k], geopandas.GeoDataFrame)]  # valid for gdf
             for k in df_list:  # delete everything that isn't the chosen lat range
-                out.data[k] = out.data[k].cx[lat_min:lat_max, -180:180]
+                out.data[k] = out.data[k].cx[-180:180, lat_min:lat_max]
                 out.data[k].sort_index(inplace=True)
             for k in [k for k in self.data if k not in df_list and isinstance(self.data[k], pd.DataFrame)]:
                 indices = [index for df_indices in [out.data[k].index for k in df_list] for index in
