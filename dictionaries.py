@@ -290,6 +290,7 @@ def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple:
 
     vlims_stdv_total = {
         'detr_sf6' : (0, 0.3),
+        'sf6' : (0, 2),
         'detr_n2o' : (0, 13),
         'detr_co'  : (10, 30),
         'detr_co2' : (0.8, 3.0),
@@ -298,6 +299,7 @@ def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple:
 
     vlims_stdv_tropo = {
         'detr_sf6' : (0.05, 0.15),
+        'sf6' : (0.05, 0.3),
         'detr_n2o' : (0.8, 1.8),
         'detr_co'  : (16, 30),
         'detr_co2' : (2.0, 3.0),
@@ -306,6 +308,7 @@ def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple:
 
     vlims_stdv_strato = {
         'detr_sf6' : (0.05, 0.3),
+        'sf6' : (0, 2),
         'detr_n2o' : (5.1, 13),
         'detr_co'  : (10, 26),
         'detr_co2' : (1.2, 1.8),
