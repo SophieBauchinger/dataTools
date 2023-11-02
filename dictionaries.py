@@ -23,6 +23,8 @@ choose_column: let user choose from available columns per specification
 from toolpac.outliers import ol_fit_functions as fct
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import cmasher as cmr
 
 #%% Coordinates
 class Coordinate():
@@ -92,21 +94,24 @@ def get_coord(**kwargs):
 
 def make_coord_label(coordinates, filter_label=False):
     """ Returns string to be used as axis label for a specific Coordinate object. """
+    tp_defs = {'chem' : 'Chemical', 
+               'dyn' : 'Dynamic', 
+               'therm': 'Thermal'}
     if not isinstance(coordinates, (list, set)): coordinates = [coordinates]
     labels=[]
     for coord in coordinates:
         if coord.vcoord is not np.nan:
             pv = '%s' % (f', {coord.pvu}' if coord.tp_def=='dyn' else '')
-            crit = '%s' % (f', {coord.crit}' if coord.tp_def=='chem' else '')
-            model = coord.model # if not coord.tp_def=='chem' else ''
-            # model = '%s' % (' - ECMWF' if (coordinate.ID=='INT' and coordinate.tp_def in ['dyn', 'therm']) else '')
-            # model += '%s' % (' - ERA5' if (coordinate.ID=='INT2' and coordinate.tp_def in ['dyn', 'therm']) else '')
-            tp = '%s' % (f', {coord.tp_def}' if coord.tp_def is not np.nan else '')
+            crit = '%s' % (', '+''.join(f"$_{i}$" if i.isdigit() else i.upper() for i in coord.crit) if coord.tp_def=='chem' else '')
+            model = coord.model
+            tp = '%s' % (coord.tp_def if coord.tp_def is not np.nan else '')
             vcoord = f'$\Delta\,${coord.vcoord}' if coord.rel_to_tp else f'{coord.vcoord}'
             if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
             
-            label = f'{vcoord} ({model+tp+pv+crit}) [{coord.unit}]'
-            if filter_label: label = f'{model+tp+pv+crit} ({vcoord})'
+            label = f'{vcoord} ({model}, {tp+pv+crit}) [{coord.unit}]'
+            if filter_label: 
+                tp = tp_defs[tp]
+                label = f'{tp+pv+crit} ({model}, {vcoord})'
             
         elif coord.hcoord is not np.nan:
             if coord.hcoord == 'lat' and coord.unit=='degrees_north': 
@@ -328,28 +333,40 @@ def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple:
 #%% Misc
 def dict_season():
     """ Use to get name_s, color_s for season s"""
-    return {'name_1': 'Spring (MAM)', 'name_2': 'Summer (JJA)',
-            'name_3': 'Autumn (SON)', 'name_4': 'Winter (DJF)',
-            'color_1': 'blue', 'color_2': 'orange',
-            'color_3': 'green', 'color_4': 'red'}
+    return {'name_1': 'Spring (MAM)', 'color_1': '#228833', # blue
+            'name_2': 'Summer (JJA)', 'color_2': '#AA3377', # yellow
+            'name_3': 'Autumn (SON)', 'color_3': '#CCBB44', # red
+            'name_4': 'Winter (DJF)', 'color_4': '#4477AA'} # green
+            # 'color_1': 'blue', 'color_2': 'orange',
+            # 'color_3': 'green', 'color_4': 'red'}
+
+def dict_colors(): 
+    """ Get colorbars and colors for various variables. """
+    return {
+        'vmean' : plt.cm.viridis,
+        'vstdv' :  cmr.get_sub_cmap('summer_r', 0.1, 1),
+        'vstdv_tropo' : cmr.get_sub_cmap('YlOrBr', 0, 0.75),
+        'vstdv_strato':  plt.cm.BuPu,
+        'diff' : plt.cm.PiYG,
+        }
+
+def axis_label(coord): 
+    """ Return axis label for vcoord / hcoord. """
+    label_dict = {
+        'pt' : '$\Theta$',
+        'z'  : 'z',
+        'p'  : 'p',
+        'lat': 'Latitude [°N]',
+        'lon': 'Longitude [°E]',
+        'mxr': 'N$_2$O mixing ratio'
+        }
+    return label_dict[coord]
 
 def dict_tps():
     """ Get color etc for tropopause definitions """
     return {'color_chem' : '#1f77b4',
             'color_therm' : '#ff7f0e',
             'color_dyn' : '#2ca02c'}
-
-# def get_vlims(substance):
-#     """ Get default limits for colormaps per substance """
-#     v_limits = {
-#         'sf6': (6,9),
-#         'n2o': (310,340),
-#         'co2': (320,380),
-#         'ch4': (1600,1950),
-#         'co' : (50, 160)}
-#     try: v_lims = v_limits[substance.lower()]
-#     except: v_lims = (np.nan, np.nan); print('no default v_lims found')
-#     return v_lims
 
 def note_dict(fig_or_ax, x=None, y=None, s=None):
     """ Return default arguments & bbox dictionary for adding notes to plots. """

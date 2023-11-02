@@ -9,7 +9,7 @@ tropopause (in km or K) versus equivalent latitude (in deg N)
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-import matplotlib.ticker as ticker
+import matplotlib.patheffects as mpe
 import pandas as pd
 import itertools
 
@@ -22,28 +22,13 @@ import tools
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
 
-# Bin2dPlotter(caribic.df).plot_2d_mxr(dcts.get_subs(short_name='sf6', ID='GHG'),
-#                                      dcts.get_coord(hcoord='lat', source='Caribic'),
-#                                      dcts.get_coord(vcoord='pt', source='Caribic',
-#                                                     tp_def='nan', col_name='int_Theta'))
+tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+eql = dcts.get_coord(hcoord='eql', model='ERA5')
 
-# BinPlotter(tpause).plot_2d_stdv(
-# dcts.get_subs(short_name='detr_sf6', ID='GHG'),
-# dcts.get_coord(source='Caribic', hcoord='lat'),
-# dcts.get_coord(tp_def='dyn', model='ERA5', pvu=3.5, rel_to_tp=True)
-# )
+sf6 = dcts.get_subs(short_name='detr_sf6', ID='GHG')
+n2o = dcts.get_subs(short_name='detr_n2o', ID='GHG')
 
-# for tp in tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan')):
-#     BinPlotter(tpause).plot_2d_stdv(
-# subs = dcts.get_subs(short_name='detr_sf6', ID='GHG'),
-# xcoord = dcts.get_coord(hcoord='eql', model='ERA5'),
-# ycoord = tp
-# )
-
-#TODO make sure x and y are actually correct when binning and plotting -> Done?
 #TODO might want to implement a logarithmic scale for pressure at some point
-#TODO average standard deviations is not weighted and therefore depends on bins
-    # -> that will be the case no matter what, since count_limit exclusion also depends on bin sizes
 
 class BinPlotter():
     """
@@ -88,38 +73,40 @@ class BinPlotter():
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         
-        self.detr = detr
-        if not 'detr' in subs_params and detr:
-            subs_params.update(dict(detr=detr))
-            if 'short_name' in subs_params and not subs_params.get('short_name').startswith('detr_'):
-                subs_params.update({'short_name' : 'detr_'+subs_params.get('short_name')})
-        self.substances = [s for s in dcts.get_substances(**subs_params)
-                           if s.col_name in self.data['df'].columns and not s.col_name.startswith('d_')]
-        self.x_coordinates = [s for s in dcts.get_coordinates(**x_params)
-                              if s.col_name in self.data['df'].columns]
-        self.y_coordinates = [s for s in dcts.get_coordinates(**y_params)
-                              if s.col_name in self.data['df'].columns]
+        # self.detr = detr
+        # if not 'detr' in subs_params and detr:
+        #     subs_params.update(dict(detr=detr))
+        #     if 'short_name' in subs_params and not subs_params.get('short_name').startswith('detr_'):
+        #         subs_params.update({'short_name' : 'detr_'+subs_params.get('short_name')})
+        # self.substances = [s for s in dcts.get_substances(**subs_params)
+        #                    if s.col_name in self.data['df'].columns and not s.col_name.startswith('d_')]
+        # self.x_coordinates = [s for s in dcts.get_coordinates(**x_params)
+        #                       if s.col_name in self.data['df'].columns]
+        # self.y_coordinates = [s for s in dcts.get_coordinates(**y_params)
+        #                       if s.col_name in self.data['df'].columns]
+        # self._check_input()
+
         self.kwargs = kwargs
-        self._check_input()
 
     def __repr__(self):
-        return '<Bin2dPlotter>\n - subs: {}\n - xcoords: {}\n - ycoords: {}'.format(
-            [f'{s.short_name} ({s.ID})' for s in self.substances],
-            self.x_coordinates, self.y_coordinates)
+        return f'<class eqlat.BinPlotter> - based on \n {self.glob_obj.__repr__()}'
+        # return '<Bin2dPlotter>\n - subs: {}\n - xcoords: {}\n - ycoords: {}'.format(
+        #     [f'{s.short_name} ({s.ID})' for s in self.substances],
+        #     self.x_coordinates, self.y_coordinates)
 
     @property
     def df(self) -> pd.DataFrame:
         return self.data['df']
 
-    def _check_input(self) -> bool:
-        """ Check if any subs, x, y columns are in data. """
-        if not any([(s.col_name in self.df.columns) for s in self.substances]):
-            raise KeyError('No substances found in data that fit the parameters. ')
-        if not any([(c.col_name in self.df.columns) for c in self.x_coordinates]):
-            raise KeyError('No x-coordinate found in data that fit the parameters. ')
-        if not any([(c.col_name in self.df.columns) for c in self.y_coordinates]):
-            raise KeyError('No y-coordinate found in data that fit the parameters. ')
-        return True            
+    # def _check_input(self) -> bool:
+    #     """ Check if any subs, x, y columns are in data. """
+    #     if not any([(s.col_name in self.df.columns) for s in self.substances]):
+    #         raise KeyError('No substances found in data that fit the parameters. ')
+    #     if not any([(c.col_name in self.df.columns) for c in self.x_coordinates]):
+    #         raise KeyError('No x-coordinate found in data that fit the parameters. ')
+    #     if not any([(c.col_name in self.df.columns) for c in self.y_coordinates]):
+    #         raise KeyError('No y-coordinate found in data that fit the parameters. ')
+    #     return True            
 
     def get_limits(self, subs, xcoord, ycoord=None, bin_attr='vmean') -> (tuple, tuple, tuple):
         """ Check kwargs for limits, otherwise set default values """
@@ -189,6 +176,11 @@ class BinPlotter():
         self.data['df'].dropna(subset=cols, how='any', inplace=True)
         return self.data['df']
 
+class BinPlotter1D(BinPlotter):
+    """ Single dimensional binning & plotting. """
+    def __init__(self, glob_obj, **kwargs):
+        super().__init__(glob_obj, **kwargs)
+
     def bin_1d_seasonal(self, subs, coord, bin_equi1d=None, xbsize=None) -> dict:
         """ Bin the data onto coord for each season. """
         out_dict = {}
@@ -223,12 +215,14 @@ class BinPlotter():
         bin_dict = self.bin_1d_seasonal(subs, coord)
         
         fig, ax = plt.subplots(dpi=200, figsize=(6,5))
+        outline = mpe.withStroke(linewidth=2, foreground='white')
 
         for s in set(self.df['season'].tolist()):
             vmean = bin_dict[s].vmean
             y = bin_dict[s].xintm
             ax.plot(vmean, y, '-', marker='o', c=dcts.dict_season()[f'color_{s}'],
-                      label=dcts.dict_season()[f'name_{s}'])
+                      label=dcts.dict_season()[f'name_{s}'],
+                      path_effects=[outline])
         
         ax.set_ylabel(dcts.make_coord_label(coord))
         ax.set_xlabel(dcts.make_subs_label(subs))
@@ -241,6 +235,12 @@ class BinPlotter():
 
         ax.grid('both')
         ax.legend()
+
+class BinPlotter2D(BinPlotter): 
+    """ Two-dimensional binning & plotting. """
+    def __init__(self, glob_obj, **kwargs): 
+        """ Initialise bin plotter. """
+        super().__init__(glob_obj, **kwargs)
 
     def bin_2d_seasonal(self, subs, xcoord, ycoord,
                      bin_equi2d = None,
@@ -572,130 +572,3 @@ class BinPlotter():
                 and params_1[2].vcoord == params_2[2].vcoord):
                 # only compare same substance in same coordinate system
                 self.plot_mxr_diff(params_1, params_2, **kwargs)
-
-    def make_bar_plot(self, subs, xcoord, tp, bin_attr, **kwargs) -> tuple: 
-        """ Plot histograms showing differences between TPs. 
-        bin over xcoord
-        overall alpha plot for average value, split up into latitude bands ? 
-        """
-        # same bins for both tropo and strato
-        if not isinstance(kwargs.get('xbsize'), float):
-            xbsize = self.get_bsize(subs, xcoord)
-        else: 
-            xbsize = kwargs.get('xbsize')
-
-        if xcoord.col_name == 'geometry.y': # latitude
-            x = self.df.geometry.y
-        elif xcoord.col_name == 'geometry.x':
-            x = self.df.geometry.x
-        else:
-            x = self.df[xcoord.col_name]
-
-        # get bins as multiples of the bin size
-        xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-        xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-        if not isinstance(kwargs.get('bin_equi1d'), (bp.Bin_equi1d, bp.Bin_notequi1d)): 
-            bin_equi1d = bp.Bin_equi1d(xbmin, xbmax, xbsize)
-        else: 
-            bin_equi1d = kwargs.get('bin_equi1d')
-
-        s_data = self.glob_obj.sel_strato(**tp.__dict__).df
-        t_data = self.glob_obj.sel_tropo(**tp.__dict__).df
-
-        t_binned_1d = bp.Simple_bin_1d(np.array(t_data[subs.col_name]), x[x.index.isin(t_data.index)],
-                                      bin_equi1d, count_limit=self.count_limit)
-
-        s_binned_1d = bp.Simple_bin_1d(np.array(s_data[subs.col_name]), x[x.index.isin(s_data.index)],
-                                      bin_equi1d, count_limit=self.count_limit)
-        
-        t_values = getattr(t_binned_1d, bin_attr)
-        s_values = getattr(s_binned_1d, bin_attr)
-        
-        t_nans = np.isnan(t_values)
-        s_nans = np.isnan(s_values)
-        
-        t_av = np.average(t_values[~t_nans], weights = t_binned_1d.vcount[~t_nans])
-        s_av = np.average(s_values[~s_nans], weights = s_binned_1d.vcount[~s_nans])
-        
-        if bin_attr=='vcount': 
-            t_av = np.round(t_av)
-            s_av = np.round(s_av)
-        
-        return t_av, s_av
-
-    def plot_bar_plots(self, subs, xcoord, bin_attr, **kwargs):
-        """ All tp defs. """
-        
-        
-        fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=200, 
-                                         figsize=(9,4), sharey=True)
-        
-        fig.suptitle(f'Average {bin_attr} of {dcts.make_subs_label(subs)}')
-        fig.subplots_adjust(top=0.85)
-        ax_t.set_title('Troposphere', fontsize=9)
-        ax_s.set_title('Stratosphere', fontsize=9)
-        
-        tropo_bar_vals = []
-        strato_bar_vals = []
-        bar_labels = []
-        
-        for i, tp in enumerate(tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))):
-            t_av, s_av = self.make_bar_plot(subs, xcoord, tp, bin_attr, **kwargs)
-
-            tropo_bar_vals.append(t_av)
-            strato_bar_vals.append(s_av)
-            
-            bar_labels.append(dcts.make_coord_label(tp, True))
-            
-        bar_params = dict(align='center', edgecolor='k',  rasterized=True,
-                          alpha=0.65, zorder=10)
-        
-        nums = range(len(bar_labels))
-
-        t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
-        s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
-        for i in nums: 
-            ax_label.text(0.5, i, bar_labels[i], 
-                          horizontalalignment='center', verticalalignment='center')
-        # ax_label.barh(nums, [1]*len(nums), color='None', align='center', 
-        #               edgecolor='b', linestyle='dotted')
-        ax_label.axis('off')
-        
-        maximum = np.nanmax(tropo_bar_vals+strato_bar_vals)
-        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals)
-        for decimal_place in [4,3,2,1,0]:
-            if all(i>np.round(minimum, decimal_place) for i in tropo_bar_vals+strato_bar_vals): 
-                minimum = np.round(minimum, decimal_place)
-            else: 
-                break
-        padding = (maximum-minimum)/4
-        
-        ax_t.set_xlim(maximum +padding , minimum-padding)
-        ax_s.set_xlim(minimum-padding, maximum +padding)
-        
-        ax_t.grid('both', ls='dotted')
-        ax_s.grid('both', ls='dotted')
-
-        if not bin_attr=='vcount':
-            ax_t.bar_label(t_bars, ['{0:.2f}'.format(t_val) for t_val in tropo_bar_vals], 
-                           padding=2)
-            ax_s.bar_label(s_bars, ['{0:.2f}'.format(s_val) for s_val in strato_bar_vals], 
-                           padding=2)
-
-        else:
-            ax_t.bar_label(t_bars, ['{0:.0f}'.format(t_val) for t_val in tropo_bar_vals], 
-                           padding=2)
-            ax_s.bar_label(s_bars, ['{0:.0f}'.format(s_val) for s_val in strato_bar_vals], 
-                           padding=2)
-
-        for ax in [ax_t, ax_s]: 
-            ax.yaxis.set_major_locator(ticker.NullLocator())
-
-        fig.subplots_adjust(wspace=0)
-
-        # ax.text(f'tropo_{dcts.make_coord_label(tp)}', t_av, s='{0:.2f}'.format(t_av), 
-        #         horizontalalignment='center', verticalalignment='bottom')
-
-        # ax.text(f'strato_{dcts.make_coord_label(tp)}', s_av, s='{0:.2f}'.format(s_av), 
-        #         horizontalalignment='center', verticalalignment='bottom')

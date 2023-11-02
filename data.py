@@ -42,9 +42,7 @@ import tools
 # TODO: fix the underlying problem in toolpac rather than just suppressing stuff
 import warnings
 from pandas.errors import SettingWithCopyWarning
-
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
-
 
 # %% Global data
 class GlobalData():
@@ -119,6 +117,11 @@ class GlobalData():
             subs (Substance): dcts.Substance instance
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
+
+    def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame: 
+        """ Flag each datapoint according to its distance to specific tropopause definitions. """
+        #TODO implement this 
+        #!!! implement this 
 
     def detrend_substance(self, substance, loc_obj=None, ID=None,
                           save=True, plot=False, note='') -> np.ndarray:
@@ -333,11 +336,11 @@ class GlobalData():
 
         if self.source in ['Caribic', 'EMAC', 'TP']:
             df_list = [k for k in self.data
-                       if isinstance(self.data[k], geopandas.GeoDataFrame)]  # valid for gdf
+                       if isinstance(self.data[k], geopandas.GeoDataFrame)]  # needed for latitude selection
             for k in df_list:  # delete everything that isn't the chosen lat range
                 out.data[k] = out.data[k].cx[-180:180, lat_min:lat_max]
                 out.data[k].sort_index(inplace=True)
-            for k in [k for k in self.data if k not in df_list and isinstance(self.data[k], pd.DataFrame)]:
+            for k in [k for k in self.data if k not in df_list and isinstance(self.data[k], pd.DataFrame)]: # non-geodataframes
                 indices = [index for df_indices in [out.data[k].index for k in df_list] for index in
                            df_indices]  # all indices in the Geo-dataframes
                 out.data[k] = out.data[k].loc[out.data[k].index.isin(indices)]
@@ -395,11 +398,11 @@ class GlobalData():
 
         if self.source not in ['Caribic', 'TP']:
             raise NotImplementedError('Action not yet supported for non-Caribic data')
-        eql_col = dcts.get_coord(source=self.source, model=model, hcoord='eql').col_name
-        df = self.data['met_data'].copy()
+        eql_col = dcts.get_coord(model=model, hcoord='eql').col_name
+        df = self.data['df'].copy()
         df = df[df[eql_col] > eql_min]
         df = df[df[eql_col] < eql_max]
-        out.data['met_data'] = df
+        out.data['df'] = df
 
         df_list = [k for k in self.data
                    if isinstance(self.data[k], pd.DataFrame)]  # all dataframes
@@ -565,10 +568,19 @@ class GlobalData():
         df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
 
         df_sorted.drop(columns=[s for s in df_sorted.columns
-                                if s in [subs.col_name, 'd_' + subs.col_name]],
+                                if not s.startswith(('Flight', 'tropo', 'strato'))],
                        inplace=True)
-
         df_sorted = df_sorted.convert_dtypes()
+        return df_sorted
+
+    def o3_filter(self, **kwargs) -> pd.DataFrame: 
+        """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
+        subs = dcts.get_subs('o3', ID='INT')
+        if not subs.col_name in self.df.columns: 
+            raise Exception(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
+        df_sorted = pd.DataFrame(index = self.df.index)
+        df_sorted.loc[self.df[subs.col_name].lt(60), 
+                      (f'strato_{subs.col_name}', f'tropo_{subs.col_name}')] = (False, True)
         return df_sorted
 
     def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
@@ -602,13 +614,14 @@ class GlobalData():
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
 
-        for tp in [tp for tp in tps if not tp.crit == 'n2o']:
+        for tp in [tp for tp in tps if not tp.vcoord == 'mxr']:
             # All other tropopause definitions
             if not tp.col_name in data.columns:
                 print(f'Note: {tp.col_name} not found, continuing.')
                 continue
 
-            if not tp.rel_to_tp:  # if rel_to_tp coordinate exists, take that one and remove the other one
+            # if rel_to_tp coordinate exists, take that one and remove the other one
+            if not tp.rel_to_tp:  
                 coord_dct = {k: v for k, v in tp.__dict__.items()
                              if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu']}
                 try:
@@ -624,7 +637,7 @@ class GlobalData():
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
             if tp.tp_def == 'dyn':  # dynamic TP only outside the tropics - latitude filter
-                tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
+                pass# tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
             if tp.tp_def == 'cpt':  # cold point TP only in the tropics
                 tp_df = tp_df[np.array([(30 > i > -30) for i in np.array(tp_df.geometry.y)])]
 
@@ -648,6 +661,12 @@ class GlobalData():
             tp_sorted = tp_sorted.convert_dtypes()
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
+
+        for tp in [tp for tp in tps if tp.crit=='o3']: 
+            o3_sorted = self.o3_filter()
+
+            df_sorted
+
 
         df_sorted = df_sorted.convert_dtypes()
         if save: self.data['df_sorted'] = df_sorted
@@ -859,7 +878,7 @@ class Caribic(GlobalData):
     """
 
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INT2'),
-                 grid_size=5, verbose=False, recalculate=False):
+                 grid_size=5, verbose=False, recalculate=False, detrend_all=True):
         """ Constructs attributes for Caribic object and creates data dictionary.
 
         Parameters:
@@ -884,7 +903,7 @@ class Caribic(GlobalData):
             if subs not in self.data:
                 self.create_substance_df(subs)
 
-        if input('Detrend all? [Y/N] ').upper()=='Y': 
+        if detrend_all: 
             self.detrend_all()
 
     def __repr__(self):
@@ -1340,7 +1359,7 @@ class EMAC(GlobalData):
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
 
-    def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True):
+    def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True, detrend_all=True):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if 2000 <= yr <= 2019])
         self.source = 'TP'
@@ -1356,7 +1375,7 @@ class TropopauseData(GlobalData):
             finally:
                 self.create_df_sorted(save=True)
 
-        if input('Detrend all? [Y/N] ').upper()=='Y': 
+        if detrend_all or input('Detrend all? [Y/N] ').upper()=='Y': 
             self.detrend_all()
 
     def __repr__(self):
@@ -1367,7 +1386,7 @@ class TropopauseData(GlobalData):
 
     def get_data(self) -> pd.DataFrame:
         """ Return merged dataframe with interpolated EMAC / Caribic data """
-        caribic = Caribic()
+        caribic = Caribic(detrend_all=False)
         emac = EMAC()
         df_caribic = caribic.df
         df_emac = emac.df

@@ -1,105 +1,106 @@
 ﻿col_name,long_name,unit,ID,source,vcoord,hcoord,var,tp_def,rel_to_tp,model,pvu,crit,var1,var2
-h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_CARIBIC2_H_rel_TP
-int_ERA5_1_5PVU_BOT,Potential temperature of the local 1.5 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,1.5,,int_Theta,int_ERA5_D_1_5PVU_BOT
-int_ERA5_2_0PVU_BOT,Potential temperature of the local 2.0 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,2,,int_Theta,int_ERA5_D_2_0PVU_BOT
-int_ERA5_3_5PVU_BOT,Potential temperature of the local 3.5 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,3.5,,int_Theta,int_ERA5_D_3_5PVU_BOT
-int_ERA5_D_TROP1_PRESS,Pressure-Distance to local lapse rate tropopause (ERA5),hPa,calc,Caribic,p,,,therm,TRUE,ERA5,,,p,int_ERA5_TROP1_PRESS
-int_ERA5_D_TROP1_THETA,THETA-Distance to local lapse rate tropopause (ERA5),K,calc,Caribic,pt,,,therm,TRUE,ERA5,,,int_Theta,int_ERA5_TROP1_THETA
-int_p_dtrop_hpa,Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p,int_dp_dtrop_hpa
-int_p_strop_hpa,Pressure of thermal tropopause (ECMWF),hPa,calc,Caribic,p,,,therm,FALSE,ECMWF,,,p,int_dp_strop_hpa
-int_pt_dTP_K,Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMWF) ,K,calc,Caribic,pt,,,dyn,FALSE,ECMWF,3.5,,int_Theta,int_pt_rel_dTP_K
-int_pt_sTP_K,Potential temperature of thermal tropopause (ECMWF) ,K,calc,Caribic,pt,,,therm,FALSE,ECMWF,,,int_Theta,int_pt_rel_sTP_K
-int_z_dTP_km,Geopotential height of dynamical (PV=3.5PVU) tropopause (ECMWF),km,calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km,int_z_rel_dTP_km
-int_z_sTP_km,Geopotential height of thermal tropopause from ECMWF,km,calc,Caribic,z,,,therm,FALSE,ECMWF,,,int_z_km,int_z_rel_sTP_km
-e5vdiff_tpot,potential temperature,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
-e5vdiff_tpot_at_fl,potential temperature at flight level,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
-ECHAM5_aclc,large scale cloud cover,,EMAC,EMAC,,,aclc,,,EMAC,,,,
-ECHAM5_etadot,vertical wind velocity,1 s-1,EMAC,EMAC,,,etadot,,,EMAC,,,,
+ECHAM5_xim1,cloud ice (xim1),kg kg-1,EMAC,EMAC,,,xim1,,,EMAC,,,,
+ECHAM5_xlm1,cloud water (xlm1),kg kg-1,EMAC,EMAC,,,xlm1,,,EMAC,,,,
+tropop_cpt_i,cold point level index,level,EMAC,EMAC,lev,,,cpt,FALSE,EMAC,,,,
+ECHAM5_rho_air_dry,density of dry air,kg/m^3,EMAC,EMAC,,,rho_air_dry,,,EMAC,,,,
+ECHAM5_tm1,dry air temperature (tm1),K,EMAC,EMAC,,,t,,,EMAC,,,,
+int_ERA5_EQLAT,Equivalent latitude (ERA5),degrees_north,INT2,Caribic,,eql,,,,ERA5,,,,
+int_eqlat,equivalent latitude in degrees north from ECMWF,degrees_north,INT,Caribic,,eql,,,,ECMWF,,,,
+ECHAM5_tpoteq,equivalent potential temperature,K,EMAC,EMAC,eqpt,,,,FALSE,EMAC,,,,
+tropop_tp_PV_f,fract. of PV-TP box in trop.,,EMAC,EMAC,,,frac,dyn,FALSE,EMAC,3.5,,,
+tropop_tp_f,fract. of TP box in trop.,,EMAC,EMAC,,,frac,combo,FALSE,EMAC,,,,
+tropop_tp_WMO_f,fract. of WMO-TP box in trop.,,EMAC,EMAC,,,frac,therm,FALSE,EMAC,,,,
+geometry,geometry,degrees,GHG,Caribic,,geometry,,,,MSMT,,,,
+tp_cpt_z_D,Geopoential height relative to cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_cpt_z
+tp_PV_z_D,Geopoential height relative to PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,TRUE,EMAC,3.5,,ECHAM5_height_at_fl,tp_PV_z
+tp_WMO_z_D,Geopoential height relative to thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_WMO_z
 ECHAM5_geopot,geopotential above ground level,m2 s-2,EMAC,EMAC,z,,geopot,,FALSE,EMAC,,,,
 ECHAM5_geopot_at_fl,geopotential above ground level at current flight level,m2 s-2,EMAC,EMAC,z,,geopot,,FALSE,EMAC,,,,
 ECHAM5_height,Geopotential height (ECHAM5) ,km,calc,EMAC,z,,,,FALSE,EMAC,,,ECHAM5_geopot,
 ECHAM5_height_at_fl,Geopotential height (ECHAM5) at flight level ,km,EMAC,EMAC,z,,,,FALSE,EMAC,,,ECHAM5_geopot_at_fl,
-ECHAM5_press,pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
-ECHAM5_qm1,specific humidity (qm1),kg kg-1,EMAC,EMAC,,,qm1,,,EMAC,,,,
-ECHAM5_rho_air_dry,density of dry air,kg/m^3,EMAC,EMAC,,,rho_air_dry,,,EMAC,,,,
-ECHAM5_rhum,relative humidity,%,EMAC,EMAC,,,rhum,,,EMAC,,,,
-ECHAM5_tm1,dry air temperature (tm1),K,EMAC,EMAC,,,t,,,EMAC,,,,
-ECHAM5_tpoteq,equivalent potential temperature,K,EMAC,EMAC,eqpt,,,,FALSE,EMAC,,,,
-ECHAM5_tsurf,surface temperature,K,EMAC,EMAC,,,tsurf,,,EMAC,,,,
-ECHAM5_um1,u-wind,m s-1,EMAC,EMAC,,,um1,,,EMAC,,,,
-ECHAM5_vm1,v-wind,m s-1,EMAC,EMAC,,,vm1,,,EMAC,,,,
-ECHAM5_vom1,vorticity,s-1,EMAC,EMAC,,,vom1,,,EMAC,,,,
-ECHAM5_xim1,cloud ice (xim1),kg kg-1,EMAC,EMAC,,,xim1,,,EMAC,,,,
-ECHAM5_xlm1,cloud water (xlm1),kg kg-1,EMAC,EMAC,,,xlm1,,,EMAC,,,,
-ilev,hybrid level at layer interfaces,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-latitude,track latitude,degrees_north,EMAC,EMAC,,lat,,,,EMAC,,,,
-lev,hybrid level at layer midpoints,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-longitude,track longitude,degrees_east,EMAC,EMAC,,lon,,,,EMAC,,,,
-tp_cpt_p_D,Pressure difference relative to cold point tropopause from EMAC,hPa,calc,EMAC,p,,,cpt,TRUE,EMAC,,,tpress,tropop_cpt
-tp_cpt_pt,Potential temperature of cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,FALSE,EMAC,,,e5vdiff_tpot,tropop_cpt_i
-tp_cpt_pt_D,Potential temperature relative to cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_cpt_pt
+int_h_rel_TP,Geopotential height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,
 tp_cpt_z,Geopotential height of cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,FALSE,EMAC,,,ECHAM5_height,tropop_cpt_i
-tp_cpt_z_D,Geopoential height relative to cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_cpt_z
-tp_PV_p_D,Pressure difference relative to PV (3.5PVU) tropopause from EMAC,hPa,calc,EMAC,p,,,dyn,TRUE,EMAC,3.5,,tpress,tropop_tp_PV
-tp_PV_pt,Potential temperature of PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,FALSE,EMAC,3.5,,e5vdiff_tpot,tropop_tp_PV_i
-tp_PV_pt_D,Potential temperature relative to PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,TRUE,EMAC,3.5,,e5vdiff_tpot_at_fl,tp_PV_pt
+int_z_dTP_km,Geopotential height of dynamical (PV=3.5PVU) tropopause (ECMWF),km,calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km,int_z_rel_dTP_km
+h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_CARIBIC2_H_rel_TP
 tp_PV_z,Geopotential height of PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,FALSE,EMAC,3.5,,ECHAM5_height,tropop_tp_PV_i
-tp_PV_z_D,Geopoential height relative to PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,TRUE,EMAC,3.5,,ECHAM5_height_at_fl,tp_PV_z
-tp_WMO_p_D,Pressure difference relative to thermal (WMO) tropopause from EMAC,hPa,calc,EMAC,p,,,therm,TRUE,EMAC,,,tpress,tropop_tp_WMO
-tp_WMO_pt,Potential temperature of thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,FALSE,EMAC,,,e5vdiff_tpot,tropop_tp_WMO_i
-tp_WMO_pt_D,Potential temperature relative to thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_WMO_pt
-tp_WMO_z,Geopotential height of thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,FALSE,EMAC,,,ECHAM5_height,tropop_tp_WMO_i
-tp_WMO_z_D,Geopoential height relative to thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_WMO_z
-tpress,track pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
-tps,track surface pressure,hPa,EMAC,EMAC,,,p0,,,EMAC,,,,
-tropop_cpt,pressure at cold point,hPa,EMAC,EMAC,p,,,cpt,FALSE,EMAC,,,,
-tropop_cpt_i,cold point level index,level,EMAC,EMAC,lev,,,cpt,FALSE,EMAC,,,,
-tropop_pblh,planetary boundary layer,m,EMAC,EMAC,z,,pblh,,FALSE,EMAC,,,,
-tropop_pblh_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-tropop_pblhRi,planetary boundary layer,m,EMAC,EMAC,z,,pblhRi,,FALSE,EMAC,,,,
-tropop_pblhRi_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
-tropop_PV,potential vorticity,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
-tropop_PV_at_fl,potential vorticity at current flight level,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
-tropop_slp,sea-level pressure,hPa,EMAC,EMAC,,,slp,,,EMAC,,,,
-tropop_tp,tropopause pressure,hPa,EMAC,EMAC,p,,,combo,FALSE,EMAC,,,,
-tropop_tp_f,fract. of TP box in trop.,,EMAC,EMAC,,,frac,combo,FALSE,EMAC,,,,
-tropop_tp_i,tropopause level index,level,EMAC,EMAC,lev,,,combo,FALSE,EMAC,,,,
-tropop_tp_PV,PV tropopause pressure,hPa,EMAC,EMAC,p,,,dyn,FALSE,EMAC,3.5,,,
-tropop_tp_PV_f,fract. of PV-TP box in trop.,,EMAC,EMAC,,,frac,dyn,FALSE,EMAC,3.5,,,
-tropop_tp_PV_i,PV tropopause level index,level,EMAC,EMAC,lev,,,dyn,FALSE,EMAC,3.5,,,
-tropop_tp_WMO,WMO tropopause pressure,hPa,EMAC,EMAC,p,,,therm,FALSE,EMAC,,,,
-tropop_tp_WMO_f,fract. of WMO-TP box in trop.,,EMAC,EMAC,,,frac,therm,FALSE,EMAC,,,,
-tropop_tp_WMO_i,WMO tropopause level index,level,EMAC,EMAC,lev,,,therm,FALSE,EMAC,,,,
-p,pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,MSMT,,,,
-geometry,geometry,degrees,GHG,Caribic,,geometry,,,,MSMT,,,,
-geometry.y,latitude,degrees_north,GHG,Caribic,,lat,,,,MSMT,,,,
-geometry.x,longitude,degrees_east,GHG,Caribic,,lon,,,,MSMT,,,,
-int_dp_dtrop_hpa,Pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,hPa,INT,Caribic,p,,,dyn,TRUE,ECMWF,3.5,,,
-int_dp_strop_hpa,Pressure difference relative to thermal tropopause from ECMWF,hPa,INT,Caribic,p,,,therm,TRUE,ECMWF,,,,
-int_eqlat,equivalent latitude in degrees north from ECMWF,degrees_north,INT,Caribic,,eql,,,,ECMWF,,,,
-int_Tpot,potential temperature derived from measured pressure and temperature,K,INT,Caribic,pt,,,,FALSE,MSMT,,,,
-int_pt_rel_dTP_K,Potential temperature difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,K,INT,Caribic,pt,,,dyn,TRUE,ECMWF,3.5,,,
-int_pt_rel_sTP_K,Potential temperature difference relative to thermal tropopause from ECMWF,K,INT,Caribic,pt,,,therm,TRUE,ECMWF,,,,
-int_PV,PV from ECMWF (integral),PVU,INT,Caribic,pv,,,,FALSE,ECMWF,,,,
 int_z_km,Geopotential height of sample from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,,FALSE,ECMWF,,,,
+tp_WMO_z,Geopotential height of thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,FALSE,EMAC,,,ECHAM5_height,tropop_tp_WMO_i
+int_z_sTP_km,Geopotential height of thermal tropopause from ECMWF,km,calc,Caribic,z,,,therm,FALSE,ECMWF,,,int_z_km,int_z_rel_sTP_km
 int_z_rel_dTP_km,Geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF,km,INT,Caribic,z,,,dyn,TRUE,ECMWF,3.5,,,
 int_z_rel_sTP_km,Geopotential height relative to thermal tropopause from ECMWF,km,INT,Caribic,z,,,therm,TRUE,ECMWF,,,,
-int_h_rel_TP,Geopotential height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,
+ilev,hybrid level at layer interfaces,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+lev,hybrid level at layer midpoints,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+ECHAM5_aclc,large scale cloud cover,,EMAC,EMAC,,,aclc,,,EMAC,,,,
+geometry.y,latitude,degrees_north,GHG,Caribic,,lat,,,,MSMT,,,,
+geometry.x,longitude,degrees_east,GHG,Caribic,,lon,,,,MSMT,,,,
 int_AgeSpec_AGE,Mean age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mean,,,MSMT,,,,
 int_AgeSpec_MEDIAN_AGE,Median age from age-spectrum,year,INT2,Caribic,,,aoa_med,,,MSMT,,,,
 int_AgeSpec_MODE,Modal age from age-spectrum (10 yr),year,INT2,Caribic,,,aoa_mod,,,MSMT,,,,
+tropop_pblh,planetary boundary layer,m,EMAC,EMAC,z,,pblh,,FALSE,EMAC,,,,
+tropop_pblhRi,planetary boundary layer,m,EMAC,EMAC,z,,pblhRi,,FALSE,EMAC,,,,
+tropop_pblh_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+tropop_pblhRi_i,planetary boundary layer index,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
+e5vdiff_tpot,potential temperature,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
+int_Theta,Potential Temperature,K,INT2,Caribic,pt,,,,FALSE,ECMWF,,,,
+e5vdiff_tpot_at_fl,potential temperature at flight level,K,EMAC,EMAC,pt,,,,FALSE,EMAC,,,,
+int_Tpot,potential temperature derived from measured pressure and temperature,K,INT,Caribic,pt,,,,FALSE,MSMT,,,,
+int_pt_rel_dTP_K,Potential temperature difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,K,INT,Caribic,pt,,,dyn,TRUE,ECMWF,3.5,,,
+int_pt_rel_sTP_K,Potential temperature difference relative to thermal tropopause from ECMWF,K,INT,Caribic,pt,,,therm,TRUE,ECMWF,,,,
+tp_cpt_pt,Potential temperature of cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,FALSE,EMAC,,,e5vdiff_tpot,tropop_cpt_i
+int_pt_dTP_K,Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMWF) ,K,calc,Caribic,pt,,,dyn,FALSE,ECMWF,3.5,,int_Theta,int_pt_rel_dTP_K
+int_ERA5_TROP1_THETA,Potential temperature of local lapse rate tropopause (ERA5),K,INT2,Caribic,pt,,,therm,FALSE,ERA5,,,,
+tp_PV_pt,Potential temperature of PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,FALSE,EMAC,3.5,,e5vdiff_tpot,tropop_tp_PV_i
+int_ERA5_1_5PVU_BOT,Potential temperature of the local 1.5 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,1.5,,int_Theta,int_ERA5_D_1_5PVU_BOT
+int_ERA5_2_0PVU_BOT,Potential temperature of the local 2.0 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,2,,int_Theta,int_ERA5_D_2_0PVU_BOT
+int_ERA5_3_5PVU_BOT,Potential temperature of the local 3.5 PVU surface (ERA5) ,K,calc,Caribic,pt,,,dyn,FALSE,ERA5,3.5,,int_Theta,int_ERA5_D_3_5PVU_BOT
+tp_WMO_pt,Potential temperature of thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,FALSE,EMAC,,,e5vdiff_tpot,tropop_tp_WMO_i
+int_pt_sTP_K,Potential temperature of thermal tropopause (ECMWF) ,K,calc,Caribic,pt,,,therm,FALSE,ECMWF,,,int_Theta,int_pt_rel_sTP_K
+tp_cpt_pt_D,Potential temperature relative to cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_cpt_pt
+tp_PV_pt_D,Potential temperature relative to PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,TRUE,EMAC,3.5,,e5vdiff_tpot_at_fl,tp_PV_pt
+tp_WMO_pt_D,Potential temperature relative to thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_WMO_pt
+tropop_PV,potential vorticity,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
+int_ERA5_PV,Potential vorticity (ERA5),PVU,INT2,Caribic,pv,,,,FALSE,ERA5,,,,
+tropop_PV_at_fl,potential vorticity at current flight level,PVU,EMAC,EMAC,,,pv,,FALSE,EMAC,,,,
+ECHAM5_press,pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
 int_ERA5_PRESS,Pressure (ERA5),hPa,INT2,Caribic,p,,,,FALSE,ERA5,,,,
+p,pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,MSMT,,,,
+tropop_cpt,pressure at cold point,hPa,EMAC,EMAC,p,,,cpt,FALSE,EMAC,,,,
+tp_cpt_p_D,Pressure difference relative to cold point tropopause from EMAC,hPa,calc,EMAC,p,,,cpt,TRUE,EMAC,,,tpress,tropop_cpt
+int_dp_dtrop_hpa,Pressure difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,hPa,INT,Caribic,p,,,dyn,TRUE,ECMWF,3.5,,,
+tp_PV_p_D,Pressure difference relative to PV (3.5PVU) tropopause from EMAC,hPa,calc,EMAC,p,,,dyn,TRUE,EMAC,3.5,,tpress,tropop_tp_PV
+tp_WMO_p_D,Pressure difference relative to thermal (WMO) tropopause from EMAC,hPa,calc,EMAC,p,,,therm,TRUE,EMAC,,,tpress,tropop_tp_WMO
+int_dp_strop_hpa,Pressure difference relative to thermal tropopause from ECMWF,hPa,INT,Caribic,p,,,therm,TRUE,ECMWF,,,,
+int_p_dtrop_hpa,Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p,int_dp_dtrop_hpa
 int_ERA5_TROP1_PRESS,Pressure of local lapse rate tropopause (ERA5),hPa,INT2,Caribic,p,,,therm,FALSE,ERA5,,,,
-int_ERA5_EQLAT,Equivalent latitude (ERA5),degrees_north,INT2,Caribic,,eql,,,,ERA5,,,,
+int_p_strop_hpa,Pressure of thermal tropopause (ECMWF),hPa,calc,Caribic,p,,,therm,FALSE,ECMWF,,,p,int_dp_strop_hpa
+int_ERA5_D_TROP1_PRESS,Pressure-Distance to local lapse rate tropopause (ERA5),hPa,calc,Caribic,p,,,therm,TRUE,ERA5,,,p,int_ERA5_TROP1_PRESS
+int_CLaMS_N2O,Pseudo coord: N2O (CLaMS) ,ppb,INT2,Caribic,mxr,,,chem,FALSE,CLAMS,,n2o,,
+N2O,Pseudo coord: N2O mixing ratio,ppb,GHG,Caribic,mxr,,,chem,FALSE,MSMT,,n2o,,
+tracer_gp_N2O_at_fl,Pseudo coord: tracer GP N2O,mol mol-1,EMAC,EMAC,mxr,,,chem,FALSE,EMAC,,n2o,,
+int_PV,PV from ECMWF (integral),PVU,INT,Caribic,pv,,,,FALSE,ECMWF,,,,
+tropop_tp_PV_i,PV tropopause level index,level,EMAC,EMAC,lev,,,dyn,FALSE,EMAC,3.5,,,
+tropop_tp_PV,PV tropopause pressure,hPa,EMAC,EMAC,p,,,dyn,FALSE,EMAC,3.5,,,
+ECHAM5_rhum,relative humidity,%,EMAC,EMAC,,,rhum,,,EMAC,,,,
+int_CARIBIC2_H_rel_TP,replacement for H_rel_TP,km,INT2,Caribic,z,,,chem,TRUE,MSMT,,o3,,
+tropop_slp,sea-level pressure,hPa,EMAC,EMAC,,,slp,,,EMAC,,,,
+ECHAM5_qm1,specific humidity (qm1),kg kg-1,EMAC,EMAC,,,qm1,,,EMAC,,,,
+ECHAM5_tsurf,surface temperature,K,EMAC,EMAC,,,tsurf,,,EMAC,,,,
+int_ERA5_TEMP,Temperature (ERA5),K,INT2,Caribic,,,t,,,ERA5,,,,
 int_ERA5_D_1_5PVU_BOT,THETA-Distance to local 1.5 PVU surface (ERA5),K,INT2,Caribic,pt,,,dyn,TRUE,ERA5,1.5,,,
 int_ERA5_D_2_0PVU_BOT,THETA-Distance to local 2.0 PVU surface (ERA5),K,INT2,Caribic,pt,,,dyn,TRUE,ERA5,2,,,
-int_ERA5_TEMP,Temperature (ERA5),K,INT2,Caribic,,,t,,,ERA5,,,,
 int_ERA5_D_3_5PVU_BOT,THETA-Distance to local 3.5 PVU surface (ERA5),K,INT2,Caribic,pt,,,dyn,TRUE,ERA5,3.5,,,
-int_ERA5_TROP1_THETA,Potential temperature of local lapse rate tropopause (ERA5),K,INT2,Caribic,pt,,,therm,FALSE,ERA5,,,,
-int_Theta,Potential Temperature,K,INT2,Caribic,pt,,,,FALSE,ECMWF,,,,
+int_ERA5_D_TROP1_THETA,THETA-Distance to local lapse rate tropopause (ERA5),K,calc,Caribic,pt,,,therm,TRUE,ERA5,,,int_Theta,int_ERA5_TROP1_THETA
 int_ToAirTmp,Total Air Temperature # Celsius-temperature-scale,degC,INT2,Caribic,,,t,,,ECMWF,,,,
-int_ERA5_PV,Potential vorticity (ERA5),PVU,INT2,Caribic,pv,,,,FALSE,ERA5,,,,
-int_CARIBIC2_H_rel_TP,replacement for H_rel_TP,km,INT2,Caribic,z,,,,FALSE,MSMT,,,,
-N2O,Pseudo coord: N2O mixing ratio,ppb,GHG,Caribic,mxr,,,chem,FALSE,MSMT,,n2o,,
-int_CLaMS_N2O,Pseudo coord: N2O (CLaMS) ,ppb,INT2,Caribic,mxr,,,chem,FALSE,CLAMS,,n2o,,
-tracer_gp_N2O_at_fl,Pseudo coord: tracer GP N2O,mol mol-1,EMAC,EMAC,mxr,,,chem,FALSE,EMAC,,n2o,,
+latitude,track latitude,degrees_north,EMAC,EMAC,,lat,,,,EMAC,,,,
+longitude,track longitude,degrees_east,EMAC,EMAC,,lon,,,,EMAC,,,,
+tpress,track pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
+tps,track surface pressure,hPa,EMAC,EMAC,,,p0,,,EMAC,,,,
+tropop_tp_i,tropopause level index,level,EMAC,EMAC,lev,,,combo,FALSE,EMAC,,,,
+tropop_tp,tropopause pressure,hPa,EMAC,EMAC,p,,,combo,FALSE,EMAC,,,,
+ECHAM5_um1,u-wind,m s-1,EMAC,EMAC,,,um1,,,EMAC,,,,
+ECHAM5_etadot,vertical wind velocity,1 s-1,EMAC,EMAC,,,etadot,,,EMAC,,,,
+ECHAM5_vom1,vorticity,s-1,EMAC,EMAC,,,vom1,,,EMAC,,,,
+ECHAM5_vm1,v-wind,m s-1,EMAC,EMAC,,,vm1,,,EMAC,,,,
+tropop_tp_WMO_i,WMO tropopause level index,level,EMAC,EMAC,lev,,,therm,FALSE,EMAC,,,,
+tropop_tp_WMO,WMO tropopause pressure,hPa,EMAC,EMAC,p,,,therm,FALSE,EMAC,,,,
+int_O3,Pseudo coord: Ozone integrated over flask sampling time from high resolution measurements,ppb,INT,Caribic,mxr,,,chem,FALSE,MSMT,,o3,,

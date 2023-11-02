@@ -177,25 +177,25 @@ def minimise_tps(tps) -> list:
     2. remove all cpt, combo tp
     3. remove all ECMWF tps 
     4. Remove modelled N2O tp
-    5. Remove 1.5 PVU ERA5 dyn tp
-    6. Remove non-relative tps if relative exists in tps
+    5. Remove duplicates of O3 tp 
+    6. Remove 1.5 PVU ERA5 dyn tp
+    7. Remove non-relative tps if relative exists in tps
     """
     # check if coord exists with pt, remove if it does 
     tp_to_remove = []
-
     for tp in tps: # 1
         try: dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def, 
                             pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
         except: continue
         if not tp.vcoord=='pt': tp_to_remove.append(tp)
-    
     [tp_to_remove.append(tp) for tp in tps if tp.tp_def in ['cpt', 'combo']] # 2
     [tp_to_remove.append(tp) for tp in tps if tp.model in ['ECMWF', 'EMAC']] # 3
     [tp_to_remove.append(tp) for tp in tps 
          if tp.col_name in [tp.col_name for tp in dcts.get_coordinates(tp_def='chem', crit='n2o', model='not_MSMT')]] # 4
-    [tp_to_remove.append(tp) for tp in tps if tp.pvu==1.5] # 5
-
-    for tp in tps: # 6 
+    [tp_to_remove.append(tp) for tp in tps 
+         if tp.col_name in ['int_CARIBIC2_H_rel_TP', 'int_O3']]
+    [tp_to_remove.append(tp) for tp in tps if tp.pvu==1.5] # 6
+    for tp in tps: # 67
         try: 
             rel_tp = dcts.get_coord(rel_to_tp=True, model=tp.model, tp_def=tp.tp_def, 
                            pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)
@@ -205,7 +205,7 @@ def minimise_tps(tps) -> list:
                 tp_to_remove.append(tp)
     tps = tps.copy()
     for tp in set(tp_to_remove): tps.remove(tp)
-    tps.sort(key=lambda x: x.col_name)
+    tps.sort(key=lambda x: x.tp_def)
     return tps
 
 #%% Data Handling
