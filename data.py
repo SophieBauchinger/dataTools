@@ -742,16 +742,49 @@ class GlobalData():
 
         #             return grouped_ratios
 
-                    else:
-                        cols = [tp.col_name for tp in tps_to_group][0]
-                        crit_label = '_' + crits if tp_def == 'chem' else ''
-                        label = f'{model}_{tp_def}' + crit_label
-                        print(label)
-                        grouped_ratios[label] = np.nanmean(ratio_df[cols])
+        return tropo_counts
 
-                    return grouped_ratios
+    def calc_shared_ratios(self, tps=None): 
+        """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
+        if not tps: 
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+
+        shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+        # shared_df = shared_df[shared_df != 0].dropna(subset=tropo_cols)
+
+        tropo_counts = shared_df[tropo_cols].apply(pd.value_counts)
+        tropo_counts.dropna(axis=1, inplace=True)
+        tropo_counts.rename(columns={c: c[6:] for c in tropo_counts.columns}, inplace=True)
+
+        ratio_df = pd.DataFrame(columns=tropo_counts.columns, index=['ratios'])
+        ratios = [tropo_counts[c][True] / tropo_counts[c][False] for c in tropo_counts.columns]
+        ratio_df.loc['ratios'] = ratios  # set col
+
+        tropo_counts = pd.concat([tropo_counts, ratio_df])
+        
+        return tropo_counts
+
+    def calc_non_shared_ratios(self, tps=None): 
+        """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
+        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+
+        shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+        non_shared_df = self.df_sorted[ ~ self.df_sorted.index.isin(shared_df.index)]
+
+        tropo_counts = non_shared_df[tropo_cols].apply(pd.value_counts)
+        tropo_counts.dropna(axis=1, inplace=True)
+        tropo_counts.rename(columns={c: c[6:] for c in tropo_counts.columns}, inplace=True)
+
+        ratio_df = pd.DataFrame(columns=tropo_counts.columns, index=['ratios'])
+        ratios = [tropo_counts[c][True] / tropo_counts[c][False] for c in tropo_counts.columns]
+        ratio_df.loc['ratios'] = ratios  # set col
+
+        tropo_counts = pd.concat([tropo_counts, ratio_df])
 
         return tropo_counts
+
 
     @property
     def df_sorted(self) -> pd.DataFrame:
