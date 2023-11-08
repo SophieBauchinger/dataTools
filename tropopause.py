@@ -396,11 +396,91 @@ class TropopausePlotter(TropopauseData):
                     plt.show()
         return self
 
-    def show_ratios(self, tps, note='', **tp_kwargs):
+    def show_strato_tropo_vcounts(self, tps, shared=True, note='', **tp_kwargs): 
+        """ Bar plots of data point allocation for multiple tp definitions. """
+        if shared is False: 
+            tropo_counts = self.calc_ratios() # dataframe
+            note += ' all'
+        if shared is True: 
+            tropo_counts = self.calc_shared_ratios()
+            # note += ' shared'
+        if shared == 'No': 
+            tropo_counts = self.calc_non_shared_ratios()
+            note += ' non-shared'
+
+        tropo_counts.drop(index='ratios', inplace=True)
+        tropo_counts = tropo_counts[[tp.col_name for tp in tps if tp.col_name in tropo_counts.columns]]
+        
+        tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
+        strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
+        
+        if not tps: 
+            tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
+                   if c in [c.col_name for c in dcts.get_coordinates() 
+                            if c.tp_def not in ['combo', 'cpt']]]
+            tps = tools.minimise_tps(tps)
+
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp, filter_label=True)) 
+                                        for tp in tps]))
+
+
+        fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=400, 
+                                        figsize=(9,4), sharey=True)
+        
+        # fig.suptitle('Number of tropospheric / stratospheric datapoints')
+        fig.subplots_adjust(top=0.85)
+        ax_t.set_title('# Tropospheric points', fontsize=9, loc='right')
+        ax_s.set_title('# Stratospheric points', fontsize=9, loc='left')
+
+        bar_labels = tp_labels
+        
+        bar_params = dict(align='center', edgecolor='k',  rasterized=True,
+                          alpha=0.65, zorder=10)
+        nums = range(len(bar_labels))
+
+        t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
+        s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
+        for i in nums: 
+            ax_label.text(0.5, i, bar_labels[i], 
+                          horizontalalignment='center', verticalalignment='center')
+        ax_label.axis('off')
+        
+        maximum = np.nanmax(tropo_bar_vals+strato_bar_vals)
+        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals)
+        for decimal_place in [4,3,2,1,0]:
+            if all(i>np.round(minimum, decimal_place) for i in tropo_bar_vals+strato_bar_vals): 
+                minimum = np.round(minimum, decimal_place)
+            else: 
+                break
+        padding = (maximum-minimum)/3
+        
+        ax_t.set_xlim(maximum +padding , minimum-padding if not minimum-padding<0 else 0)
+        ax_s.set_xlim(minimum-padding if not minimum-padding<0 else 0, maximum +padding)
+        
+        ax_t.grid('both', ls='dotted')
+        ax_s.grid('both', ls='dotted')
+        # ax_t.axis('off')
+        # ax_s.axis('off')
+        
+        ax_t.bar_label(t_bars, ['{0:.0f}'.format(t_val) for t_val in tropo_bar_vals], 
+                       padding=2)
+        ax_s.bar_label(s_bars, ['{0:.0f}'.format(s_val) for s_val in strato_bar_vals], 
+                       padding=2)
+
+        for ax in [ax_t, ax_s]: 
+            ax.yaxis.set_major_locator(ticker.NullLocator())
+        if note: ax.text(s=note, **dcts.note_dict(ax, y=1.1))
+        fig.subplots_adjust(wspace=0)
+
+    def show_ratios(self, tps, shared=False, note='', **tp_kwargs):
     # , as_subplot=False, ax=None, single_tp_def=None, group_vc=False,
     #                 unity_line=True, minimise_tps=True, note='', **tp_kwargs):
         """ Plot ratio of tropo / strato datapoints on a horizontal bar plot """
         tropo_counts = self.calc_ratios() # dataframe
+        if shared: 
+            tropo_counts = self.calc_shared_ratios()
+        if shared == 'No': 
+            tropo_counts = self.calc_non_shared_ratios()
 
         ratios = tropo_counts.loc['ratios']
         tropo_counts.drop(index='ratios', inplace=True)
