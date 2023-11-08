@@ -37,8 +37,8 @@ count_limit = 5
 #%% Define TropopausePlotter
 class TropopausePlotter(TropopauseData):
     """ Add plotting functionality to tropopause data objects """
-    def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True,
-                 tp_data = None):
+    def __init__(self, tp_data = None, years=range(2005, 2020), 
+                 interp=True, method='n', df_sorted=True):
         if not tp_data is None: #isinstance(tp_data, TropopauseData):
             self.__dict__ = tp_data.__dict__.copy()
         else: 
@@ -239,12 +239,15 @@ class TropopausePlotter(TropopauseData):
             ax.legend()
             plt.show()
             
-    def tp_height_seasonal_laitude_binned(self, rel=False, note='', seasonal_stdvs=False): 
+    def tp_height_seasonal_laitude_binned(self, rel=False, note='', 
+                                          seasonal_stdvs=False): 
         """ Plot average and seasonal tropopause heights, optionally with standard deviation. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
+        
+        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel))
 
-        for tp in tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel)):
+        for tp in tps:
             fig, ax = plt.subplots(dpi=250)
             # ax.set_title('Vertical extent of'+dcts.make_coord_label(tp, True)+' Tropopause')
             ax.set_xlim(30, 90)
@@ -256,6 +259,8 @@ class TropopausePlotter(TropopauseData):
 
             for s in ['av', 1,2,3,4]:
                 data = self.sel_season(s).df if not s=='av' else self.df
+                data = data[data.index.isin(self.get_shared_indices(tps))]
+                
                 bin1d = bp.Simple_bin_1d(data[tp.col_name],
                                       np.array(data.geometry.y), bci,
                                       count_limit = self.count_limit)
@@ -275,7 +280,8 @@ class TropopausePlotter(TropopauseData):
 
                 else: 
                     plot_kwargs.update(dict(
-                        label = 'Average', color='dimgray', 
+                        label = 'Average', 
+                        color='dimgray', 
                         ls = 'dashed', zorder=5))
                     if not seasonal_stdvs: 
                         ax.fill_between(bin1d.xintm, 
@@ -301,9 +307,9 @@ class TropopausePlotter(TropopauseData):
                                     edgecolor='grey', alpha=0.5, pad=0.25))
             
 
-            ylabel = dcts.make_coord_label(tp, True) # dcts.axis_label(tp.vcoord) +' of '+ dcts.make_coord_label(tp, True)
+            ylabel = dcts.make_coord_label(tp)# , True) # dcts.axis_label(tp.vcoord) +' of '+ dcts.make_coord_label(tp, True)
             vc_label = {'pt': '$\Theta$', 'z':'z', 'mxr':'mxr'}
-            ax.set_ylabel(ylabel if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
+            ax.set_ylabel(ylabel)# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
             ax.set_xlabel(dcts.axis_label('lat'))
 
 # =============================================================================
