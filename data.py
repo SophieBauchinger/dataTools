@@ -590,6 +590,7 @@ class GlobalData():
         subs = dcts.get_subs('o3', ID='INT')
         if not subs.col_name in self.df.columns: 
             raise Exception(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
+            raise KeyError(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
         df_sorted = pd.DataFrame(index = self.df.index)
         df_sorted.loc[self.df[subs.col_name].lt(60), 
                       (f'strato_{subs.col_name}', f'tropo_{subs.col_name}')] = (False, True)
@@ -675,10 +676,20 @@ class GlobalData():
             df_sorted[strato] = tp_sorted[strato]
 
         for tp in [tp for tp in tps if tp.crit=='o3']: 
+        # flag tropospheric ozone below 60 ppb as tropospheric
+        try: 
             o3_sorted = self.o3_filter()
 
             df_sorted
 
+            o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
+            o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
+            for tp in [tp for tp in tps if tp.crit=='o3' and tp.vcoord=='z']:
+                o3_sorted[f'tropo_{tp.col_name}'] = o3_tropo
+                o3_sorted[f'strato_{tp.col_name}'] = o3_strato
+                df_sorted.update(o3_sorted, overwrite=False)
+        except KeyError: 
+            print('Ozone data not found. ')
 
         df_sorted = df_sorted.convert_dtypes()
         if save: self.data['df_sorted'] = df_sorted
