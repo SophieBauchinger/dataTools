@@ -539,61 +539,36 @@ class TropopausePlotter(TropopauseData):
         plt.show()
 
 #%% N2O filter
-def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
-                subs=None, subs_col=None, detr=True, **kwargs):
+def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
     """ Plot strat / trop sorted data """
     # only take data with index that is available in df_sorted
-    if subs in glob_obj.data.keys(): df = glob_obj.data[subs]
-    elif glob_obj.source=='Caribic': df = glob_obj.data[ID]
-    else: df = glob_obj.df
-    data = df[df.index.isin(df_sorted.index)]
-
-    # data = glob_obj.data[ID][glob_obj.data[ID].index.isin(df_sorted.index)]
+    data = glob_obj.df[glob_obj.df.index.isin(glob_obj.df_sorted.index)]
     data.sort_index(inplace=True)
-
-    # separate trop/strat data for any criterion
-    tropo_col = [col for col in df_sorted.columns if col.startswith('tropo')][0]
-    strato_col = [col for col in df_sorted.columns if col.startswith('strato')][0]
+    
+    tropo_col = 'tropo_'+tp.col_name
+    strato_col = 'strato_'+tp.col_name
 
     # take 'data' here because substances may not be available in df_sorted
-    df_tropo = data[df_sorted[tropo_col] == True]
-    df_strato = data[df_sorted[strato_col] == True]
-
-    if crit in ['o3', 'n2o'] and not subs: subs = crit
-
-    if 'subs_pfx' in kwargs.keys():
-        subs_pfx = kwargs['subs_pfx']
-        substance = dcts.get_col_name(subs, glob_obj.source, kwargs['subs_pfx'])
-    else:
-        if subs_col is None and subs is not None:
-            for subs_pfx in (ID, 'GHG', 'INT', 'INT2'):
-                try: substance = dcts.get_col_name(subs, glob_obj.source, subs_pfx); break
-                except: substance = None; continue
-        else: substance = subs_col; subs_pfx = ID
-    if substance is None:
-        print(f'Cannot plot {subs}, not available in {ID}.'); return
-    if 'detr_'+substance in data.columns: substance = 'detr_'+substance
+    df_tropo = data[glob_obj.df_sorted[tropo_col] == True]
+    df_strato = data[glob_obj.df_sorted[strato_col] == True]
 
     fig, ax = plt.subplots(dpi=200)
-    plt.title(f'{crit} filter on {ID} data')
-    ax.scatter(df_strato.index, df_strato[substance],
+    plt.title(f'{dcts.make_coord_label(tp, True)} filter on {dcts.make_subs_label(subs)} data')
+    ax.scatter(df_strato.index, df_strato[subs.col_name],
                 c='grey',  marker='.', zorder=0, label='strato')
-    ax.scatter(df_tropo.index, df_tropo[substance],
+    ax.scatter(df_tropo.index, df_tropo[subs.col_name],
                 c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
 
-    if popt0 is not None and popt1 is not None and (subs==crit or subs is None):
+    if popt0 is not None and popt1 is not None and subs.short_name == tp.crit:
         # only plot baseline for chemical tropopause def and where crit is being plotted
-        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
-        ls = 'solid'
-        if not subs_pfx == ID: ls = 'dashed'
-        ax.plot(df_sorted.index, dcts.get_fct_substance(crit)(t_obs_tot-2005, *popt0),
+        t_obs_tot = np.array(dt_to_fy(glob_obj.df_sorted.index, method='exact'))
+        ls = 'solid' if tp.ID == subs.ID else 'dashed'
+        ax.plot(glob_obj.df_sorted.index, dcts.get_fct_substance(tp.crit)(t_obs_tot-2005, *popt0),
                 c='r', lw=1, ls=ls, label='initial')
-        ax.plot(df_sorted.index, dcts.get_fct_substance(crit)(t_obs_tot-2005, *popt1),
+        ax.plot(glob_obj.df_sorted.index, dcts.get_fct_substance(tp.crit)(t_obs_tot-2005, *popt1),
                 c='k', lw=1, ls=ls, label='filtered')
 
-    # plt.ylim(220, 340)
-
-    plt.ylabel(substance)
+    plt.ylabel(dcts.make_subs_label(subs))
     plt.legend()
     plt.show()
 
