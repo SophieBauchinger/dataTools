@@ -127,7 +127,7 @@ def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwarg
         fig.autofmt_xdate()
         plt.show()
 
-def scatter_lat_lon_binned(glob_obj, detr=False, **subs_kwargs):
+def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs):
     """ Plots 1D averaged values over latitude / longitude including colormap
 
     Parameters:
@@ -192,17 +192,20 @@ def scatter_lat_lon_binned(glob_obj, detr=False, **subs_kwargs):
 
             if all(np.isnan(out_x.vmean)) and all(np.isnan(out_y.vmean)):
                 continue
+            
+            data_x = getattr(out_x, bin_attr)
+            data_y = getattr(out_y, bin_attr)
 
-            axs[0].plot(out_x.xintm, out_x.vmean, zorder=1, color='black', lw=0.5)
-            axs[0].scatter(out_x.xintm, out_x.vmean,  # plot across longitude
-                           c=out_x.vmean, cmap=cmap, norm=norm)
+            axs[0].plot(out_x.xintm, data_x, zorder=1, color='black', lw=0.5)
+            axs[0].scatter(out_x.xintm, data_x,  # plot across longitude
+                           c=data_x, cmap=cmap, norm=norm)
             axs[0].set_xlabel('Longitude [deg]')  # ; plt.xlim(out_x.xbmin, out_x.xbmax)
             axs[0].set_ylabel(dcts.make_subs_label(substance))
             axs[0].set_ylim(ymax=ymax, ymin=ymin)
 
-            axs[1].plot(out_y.xintm, out_y.vmean, zorder=1, color='black', lw=0.5)
-            axs[1].scatter(out_y.xintm, out_y.vmean,  # plot across latitude
-                           c=out_y.vmean, cmap=cmap, norm=norm, zorder=2)
+            axs[1].plot(out_y.xintm, data_y, zorder=1, color='black', lw=0.5)
+            axs[1].scatter(out_y.xintm, data_y,  # plot across latitude
+                           c=data_y, cmap=cmap, norm=norm, zorder=2)
             axs[1].set_xlabel('Latitude [deg]')  # ; plt.xlim(out_y.xbmin, out_y.xbmax)
 
         cax = fig.add_subplot(outer_grid[-1, :])
