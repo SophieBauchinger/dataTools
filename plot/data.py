@@ -35,19 +35,6 @@ warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 # ignore warning for np.nanmin / np.nanmax for all-nan sclice
 warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
-vlims = {  # optimised for Caribic measurements from 2005 to 2020
-    'co': (15, 250),
-    'o3': (0.0, 1000),
-    'h2o': (0.0, 1000),
-    'no': (0.0, 0.6),
-    'noy': (0.0, 6),
-    'co2': (370, 420),
-    'ch4': (1650, 1970),
-    'f11': (130, 250),
-    'f12': (400, 540),
-    'n2o': (290, 330),
-    'sf6': (5.5, 10),
-}
 
 # %% GlobalData plotting
 def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwargs):
@@ -86,7 +73,7 @@ def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwarg
             ax.text(**dcts.note_dict(ax, s=note, y=0.075))
 
         # Plot mixing ratios x
-        vmin, vmax = vlims.get(subs.short_name)
+        vmin, vmax = dcts.get_vlims(subs.short_name)
         if 'mol' in subs.unit:
             ref_unit = dcts.get_substances(short_name=subs.short_name,
                                            source='Caribic')[0].unit
@@ -188,7 +175,7 @@ def scatter_lat_lon_binned(glob_obj, detr=False, **subs_kwargs):
 
         # Colormapping
         cmap = plt.cm.viridis_r
-        vmin, vmax = vlims.get(substance.short_name)
+        vmin, vmax = dcts.get_vlims(substance.short_name)
         if 'mol' in substance.unit:
             ref_unit = dcts.get_substances(short_name=substance.short_name,
                                            source='Caribic')[0].unit
@@ -275,9 +262,9 @@ def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
         out_list = glob_obj.binned_2d(substance)
 
         cmap = plt.cm.viridis_r  # create colormap
-        vmin, vmax = vlims.get(substance.short_name)
         if 'mol' in substance.unit:
             ref_unit = dcts.get_substances(short_name=substance.short_name,
+        vmin, vmax = dcts.get_vlims(subs.short_name)# vlims.get(substance.short_name)
                                            source='Caribic')[0].unit
             vmin = tools.conv_PartsPer_molarity(vmin, ref_unit)
             vmax = tools.conv_PartsPer_molarity(vmax, ref_unit)
@@ -382,7 +369,7 @@ def local(loc_obj, greyscale=False, v_limits=(None, None), **subs_kwargs):
         if all(isinstance(i, (int, float)) for i in v_limits):
             vmin, vmax = v_limits
         else:
-            vmin, vmax = vlims.get(subs.short_name)  # dcts.get_vlims(substance) # default values
+            vmin, vmax = dcts.get_vlims(subs.short_name) # default values
         norm = Normalize(vmin, vmax)
 
         # Plot all available info on one graph
