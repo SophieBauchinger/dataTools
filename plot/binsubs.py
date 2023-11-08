@@ -513,7 +513,24 @@ class BinPlotter1D(BinPlotter):
         
         return bin_dict, fig 
 
+    def plot_1d_seasonal_gradient_with_vstdv(self, subs, coord): 
+        """ Add second axis to vertical gradient plots to indicate variability. """
+        bin_dict, fig = self.plot_1d_seasonal_gradient(subs, coord)
 
+        ax1 = fig.add_subplot(133)
+        outline = mpe.withStroke(linewidth=2, foreground='white')
+
+        for s in set(self.df['season'].tolist()):
+            y = bin_dict[s].xintm
+            
+            ax1.plot(bin_dict[s].vstdv, y, '-', 
+                    c=dcts.dict_season()[f'color_{s}'],
+                    label=dcts.dict_season()[f'name_{s}'],
+                    path_effects=[outline], zorder=2)
+        ax1.grid('both')
+        ax1.tick_params(labelleft=False)
+
+        fig.set_size_inches(8,5)
 
     def make_bar_plot(self, subs, xcoord, tp, bin_attr, percent_deviation=False, **kwargs) -> tuple: 
         """ Plot histograms showing differences between TPs. 
