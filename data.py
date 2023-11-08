@@ -118,6 +118,16 @@ class GlobalData():
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
 
+    def get_shared_indices(self, tps=None): 
+        """ Make reference for shared indices of chosen tropopause definitions. """
+        if not 'df_sorted' in self.data: 
+            self.create_df_sorted()
+        if not tps: 
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+        indices = self.df_sorted.dropna(subset=tropo_cols, how='any').index
+        return indices
+
     def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame: 
         """ Flag each datapoint according to its distance to specific tropopause definitions. """
         #TODO implement this 
