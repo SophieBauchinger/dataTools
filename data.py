@@ -419,20 +419,16 @@ class GlobalData():
 
         return out
 
-    def sel_season(self, season: int):
     def sel_season(self, *seasons):
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
         
         Parameters: 
-            season (int): one of the following: ""1,2,3,4
             season (List[int]): list of multiple of 1,2,3,4
                 1 - spring, 2 - summer, 3 - autumn, 4 - winter """
         if 'season' in self.status:
-            if self.status['season'] == dcts.dict_season()[f'name_{season}']:
             if any(s == dcts.dict_season()[f'name_{s}'] for s in self.status['season']):
                 return self
             raise Warning('Cannot select {} as already filtered for {}'.format(
-                dcts.dict_season()[f'name_{season}'], self.status['season']))
                 [dcts.dict_season()[f'name_{s}'] for s in seasons], self.status['season']))
         out = type(self).__new__(self.__class__)  # new class instance
         for attribute_key in self.__dict__:  # copy attributes
@@ -445,7 +441,6 @@ class GlobalData():
         for k in df_list:  # only take data from chosen years
             out.data[k] = self.data[k].copy()
             out.data[k]['season'] = tools.make_season(out.data[k].index.month)
-            out.data[k] = out.data[k].loc[out.data[k]['season'] == season]
 
             mask = [i in seasons for i in out.data[k]['season']]
             out.data[k] = out.data[k].loc[mask]
