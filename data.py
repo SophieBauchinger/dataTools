@@ -451,7 +451,6 @@ class GlobalData():
             out.flights = list(set(out.data[df_list[-1]]['Flight number']))
             out.flights.sort()
 
-        out.status['season'] = dcts.dict_season()[f'name_{season}']
         out.status['season'] = [dcts.dict_season()[f'name_{s}'] for s in seasons]
         return out
 
