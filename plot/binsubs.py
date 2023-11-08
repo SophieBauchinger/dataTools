@@ -610,7 +610,7 @@ class BinPlotter1D(BinPlotter):
         else: 
             description = bin_attr
         
-        fig.suptitle(f'{description} of {dcts.make_subs_label(subs)}')
+        fig.suptitle(f'{description} of {dcts.make_subs_label(subs)}' if not bin_attr=='vcount' else description)
         fig.subplots_adjust(top=0.85)
         ax_t.set_title('Troposphere', fontsize=9, loc='right')
         ax_s.set_title('Stratosphere', fontsize=9, loc='left')
@@ -1121,11 +1121,17 @@ class BinPlotter2D(BinPlotter):
     
         df = self.df
 
-        if xcoord.col_name == 'geometry.y': # latitude
+        if xcoord.col_name == 'geometry.x': 
+            x = df.geometry.x
+        elif xcoord.col_name == 'geometry.y': 
             x = df.geometry.y
         else:
             x = np.array(df[xcoord.col_name])
-        y = np.array(df[ycoord.col_name])
+
+        if ycoord.col_name == 'geometry.y': 
+            y =  df.geometry.y
+        else: 
+            y = np.array(df[ycoord.col_name])
 
         xbsize = self._get_bsize(xcoord, 'x')
         ybsize = self._get_bsize(ycoord, 'y')
