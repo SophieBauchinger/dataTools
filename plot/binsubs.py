@@ -383,6 +383,76 @@ class BinPlotter1D(BinPlotter):
         super().__init__(glob_obj, **kwargs)
 
     def plot_1d_gradient(self, subs, coord, bin_attr='vmean', **kwargs):
+    # def plot_1d_variability(self, subs, coord, bin_attr=)
+
+    def flight_height_histogram(self, tp): 
+        """ Make a histogram of the number of datapoints for each tp bin. """
+        fig, ax = plt.subplots(dpi=250, figsize=(5,3))
+        
+        rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (self.glob_obj.df[tp.col_name].min(), 
+                                                                      self.glob_obj.df[tp.col_name].max())
+        
+        hist = ax.hist(self.glob_obj.df[tp.col_name].values, 
+                       bins=35, range=rlims, alpha=0.7)
+        ax.grid(ls='dotted')
+        if tp.rel_to_tp: 
+            ax.vlines(0, max(hist[0]), 0, color='k', ls='dashed')
+        ax.set_ylabel('# datapoints')
+        ax.set_xlabel(dcts.make_coord_label(tp))
+        
+        if tp.crit == 'n2o': 
+            ax.invert_xaxis()
+            ax.vlines(320.459, max(hist[0]), 0, color='k', ls='dashed', lw=0.5)
+
+    def plot_1d_variability_comparison(self, subs, tps, rel=True, bin_attr='vstdv', **kwargs): 
+        """ Compare relative mixing ratio varibility between tropopause definitions. """
+        
+        fig, ax = plt.subplots(dpi=500, figsize=(4,5))
+        outline = mpe.withStroke(linewidth=2, foreground='white')
+        
+        for i, tp in enumerate(tps):
+            bin_dict = self.bin_1d_seasonal(subs, tp)
+            
+            ls = ['--', '-.', ':'][i]
+            
+            for s in [1,3]: 
+                    
+                vdata = getattr(bin_dict[s], bin_attr)
+                if rel: vdata = vdata / bin_dict[s].vmean * 100
+                
+                y = bin_dict[s].xintm
+                
+                ax.plot(vdata, y, ls=ls,
+                        c=dcts.dict_season()[f'color_{s}'],
+                        label=dcts.make_coord_label(tp, True) if s==1 else None,
+                        path_effects=[outline], zorder=2, lw=2.5)
+                
+                ax.scatter(vdata, y,marker='.', 
+                        c=dcts.dict_season()[f'color_{s}'],
+                        zorder=3)
+
+                if s==3:
+                    yticks = [i for i in y if i<0] + [0] + [i for i in y if i > 0] + [-55, -65]
+                    ax.set_yticks(y if not tp.rel_to_tp else yticks)
+            
+        ax.grid('both')
+        ax.set_ylabel(f'$\Delta\,\Theta$ [{tps[0].unit}]')
+        
+        if bin_attr == 'vstdv': 
+            ax.set_xlabel(('Relative variability' if rel else 'Variability')+ f' of {dcts.make_subs_label(subs, name_only=True)} [%]')
+        elif bin_attr == 'vmean': 
+            ax.set_xlabel(dcts.make_subs_label(subs))
+        
+        if tps[0].rel_to_tp: 
+            xlims = plt.axis()[:2]
+            ax.hlines(0, *xlims, ls='dashed', color='k', lw=1, label = 'Tropopause', zorder=1)
+            ax.set_xlim(*xlims)
+
+        ax.legend()
+        ax.grid('both', ls='dashed', lw=0.5)
+        ax.set_axisbelow(True)
+        ax.set_ylim(-70, 70)
+
         """ Plot gradient per season onto one plot. """
         bin_dict = self.bin_1d_seasonal(subs, coord)
         
