@@ -15,10 +15,10 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patheffects as mpe
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, BoundaryNorm
 from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
-from matplotlib.patches import Patch
+from matplotlib.patches import Patch, Rectangle
 import numpy as np
 
 import geopandas
@@ -26,7 +26,9 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 
 if '..' not in sys.path:
     sys.path.append('..')
-sys.path = sys.path[1:]
+
+import toolpac.calc.dev_binprocessor as bp
+
 import tools
 import dictionaries as dcts
 
@@ -218,7 +220,66 @@ def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs
 
         break
 
-def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
+def plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', hide_lats=False, **subs_kwargs): 
+    """ 2D plot of binned substance data for all years at once. """
+    data = glob_obj.df
+    substances = [dcts.get_subs(col_name=c) for c in data.columns
+                  if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
+                  and not c.startswith('d_')]
+
+    for subs in substances: 
+        fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
+
+        cmap = dcts.dict_colors()[bin_attr]
+        vmin, vmax = dcts.get_vlims(subs.short_name, bin_attr)
+        if 'mol' in subs.unit:
+            ref_unit = dcts.get_substances(short_name=subs.short_name,
+                                           source='Caribic')[0].unit
+            vmin = tools.conv_PartsPer_molarity(vmin, ref_unit)
+            vmax = tools.conv_PartsPer_molarity(vmax, ref_unit)
+        norm = Normalize(vmin, vmax)  # normalise color map to set limits
+
+        if bin_attr=='vcount': 
+            cmap.set_under('white')
+            bounds=[1, 5, 10, 15, 30, 45, 60]
+            norm = BoundaryNorm(bounds, cmap.N)
+        
+        world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+        world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+
+        bci = bp.Bin_equi2d(-90, 90, glob_obj.grid_size,
+                            -180, 180, glob_obj.grid_size)
+        lat = data.geometry.y 
+        lon = data.geometry.x
+        out = bp.Simple_bin_2d(data[subs.col_name], lat, lon, bci)
+
+        img_data = getattr(out, bin_attr)
+        img = ax.imshow(img_data, cmap=cmap, norm=norm, origin='lower',
+                        extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
+        
+        if hide_lats:
+            ax.hlines(30, -180, 180, color='k', lw=1, ls='dashed')
+            ax.add_patch(Rectangle((-180, -90), 180*2, 90+30, facecolor="grey", alpha=0.25))
+
+        # ax.set_title(f'{yr}')#, weight='bold')
+        # ax.text(**dcts.note_dict(ax, 0.13, 0.1, f'{year}'), weight='bold')
+        ax.set_xlim(-180, 180)
+        ax.set_ylim(-90, 90)
+
+        # label outer plot axes
+        ax.set_ylabel('Latitude [°N]')
+        ax.set_xlabel('Longitude [°E]')
+        
+        cbar = plt.colorbar(img, ax=ax, extend='neither' if not bin_attr=='vcount' else 'max')
+        cbar.ax.set_xlabel(f'[{subs.unit}]' if bin_attr!='vcount' else '[# Points]')
+        # cbar.ax.tick_params(labelsize=15, which='both')
+        # cbar.ax.minorticks_on()
+
+        # ax.set_title(dcts.make_subs_label(subs, detr=detr)
+        #              if bin_attr != 'vcount' else 'Distribution of greenhouse gas flask measurements')
+
+
+def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs):
     # glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
     """ Create a 2D plot of binned mixing ratios for each available year on a grid.
 
@@ -231,17 +292,7 @@ def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
                   if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
                   and not c.startswith('d_')]
 
-    for substance in substances:  # for year in glob_obj.years
-        # col = substance.col_name
-        # if detr and 'detr' + col not in data.columns:
-        #     try:
-        #         glob_obj.detrend_substance(substance.short_name)
-        #         data = glob_obj.df
-        #         if 'detr_' + col in data.columns:
-        #             col = 'detr_' + col
-        #     finally:
-        #         print(f'Could not detrend {substance.short_name}')
-
+    for subs in substances:  
         nplots = len(glob_obj.years)
         nrows = nplots if nplots <= 4 else math.ceil(nplots / 3)
         ncols = 1 if nplots <= 4 else 3
@@ -257,17 +308,17 @@ def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
                         cbar_mode="single")
 
         if nplots >= 4:
-            data_type = 'measured' if substance.model == 'MSMT' else 'modeled'
-            fig.suptitle(f'Global {data_type} mixing ratios of {dcts.make_subs_label(substance, detr=detr)}',
+            data_type = 'measured' if subs.model == 'MSMT' else 'modeled'
+            fig.suptitle(f'Global {data_type} mixing ratios of {dcts.make_subs_label(subs, detr=detr)}',
                          fontsize=25)
             plt.subplots_adjust(top=0.96)
 
-        out_list = glob_obj.binned_2d(substance)
+        out_list = glob_obj.binned_2d(subs)
 
         cmap = plt.cm.viridis_r  # create colormap
-        if 'mol' in substance.unit:
-            ref_unit = dcts.get_substances(short_name=substance.short_name,
         vmin, vmax = dcts.get_vlims(subs.short_name)# vlims.get(substance.short_name)
+        if 'mol' in subs.unit:
+            ref_unit = dcts.get_substances(short_name=subs.short_name,
                                            source='Caribic')[0].unit
             vmin = tools.conv_PartsPer_molarity(vmin, ref_unit)
             vmax = tools.conv_PartsPer_molarity(vmax, ref_unit)
@@ -276,7 +327,9 @@ def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
 
         for i, (out, ax, year) in enumerate(zip(out_list, grid, glob_obj.years)):
             world.boundary.plot(ax=ax, color='black', linewidth=0.3)
-            img = ax.imshow(out.vmean.T, cmap=cmap, norm=norm, origin='lower',
+            
+            img_data = getattr(out, bin_attr)
+            img = ax.imshow(img_data.T, cmap=cmap, norm=norm, origin='lower',
                             extent=[out.xbmin, out.xbmax, out.ybmin, out.ybmax])
 
             # ax.set_title(f'{yr}')#, weight='bold')
@@ -294,7 +347,7 @@ def plot_binned_2d(glob_obj, detr=False, **subs_kwargs):
                 cbar = grid.cbar_axes[0].colorbar(img)
                 cbar.ax.tick_params(labelsize=15, which='both')
                 # cbar.ax.minorticks_on()
-                cbar.ax.set_xlabel(dcts.make_subs_label(substance, detr=detr), fontsize=15)
+                cbar.ax.set_xlabel(dcts.make_subs_label(subs, detr=detr), fontsize=15)
 
         for i, ax in enumerate(grid):  # hide extra plots
             if i >= nplots:
