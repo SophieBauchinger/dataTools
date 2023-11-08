@@ -141,7 +141,7 @@ def get_default_bsize(short_coord):
     bsizes_dict = {
         'pt': 10,
         'p' : 25, 
-        'z' : 0.5,
+        'z' : 0.75,
         'mxr' : 5, # n2o
         'eqpt' : 5,
         'eqlat' : 5, 
@@ -334,7 +334,10 @@ def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple:
             return vlims_stdv_strato[subs_short]
         else: 
             raise KeyError(f'No default vlims for {subs_short} STDV in {atm_layer}')
-
+            
+    if bin_attr=='vcount': 
+        return (1, np.nan)
+    
 #%% Misc
 def dict_season():
     """ Use to get name_s, color_s for season s"""
@@ -353,6 +356,8 @@ def dict_colors():
         'vstdv_tropo' : cmr.get_sub_cmap('YlOrBr', 0, 0.75),
         'vstdv_strato':  plt.cm.BuPu,
         'diff' : plt.cm.PiYG,
+        'vcount' : cmr.get_sub_cmap('plasma_r', 0.1, 0.9), 
+        # 'vcount' : plt.cm.PuRd,
         }
 
 def axis_label(coord): 
