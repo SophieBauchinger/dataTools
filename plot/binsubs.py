@@ -382,7 +382,6 @@ class BinPlotter1D(BinPlotter):
     def __init__(self, glob_obj, **kwargs):
         super().__init__(glob_obj, **kwargs)
 
-    def plot_1d_gradient(self, subs, coord, bin_attr='vmean', **kwargs):
     # def plot_1d_variability(self, subs, coord, bin_attr=)
 
     def flight_height_histogram(self, tp): 
@@ -453,56 +452,68 @@ class BinPlotter1D(BinPlotter):
         ax.set_axisbelow(True)
         ax.set_ylim(-70, 70)
 
+    def plot_1d_seasonal_gradient(self, subs, coord, bin_attr='vmean', **kwargs):
         """ Plot gradient per season onto one plot. """
         bin_dict = self.bin_1d_seasonal(subs, coord)
         
-        fig, ax = plt.subplots(dpi=200, figsize=(6,5))
+        fig = plt.figure(dpi=500, figsize=(12,5))
+
+        ax = fig.add_subplot(132)
         outline = mpe.withStroke(linewidth=2, foreground='white')
 
         for s in set(self.df['season'].tolist()):
-            vmean = bin_dict[s].vmean
+            vdata = getattr(bin_dict[s], bin_attr)
             y = bin_dict[s].xintm
-            ax.plot(vmean, y, '-', marker='o', c=dcts.dict_season()[f'color_{s}'],
-                      label=dcts.dict_season()[f'name_{s}'],
-                      path_effects=[outline])
+            
+            if bin_attr=='vmean': 
+                ax.errorbar(vdata, y, xerr = bin_dict[s].vstdv, 
+                            c = dcts.dict_season()[f'color_{s}'], 
+                            lw=1,capsize=2, alpha=1, zorder=3)
+            
+            ax.plot(vdata, y, '-', marker='o', 
+                    c=dcts.dict_season()[f'color_{s}'],
+                    label=dcts.dict_season()[f'name_{s}'],
+                    path_effects=[outline], zorder=2)
 
-            if s==3: 
-                ax.set_yticks(y if not coord.rel_to_tp else [0]+y)
-                print(y)
+            if s==3:
+                yticks = [i for i in y if i<0] + [0] + [i for i in y if i > 0]
+                ax.set_yticks(y if not coord.rel_to_tp else yticks)
+                
+        for s in set(self.df['season'].tolist()):
+            # markers should be on top of all other information in the plot 
+            ax.scatter(getattr(bin_dict[s], bin_attr), 
+                       bin_dict[s].xintm, 
+                       marker='o', c=dcts.dict_season()[f'color_{s}'], zorder=20)
         
-        ax.set_ylabel(dcts.make_coord_label(coord))
+        cl = f'{coord.vcoord} [{coord.unit}]'
+        if coord.vcoord=='pt': 
+            cl = f'$\Theta$ [{coord.unit}]'
+        if coord.rel_to_tp: 
+            cl = '$\Delta$' + cl
+        ax.set_ylabel((f'{cl} - ' if coord.tp_def in ['dyn', 'therm'] else '') + f'{dcts.make_coord_label(coord, True)}')
         ax.set_xlabel(dcts.make_subs_label(subs))
 
-        xmin = np.nanmin([np.nanmin(bin_inst.vmean) for bin_inst in bin_dict.values()])
-        xmax = np.nanmax([np.nanmax(bin_inst.vmean) for bin_inst in bin_dict.values()])
-
-        if coord.rel_to_tp: 
-            ax.hlines(0, xmin, xmax, ls='dashed', color='k', lw=1)
-
-        # ax.set_yticks([0] + bin_dict[1].xintm)
-        # ax.set_yticks(y, minor=True)
-        # print(y)
+        # xmin = np.nanmin([np.nanmin(bin_inst.vmean) for bin_inst in bin_dict.values()])
+        # xmax = np.nanmax([np.nanmax(bin_inst.vmean) for bin_inst in bin_dict.values()])
         
         if coord.vcoord in ['mxr', 'p'] and not coord.rel_to_tp: 
             ax.invert_yaxis()
         if coord.vcoord=='p': 
             ax.set_yscale('symlog' if coord.rel_to_tp else 'log')
 
-        # ax.set_yticks(np.concatenate([y[:-1], y[:-1] * 3]), minor=True)
+        if coord.rel_to_tp: 
+            xlims = plt.axis()[:2]
+            ax.hlines(0, *xlims, ls='dashed', color='k', lw=1, label = 'Tropopause', zorder=1)
+            ax.set_xlim(*xlims)
 
-        # y = np.exp(np.linspace(min(y),max(y),1000))
-        # ax.tick_params(axis='y', which='minor')
-        
-        # y_minor = ticker.LogLocator(base = 10.0, subs = np.arange(min(y), max(y)), numticks = 10)
-        # ax.yaxis.set_minor_locator(y_minor)
-        # ax.yaxis.set_minor_formatter(ticker.NullFormatter())
-        
-        # ax.yaxis.set_minor_formatter(FormatStrFormatter("%.1f"))
 
-        # ax.set_yticks(minor=True, ticks = np.arange())
-
-        ax.grid('both', ls='dashed', lw=0.5)
         ax.legend()
+        ax.grid('both', ls='dashed', lw=0.5)
+        ax.set_axisbelow(True)
+        
+        return bin_dict, fig 
+
+
 
     def make_bar_plot(self, subs, xcoord, tp, bin_attr, percent_deviation=False, **kwargs) -> tuple: 
         """ Plot histograms showing differences between TPs. 
