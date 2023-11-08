@@ -589,7 +589,6 @@ class GlobalData():
         """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
         subs = dcts.get_subs('o3', ID='INT')
         if not subs.col_name in self.df.columns: 
-            raise Exception(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
             raise KeyError(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
         df_sorted = pd.DataFrame(index = self.df.index)
         df_sorted.loc[self.df[subs.col_name].lt(60), 
@@ -675,13 +674,9 @@ class GlobalData():
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
 
-        for tp in [tp for tp in tps if tp.crit=='o3']: 
         # flag tropospheric ozone below 60 ppb as tropospheric
         try: 
             o3_sorted = self.o3_filter()
-
-            df_sorted
-
             o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
             o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
             for tp in [tp for tp in tps if tp.crit=='o3' and tp.vcoord=='z']:
@@ -711,32 +706,41 @@ class GlobalData():
 
         tropo_counts = pd.concat([tropo_counts, ratio_df])
 
-        if group_vc:
-            grouped_ratios = pd.DataFrame(index=['ratios'])
-            # make coordinates so that grouping by model is possible
-            tps = [dcts.get_coord(col_name=c) for c in tropo_counts.columns
-                   if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
+        # if group_vc:
+        #     grouped_ratios = pd.DataFrame(index=['ratios'])
+        #     # make coordinates so that grouping by model is possible
+        #     tps = [dcts.get_coord(col_name=c) for c in tropo_counts.columns
+        #            if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
 
-            # create pseudo coordinate for n2o filter
-            subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if
-                      c in [s.col_name for s in dcts.get_substances()]]
-            subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for
-                        subs in subses]
-            tps = tps + subs_tps
+        #     # create pseudo coordinate for n2o filter
+        #     subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if
+        #               c in [s.col_name for s in dcts.get_substances()]]
+        #     subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for
+        #                 subs in subses]
+        #     tps = tps + subs_tps
 
-            # group by model and average the ratios
-            for tp_def in set(tp.tp_def for tp in tps):
-                for model in set(tp.model for tp in tps if tp.tp_def == tp_def):
-                    tps_to_group = [tp for tp in tps if (tp.model == model and tp.tp_def == tp_def)]
+        #     # group by model and average the ratios
+        #     for tp_def in set(tp.tp_def for tp in tps):
+        #         for model in set(tp.model for tp in tps if tp.tp_def == tp_def):
+        #             tps_to_group = [tp for tp in tps if (tp.model == model and tp.tp_def == tp_def)]
 
-                    crits = set(tp.crit for tp in tps_to_group)
+        #             crits = set(tp.crit for tp in tps_to_group)
 
-                    if len(crits) > 1:
-                        for crit in crits:
-                            cols = [tp.col_name for tp in tps_to_group if tp.crit == crit]
-                            label = f'{model}_{tp_def}_{crit}'
-                            print(label)
-                            grouped_ratios[label] = np.nanmean(ratios[cols])
+        #             if len(crits) > 1:
+        #                 for crit in crits:
+        #                     cols = [tp.col_name for tp in tps_to_group if tp.crit == crit]
+        #                     label = f'{model}_{tp_def}_{crit}'
+        #                     print(label)
+        #                     grouped_ratios[label] = np.nanmean(ratios[cols])
+
+        #             else:
+        #                 cols = [tp.col_name for tp in tps_to_group][0]
+        #                 crit_label = '_' + crits if tp_def == 'chem' else ''
+        #                 label = f'{model}_{tp_def}' + crit_label
+        #                 print(label)
+        #                 grouped_ratios[label] = np.nanmean(ratio_df[cols])
+
+        #             return grouped_ratios
 
                     else:
                         cols = [tp.col_name for tp in tps_to_group][0]
