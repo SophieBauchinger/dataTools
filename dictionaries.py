@@ -101,17 +101,22 @@ def make_coord_label(coordinates, filter_label=False):
     labels=[]
     for coord in coordinates:
         if coord.vcoord is not np.nan:
-            pv = '%s' % (f', {coord.pvu}' if coord.tp_def=='dyn' else '')
-            crit = '%s' % (', '+''.join(f"$_{i}$" if i.isdigit() else i.upper() for i in coord.crit) if coord.tp_def=='chem' else '')
-            model = coord.model
-            tp = '%s' % (coord.tp_def if coord.tp_def is not np.nan else '')
-            vcoord = f'$\Delta\,${coord.vcoord}' if coord.rel_to_tp else f'{coord.vcoord}'
-            if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
             
-            label = f'{vcoord} ({model}, {tp+pv+crit}) [{coord.unit}]'
-            if filter_label: 
-                tp = tp_defs[tp]
-                label = f'{tp+pv+crit} ({model}, {vcoord})'
+            if coord.tp_def is not np.nan: 
+            
+                pv = '%s' % (f', {coord.pvu}' if coord.tp_def=='dyn' else '')
+                crit = '%s' % (', '+''.join(f"$_{i}$" if i.isdigit() else i.upper() for i in coord.crit) if coord.tp_def=='chem' else '')
+                model = coord.model
+                tp = '%s' % (coord.tp_def if coord.tp_def is not np.nan else '')
+                vcoord = f'$\Delta\,${coord.vcoord}' if coord.rel_to_tp else f'{coord.vcoord}'
+                if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
+                
+                label = f'{vcoord} ({model}, {tp+pv+crit}) [{coord.unit}]'
+                if filter_label: 
+                    tp = tp_defs[tp]
+                    label = f'{tp+pv+crit} ({model}, {vcoord})'
+            else: 
+                label = (f'$\Delta\,${coord.vcoord}' if not coord.vcoord=='pt' else '$\Theta$') + f' [{coord.unit}]'
             
         elif coord.hcoord is not np.nan:
             if coord.hcoord == 'lat' and coord.unit=='degrees_north': 
