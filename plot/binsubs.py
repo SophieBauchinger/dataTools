@@ -5,6 +5,15 @@
 
 Showing mixing ratios per season on a plot of coordinate relative to the
 tropopause (in km or K) versus equivalent latitude (in deg N)
+
+BinPlotter1D: 
+    - Histograms of nr of datapoints over distance to tropopause bins
+    - Vertical profiles: 
+        seasonal or not
+        variability or mean mixing ratios
+    - Bar plots for Troposphere | Stratosphere: vmean, vstdv, vcount
+    - Matrices of variability per latitude bin
+
 """
 import numpy as np
 import math
@@ -18,7 +27,6 @@ import itertools
 from mpl_toolkits.axes_grid1 import AxesGrid
 import geopandas
 
-
 import toolpac.calc.dev_binprocessor as bp
 
 import dictionaries as dcts
@@ -26,6 +34,8 @@ import tools
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
+
+outline = mpe.withStroke(linewidth=2, foreground='white')
 
 #TODO map of distance to tropopause (stratosphere only?)
 #TODO might want to implement a logarithmic scale for pressure at some point
@@ -70,7 +80,10 @@ class BinPlotter():
         get_coord_lims(coord, xyz)
         _get_bsize(coord, xyz)
         filter_non_shared_indices(tps)
-        bin_1d_seasonal(self, subs, coord, bin_equi1d, xbsize)
+        bin_1d(subs, coord)
+        bin_2d(subs, xcoord, ycoord)
+        bin_3d(subs, zcoord)
+        bin_1d_seasonal(subs, coord, bin_equi1d, xbsize)
         bin_2d_seasonal(subs, xcoord, ycoord, bin_equi2d, xbsize, ybsize)
     """
     def __init__(self, glob_obj, **kwargs):
@@ -90,11 +103,10 @@ class BinPlotter():
 
         self.data = {'df' : glob_obj.df} # dataframe
 
-        filter_tps = kwargs.pop('filter_tps') if 'filter_tps' in kwargs else True
+        filter_tps = kwargs.pop('filter_tps') if 'filter_tps' in kwargs else False
         if filter_tps: 
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
             self.filter_non_shared_indices(tps)
-            print(self.data['df'])
             glob_obj.data['df'] = self.df.copy()
 
         self.count_limit = glob_obj.count_limit
@@ -172,7 +184,7 @@ based on {self.glob_obj.__repr__()}'
 
     def filter_non_shared_indices(self, tps):
         """ Filter dataframe for datapoints that don't exist for all tps or are zero. """
-        # print('Filtering out non-shared indices. ')
+        print('Filtering out non-shared indices. ')
         cols = [tp.col_name for tp in tps]
         self.data['df'].dropna(subset=cols, how='any', inplace=True)
         self.data['df'] = self.data['df'][self.data['df'] != 0].dropna(subset=cols)
@@ -369,6 +381,32 @@ based on {self.glob_obj.__repr__()}'
 
         return out_dict
 
+    def rms_seasonal_vstdv(self, subs, coord, **kwargs) -> pd.DataFrame:
+        """ Root mean squared of seasonal variability for given substance and tp. """
+        data_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
+
+        df = pd.DataFrame(index = data_dict[1].xintm)
+        df['rms_vstdv'] = np.nan
+        
+        for s in data_dict: 
+            df[f'vstdv_{s}'] = data_dict[s].vstdv
+            df[f'vcount_{s}'] = data_dict[s].vcount
+
+        s_cols = [c for c in df.columns if c.startswith('vstdv')]
+        n_cols = [c for c in df.columns if c.startswith('vcount')]
+
+        # for each bin, calculate the root mean square of the season's standard deviations
+        for i in df.index: 
+            n = df.loc[i][n_cols].values
+            s = df.loc[i][s_cols].values
+            
+            denom = np.nansum([( n[j]-1 ) * s[j]**2 for j in range(4)])
+            nom = sum(n) - len([i for i in n if i])
+            
+            df['rms_vstdv'].loc[i] = np.sqrt(denom / nom) if not nom==0 else np.nan
+
+        return df
+
 class BinPlotter1D(BinPlotter):
     """ Single dimensional binning & plotting. 
     
@@ -382,30 +420,41 @@ class BinPlotter1D(BinPlotter):
     def __init__(self, glob_obj, **kwargs):
         super().__init__(glob_obj, **kwargs)
 
-    # def plot_1d_variability(self, subs, coord, bin_attr=)
-
-    def flight_height_histogram(self, tp): 
+    def flight_height_histogram(self, tp, alpha=0.7, ax=None, **kwargs): 
         """ Make a histogram of the number of datapoints for each tp bin. """
-        fig, ax = plt.subplots(dpi=250, figsize=(5,3))
-        
+        if ax is None: 
+            fig, ax = plt.subplots(dpi=250, figsize=(5,3))
+            ax.set_xlabel(dcts.make_coord_label(tp))
         rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (self.glob_obj.df[tp.col_name].min(), 
                                                                       self.glob_obj.df[tp.col_name].max())
-        
         hist = ax.hist(self.glob_obj.df[tp.col_name].values, 
-                       bins=35, range=rlims, alpha=0.7)
+                       bins=35, range=rlims, alpha=alpha, **kwargs)
         ax.grid(ls='dotted')
-        if tp.rel_to_tp: 
+        if tp.rel_to_tp and ax is not None: 
             ax.vlines(0, max(hist[0]), 0, color='k', ls='dashed')
         ax.set_ylabel('# datapoints')
-        ax.set_xlabel(dcts.make_coord_label(tp))
         
         if tp.crit == 'n2o': 
             ax.invert_xaxis()
             ax.vlines(320.459, max(hist[0]), 0, color='k', ls='dashed', lw=0.5)
+        return hist
 
-    def plot_1d_variability_comparison(self, subs, tps, rel=True, bin_attr='vstdv', **kwargs): 
+    def overlapping_histograms(self, tps): 
+        """ """
+        tps = [tp for tp in tps if tp.vcoord=='pt']
+        fig, ax = plt.subplots(dpi=250, figsize=(5,3))
+        for tp in tps: 
+            hist = self.flight_height_histogram(tp, alpha=0.6, ax=ax,
+                                                label=dcts.make_coord_label(tp, True))
+            
+        ax.vlines(0, max(hist[0]), 0, color='k', ls='dashed')
+        ax.set_xlabel('$\Delta\,\Theta$ relative to Tropopause')
+        ax.legend(fontsize=7)
+
+    def plot_vertial_profile_variability_comparison(self, subs, tps, rel=True, 
+                                                    bin_attr='vstdv', seasons = [1,3],
+                                                    **kwargs): 
         """ Compare relative mixing ratio varibility between tropopause definitions. """
-        
         fig, ax = plt.subplots(dpi=500, figsize=(4,5))
         outline = mpe.withStroke(linewidth=2, foreground='white')
         
@@ -413,14 +462,12 @@ class BinPlotter1D(BinPlotter):
             bin_dict = self.bin_1d_seasonal(subs, tp)
             
             ls = ['--', '-.', ':'][i]
-            
-            for s in [1,3]: 
-                    
+
+            for s in seasons: 
                 vdata = getattr(bin_dict[s], bin_attr)
                 if rel: vdata = vdata / bin_dict[s].vmean * 100
-                
                 y = bin_dict[s].xintm
-                
+
                 ax.plot(vdata, y, ls=ls,
                         c=dcts.dict_season()[f'color_{s}'],
                         label=dcts.make_coord_label(tp, True) if s==1 else None,
@@ -491,7 +538,10 @@ class BinPlotter1D(BinPlotter):
         if coord.rel_to_tp: 
             cl = '$\Delta$' + cl
         ax.set_ylabel((f'{cl} - ' if coord.tp_def in ['dyn', 'therm'] else '') + f'{dcts.make_coord_label(coord, True)}')
-        ax.set_xlabel(dcts.make_subs_label(subs))
+        if bin_attr=='vmean':
+            ax.set_xlabel(dcts.make_subs_label(subs))
+        elif bin_attr=='vstdv': 
+            ax.set_xlabel('Relative variability of '+dcts.make_subs_label(subs, name_only=True))
 
         # xmin = np.nanmin([np.nanmin(bin_inst.vmean) for bin_inst in bin_dict.values()])
         # xmax = np.nanmax([np.nanmax(bin_inst.vmean) for bin_inst in bin_dict.values()])
@@ -507,7 +557,7 @@ class BinPlotter1D(BinPlotter):
             ax.set_xlim(*xlims)
 
 
-        ax.legend()
+        # ax.legend()
         ax.grid('both', ls='dashed', lw=0.5)
         ax.set_axisbelow(True)
         
@@ -522,7 +572,7 @@ class BinPlotter1D(BinPlotter):
 
         for s in set(self.df['season'].tolist()):
             y = bin_dict[s].xintm
-            
+
             ax1.plot(bin_dict[s].vstdv, y, '-', 
                     c=dcts.dict_season()[f'color_{s}'],
                     label=dcts.dict_season()[f'name_{s}'],
@@ -531,6 +581,62 @@ class BinPlotter1D(BinPlotter):
         ax1.tick_params(labelleft=False)
 
         fig.set_size_inches(8,5)
+
+    def plot_vertical_profile_mean_vstdv(self, subs, tps=None, **kwargs): 
+        """ Scatter plot of mean seasnoal variability for troopause definitions """
+        if tps is None: 
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True))
+            tps = [tp for tp in tps if tp.vcoord=='pt']
+            tps.append(dcts.get_coord(vcoord='pt', tp_def='nan', model='MSMT'))
+
+        fig, ax = plt.subplots(dpi=250)
+        ax.set_ylim(-70, 70)
+
+        for tp in tps: 
+            df = self.rms_seasonal_vstdv(subs, tp)
+            if tp.model=='ERA5': 
+                ax.plot(df['rms_vstdv'], df.index, '-', marker='o', 
+                        # c=dcts.dict_season()[f'color_{s}'],
+                        label=dcts.make_coord_label(tp, True),
+                        path_effects=[outline], zorder=2)
+
+                ax.set_ylabel('$\Delta\,\Theta$ [K]') 
+
+            elif tp.model=='MSMT':
+                color = 'xkcd:red'
+                ax2 = ax.twinx() 
+                ax2.set_ylabel(dcts.make_coord_label(tp),
+                               color = color) 
+                ax2.set_ylim(330-70, 330+70)
+                
+                ax2.plot(df['rms_vstdv'], df.index, '-', marker='o', 
+                        c = color, 
+                        label=dcts.make_coord_label(tp, True),
+                        path_effects=[outline], zorder=2)
+                ax2.tick_params(axis ='y', labelcolor = color, color=color)
+
+                ax2.spines['right'].set_color(color)
+                
+            ax.grid('both', ls='dotted')
+            ax.set_xlabel(f'Mean variability of {dcts.make_subs_label(subs, name_only=True)}')
+            ax.legend(loc='lower right')
+
+    def stdv_rms_non_pt(self, subs, tp): 
+        """ Same as plot_vertical_profile_mean_vstdv but for other vcoords. """
+        fig, ax = plt.subplots(dpi=250, figsize=(2.5, 6))
+
+        for tp in [tp]: 
+            df = self.rms_seasonal_vstdv(subs, tp)
+            ax.plot(df['rms_vstdv'], df.index, '-', marker='o', 
+                    # c=dcts.dict_season()[f'color_{s}'],
+                    label=dcts.make_coord_label(tp, True),
+                    path_effects=[outline], zorder=2)
+
+            ax.set_ylabel(dcts.make_coord_label(tp)) 
+
+            ax.grid('both', ls='dotted')
+            ax.set_xlabel(f'Mean variability of {dcts.make_subs_label(subs, name_only=True)}')
+            ax.legend(loc='lower right')
 
     def make_bar_plot(self, subs, xcoord, tp, bin_attr, percent_deviation=False, **kwargs) -> tuple: 
         """ Plot histograms showing differences between TPs. 
@@ -572,7 +678,7 @@ class BinPlotter1D(BinPlotter):
 
         s_binned_1d = bp.Simple_bin_1d(np.array(s_data[subs.col_name]), x[x.index.isin(s_data.index)],
                                       bin_equi1d, count_limit=self.count_limit if not bin_attr=='vcount' else 1)
-        
+
         t_values = getattr(t_binned_1d, bin_attr)
         s_values = getattr(s_binned_1d, bin_attr)
         
@@ -581,8 +687,6 @@ class BinPlotter1D(BinPlotter):
         
         t_av = np.average(t_values[~t_nans], weights = t_binned_1d.vcount[~t_nans])
         s_av = np.average(s_values[~s_nans], weights = s_binned_1d.vcount[~s_nans])
-        
-
 
         if bin_attr=='vstdv' and percent_deviation: 
             t_av = t_av / np.average(t_binned_1d.vmean[~t_nans], weights = t_binned_1d.vcount[~t_nans]) * 100
@@ -1363,4 +1467,38 @@ class BinPlotter3D(BinPlotter):
         plt.colorbar(img, ax=ax, pad=0.1, orientation='horizontal') # colorbar
         plt.show()
 
+def n2o_tp_stdv_rms(glob_obj, subs): 
+    n2o = dcts.get_coord(col_name='N2O')
+    vcoord = dcts.get_coord(col_name='int_z_km')
+    
+    bin_equi1d = bp.Bin_equi1d(4, 13, 0.75)
+    
+    strato = BinPlotter1D(glob_obj.sel_strato(**n2o.__dict__))
+    s_var_df = strato.rms_seasonal_vstdv(subs, vcoord, 
+                                         bin_equi1d=bin_equi1d)
+    
+    tropo = BinPlotter1D(glob_obj.sel_tropo(**n2o.__dict__))
+    t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord,
+                                        bin_equi1d=bin_equi1d)
+    
+    fig, ax = plt.subplots(dpi=250, figsize=(2.5, 6))
 
+    ax.plot(t_var_df['rms_vstdv'], t_var_df.index, 
+            '-', marker='o', 
+            # c=dcts.dict_season()[f'color_{s}'],
+            label='Tropospheric',
+            path_effects=[outline], zorder=2)
+    
+    ax.plot(s_var_df['rms_vstdv'], s_var_df.index, 
+            '-', marker='o', 
+            # c=dcts.dict_season()[f'color_{s}'],
+            label='Stratospheric',
+            path_effects=[outline], zorder=2)
+
+    ax.set_ylabel(dcts.make_coord_label(vcoord)) 
+
+    ax.grid('both', ls='dotted')
+    ax.set_xlabel(f'Mean variability of {dcts.make_subs_label(subs, name_only=True)}')
+    ax.legend(loc='lower right')
+    
+    
