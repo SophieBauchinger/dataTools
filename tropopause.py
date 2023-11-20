@@ -248,9 +248,10 @@ class TropopausePlotter(TropopauseData):
         tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel))
 
         for tp in tps:
-            fig, ax = plt.subplots(dpi=250)
+            fig, ax = plt.subplots(dpi=250, figsize=(7*0.8,4*0.8))
+            ax.set_title(dcts.make_coord_label(tp, True))
             # ax.set_title('Vertical extent of'+dcts.make_coord_label(tp, True)+' Tropopause')
-            ax.set_xlim(30, 90)
+            
             
             if tp.vcoord=='pt' and not rel: 
                 ax.set_ylim(290, 380)
@@ -259,7 +260,7 @@ class TropopausePlotter(TropopauseData):
 
             for s in ['av', 1,2,3,4]:
                 data = self.sel_season(s).df if not s=='av' else self.df
-                data = data[data.index.isin(self.get_shared_indices(tps))]
+                data = data[data.index.isin(self.get_shared_indices(tps, df=True))]
                 
                 bin1d = bp.Simple_bin_1d(data[tp.col_name],
                                       np.array(data.geometry.y), bci,
@@ -277,7 +278,6 @@ class TropopausePlotter(TropopauseData):
                                         bin1d.vmean - bin1d.vstdv, 
                                         bin1d.vmean + bin1d.vstdv,
                                         alpha=0.2, color=plot_kwargs['color'])
-
                 else: 
                     plot_kwargs.update(dict(
                         label = 'Average', 
@@ -287,30 +287,43 @@ class TropopausePlotter(TropopauseData):
                         ax.fill_between(bin1d.xintm, 
                                         bin1d.vmean - bin1d.vstdv, 
                                         bin1d.vmean + bin1d.vstdv,
-                                        alpha=0.2, color=plot_kwargs['color'])
+                                        alpha=0.13, color=plot_kwargs['color'])
 
                 ax.plot(bin1d.xintm, bin1d.vmean, **plot_kwargs)
-
-                ax.set_xticks(np.arange(30, 95, 5), minor=True)
-                ax.grid(True, ls='dotted')
-                ax.legend(loc='lower right' if tp.rel_to_tp else 'upper right')
 
                 if s=='av' and tp.vcoord in ['mxr', 'p']: 
                     ax.invert_yaxis()
                     if tp.vcoord=='p': 
                         ax.set_yscale('log' if not tp.rel_to_tp else 'symlog')
 
+            ax.set_xlim(30, 80)
+
             if note: 
                 ax.text(0.05, 0.05, note,
                         transform=ax.transAxes, verticalalignment='bottom',
                         bbox = dict(boxstyle='round', facecolor='white',
                                     edgecolor='grey', alpha=0.5, pad=0.25))
-            
 
-            ylabel = dcts.make_coord_label(tp)# , True) # dcts.axis_label(tp.vcoord) +' of '+ dcts.make_coord_label(tp, True)
-            vc_label = {'pt': '$\Theta$', 'z':'z', 'mxr':'mxr'}
-            ax.set_ylabel(ylabel)# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
+            # ax.set_ylabel(dcts.make_coord_label(tp))# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
+            ax.set_ylabel(dcts.make_coord_label(tp,coord_only=True))
             ax.set_xlabel(dcts.axis_label('lat'))
+
+            ax.set_xticks(np.arange(30, 85, 5), minor=True)
+
+            if tp.vcoord=='pt' and tp.rel_to_tp: 
+                ax.set_yticks(np.arange(-30, 60, 15))
+                ax.set_ylim(-35, 60)
+            if tp.vcoord=='z' and tp.rel_to_tp: 
+                ax.set_ylim(-2.5,4.1)
+            ax.grid(True, ls='dotted')
+            ax.legend(loc='upper left' if tp.rel_to_tp else 'upper right', 
+                      fontsize=9)
+            
+            if tp.rel_to_tp: 
+                zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks()!=0)
+                for l in zero_lines: 
+                    l.set_color('xkcd:dark grey')
+                    l.set_linestyle('-.')
 
     def plot_subs_sorted(self, substances, vcoords=['p', 'pt', 'z', 'mxr'],
                          detr = False, minimise_tps = True):
@@ -408,17 +421,17 @@ class TropopausePlotter(TropopauseData):
             tropo_counts = self.calc_non_shared_ratios()
             note += ' non-shared'
 
-        tropo_counts.drop(index='ratios', inplace=True)
-        tropo_counts = tropo_counts[[tp.col_name for tp in tps if tp.col_name in tropo_counts.columns]]
-        
-        tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
-        strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
-        
         if not tps: 
             tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
                    if c in [c.col_name for c in dcts.get_coordinates() 
                             if c.tp_def not in ['combo', 'cpt']]]
             tps = tools.minimise_tps(tps)
+
+        tropo_counts.drop(index='ratios', inplace=True)
+        tropo_counts = tropo_counts[[tp.col_name for tp in tps if tp.col_name in tropo_counts.columns]]
+        
+        tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
+        strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
 
         cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp, filter_label=True)) 
                                         for tp in tps]))
@@ -538,6 +551,30 @@ class TropopausePlotter(TropopauseData):
         fig.tight_layout()
         plt.show()
 
+    def strato_tropo_stdv_table(self, subs, tps=None, **kwargs):
+        """ Creates a table with the """
+        stdv_df = self.strato_tropo_stdv(subs, tps)
+        
+        if kwargs.get('rel'): 
+            stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' in c]]
+        else: 
+            stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' not in c]]
+        
+        stdv_df = stdv_df.astype(float).round(2 if kwargs.get('rel') else 3)
+        stdv_df.sort_index()
+        
+        fig, ax = plt.subplots(dpi=250)
+
+        rowLabels = dcts.make_coord_label([dcts.get_coord(col_name=c) for c in stdv_df.index], True)
+        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
+        table = ax.table(stdv_df.values, 
+                          rowLabels=rowLabels, 
+                          colLabels = colLabels,
+                         loc='center')
+        table.set_fontsize(14)
+        table.scale(1,4)
+        ax.axis('off')
+
 #%% N2O filter
 def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
     """ Plot strat / trop sorted data """
@@ -553,11 +590,17 @@ def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
     df_strato = data[glob_obj.df_sorted[strato_col] == True]
 
     fig, ax = plt.subplots(dpi=200)
-    plt.title(f'{dcts.make_coord_label(tp, True)} filter on {dcts.make_subs_label(subs)} data')
-    ax.scatter(df_strato.index, df_strato[subs.col_name],
+    plt.title(f'{dcts.make_coord_label(tp, True)}')#' filter on {dcts.make_subs_label(subs)} data')
+    # ax.scatter(df_strato.index, df_strato[subs.col_name],
+    #             c='grey',  marker='.', zorder=0, label='strato')
+    # ax.scatter(df_tropo.index, df_tropo[subs.col_name],
+    #             c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
+
+    ax.scatter(df_strato[subs.col_name], df_strato['p'], 
                 c='grey',  marker='.', zorder=0, label='strato')
-    ax.scatter(df_tropo.index, df_tropo[subs.col_name],
+    ax.scatter(df_tropo[subs.col_name], df_tropo['p'], 
                 c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
+
 
     if popt0 is not None and popt1 is not None and subs.short_name == tp.crit:
         # only plot baseline for chemical tropopause def and where crit is being plotted
