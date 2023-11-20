@@ -92,7 +92,8 @@ def get_coord(**kwargs):
         return [i.col_name for i in coordinates]
     return coordinates[0]
 
-def make_coord_label(coordinates, filter_label=False):
+
+def make_coord_label(coordinates, filter_label=False, coord_only=False):
     """ Returns string to be used as axis label for a specific Coordinate object. """
     tp_defs = {'chem' : 'Chemical', 
                'dyn' : 'Dynamic', 
@@ -101,23 +102,24 @@ def make_coord_label(coordinates, filter_label=False):
     labels=[]
     for coord in coordinates:
         if coord.vcoord is not np.nan:
-            
             if coord.tp_def is not np.nan: 
-            
                 pv = '%s' % (f', {coord.pvu}' if coord.tp_def=='dyn' else '')
                 crit = '%s' % (', '+''.join(f"$_{i}$" if i.isdigit() else i.upper() for i in coord.crit) if coord.tp_def=='chem' else '')
                 model = coord.model
                 tp = '%s' % (coord.tp_def if coord.tp_def is not np.nan else '')
-                vcoord = f'$\Delta\,${coord.vcoord}' if coord.rel_to_tp else f'{coord.vcoord}'
-                if coord.vcoord == 'pt': vcoord = '$\Delta\,\Theta$' if coord.rel_to_tp else '$\Theta$'
+                vcoord = f'{coord.vcoord}-Distance to TP' if coord.rel_to_tp else f'{coord.vcoord}'
+                if coord.vcoord == 'pt': vcoord = '$\Theta$-Distance to TP' if coord.rel_to_tp else '$\Theta$'
                 
                 label = f'{vcoord} ({model}, {tp+pv+crit}) [{coord.unit}]'
                 if filter_label: 
                     tp = tp_defs[tp]
-                    label = f'{tp+pv+crit} ({model}, {vcoord})'
+                    vc = coord.vcoord if not coord.vcoord=='pt' else '$\Theta$'
+                    label = f'{tp+pv+crit} ({model}, {vc})'
             else: 
-                label = (f'$\Delta\,${coord.vcoord}' if not coord.vcoord=='pt' else '$\Theta$') + f' [{coord.unit}]'
-            
+                if coord.rel_to_tp: 
+                    label = (f'{coord.vcoord}  - Distance to TP' if not coord.vcoord=='pt' else '$\Theta$') + f' [{coord.unit}]'
+                else: 
+                    label = (f'{coord.vcoord}' if not coord.vcoord=='pt' else '$\Theta$') + f' [{coord.unit}]'
         elif coord.hcoord is not np.nan:
             if coord.hcoord == 'lat' and coord.unit=='degrees_north': 
                 label = 'Latitude [°N]'
@@ -131,6 +133,12 @@ def make_coord_label(coordinates, filter_label=False):
         elif coord.var is not np.nan and coord.vcoord is np.nan:
             print(coord)
             label = f'{coord.var} {coord.unit}'
+
+        if coord_only: 
+            vcoord = f'{coord.vcoord}-Distance to TP' if coord.rel_to_tp else f'{coord.vcoord}'
+            if coord.vcoord == 'pt': vcoord = '$\Theta$-Distance to TP' if coord.rel_to_tp else '$\Theta$'
+            label = f'{vcoord} [{coord.unit}]'
+
         labels.append(label)
 
     if len(coordinates)==1: return labels[0]
@@ -251,8 +259,9 @@ def make_subs_label(substances, name_only=False, detr=False):
         unit = subs.unit if not subs.unit=='mol mol-1' else '$mol/mol$'
         label = f'{name} [{unit}] ({source})'
         if name_only: labels.append(name)
-        else: labels.append(label if not subs.detr else f'{label} detrended wrt. MLO 2005')
-    
+        # else: labels.append(label if not subs.detr else f'{label} detrended wrt. MLO 2005') #!!! even mention MLO? 
+        else: labels.append(label if subs.detr is not True else f'{name} detrended wrt. 2005 [{unit}]') #!!! even mention MLO? 
+
     if len(substances)==1: return labels[0]
     else: return labels
 
