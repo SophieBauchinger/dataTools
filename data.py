@@ -118,14 +118,19 @@ class GlobalData():
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
 
-    def get_shared_indices(self, tps=None): 
+    def get_shared_indices(self, tps=None, df=True): 
         """ Make reference for shared indices of chosen tropopause definitions. """
         if not 'df_sorted' in self.data: 
             self.create_df_sorted()
         if not tps: 
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
-        indices = self.df_sorted.dropna(subset=tropo_cols, how='any').index
+        
+        data = self.df_sorted if not df else self.df
+        prefix = 'tropo_' if not df else ''
+            
+        tropo_cols = [prefix+tp.col_name for tp in tps if prefix+tp.col_name in data]
+        indices = data.dropna(subset=tropo_cols, how='any').index
+        
         return indices
 
     def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame: 
@@ -785,6 +790,37 @@ class GlobalData():
 
         return tropo_counts
 
+    def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
+        """ Calculate overall variability of stratospheric and tropospheric air. """
+        if not tps: 
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+
+        shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+        stdv_df = pd.DataFrame(columns= ['tropo_stdv', 'strato_stdv',
+                                         'tropo_mean', 'strato_mean',
+                                         'rel_tropo_stdv', 'rel_strato_stdv'],
+                               index = [tp.col_name for tp in tps])
+
+        subs_data = self.df[self.df.index.isin(shared_df.index)][subs.col_name]
+
+        for tp in tps: 
+            t_stdv = subs_data[shared_df['tropo_'+tp.col_name]].std(skipna=True)
+            s_stdv = subs_data[shared_df['strato_'+tp.col_name]].std(skipna=True)
+            
+            t_mean = subs_data[shared_df['tropo_'+tp.col_name]].mean(skipna=True)
+            s_mean = subs_data[shared_df['tropo_'+tp.col_name]].mean(skipna=True)
+
+            stdv_df['tropo_stdv'][tp.col_name] = t_stdv
+            stdv_df['strato_stdv'][tp.col_name] = s_stdv
+            
+            stdv_df['tropo_mean'][tp.col_name] = t_mean
+            stdv_df['strato_mean'][tp.col_name] = s_mean
+            
+            stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv/t_mean * 100 
+            stdv_df['rel_strato_stdv'][tp.col_name] = s_stdv/s_mean * 100
+        
+        return stdv_df
 
     @property
     def df_sorted(self) -> pd.DataFrame:
