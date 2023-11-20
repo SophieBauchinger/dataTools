@@ -19,10 +19,22 @@ from matplotlib.colors import Normalize, BoundaryNorm
 from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch, Rectangle
+# from matplotlib.pyplot import pcolormesh as pcm
 import numpy as np
+import cartopy.crs as ccrs
 
 import geopandas
 from mpl_toolkits.axes_grid1 import AxesGrid
+
+from mpl_toolkits.basemap import Basemap
+# set up orthographic map projection with
+# perspective of satellite looking down at 50N, 100W.
+# use low resolution coastlines.
+# plt.figure(dpi=200)
+# map = Basemap(projection='ortho',lat_0=50,lon_0=8,resolution='l')
+# # draw coastlines, country boundaries, fill continents.
+# map.drawcoastlines(linewidth=0.25)
+# map.drawcountries(linewidth=0.25)
 
 if '..' not in sys.path:
     sys.path.append('..')
@@ -37,6 +49,10 @@ warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
 # ignore warning for np.nanmin / np.nanmax for all-nan sclice
 warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
+
+transform = ccrs.PlateCarree()
+# ax._autoscaleXon = False
+# ax._autoscaleYon = False
 
 # %% GlobalData plotting
 def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwargs):
@@ -220,16 +236,17 @@ def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs
 
         break
 
-def plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', hide_lats=False, **subs_kwargs): 
+def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False, 
+                   projection='moll', **subs_kwargs): 
     """ 2D plot of binned substance data for all years at once. """
     data = glob_obj.df
     substances = [dcts.get_subs(col_name=c) for c in data.columns
                   if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
                   and not c.startswith('d_')]
 
-    for subs in substances: 
+    for subs in (substances if not bin_attr=='vcount' else [dcts.get_subs(col_name='N2O')]): 
         fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
-
+        # ax = fig.add_subplot(projection="aitoff")
         cmap = dcts.dict_colors()[bin_attr]
         vmin, vmax = dcts.get_vlims(subs.short_name, bin_attr)
         if 'mol' in subs.unit:
@@ -243,9 +260,6 @@ def plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', hide_lats=False, **su
             cmap.set_under('white')
             bounds=[1, 5, 10, 15, 30, 45, 60]
             norm = BoundaryNorm(bounds, cmap.N)
-        
-        world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-        world.boundary.plot(ax=ax, color='black', linewidth=0.3)
 
         bci = bp.Bin_equi2d(-90, 90, glob_obj.grid_size,
                             -180, 180, glob_obj.grid_size)
@@ -254,8 +268,31 @@ def plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', hide_lats=False, **su
         out = bp.Simple_bin_2d(data[subs.col_name], lat, lon, bci)
 
         img_data = getattr(out, bin_attr)
-        img = ax.imshow(img_data, cmap=cmap, norm=norm, origin='lower',
-                        extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
+        
+        if projection is not None: 
+            lat0 = 0
+            lon0 = 0
+            map = Basemap(projection=projection, lat_0=lat0,lon_0=lon0,resolution='l')
+            # # draw coastlines, country boundaries, fill continents.
+            # map.drawcoastlines(linewidth=0.25, zorder=10)
+            # map.drawcountries(linewidth=0.25, zorder=10)
+
+            xpt,ypt = map(out.xintm, out.yintm)
+            print(out.yintm, xpt)
+
+            # img = map.pcolormesh(ypt, xpt,
+            #     #bci.yintm, bci.xintm,
+            #                      img_data.T, 
+            #                      cmap=cmap, 
+            #                      norm=norm,
+            #                      # origin='lower',
+            #                     # extent=[out.ybmin-lat0, out.ybmax-lat0, out.xbmin-lon0, out.xbmax-lon0],
+            #                     zorder=30)
+        else: 
+            world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+            img = ax.imshow(img_data, cmap=cmap, norm=norm, origin='lower',
+                            extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
         
         if hide_lats:
             ax.hlines(30, -180, 180, color='k', lw=1, ls='dashed')
@@ -263,8 +300,8 @@ def plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', hide_lats=False, **su
 
         # ax.set_title(f'{yr}')#, weight='bold')
         # ax.text(**dcts.note_dict(ax, 0.13, 0.1, f'{year}'), weight='bold')
-        ax.set_xlim(-180, 180)
-        ax.set_ylim(-90, 90)
+        # ax.set_xlim(-180, 180)
+        # ax.set_ylim(-90, 90)
 
         # label outer plot axes
         ax.set_ylabel('Latitude [°N]')
@@ -400,6 +437,29 @@ def lonlat_1d(mzt_obj, subs='sf6',
         ax2.set_ylabel('')
         plt.show()
 
+def mxr_vs_vcoord(glob_obj, subs, vcoord): 
+    glob_obj.data['df']['season'] = tools.make_season(glob_obj.data['df'].index.month)
+
+    fig, ax = plt.subplots(dpi=200)
+    for s in set(glob_obj.df['season'].tolist()):
+        df = glob_obj.df[glob_obj.df['season'] == s].dropna(subset='int_ERA5_D_TROP1_THETA', how='all')
+        
+        x = df[subs.col_name]
+        y = df[vcoord.col_name]
+        
+        if vcoord.rel_to_tp: 
+            ax.set_ylim(-70, 90)
+        if subs.col_name=='detr_SF6': 
+            ax.set_xlim(5,7)
+        
+        ax.scatter(x, y, 
+                   marker='.',
+                   label = dcts.dict_season()[f'name_{s}'],
+                   c=dcts.dict_season()[f'color_{s}'])
+        # ax.legend()
+        
+    ax.set_ylabel(dcts.make_coord_label(vcoord))
+    ax.set_xlabel(dcts.make_subs_label(subs))
 
 # %% LocalData
 
