@@ -300,8 +300,21 @@ def conv_PartsPer_molarity(x, unit):
                }
     return x*factor[unit]
 
+#%% Plotting tools
+def add_zero_line(ax, axis='y'): 
+    """ Highlight the gridline at 0 for the chosen axis on the given Axes object. 
 
+    Call when everything else has been plotted already, otherwise the limits will be messy. 
+    """
+    zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks()!=0)
+    for l in zero_lines: 
+        l.set_color('k')
+        l.set_linestyle('-.')
 
+    if len(zero_lines) == 0: 
+        xlims = ax.get_xlim()
+        ax.hlines(0, *xlims)
+        ax.set_xlim(*xlims)
 
 #%% Caribic combine GHG measurements with INT and INT2 coordinates
 # def coord_merge_substance(c_obj, subs, save=True, detr=True):
