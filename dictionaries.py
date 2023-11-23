@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import cmasher as cmr
 
 #%% Coordinates
-class Coordinate():
+class Coordinate:
     def __init__(self, **kwargs):
         """ Correlate column names with corresponding descriptors
 
@@ -89,7 +89,6 @@ def get_coord(**kwargs):
     coordinates = get_coordinates(**kwargs) # dict i:Coordinate
     if len(coordinates) > 1: 
         raise ValueError(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
-        return [i.col_name for i in coordinates]
     return coordinates[0]
 
 
@@ -134,6 +133,9 @@ def make_coord_label(coordinates, filter_label=False, coord_only=False):
             print(coord)
             label = f'{coord.var} {coord.unit}'
 
+        else:
+            raise NotImplementedError('Cannot create label, this should not have happened.')
+
         if coord_only: 
             vcoord = f'{coord.vcoord}-Distance to TP' if coord.rel_to_tp else f'{coord.vcoord}'
             if coord.vcoord == 'pt': vcoord = '$\Theta$-Distance to TP' if coord.rel_to_tp else '$\Theta$'
@@ -156,7 +158,7 @@ def get_default_bsize(short_coord):
         'lat' : 10, 
         'lon' : 10, 
         }
-    
+
     try: 
         return bsizes_dict[short_coord]
     except: 
@@ -189,7 +191,7 @@ def substance_df():
     substances['function'] = [fctn_dict.get(f) for f in substances['function']]
     return substances
 
-def get_substances(**kwargs) -> list('Substance'):
+def get_substances(**kwargs) -> list['Substance']:
     """ Return list of Substance for all items conditions are met for. """
     df = substance_df()
     # keep only rows where all conditions are fulfilled
@@ -235,12 +237,7 @@ def get_subs(*args, **kwargs):
     substances = get_substances(**kwargs)
     if len(substances) > 1: 
         raise Warning(f'Multiple columns fulfill the conditions: {substances}')
-        return list(substances)
     return substances[0]
-
-def get_col_name(substance, ID, clams=False):
-    #TODO change source, c_pfx to ID in all other scripts
-    return get_subs(substance, ID, clams).col_name
 
 def make_subs_label(substances, name_only=False, detr=False):
     """ Returns string to be used as axis label for a specific Coordinate object. """
@@ -259,8 +256,7 @@ def make_subs_label(substances, name_only=False, detr=False):
         unit = subs.unit if not subs.unit=='mol mol-1' else '$mol/mol$'
         label = f'{name} [{unit}] ({source})'
         if name_only: labels.append(name)
-        # else: labels.append(label if not subs.detr else f'{label} detrended wrt. MLO 2005') #!!! even mention MLO? 
-        else: labels.append(label if subs.detr is not True else f'{name} detrended wrt. 2005 [{unit}]') #!!! even mention MLO? 
+        else: labels.append(label if subs.detr is not True else f'{name} detrended wrt. 2005 [{unit}]') 
 
     if len(substances)==1: return labels[0]
     else: return labels
@@ -288,19 +284,23 @@ def get_fct_substance(substance, verbose=False):
 def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple: 
     """ Default colormap normalisation limits for substance mixing ratio or variability. """
     vlims_mxr = {  # optimised for Caribic measurements from 2005 to 2020
+        'sf6': (5.5, 10),
+        'co2': (370, 420),
+        'ch4': (1650, 1970),
+        'n2o': (290, 330),
+
         'co': (15, 250),
         'o3': (0.0, 1000),
         'h2o': (0.0, 1000),
         'no': (0.0, 0.6),
         'noy': (0.0, 6),
-        'co2': (370, 420),
-        'ch4': (1650, 1970),
         'f11': (130, 250),
         'f12': (400, 540),
-        'n2o': (290, 330),
-        'sf6': (5.5, 10),
 
         'detr_sf6': (5.5, 6.5),
+        'detr_co2': (370, 395), 
+        'detr_ch4': (1650, 1970),
+        'detr_n2o': (290, 330),
     }
     
     if bin_attr=='vmean': 
@@ -405,28 +405,3 @@ def note_dict(fig_or_ax, x=None, y=None, s=None):
     if s: note_dict.update(dict(s=s))
 
     return note_dict
-
-#%% Input choice and validation
-def validated_input(prompt, choices):
-    valid_values = choices
-    valid_input = False
-    while not valid_input:
-        value = input(prompt)
-        if int(value) == 99: return None
-        if int(value) in valid_values:
-            yn = input(f'Confirm your choice ({choices[int(value)]}): Y/N \n')
-            if yn.upper() =='Y': valid_input = int(value) in valid_values
-            else: value = None; pass
-
-        try: valid_input = int(value) in valid_values
-        except: print('')
-    return value
-
-def choose_column(df, var='subs'):
-    """ Let user choose one of the available column names """
-    choices = dict(zip(range(0, len(df.columns)), df.columns))
-    for k, v in choices.items(): print(k, ':', v)
-    print('99 : pass')
-    x = validated_input(f'Select a {var} column by choosing a number between \0 and {len(df.columns)}: \n', choices)
-    if not x: return None
-    return choices[int(x)]

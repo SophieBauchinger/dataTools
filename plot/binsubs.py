@@ -446,13 +446,13 @@ class BinPlotter1D(BinPlotter):
     def overlapping_histograms(self, tps): 
         """ """
         tps = [tp for tp in tps if tp.vcoord=='pt']
-        fig, ax = plt.subplots(dpi=250, figsize=(5,3))
+        fig, ax = plt.subplots(dpi=250, figsize=(6,4))
         for tp in tps: 
             hist = self.flight_height_histogram(tp, alpha=0.6, ax=ax,
                                                 label=dcts.make_coord_label(tp, True))
             
-        ax.vlines(0, max(hist[0]), 0, color='k', ls='dashed')
-        ax.set_xlabel('$\Delta\,\Theta$ relative to Tropopause')
+        ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
+        ax.set_ylabel('$\Delta\,\Theta$ relative to Tropopause')
         ax.legend(fontsize=7)
 
     def plot_vertial_profile_variability_comparison(self, subs, tps, rel=True, 
@@ -506,7 +506,7 @@ class BinPlotter1D(BinPlotter):
     def plot_1d_seasonal_gradient(self, subs, coord, bin_attr='vmean', 
                                   add_stdv=False, **kwargs):
         """ Plot gradient per season onto one plot. """
-        big = kwargs.pop('big')
+        big = kwargs.pop('big') if 'big' in kwargs else False
         bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
         
         # fig = plt.figure(dpi=500, figsize=(8,8/3))
@@ -1501,6 +1501,34 @@ class BinPlotter3D(BinPlotter):
     Methods: 
         stratosphere_map(subs, tp, bin_attr)
     """
+
+    def z_crossection(self, subs, tp, bin_attr, zbsize=None): 
+        """ Create lat/lon gridded plots for all z-bins. """
+        binned_data = self.bin_3d(subs, tp, zbsize=zbsize)
+
+        lon_bins = binned_data.xintm
+        lat_bins = binned_data.yintm
+        z_bins = binned_data.zintm
+
+        vcounts_per_z_level = [sum(j) for j in [sum(i) for i in binned_data.vcount]]
+        
+        # first z level: binned_data.vcount[:,:,0]
+        
+        for ix in range(binned_data.nx):
+            for iy in range(binned_data.ny): 
+                for iz in range(binned_data.nz):
+                    data = binned_data[ix, iy, iz]
+                    
+        
+        fig = plt.figure(dpi=150)
+        for i, zbin in enumerate(z_bins): 
+            if not vcounts_per_z_level[i] < 100:
+                ax = fig.add_subplot()
+                
+
+        vlims = self.get_vlimit(subs, bin_attr)
+        cmap = dcts.dict_colors()[bin_attr]
+        
 
     def stratosphere_map(self, subs, tp, bin_attr): 
         """ Plot (first two ?) stratospheric bins on a lon-lat binned map. """

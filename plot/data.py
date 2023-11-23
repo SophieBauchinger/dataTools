@@ -27,14 +27,15 @@ import geopandas
 from mpl_toolkits.axes_grid1 import AxesGrid
 
 from mpl_toolkits.basemap import Basemap
-# set up orthographic map projection with
-# perspective of satellite looking down at 50N, 100W.
-# use low resolution coastlines.
-# plt.figure(dpi=200)
-# map = Basemap(projection='ortho',lat_0=50,lon_0=8,resolution='l')
-# # draw coastlines, country boundaries, fill continents.
-# map.drawcoastlines(linewidth=0.25)
-# map.drawcountries(linewidth=0.25)
+"""
+# set up orthographic map projection with perspective of satellite looking 
+# down at 50N, 100W. use low resolution coastlines.
+plt.figure(dpi=200)
+map = Basemap(projection='ortho',lat_0=50,lon_0=8,resolution='l')
+# draw coastlines, country boundaries, fill continents.
+map.drawcoastlines(linewidth=0.25)
+map.drawcountries(linewidth=0.25)
+"""
 
 if '..' not in sys.path:
     sys.path.append('..')
@@ -60,31 +61,18 @@ def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwarg
     data = glob_obj.df
     df_mm = tools.monthly_mean(data)
     substances = [dcts.get_subs(col_name=c) for c in data.columns
-                  if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
+                  if c in [s.col_name for s in dcts.get_substances(detr=detr, **subs_kwargs)]
                   and not c.startswith('d_')]
 
     for subs in substances:
         col = subs.col_name
-
         if detr:
             try:
-                print(subs.col_name)
                 subs = dcts.get_subs(col_name = f'detr_{subs.col_name}')
             except KeyError:
                 print(f'Could not detrend {subs.short_name}')
             else:
                 glob_obj.detrend_substance(subs.short_name)
-
-
-        # if detr and 'detr' + col not in data.columns:
-        #     try:
-        #         glob_obj.detrend_substance(subs.short_name)
-        #         data = glob_obj.df
-        #         df_mm = tools.monthly_mean(data)
-        #         if 'detr_' + col in data.columns:
-        #             col = 'detr_' + col
-        #     finally:
-        #         print(f'Could not detrend {substance.short_name}')
 
         fig, ax = plt.subplots(dpi=250, figsize=(8, 4))
         if note:
@@ -162,17 +150,6 @@ def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs
     ncols = 1 if nplots <= 4 else 3
 
     for substance in substances:
-        # TODO: detrended data
-        # col = substance.col_name
-        # if detr and 'detr' + col not in data.columns:
-        #     try:
-        #         glob_obj.detrend_substance(substance.short_name)
-        #         data = glob_obj.df
-        #         if 'detr_' + col in data.columns:
-        #             col = 'detr_' + col
-        #     finally:
-        #         print(f'Could not detrend {substance.short_name}')
-
         out_x_list, out_y_list = glob_obj.binned_1d(substance)
 
         values = [item for out_x, out_y in zip(out_x_list, out_y_list) for item in [*out_x.vmean, *out_y.vmean]]
@@ -315,7 +292,6 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
         # ax.set_title(dcts.make_subs_label(subs, detr=detr)
         #              if bin_attr != 'vcount' else 'Distribution of greenhouse gas flask measurements')
 
-
 def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs):
     # glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
     """ Create a 2D plot of binned mixing ratios for each available year on a grid.
@@ -397,8 +373,6 @@ def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs)
         # fig.tight_layout()
         plt.show()
 
-
-
 # Mozart
 def lonlat_1d(mzt_obj, subs='sf6',
               lon_values=(10, 60, 120, 180),
@@ -479,7 +453,7 @@ def local(loc_obj, greyscale=False, v_limits=(None, None), **subs_kwargs):
         colors = {'msmts': plt.cm.viridis_r, 'day': plt.cm.viridis_r}
 
     substances = [s for s in dcts.get_substances(source=loc_obj.source, **subs_kwargs)
-                  if s.col_name in loc_obj.df.columns]
+                  if s.col_name in loc_obj.df.columns and not s.short_name.startswith('d_')]
 
     for subs in substances:
         if all(isinstance(i, (int, float)) for i in v_limits):

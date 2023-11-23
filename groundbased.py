@@ -10,10 +10,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from os.path import exists
+import sys
+if not '..' in sys.path:
+    sys.path.append('..')
 
 from toolpac.conv.times import fractionalyear_to_datetime, datetime_to_fractionalyear
 
-from tools import monthly_mean, daily_mean
+import tools
 from dictionaries import get_col_name, substance_list
 
 #%% Local data
@@ -124,7 +127,7 @@ class Mauna_Loa(LocalData):
             if data_Day: # user input saying if daily data should exist
                 fname_Day = r'\mlo_{}_Day.dat'.format(self.subs.upper())
                 self.df_Day = self.get_data(path_dir + fname_Day)
-                try: self.df_monthly_mean = monthly_mean(self.df_Day)
+                try: self.df_monthly_mean = tools.time_mean(self.df_Day, f='M')
                 except: pass
 
         elif subs in ['co2', 'ch4', 'co']:
@@ -147,8 +150,8 @@ class Mace_Head(LocalData):
         self.substance = substance
 
         self.df = self.get_data(path)
-        self.df_Day = daily_mean(self.df)
-        self.df_monthly_mean = monthly_mean(self.df)
+        self.df_Day = tools.time_mean(self.df, f='D')# daily_mean(self.df)
+        self.df_monthly_mean = tools.time_mean(self.df, f='M')
 
 def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False,
                       as_subplot=False, ax=None, c_pfx=None, note=''):

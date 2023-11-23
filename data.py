@@ -956,7 +956,6 @@ class GlobalData():
         out.status.update({'EE_filter': True})
         return out
 
-
 # Caribic
 class Caribic(GlobalData):
     """ Stores all available information from Caribic datafiles and allows further analysis.
@@ -1220,7 +1219,6 @@ class Caribic(GlobalData):
             return self.data['df']
         return self.create_df()
 
-
 # EMAC
 class EMAC(GlobalData):
     """ Data class holding information on Caribic-specific EMAC Model output.
@@ -1450,7 +1448,6 @@ class EMAC(GlobalData):
                 dill.dump(self.df, f)
         return self
 
-
 # Combine Caribic and EMAC
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
@@ -1549,7 +1546,6 @@ class TropopauseData(GlobalData):
             return self.data['df_sorted']
         return self.create_df_sorted(save=True)
 
-
 # Mozart
 class Mozart(GlobalData):
     """ Stores relevant Mozart data
@@ -1627,7 +1623,6 @@ class Mozart(GlobalData):
     def SF6(self) -> xr.Dataset:
         return self.data['SF6']
 
-
 # %% Local data
 class LocalData():
     """ Contains time-series data from ground-based stations.
@@ -1673,7 +1668,6 @@ class LocalData():
         if 'df' in self.data:
             return self.data['df']  #
         return self.create_df()
-
 
 class MaunaLoa(LocalData):
     """ Stores data for all substances measured at Mauna Loa. """
@@ -1842,16 +1836,7 @@ class MaceHead(LocalData):
         df = df[cols]
 
         self.data_Hour = {'df': df}
-        self.data_Day = {'df': tools.daily_mean(df)}
-        self.data['df'] = tools.monthly_mean(df)
+        # self.data_Day = {'df': tools.time_mean(df, f='D')}
+        # self.data['df'] = tools.time_mean(df, f='M')
 
         return df
-
-# #%% Function calls
-# if __name__=='__main__':
-#     caribic = Caribic()
-#     emac = EMAC()
-#     tpause = TropopauseData()
-#     mzt = Mozart()
-#     mlo = MaunaLoa()
-#     mhd = MaceHead()

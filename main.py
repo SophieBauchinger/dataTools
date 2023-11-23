@@ -26,14 +26,21 @@ caribic = Caribic()
 emac = EMAC()
 tpause = TropopauseData()
 
-#%% 
+#%% Get main coordinates and substances
 tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+pt = dcts.get_coord(vcoord='pt', model='MSMT')
+
+lat = dcts.get_coord(hcoord='lat', ID='GHG')
+lon = dcts.get_coord(hcoord='lon', ID='GHG')
 eql = dcts.get_coord(hcoord='eql', model='ERA5')
 
 sf6 = dcts.get_subs(short_name='detr_sf6', ID='GHG')
 n2o = dcts.get_subs(short_name='detr_n2o', ID='GHG')
+co2 = dcts.get_subs(short_name='detr_co2', ID='GHG')
+ch4 = dcts.get_subs(short_name='detr_ch4', ID='GHG')
 
-#%% Tropopause definitions
+#%% Tropopause definition comparison
+
 
 #%% Plot data
 # for pfx in caribic.pfxs: # scatter plots of all caribic data
