@@ -51,7 +51,7 @@ class TropopausePlotter(TropopauseData):
 
         for tp in tps: 
             fig, ax = plt.subplots(dpi=150, figsize=(10,5))
-            ax.set_title(dcts.make_coord_label(tp, True))
+            ax.set_title(tp.label(True))
 
             bci =  bp.Bin_equi2d(-180, 180, self.grid_size, 
                                  -90, 90, self.grid_size)
@@ -100,7 +100,7 @@ class TropopausePlotter(TropopauseData):
                 continue
             fig, axs = plt.subplots(2,2,dpi=150, figsize=(10,5))
             # fig.suptitle(f'{tp.col_name} - {tp.long_name}')
-            fig.suptitle(dcts.make_coord_label(tp, True))
+            fig.suptitle(tp.label(True))
             if year: fig.text(0.9, 0.95, f'{year}',
                               bbox = dict(boxstyle='round', facecolor='white',
                                           edgecolor='grey', alpha=0.5, pad=0.25))
@@ -144,7 +144,7 @@ class TropopausePlotter(TropopauseData):
 
         for tp in tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel)):
             fig, ax = plt.subplots(dpi=250)
-            # ax.set_title('Vertical extent of'+dcts.make_coord_label(tp, True)+' Tropopause')
+            # ax.set_title('Vertical extent of'+tp.label(True)+' Tropopause')
             ax.set_xlim(30, 90)
 
             for s in ['av', 1,2,3,4]:
@@ -182,7 +182,7 @@ class TropopausePlotter(TropopauseData):
                         ax.set_yscale('log' if not tp.rel_to_tp else 'symlog')
 
                 # ax.text(0.05, 0.05,
-                #         dcts.make_coord_label(tp, True),
+                #         tp.label(True),
                 #         transform=ax.transAxes, verticalalignment='bottom',
                 #         bbox = dict(boxstyle='round', facecolor='white',
                 #                     edgecolor='grey', alpha=0.5, pad=0.25))
@@ -190,7 +190,7 @@ class TropopausePlotter(TropopauseData):
                 # get last hline and set label for the legend
                 trace.set_label(dcts.dict_season()[f'name_{s}'] if not s=='av' else 'Average')
 
-            ylabel = dcts.make_coord_label(tp, True) # dcts.axis_label(tp.vcoord) +' of '+ dcts.make_coord_label(tp, True)
+            ylabel = tp.label(True) # dcts.axis_label(tp.vcoord) +' of '+ tp.label(True)
             vc_label = {'pt': '$\Theta$', 'z':'z', 'mxr':'mxr'}
             ax.set_ylabel(ylabel if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
             ax.set_xlabel(dcts.axis_label('lat'))
@@ -228,9 +228,9 @@ class TropopausePlotter(TropopauseData):
                         color = cmap(norm(year)),
                         label=str(year),
                         lw=1, path_effects = [outline])
-            ax.set_title(dcts.make_coord_label(tp, True))
+            ax.set_title(tp.label(True))
 
-            ylabel = dcts.make_coord_label(tp, True) # dcts.axis_label(tp.vcoord) +' of '+ dcts.make_coord_label(tp, True)
+            ylabel = tp.label(True) # dcts.axis_label(tp.vcoord) +' of '+ tp.label(True)
             vc_label = {'pt': '$\Theta$', 'z':'z', 'mxr':'mxr'}
             ax.set_ylabel(ylabel if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
             ax.set_xlabel(dcts.axis_label('lat'))
@@ -249,8 +249,8 @@ class TropopausePlotter(TropopauseData):
 
         for tp in tps:
             fig, ax = plt.subplots(dpi=250, figsize=(7*0.8,4*0.8))
-            ax.set_title(dcts.make_coord_label(tp, True))
-            # ax.set_title('Vertical extent of'+dcts.make_coord_label(tp, True)+' Tropopause')
+            ax.set_title(tp.label(True))
+            # ax.set_title('Vertical extent of'+tp.label(True)+' Tropopause')
             
             
             if tp.vcoord=='pt' and not rel: 
@@ -304,8 +304,8 @@ class TropopausePlotter(TropopauseData):
                         bbox = dict(boxstyle='round', facecolor='white',
                                     edgecolor='grey', alpha=0.5, pad=0.25))
 
-            # ax.set_ylabel(dcts.make_coord_label(tp))# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
-            ax.set_ylabel(dcts.make_coord_label(tp,coord_only=True))
+            # ax.set_ylabel(tp.label())# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
+            ax.set_ylabel(tp.label(coord_only=True))
             ax.set_xlabel(dcts.axis_label('lat'))
 
             ax.set_xticks(np.arange(30, 85, 5), minor=True)
@@ -365,7 +365,7 @@ class TropopausePlotter(TropopauseData):
                     tp_tropo = self.df[df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
                     tp_strato = self.df[df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
 
-                    ax.set_title(dcts.make_coord_label(tp, filter_label=True), fontsize=8)
+                    ax.set_title(tp.label(filter_label=True), fontsize=8)
                     ax.scatter(tp_strato.index, tp_strato[subs.col_name],
                                 c='grey',  marker='.', zorder=0, label='strato')
                     ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
@@ -394,7 +394,7 @@ class TropopausePlotter(TropopauseData):
                         tp_tropo = self.df[df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
                         tp_strato = self.df[df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
     
-                        ax.set_title(dcts.make_coord_label(tp, filter_label=True), fontsize=8)
+                        ax.set_title(tp.label(filter_label=True), fontsize=8)
                         ax.scatter(tp_strato.index, tp_strato[subs.col_name],
                                     c='grey',  marker='.', zorder=0, label='strato')
                         ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
@@ -433,7 +433,7 @@ class TropopausePlotter(TropopauseData):
         tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
         strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
 
-        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp, filter_label=True)) 
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
                                         for tp in tps]))
 
 
@@ -513,7 +513,7 @@ class TropopausePlotter(TropopauseData):
         if len(tps)==0: raise Exception('No tps found that fit the criteria.')
 
         # make sure cols and labels are related 
-        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, dcts.make_coord_label(tp, filter_label=True)) 
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
                                         for tp in tps]))
 
         fig, ax = plt.subplots(dpi=240, figsize=(8,6))
@@ -528,7 +528,7 @@ class TropopausePlotter(TropopauseData):
             color = dcts.dict_tps()[f'color_{tp.tp_def}']
             ratio = ratios[tp.col_name]
             n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
-            label = dcts.make_coord_label(tp, True)
+            label = tp.label(True)
             
             bars = ax.barh(label, ratio, rasterized=True, color=color, alpha=0.9)
             bar_labels = ['{:.2f} (n={:.0f})'.format(r,n) for r,n in zip([ratio], [n_value])]
@@ -565,7 +565,7 @@ class TropopausePlotter(TropopauseData):
         
         fig, ax = plt.subplots(dpi=250)
 
-        rowLabels = dcts.make_coord_label([dcts.get_coord(col_name=c) for c in stdv_df.index], True)
+        rowLabels = [dcts.get_coord(col_name=c).label(True) for c in stdv_df.index]
         colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
         table = ax.table(stdv_df.values, 
                           rowLabels=rowLabels, 
@@ -590,7 +590,7 @@ def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
     df_strato = data[glob_obj.df_sorted[strato_col] == True]
 
     fig, ax = plt.subplots(dpi=200)
-    plt.title(f'{dcts.make_coord_label(tp, True)}')#' filter on {dcts.make_subs_label(subs)} data')
+    plt.title(f'{tp.label(True)}')#' filter on {subs.label()} data')
     # ax.scatter(df_strato.index, df_strato[subs.col_name],
     #             c='grey',  marker='.', zorder=0, label='strato')
     # ax.scatter(df_tropo.index, df_tropo[subs.col_name],
@@ -606,12 +606,14 @@ def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
         # only plot baseline for chemical tropopause def and where crit is being plotted
         t_obs_tot = np.array(dt_to_fy(glob_obj.df_sorted.index, method='exact'))
         ls = 'solid' if tp.ID == subs.ID else 'dashed'
-        ax.plot(glob_obj.df_sorted.index, dcts.get_fct_substance(tp.crit)(t_obs_tot-2005, *popt0),
+
+        func = dcts.get_subs(col_name=tp.col_name).function
+        ax.plot(glob_obj.df_sorted.index, func(t_obs_tot-2005, *popt0),
                 c='r', lw=1, ls=ls, label='initial')
-        ax.plot(glob_obj.df_sorted.index, dcts.get_fct_substance(tp.crit)(t_obs_tot-2005, *popt1),
+        ax.plot(glob_obj.df_sorted.index, func(t_obs_tot-2005, *popt1),
                 c='k', lw=1, ls=ls, label='filtered')
 
-    plt.ylabel(dcts.make_subs_label(subs))
+    plt.ylabel(subs.label())
     plt.legend()
     plt.show()
 
@@ -696,7 +698,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     # -------------------------------------------------------------------------
     pixels = glob_obj.grid_size # how many pixels per imshow square
     yticks = np.linspace(0, (len(tps)-1)*pixels, num=len(tps))[::-1] # order was reversed for some reason
-    tp_labels = [dcts.make_coord_label(tp, True)+'\n' for tp in tps]
+    tp_labels = [tp.label(True)+'\n' for tp in tps]
     xticks = np.arange(lat_bmin, lat_bmax+glob_obj.grid_size, glob_obj.grid_size)
 
     fig = plt.figure(dpi=200, figsize=(lat_bci.nx*0.825, len(tps)*2))
@@ -723,7 +725,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     # Plot STRATOSPHERE
     # -------------------------------------------------------------------------
     try: 
-        vmin, vmax = dcts.get_vlims(substance.short_name, 'vstdv', 'strato')
+        vmin, vmax = substance.vlims('vstdv', 'strato')
     except KeyError: 
         vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
         
@@ -735,7 +737,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
 
     norm = Normalize(vmin, vmax)  # normalise color map to set limits
     strato_cmap = plt.cm.BuPu  # create colormap
-    ax_strato1.set_title(f'Stratospheric variability of {dcts.make_subs_label(substance)}{note}', fontsize=14)
+    ax_strato1.set_title(f'Stratospheric variability of {substance.label()}{note}', fontsize=14)
 
     img = ax_strato1.matshow(strato_stdevs, alpha=0.75,
                      extent = [lat_bmin, lat_bmax,
@@ -761,7 +763,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
                         '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
                         va='center', ha='center')
     cbar = plt.colorbar(img, cax=cax_s, orientation='horizontal')
-    cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
+    cbar.set_label(f'Standard deviation of {substance.label(name_only=True)} within bin [{substance.unit}]')
     # make sure vmin and vmax are shown as colorbar ticks
     cbar_vals = cbar.get_ticks()
     cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
@@ -785,7 +787,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     # Plot TROPOSPHERE
     # -------------------------------------------------------------------------
     try: 
-        vmin, vmax = dcts.get_vlims(substance.short_name, 'vstdv', 'tropo')
+        vmin, vmax = substance.vlims('vstdv', 'tropo')
     except KeyError: 
         vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
     # if substance.short_name in variability_tropo: 
@@ -795,7 +797,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     #     vmin, vmax = np.nanmin(tropo_stdevs), np.nanmax(tropo_stdevs)
     norm = Normalize(vmin, vmax)  # normalise color map to set limits
     tropo_cmap = cmr.get_sub_cmap('YlOrBr', 0, 0.75) # create colormap
-    ax_tropo1.set_title(f'Tropospheric variability of {dcts.make_subs_label(substance)}{note}', fontsize=14)
+    ax_tropo1.set_title(f'Tropospheric variability of {substance.label()}{note}', fontsize=14)
 
     img = ax_tropo1.matshow(tropo_stdevs, alpha=0.75,
                      extent = [lat_bmin, lat_bmax,
@@ -822,7 +824,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
                         '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
                         va='center', ha='center')
     cbar = plt.colorbar(img, cax=cax_t, orientation='horizontal')
-    cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
+    cbar.set_label(f'Standard deviation of {substance.label(name_only=True)} within bin [{substance.unit}]')
     # make sure vmin and vmax are shown as colorbar ticks
     cbar_vals = cbar.get_ticks()
     cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
@@ -911,7 +913,7 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
 #                             label='Average' if j==0 else dcts.dict_season()[f'name_{j}'])
 # 
 #                 ax.text(0.05, 0.05,
-#                         dcts.make_coord_label(tp, True),
+#                         tp.label(True),
 #                         # '{}_{}{}'.format(tp.model, tp.tp_def,
 #                         #                  '_'+str(tp.pvu) if tp.tp_def=='dyn' else ''),
 #                         transform=ax.transAxes, verticalalignment='bottom',
@@ -1029,7 +1031,7 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
 #                     if not seasonal:
 #                         vmeans[tp.col_name] = bin1d.vmean
 #                         vmeans_std[tp.col_name+'_std'] = bin1d.vstdv
-#                         label = dcts.make_coord_label(tp, True) # '{}_{}{}'.format(tp.model, tp.tp_def, '_'+str(tp.pvu) if tp.tp_def=='dyn' else '')
+#                         label = tp.label(True) # '{}_{}{}'.format(tp.model, tp.tp_def, '_'+str(tp.pvu) if tp.tp_def=='dyn' else '')
 #                         ax.plot(bin1d.xmean, bin1d.vmean, color='#1f77b4', label=label)
 #                         ax.fill_between(bin1d.xmean, bin1d.vmean-bin1d.vstdv, bin1d.vmean+bin1d.vstdv,
 #                                         alpha=0.3, color='#1f77b4')
@@ -1046,7 +1048,7 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
 #                                     color=color, label=dcts.dict_season()[f'name_{s}'])
 #                         
 #                         ax.text(0.05, 0.05,
-#                                 dcts.make_coord_label(tp, True),
+#                                 tp.label(True),
 #                                 # '{}_{}{}'.format(tp.model, tp.tp_def,
 #                                 #                  '_'+str(tp.pvu) if tp.tp_def=='dyn' else ''),
 #                                 transform=ax.transAxes, verticalalignment='bottom',
@@ -1105,9 +1107,9 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
 #         
 #         # if nrows>1: 
 #         #     for ax in [axs[0,0], axs[0,1]]: # left most
-#         #         ax.set_ylabel(dcts.make_coord_label(tp))
+#         #         ax.set_ylabel(tp.label())
 #         # else: 
-#         #     axs.flatten()[0].set_ylabel(dcts.make_coord_label(tp))
+#         #     axs.flatten()[0].set_ylabel(tp.label())
 # 
 #         fig.tight_layout()
 #         if seasonal: # add horizontal figure legend for seasons at the top

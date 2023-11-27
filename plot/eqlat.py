@@ -73,19 +73,6 @@ class BinPlotter():
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         
-        # self.detr = detr
-        # if not 'detr' in subs_params and detr:
-        #     subs_params.update(dict(detr=detr))
-        #     if 'short_name' in subs_params and not subs_params.get('short_name').startswith('detr_'):
-        #         subs_params.update({'short_name' : 'detr_'+subs_params.get('short_name')})
-        # self.substances = [s for s in dcts.get_substances(**subs_params)
-        #                    if s.col_name in self.data['df'].columns and not s.col_name.startswith('d_')]
-        # self.x_coordinates = [s for s in dcts.get_coordinates(**x_params)
-        #                       if s.col_name in self.data['df'].columns]
-        # self.y_coordinates = [s for s in dcts.get_coordinates(**y_params)
-        #                       if s.col_name in self.data['df'].columns]
-        # self._check_input()
-
         self.kwargs = kwargs
 
     def __repr__(self):
@@ -98,16 +85,6 @@ class BinPlotter():
     def df(self) -> pd.DataFrame:
         return self.data['df']
 
-    # def _check_input(self) -> bool:
-    #     """ Check if any subs, x, y columns are in data. """
-    #     if not any([(s.col_name in self.df.columns) for s in self.substances]):
-    #         raise KeyError('No substances found in data that fit the parameters. ')
-    #     if not any([(c.col_name in self.df.columns) for c in self.x_coordinates]):
-    #         raise KeyError('No x-coordinate found in data that fit the parameters. ')
-    #     if not any([(c.col_name in self.df.columns) for c in self.y_coordinates]):
-    #         raise KeyError('No y-coordinate found in data that fit the parameters. ')
-    #     return True            
-
     def get_limits(self, subs, xcoord, ycoord=None, bin_attr='vmean') -> (tuple, tuple, tuple):
         """ Check kwargs for limits, otherwise set default values """
 
@@ -115,7 +92,7 @@ class BinPlotter():
             vlims = self.kwargs.get('vlims')
         else:
             try:
-                vlims = dcts.get_vlims(subs.short_name, bin_attr=bin_attr)
+                vlims = subs.vlims(bin_attr=bin_attr) # dcts.get_vlims(subs.short_name, bin_attr=bin_attr)
             except KeyError:
                 if bin_attr=='vmean':
                     vlims = (np.nanmin(self.df[subs.col_name]), np.nanmax(self.df[subs.col_name]))
@@ -149,23 +126,17 @@ class BinPlotter():
 
         x_bin = self.kwargs.get('x_bin')
         if not x_bin:
-            
-            try:
-                x_bin = dcts.get_default_bsize(xcoord.hcoord)
-            except KeyError:
-                try: 
-                    x_bin = dcts.get_default_bsize(xcoord.vcoord)
-                except KeyError: 
-                    x_bin = 10
+            x_bin = xcoord.get_bsize()
+        if not x_bin:
+            x_bin = 10
 
         if ycoord: 
             y_bin = self.kwargs.get('y_bin')
             if not y_bin:
-                try:
-                    y_bin = dcts.get_default_bsize(ycoord.vcoord)
-                except KeyError:
-                    y_bin = 5 * ( np.ceil((ylims[1]-ylims[0])/10) / 5 )
-                    if (ylims[1]-ylims[0])/10<1: y_bin=0.5
+                y_bin = ycoord.get_bsize() # dcts.get_default_bsize(ycoord.vcoord)
+            if not y_bin:
+                y_bin = 5 * ( np.ceil((ylims[1]-ylims[0])/10) / 5 )
+                if (ylims[1]-ylims[0])/10<1: y_bin=0.5
             return x_bin, y_bin
         else: 
             return x_bin
@@ -224,8 +195,8 @@ class BinPlotter1D(BinPlotter):
                       label=dcts.dict_season()[f'name_{s}'],
                       path_effects=[outline])
         
-        ax.set_ylabel(dcts.make_coord_label(coord))
-        ax.set_xlabel(dcts.make_subs_label(subs))
+        ax.set_ylabel(coord.label())
+        ax.set_xlabel(subs.label())
 
         xmin = np.nanmin([np.nanmin(bin_inst.vmean) for bin_inst in bin_dict.values()])
         xmax = np.nanmax([np.nanmax(bin_inst.vmean) for bin_inst in bin_dict.values()])
@@ -295,8 +266,8 @@ class BinPlotter2D(BinPlotter):
                         # if not ycoord.vcoord in ['p', 'mxr'] else [bci.xbmin, bci.xbmax, bci.ybmax, bci.ybmin]
                         )
 
-        ax.set_xlabel(dcts.make_coord_label(xcoord))
-        ax.set_ylabel(dcts.make_coord_label(ycoord))
+        ax.set_xlabel(xcoord.label())
+        ax.set_ylabel(ycoord.label())
 
         ax.set_xlim(*xlims)
         #TODO with count_limit > 1, might not have data in all bins - get dynamic bins?
@@ -351,7 +322,7 @@ class BinPlotter2D(BinPlotter):
         fig.subplots_adjust(top = 1.1)
 
         data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
-        # fig.suptitle(f'{data_title} of {dcts.make_subs_label(subs)}', y=0.95)
+        # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
 
         for season, ax in zip([1,2,3,4], axs.flatten()):
             bin2d_inst = binned_seasonal[season]
@@ -367,7 +338,7 @@ class BinPlotter2D(BinPlotter):
                             orientation='horizontal', 
                             # location='top', ticklocation='bottom'
                             )
-        cbar.ax.set_xlabel(data_title+' of '+dcts.make_subs_label(subs), 
+        cbar.ax.set_xlabel(data_title+' of '+subs.label(), 
                            # fontsize=13
                            )
 
@@ -486,7 +457,7 @@ class BinPlotter2D(BinPlotter):
         fig.subplots_adjust(top = 1.1)
 
         data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
-        # fig.suptitle(f'{data_title} of {dcts.make_subs_label(subs)}', y=0.95)
+        # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
 
         cmap = plt.cm.viridis if bin_attr=='vmean' else cmr.get_sub_cmap('summer_r', 0.1, 1)
 
@@ -497,7 +468,7 @@ class BinPlotter2D(BinPlotter):
         fig.tight_layout(pad=2.5)
 
         cbar = fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
-        cbar.ax.set_xlabel(data_title+' of '+dcts.make_subs_label(subs))
+        cbar.ax.set_xlabel(data_title+' of '+subs.label())
 
         cbar_vals = cbar.get_ticks()
         cbar_vals = [vlims[0]] + cbar_vals[1:-1].tolist() + [vlims[1]]
@@ -544,8 +515,8 @@ class BinPlotter2D(BinPlotter):
             ax.set_xlim(xlims[0]*0.95, xlims[1]*1.05)
             ax.set_ylim(ylims[0]*0.95, ylims[1]*1.05)
 
-            ax.set_xlabel(dcts.make_coord_label(xcoord1))
-            ax.set_ylabel(dcts.make_coord_label(ycoord1))
+            ax.set_xlabel(xcoord1.label())
+            ax.set_ylabel(ycoord1.label())
 
             if kwargs.get('note'):
                 ax.text(**dcts.note_dict(ax, s=kwargs.get('note')))
@@ -556,8 +527,8 @@ class BinPlotter2D(BinPlotter):
         cbar = fig.colorbar(img, ax = axs.ravel().tolist(), aspect=30,
                             pad=0.09, orientation='horizontal')
         cbar.ax.set_xlabel(
-            f'{dcts.make_subs_label(subs1)} {dcts.make_coord_label(xcoord1)} {dcts.make_coord_label(ycoord1)} \n vs.\n\
-{dcts.make_subs_label(subs2)} {dcts.make_coord_label(xcoord2)} {dcts.make_coord_label(ycoord2)}')
+            f'{subs1.label()} {xcoord1.label()} {ycoord1.label()} \n vs.\n\
+{subs2.label()} {xcoord2.label()} {ycoord2.label()}')
         plt.show()
 
     def plot_differences(self, **kwargs):

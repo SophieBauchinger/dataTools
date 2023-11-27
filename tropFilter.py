@@ -109,7 +109,7 @@ def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
         INT: 'o3'
         INT2: 'o3', 'n2o'
     """
-    if crit not in dcts.substance_list(ID):
+    if crit not in set([i.short_name for i in dcts.get_substances(ID=ID)]):
         default_crit = {'GHG' : 'n2o', 'INT' : 'o3', 'INT2' : 'n2o'}
         print(f'{crit} not available in {ID}, using {default_crit[ID]}')
         crit = default_crit[ID]
@@ -170,7 +170,7 @@ def chemical(glob_obj, crit='n2o', ID='GHG', ref_obj=None, detr=True,
         try: flag = df_sorted[f'flag_{crit}']
         except: flag = None
 
-        func = dcts.get_fct_substance(crit)
+        func = dcts.get_subs(col_name=substance).function
         ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
                               flag = flag, verbose=False, plot=False,
                               limit=0.1, direction = 'n')
@@ -340,9 +340,10 @@ def plot_sorted(glob_obj, df_sorted, crit, ID, popt0=None, popt1=None,
         t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
         ls = 'solid'
         if not subs_pfx == ID: ls = 'dashed'
-        ax.plot(df_sorted.index, dcts.get_fct_substance(crit)(t_obs_tot-2005, *popt0),
+        func = dcts.get_subs(col_name=substance).function
+        ax.plot(df_sorted.index, func(t_obs_tot-2005, *popt0),
                 c='r', lw=1, ls=ls, label='initial')
-        ax.plot(df_sorted.index, dcts.get_fct_substance(crit)(t_obs_tot-2005, *popt1),
+        ax.plot(df_sorted.index, func(t_obs_tot-2005, *popt1),
                 c='k', lw=1, ls=ls, label='filtered')
 
     # plt.ylim(220, 340)

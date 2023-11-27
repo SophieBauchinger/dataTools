@@ -17,7 +17,7 @@ if not '..' in sys.path:
 from toolpac.conv.times import fractionalyear_to_datetime, datetime_to_fractionalyear
 
 import tools
-from dictionaries import get_col_name, substance_list
+from dictionaries import get_substances
 
 #%% Local data
 class LocalData(object):
@@ -169,7 +169,7 @@ def detrend_substance(c_obj, subs, loc_obj=None, degree=2, save=True, plot=False
     out_dict = {}
 
     if c_pfx: pfxs = [c_pfx]
-    else: pfxs = [pfx for pfx in c_obj.pfxs if subs in substance_list(pfx)]
+    else: pfxs = [pfx for pfx in c_obj.pfxs if subs in set([i.short_name for i in get_substances(ID=pfx)])]
 
     if plot:
         if not as_subplot:

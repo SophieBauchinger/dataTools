@@ -35,7 +35,7 @@ def plot_gradient_by_season(glob_obj, substance, ycoord,
     # subs_col = substance.col_name # subs, c_obj.source, x_params['ID'])
 
     # y-axis
-    y_label = dcts.make_coord_label(ycoord)
+    y_label = ycoord.label()
     y_bins = {'z' : 0.5, 'pt' : 10, 'p' : 40}
     y_bin = y_bins[ycoord.vcoord]
     # if not 'y_bin' in y_params.keys():
@@ -97,7 +97,7 @@ def plot_gradient_by_season(glob_obj, substance, ycoord,
 
     plt.ylim([min_y, max_y])
     plt.ylabel(y_label)
-    plt.xlabel(dcts.make_subs_label(substance))
+    plt.xlabel(substance.label())
     # if detr: # remove the 'delta_' and replace with symbol
     #     plt.xlabel(substance.col_name.split("_")[-1] + ' detrended wrt. 2005')
 

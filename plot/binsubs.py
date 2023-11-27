@@ -15,6 +15,11 @@ BinPlotter1D:
     - Matrices of variability per latitude bin
 
 """
+
+
+
+
+
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -35,7 +40,7 @@ import tools
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
 
-outline = mpe.withStroke(linewidth=2, foreground='white')
+# outline = mpe.withStroke(linewidth=2, foreground='white')
 
 #TODO map of distance to tropopause (stratosphere only?)
 #TODO might want to implement a logarithmic scale for pressure at some point
@@ -112,6 +117,7 @@ class BinPlotter():
         self.count_limit = glob_obj.count_limit
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
+        self.outline = mpe.withStroke(linewidth=2, foreground='white')
 
         self.kwargs = kwargs
 
@@ -129,7 +135,7 @@ based on {self.glob_obj.__repr__()}'
             vlims = self.kwargs.get('vlims')
         else:
             try:
-                vlims = dcts.get_vlims(subs.short_name, bin_attr=bin_attr)
+                vlims = subs.vlims(bin_attr=bin_attr)
             except KeyError:
                 if bin_attr=='vmean':
                     vlims = (np.nanmin(self.df[subs.col_name]), np.nanmax(self.df[subs.col_name]))
@@ -167,19 +173,14 @@ based on {self.glob_obj.__repr__()}'
             bsize = self.kwargs.get('zbsize')
 
         else: 
-            try: 
-                bsize = dcts.get_default_bsize(coord.hcoord)
-            except KeyError: 
-                try: 
-                    bsize = dcts.get_default_bsize(coord.vcoord)
-                except KeyError: 
-                    if xyz=='x': 
-                        bsize = 10
-                    else:
-                        lims = self.get_coord_lims(coord, xyz)
-                        bsize = 5 * ( np.ceil((lims[1]-lims[0])/10) / 5 )
-                        if (lims[1]-lims[0])/10<1: 
-                            bsize=0.5
+            bsize = coord.get_bsize()# dcts.get_default_bsize(coord.hcoord)
+            if not bsize and xyz=='x': 
+                bsize = 10
+            if not bsize:    
+                lims = self.get_coord_lims(coord, xyz)
+                bsize = 5 * ( np.ceil((lims[1]-lims[0])/10) / 5 )
+                if (lims[1]-lims[0])/10<1: 
+                    bsize=0.5
         return bsize
 
     def filter_non_shared_indices(self, tps):
@@ -424,7 +425,7 @@ class BinPlotter1D(BinPlotter):
         """ Make a histogram of the number of datapoints for each tp bin. """
         if ax is None: 
             fig, ax = plt.subplots(dpi=250, figsize=(6,4))
-            ax.set_ylabel(dcts.make_coord_label(tp))
+            ax.set_ylabel(tp.label())
             
         ax.set_title('Distribution of CARIBIC measurements relative to tropopause')
         rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (self.glob_obj.df[tp.col_name].min(), 
@@ -449,7 +450,7 @@ class BinPlotter1D(BinPlotter):
         fig, ax = plt.subplots(dpi=250, figsize=(6,4))
         for tp in tps: 
             hist = self.flight_height_histogram(tp, alpha=0.6, ax=ax,
-                                                label=dcts.make_coord_label(tp, True))
+                                                label=tp.label(True))
             
         ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
         ax.set_ylabel('$\Delta\,\Theta$ relative to Tropopause')
@@ -474,7 +475,7 @@ class BinPlotter1D(BinPlotter):
 
                 ax.plot(vdata, y, ls=ls,
                         c=dcts.dict_season()[f'color_{s}'],
-                        label=dcts.make_coord_label(tp, True) if s==1 else None,
+                        label=tp.label(True) if s==1 else None,
                         path_effects=[outline], zorder=2, lw=2.5)
                 
                 ax.scatter(vdata, y,marker='.', 
@@ -489,9 +490,9 @@ class BinPlotter1D(BinPlotter):
         ax.set_ylabel(f'$\Delta\,\Theta$ [{tps[0].unit}]')
         
         if bin_attr == 'vstdv': 
-            ax.set_xlabel(('Relative variability' if rel else 'Variability')+ f' of {dcts.make_subs_label(subs, name_only=True)} [%]')
+            ax.set_xlabel(('Relative variability' if rel else 'Variability')+ f' of {subs.label(name_only=True)} [%]')
         elif bin_attr == 'vmean': 
-            ax.set_xlabel(dcts.make_subs_label(subs))
+            ax.set_xlabel(subs.label())
         
         if tps[0].rel_to_tp: 
             xlims = plt.axis()[:2]
@@ -568,20 +569,20 @@ class BinPlotter1D(BinPlotter):
             #     yticks = [i for i in y if i<0] + [0] + [i for i in y if i > 0]
             #     ax.set_yticks(y if not coord.rel_to_tp else yticks)
         
-        ax.set_title(dcts.make_coord_label(coord, filter_label = True))
-        ax.set_ylabel(dcts.make_coord_label(coord, coord_only = True))
+        ax.set_title(coord.label(filter_label=True))
+        ax.set_ylabel(coord.label(coord_only = True))
 
         # cl = f'{coord.vcoord} [{coord.unit}]'
         # if coord.vcoord=='pt': 
         #     cl = f'$\Theta$ [{coord.unit}]'
         # if coord.rel_to_tp: 
         #     cl = '$\Delta$' + cl
-        # ax.set_ylabel((f'{cl} - ' if coord.tp_def in ['dyn', 'therm'] else '') + f'{dcts.make_coord_label(coord, True)}')
+        # ax.set_ylabel((f'{cl} - ' if coord.tp_def in ['dyn', 'therm'] else '') + f'{coord.label(True)}')
 
         if bin_attr=='vmean':
-            ax.set_xlabel(dcts.make_subs_label(subs))
+            ax.set_xlabel(subs.label())
         elif bin_attr=='vstdv': 
-            ax.set_xlabel('Relative variability of '+dcts.make_subs_label(subs, name_only=True))
+            ax.set_xlabel('Relative variability of '+subs.label(name_only=True))
 
         # xmin = np.nanmin([np.nanmin(bin_inst.vmean) for bin_inst in bin_dict.values()])
         # xmax = np.nanmax([np.nanmax(bin_inst.vmean) for bin_inst in bin_dict.values()])
@@ -647,8 +648,8 @@ class BinPlotter1D(BinPlotter):
             if tp.model=='ERA5': 
                 ax.plot(df['rms_vstdv'], df.index, '-', marker='o', 
                         # c=dcts.dict_season()[f'color_{s}'],
-                        label=dcts.make_coord_label(tp, True),
-                        path_effects=[outline], zorder=10)
+                        label=tp.label(True),
+                        path_effects=[self.outline], zorder=10)
 
                 ax.set_ylabel('$\Theta$-Distance to TP [K]') 
 
@@ -656,14 +657,14 @@ class BinPlotter1D(BinPlotter):
                 if tp.tp_def == 'chem':
                     color = 'yellow'
                     ax2 = ax.twinx()
-                    ax2.set_ylabel(dcts.make_coord_label(tp),
+                    ax2.set_ylabel(tp.label(),
                                    color = color) 
                     # ax2.set_ylim(330-70, 330+70)
                     ax.plot(df['rms_vstdv'], df.index, '-', marker='o', 
                             # c=dcts.dict_season()[f'color_{s}'],
                             c = color,
-                            label=dcts.make_coord_label(tp, True),
-                            path_effects=[outline], zorder=10)
+                            label=tp.label(True),
+                            path_effects=[self.outline], zorder=10)
     
                     ax.set_ylabel('$\Theta$-Distance to TP [K]')
                     ax2.tick_params(axis ='y', labelcolor = color, color=color)
@@ -672,14 +673,14 @@ class BinPlotter1D(BinPlotter):
                 else: 
                     color = 'xkcd:grey'
                     ax2 = ax.twinx()
-                    ax2.set_ylabel(dcts.make_coord_label(tp),
+                    ax2.set_ylabel(tp.label(),
                                    color = color) 
                     ax2.set_ylim(330-70, 330+70)
                     
                     ax2.plot(df['rms_vstdv'], df.index, '--', marker='o', 
                             c = color, 
-                            # label=dcts.make_coord_label(tp, True),
-                            path_effects=[outline], zorder=0,
+                            # label=tp.label(True),
+                            path_effects=[self.outline], zorder=0,
                             label='Potential Temperature')
                     ax2.tick_params(axis ='y', labelcolor = color, color=color)
                     ax2.spines['right'].set_color(color)
@@ -688,7 +689,7 @@ class BinPlotter1D(BinPlotter):
         # ax.hlines(0, 0, 0.25, color='k', ls='dashed', zorder=0)
         
         ax.grid('both', ls='dotted')
-        ax.set_xlabel(f'Mean seasonal variability of {dcts.make_subs_label(subs, name_only=True)} [{subs.unit}]')
+        ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
         ax.set_zorder(3)
         ax.patch.set_visible(False)
         ax2.set_zorder(2)
@@ -710,13 +711,13 @@ class BinPlotter1D(BinPlotter):
             df = self.rms_seasonal_vstdv(subs, tp)
             ax.plot(df['rms_vstdv'], df.index, '-', marker='o', 
                     # c=dcts.dict_season()[f'color_{s}'],
-                    label=dcts.make_coord_label(tp, True),
-                    path_effects=[outline], zorder=2)
+                    label=tp.label(True),
+                    path_effects=[self.outline], zorder=2)
 
-            ax.set_ylabel(dcts.make_coord_label(tp)) 
+            ax.set_ylabel(tp.label()) 
 
             ax.grid('both', ls='dotted')
-            ax.set_xlabel(f'Mean variability of {dcts.make_subs_label(subs, name_only=True)}')
+            ax.set_xlabel(f'Mean variability of {subs.label(name_only=True)}')
             ax.legend(loc='lower right')
 
     def make_bar_plot(self, subs, xcoord, tp, bin_attr, percent_deviation=False, **kwargs) -> tuple: 
@@ -795,7 +796,7 @@ class BinPlotter1D(BinPlotter):
         else: 
             description = bin_attr
         
-        fig.suptitle(f'{description} of {dcts.make_subs_label(subs)}' if not bin_attr=='vcount' else description)
+        fig.suptitle(f'{description} of {subs.label()}' if not bin_attr=='vcount' else description)
         fig.subplots_adjust(top=0.85)
         ax_t.set_title('Troposphere', fontsize=9, loc='right')
         ax_s.set_title('Stratosphere', fontsize=9, loc='left')
@@ -811,7 +812,7 @@ class BinPlotter1D(BinPlotter):
             tropo_bar_vals.append(t_av)
             strato_bar_vals.append(s_av)
             
-            bar_labels.append(dcts.make_coord_label(tp, True))
+            bar_labels.append(tp.label(True))
             
         bar_params = dict(align='center', edgecolor='k',  rasterized=True,
                           alpha=0.65, zorder=10)
@@ -922,7 +923,7 @@ class BinPlotter1D(BinPlotter):
         # -------------------------------------------------------------------------
         pixels = self.glob_obj.grid_size # how many pixels per imshow square
         yticks = np.linspace(0, (len(tps)-1)*pixels, num=len(tps))[::-1] # order was reversed for some reason
-        tp_labels = [dcts.make_coord_label(tp, True)+'\n' for tp in tps]
+        tp_labels = [tp.label(True)+'\n' for tp in tps]
         xticks = np.arange(lat_bmin, lat_bmax+self.glob_obj.grid_size, self.glob_obj.grid_size)
     
         fig = plt.figure(dpi=200, figsize=(lat_bci.nx*0.825, len(tps)*2))
@@ -949,13 +950,13 @@ class BinPlotter1D(BinPlotter):
         # Plot STRATOSPHERE
         # -------------------------------------------------------------------------
         try: 
-            vmin, vmax = dcts.get_vlims(substance.short_name, 'vstdv', 'strato')
+            vmin, vmax = substance.vlims('vstdv', 'strato')
         except KeyError: 
             vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
             
         norm = Normalize(vmin, vmax)  # normalise color map to set limits
         strato_cmap = dcts.dict_colors()['vstdv_strato'] # plt.cm.BuPu  # create colormap
-        ax_strato1.set_title(f'Stratospheric variability of {dcts.make_subs_label(substance)}{note}', fontsize=14)
+        ax_strato1.set_title(f'Stratospheric variability of {substance.label()}{note}', fontsize=14)
     
         img = ax_strato1.matshow(strato_stdevs, alpha=0.75,
                          extent = [lat_bmin, lat_bmax,
@@ -981,7 +982,7 @@ class BinPlotter1D(BinPlotter):
                             '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
                             va='center', ha='center')
         cbar = plt.colorbar(img, cax=cax_s, orientation='horizontal')
-        cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
+        cbar.set_label(f'Standard deviation of {substance.label(name_only=True)} within bin [{substance.unit}]')
         # make sure vmin and vmax are shown as colorbar ticks
         cbar_vals = cbar.get_ticks()
         cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
@@ -1005,12 +1006,12 @@ class BinPlotter1D(BinPlotter):
         # Plot TROPOSPHERE
         # -------------------------------------------------------------------------
         try: 
-            vmin, vmax = dcts.get_vlims(substance.short_name, 'vstdv', 'tropo')
+            vmin, vmax = substance.vlims('vstdv', 'tropo')
         except KeyError: 
             vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
         norm = Normalize(vmin, vmax)  # normalise color map to set limits
         tropo_cmap = dcts.dict_colors()['vstdv_tropo'] # cmr.get_sub_cmap('YlOrBr', 0, 0.75) # create colormap
-        ax_tropo1.set_title(f'Tropospheric variability of {dcts.make_subs_label(substance)}{note}', fontsize=14)
+        ax_tropo1.set_title(f'Tropospheric variability of {substance.label()}{note}', fontsize=14)
     
         img = ax_tropo1.matshow(tropo_stdevs, alpha=0.75,
                          extent = [lat_bmin, lat_bmax,
@@ -1037,7 +1038,7 @@ class BinPlotter1D(BinPlotter):
                             '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
                             va='center', ha='center')
         cbar = plt.colorbar(img, cax=cax_t, orientation='horizontal')
-        cbar.set_label(f'Standard deviation of {dcts.make_subs_label(substance, name_only=True)} within bin [{substance.unit}]')
+        cbar.set_label(f'Standard deviation of {substance.label(name_only=True)} within bin [{substance.unit}]')
         # make sure vmin and vmax are shown as colorbar ticks
         cbar_vals = cbar.get_ticks()
         cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
@@ -1161,7 +1162,7 @@ class BinPlotter2D(BinPlotter):
 
         if nplots >= 4:
             data_type = 'measured' if subs.model == 'MSMT' else 'modeled'
-            fig.suptitle(f'{bin_attr} of binned global {data_type} mixing ratios of {dcts.make_subs_label(subs)}',
+            fig.suptitle(f'{bin_attr} of binned global {data_type} mixing ratios of {subs.label()}',
                          fontsize=25)
             plt.subplots_adjust(top=0.96)
 
@@ -1209,7 +1210,7 @@ class BinPlotter2D(BinPlotter):
             cbar = grid.cbar_axes[0].colorbar(img, aspect=5, pad=0.1) # colorbar
             cbar.ax.tick_params(labelsize=15)
             cbar.ax.minorticks_on()
-            cbar.ax.set_xlabel(dcts.make_subs_label(subs), fontsize=15)
+            cbar.ax.set_xlabel(subs.label(), fontsize=15)
         
         fig.tight_layout()
         plt.show()
@@ -1241,7 +1242,7 @@ class BinPlotter2D(BinPlotter):
         fig.subplots_adjust(top = 1.1)
 
         data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
-        # fig.suptitle(f'{data_title} of {dcts.make_subs_label(subs)}', y=0.95)
+        # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
 
         for season, ax in zip([1,2,3,4], axs.flatten()):
             bin2d_inst = binned_seasonal[season]
@@ -1257,7 +1258,7 @@ class BinPlotter2D(BinPlotter):
                             orientation='horizontal', 
                             # location='top', ticklocation='bottom'
                             )
-        cbar.ax.set_xlabel(data_title+' of '+dcts.make_subs_label(subs), 
+        cbar.ax.set_xlabel(data_title+' of '+subs.label(), 
                            # fontsize=13
                            )
 
@@ -1344,7 +1345,7 @@ class BinPlotter2D(BinPlotter):
         fig.subplots_adjust(top = 1.1)
 
         data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
-        # fig.suptitle(f'{data_title} of {dcts.make_subs_label(subs)}', y=0.95)
+        # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
 
         cmap = dcts.dict_colors()[bin_attr]
 
@@ -1355,7 +1356,7 @@ class BinPlotter2D(BinPlotter):
         fig.tight_layout(pad=2.5)
 
         cbar = fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
-        cbar.ax.set_xlabel(data_title+' of '+dcts.make_subs_label(subs))
+        cbar.ax.set_xlabel(data_title+' of '+subs.label())
 
         cbar_vals = cbar.get_ticks()
         cbar_vals = [vlims[0]] + cbar_vals[1:-1].tolist() + [vlims[1]]
@@ -1410,8 +1411,8 @@ class BinPlotter2D(BinPlotter):
             ax.set_xlim(xlims[0]*0.95, xlims[1]*1.05)
             ax.set_ylim(ylims[0]*0.95, ylims[1]*1.05)
 
-            ax.set_xlabel(dcts.make_coord_label(xcoord1))
-            ax.set_ylabel(dcts.make_coord_label(ycoord1))
+            ax.set_xlabel(xcoord1.label())
+            ax.set_ylabel(ycoord1.label())
 
             if kwargs.get('note'):
                 ax.text(**dcts.note_dict(ax, s=kwargs.get('note')))
@@ -1422,8 +1423,8 @@ class BinPlotter2D(BinPlotter):
         cbar = fig.colorbar(img, ax = axs.ravel().tolist(), aspect=30,
                             pad=0.09, orientation='horizontal')
         cbar.ax.set_xlabel(
-            f'{dcts.make_subs_label(subs1)} {dcts.make_coord_label(xcoord1)} {dcts.make_coord_label(ycoord1)} \n vs.\n\
-{dcts.make_subs_label(subs2)} {dcts.make_coord_label(xcoord2)} {dcts.make_coord_label(ycoord2)}')
+            f'{subs1.label()} {xcoord1.label()} {ycoord1.label()} \n vs.\n\
+{subs2.label()} {xcoord2.label()} {ycoord2.label()}')
         plt.show()
 
     def plot_differences(self, subs_params={}, **kwargs):
@@ -1457,8 +1458,8 @@ class BinPlotter2D(BinPlotter):
                         # if not ycoord.vcoord in ['p', 'mxr'] else [bci.xbmin, bci.xbmax, bci.ybmax, bci.ybmin]
                         )
 
-        ax.set_xlabel(dcts.make_coord_label(xcoord))
-        ax.set_ylabel(dcts.make_coord_label(ycoord))
+        ax.set_xlabel(xcoord.label())
+        ax.set_ylabel(ycoord.label())
 
         ax.set_xlim(*xlims)
         #TODO with count_limit > 1, might not have data in all bins - get dynamic bins?
@@ -1502,9 +1503,11 @@ class BinPlotter3D(BinPlotter):
         stratosphere_map(subs, tp, bin_attr)
     """
 
-    def z_crossection(self, subs, tp, bin_attr, zbsize=None): 
+    def z_crossection(self, subs, tp, bin_attr, threshold = 3, zbsize=None): 
         """ Create lat/lon gridded plots for all z-bins. """
         binned_data = self.bin_3d(subs, tp, zbsize=zbsize)
+        
+        data3d = getattr(binned_data, bin_attr)
 
         lon_bins = binned_data.xintm
         lat_bins = binned_data.yintm
@@ -1517,17 +1520,50 @@ class BinPlotter3D(BinPlotter):
         for ix in range(binned_data.nx):
             for iy in range(binned_data.ny): 
                 for iz in range(binned_data.nz):
-                    data = binned_data[ix, iy, iz]
-                    
-        
-        fig = plt.figure(dpi=150)
-        for i, zbin in enumerate(z_bins): 
-            if not vcounts_per_z_level[i] < 100:
-                ax = fig.add_subplot()
-                
+                    datapoint = data3d[ix, iy, iz]
 
+        
+        # fig = plt.figure(dpi=150)
+        
         vlims = self.get_vlimit(subs, bin_attr)
+        norm = Normalize(*vlims)
         cmap = dcts.dict_colors()[bin_attr]
+
+        data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
+        # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
+
+        cmap = dcts.dict_colors()[bin_attr]
+        world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+        
+        # if tp.rel_to_tp:
+        #     title = f'Horizontal cross section relative in {} to {tp.label(filter_label=True)} Tropopause'
+        # else: 
+        #     title = f' in {tp.label()}'
+        title = ''
+
+        for iz in range(binned_data.nz):
+            data2d = data3d[:,:,iz]
+            if sum(~np.isnan(data2d.flatten())) > threshold: 
+                fig, ax = plt.subplots(dpi=200)
+                world.boundary.plot(ax=ax, color='grey', linewidth=0.3, zorder=0)
+                ax.set_title(title)
+                ax.text(s = '{:.0f} to {:.0f} {}'.format(binned_data.zbinlimits[iz], binned_data.zbinlimits[iz+1], tp.unit),
+                        **dcts.note_dict(ax, x=0.025, y=0.05))
+
+                img = ax.imshow(data2d.T,
+                                cmap = cmap, norm=norm,
+                                aspect='auto', origin='lower',
+                                # if not ycoord.vcoord in ['p', 'mxr'] else 'upper',
+                                extent=[binned_data.xbmin, binned_data.xbmax, 
+                                        binned_data.ybmin, binned_data.ybmax],
+                                zorder = 1)
+
+                cbar = fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
+                cbar.ax.set_xlabel(f'{data_title} of {subs.label()}')
+                
+                plt.show()
+    
+        return binned_data
         
 
     def stratosphere_map(self, subs, tp, bin_attr): 
@@ -1536,7 +1572,7 @@ class BinPlotter3D(BinPlotter):
         # df = self.glob_obj.sel_tropo(**tp.__dict__).df
 
         fig, ax = plt.subplots(figsize=(9,9))
-        ax.set_title(dcts.make_coord_label(tp, True))
+        ax.set_title(tp.label(True))
         world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
         world.boundary.plot(ax=ax, color='grey', linewidth=0.3)
         
@@ -1595,18 +1631,18 @@ def n2o_tp_stdv_rms(glob_obj, subs):
             '-', marker='o', 
             # c=dcts.dict_season()[f'color_{s}'],
             label='Tropospheric',
-            path_effects=[outline], zorder=2)
+            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
     
     ax.plot(s_var_df['rms_vstdv'], s_var_df.index, 
             '-', marker='o', 
             # c=dcts.dict_season()[f'color_{s}'],
             label='Stratospheric',
-            path_effects=[outline], zorder=2)
+            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
 
-    ax.set_ylabel(dcts.make_coord_label(vcoord)) 
+    ax.set_ylabel(vcoord.label()) 
 
     ax.grid('both', ls='dotted')
-    ax.set_xlabel(f'Mean variability of {dcts.make_subs_label(subs, name_only=True)}')
+    ax.set_xlabel(f'Mean variability of {subs.label(name_only=True)}')
     ax.legend(loc='lower right')
     
     

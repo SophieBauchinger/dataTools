@@ -79,7 +79,7 @@ def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwarg
             ax.text(**dcts.note_dict(ax, s=note, y=0.075))
 
         # Plot mixing ratios x
-        vmin, vmax = dcts.get_vlims(subs.short_name)
+        vmin, vmax = subs.vlims()
         if 'mol' in subs.unit:
             ref_unit = dcts.get_substances(short_name=subs.short_name,
                                            source='Caribic')[0].unit
@@ -102,7 +102,7 @@ def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwarg
                          label=f'{subs.short_name.upper()} [{subs.unit}]')
             # cbar.ax.set_xlabel(substance.unit, fontsize=8)
 
-        ax.set_ylabel(dcts.make_subs_label(subs, detr=detr))
+        ax.set_ylabel(subs.label())
         ax.set_xlabel('Time')
 
         if len(glob_obj.years) > 3:
@@ -164,13 +164,13 @@ def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs
                                       )
         if nplots >= 4:
             data_type = 'measured' if substance.model == 'MSMT' else 'modeled'
-            fig.suptitle(f'Lat/Lon binned {data_type} mixing ratios of {dcts.make_subs_label(substance)}',
+            fig.suptitle(f'Lat/Lon binned {data_type} mixing ratios of {substance.label()}',
                          fontsize=25)
             plt.subplots_adjust(top=0.96)
 
         # Colormapping
         cmap = plt.cm.viridis_r
-        vmin, vmax = dcts.get_vlims(substance.short_name)
+        vmin, vmax = substance.vlims()
         if 'mol' in substance.unit:
             ref_unit = dcts.get_substances(short_name=substance.short_name,
                                            source='Caribic')[0].unit
@@ -195,7 +195,7 @@ def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs
             axs[0].scatter(out_x.xintm, data_x,  # plot across longitude
                            c=data_x, cmap=cmap, norm=norm)
             axs[0].set_xlabel('Longitude [deg]')  # ; plt.xlim(out_x.xbmin, out_x.xbmax)
-            axs[0].set_ylabel(dcts.make_subs_label(substance))
+            axs[0].set_ylabel(substance.label())
             axs[0].set_ylim(ymax=ymax, ymin=ymin)
 
             axs[1].plot(out_y.xintm, data_y, zorder=1, color='black', lw=0.5)
@@ -225,7 +225,7 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
         fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
         # ax = fig.add_subplot(projection="aitoff")
         cmap = dcts.dict_colors()[bin_attr]
-        vmin, vmax = dcts.get_vlims(subs.short_name, bin_attr)
+        vmin, vmax = subs.vlims(bin_attr=bin_attr)
         if 'mol' in subs.unit:
             ref_unit = dcts.get_substances(short_name=subs.short_name,
                                            source='Caribic')[0].unit
@@ -289,7 +289,7 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
         # cbar.ax.tick_params(labelsize=15, which='both')
         # cbar.ax.minorticks_on()
 
-        # ax.set_title(dcts.make_subs_label(subs, detr=detr)
+        # ax.set_title(subs.label()
         #              if bin_attr != 'vcount' else 'Distribution of greenhouse gas flask measurements')
 
 def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs):
@@ -322,14 +322,14 @@ def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs)
 
         if nplots >= 4:
             data_type = 'measured' if subs.model == 'MSMT' else 'modeled'
-            fig.suptitle(f'Global {data_type} mixing ratios of {dcts.make_subs_label(subs, detr=detr)}',
+            fig.suptitle(f'Global {data_type} mixing ratios of {subs.label()}',
                          fontsize=25)
             plt.subplots_adjust(top=0.96)
 
         out_list = glob_obj.binned_2d(subs)
 
         cmap = plt.cm.viridis_r  # create colormap
-        vmin, vmax = dcts.get_vlims(subs.short_name)# vlims.get(substance.short_name)
+        vmin, vmax = subs.vlims()# vlims.get(substance.short_name)
         if 'mol' in subs.unit:
             ref_unit = dcts.get_substances(short_name=subs.short_name,
                                            source='Caribic')[0].unit
@@ -360,7 +360,7 @@ def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs)
                 cbar = grid.cbar_axes[0].colorbar(img)
                 cbar.ax.tick_params(labelsize=15, which='both')
                 # cbar.ax.minorticks_on()
-                cbar.ax.set_xlabel(dcts.make_subs_label(subs, detr=detr), fontsize=15)
+                cbar.ax.set_xlabel(subs.label(), fontsize=15)
 
         for i, ax in enumerate(grid):  # hide extra plots
             if i >= nplots:
@@ -432,8 +432,8 @@ def mxr_vs_vcoord(glob_obj, subs, vcoord):
                    c=dcts.dict_season()[f'color_{s}'])
         # ax.legend()
         
-    ax.set_ylabel(dcts.make_coord_label(vcoord))
-    ax.set_xlabel(dcts.make_subs_label(subs))
+    ax.set_ylabel(vcoord.label())
+    ax.set_xlabel(subs.label())
 
 # %% LocalData
 
@@ -459,7 +459,7 @@ def local(loc_obj, greyscale=False, v_limits=(None, None), **subs_kwargs):
         if all(isinstance(i, (int, float)) for i in v_limits):
             vmin, vmax = v_limits
         else:
-            vmin, vmax = dcts.get_vlims(subs.short_name) # default values
+            vmin, vmax = subs.vlims() # default values
         norm = Normalize(vmin, vmax)
 
         # Plot all available info on one graph
@@ -467,13 +467,13 @@ def local(loc_obj, greyscale=False, v_limits=(None, None), **subs_kwargs):
         # Measurement data (monthly)
         plt.scatter(loc_obj.df.index, loc_obj.df[subs.col_name], c=loc_obj.df[subs.col_name],
                     cmap=colors['msmts'], norm=norm, marker='+', zorder=1,
-                    label=dcts.make_subs_label(subs, name_only=True))
+                    label=subs.label(name_only=True))
         # Daily mean
         if hasattr(loc_obj, 'df_Day'):
             if not loc_obj.df_Day.empty:  # check if there is data in the daily df
                 plt.scatter(loc_obj.df_Day.index, loc_obj.df_Day[subs.col_name],
                             color='silver', marker='+', zorder=0,
-                            label=f'{dcts.make_subs_label(subs, name_only=True)} (D)')
+                            label=f'{subs.label(name_only=True)} (D)')
         # Monthly mean
         if hasattr(loc_obj, 'df_monthly_mean'):
             if not loc_obj.df_monthly_mean.empty:  # check for data in the monthly df
@@ -487,9 +487,9 @@ def local(loc_obj, greyscale=False, v_limits=(None, None), **subs_kwargs):
                               linestyle='dashed', zorder=2)
                     if i == 0:  # avoid multiple labels by replotting single hline with label
                         ax.hlines(mean, xmin, xmax, color='black', ls='dashed',
-                                  label=f'{dcts.make_subs_label(subs, name_only=True)} (M)')
+                                  label=f'{subs.label(name_only=True)} (M)')
 
-        plt.ylabel(dcts.make_subs_label(subs))
+        plt.ylabel(subs.label())
         plt.xlim(min(loc_obj.df.index), max(loc_obj.df.index))
         plt.xlabel('Time')
 

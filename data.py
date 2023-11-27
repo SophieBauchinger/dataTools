@@ -241,7 +241,7 @@ class GlobalData():
                 ax.plot(df_detr.index, c_fit(t_obs), label='trendline',
                         color='black', ls='dashed')
 
-                ax.set_ylabel(dcts.make_subs_label(subs))  # ; ax.set_xlabel('Time')
+                ax.set_ylabel(subs.label())  # ; ax.set_xlabel('Time')
                 # if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
                 if note != '':
                     leg = ax.legend(title=note)
@@ -575,9 +575,7 @@ class GlobalData():
         strato = f'strato_{subs.col_name}'
         tropo = f'tropo_{subs.col_name}'
 
-        func = dcts.get_fct_substance('n2o')
-
-        ol = outliers.find_ol(func, t_obs_tot, mxr, d_mxr,
+        ol = outliers.find_ol(subs.function, t_obs_tot, mxr, d_mxr,
                               flag=flag, verbose=False, plot=False,
                               limit=0.1, direction='n')
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
@@ -710,43 +708,6 @@ class GlobalData():
         ratio_df.loc['ratios'] = ratios  # set col
 
         tropo_counts = pd.concat([tropo_counts, ratio_df])
-
-        # if group_vc:
-        #     grouped_ratios = pd.DataFrame(index=['ratios'])
-        #     # make coordinates so that grouping by model is possible
-        #     tps = [dcts.get_coord(col_name=c) for c in tropo_counts.columns
-        #            if c in [c.col_name for c in dcts.get_coordinates() if c.tp_def not in ['combo', 'cpt']]]
-
-        #     # create pseudo coordinate for n2o filter
-        #     subses = [dcts.get_subs(col_name=c) for c in tropo_counts.columns if
-        #               c in [s.col_name for s in dcts.get_substances()]]
-        #     subs_tps = [dcts.Coordinate(**subs.__dict__, tp_def='chem', crit='n2o', vcoord='mxr', rel_to_tp='False') for
-        #                 subs in subses]
-        #     tps = tps + subs_tps
-
-        #     # group by model and average the ratios
-        #     for tp_def in set(tp.tp_def for tp in tps):
-        #         for model in set(tp.model for tp in tps if tp.tp_def == tp_def):
-        #             tps_to_group = [tp for tp in tps if (tp.model == model and tp.tp_def == tp_def)]
-
-        #             crits = set(tp.crit for tp in tps_to_group)
-
-        #             if len(crits) > 1:
-        #                 for crit in crits:
-        #                     cols = [tp.col_name for tp in tps_to_group if tp.crit == crit]
-        #                     label = f'{model}_{tp_def}_{crit}'
-        #                     print(label)
-        #                     grouped_ratios[label] = np.nanmean(ratios[cols])
-
-        #             else:
-        #                 cols = [tp.col_name for tp in tps_to_group][0]
-        #                 crit_label = '_' + crits if tp_def == 'chem' else ''
-        #                 label = f'{model}_{tp_def}' + crit_label
-        #                 print(label)
-        #                 grouped_ratios[label] = np.nanmean(ratio_df[cols])
-
-        #             return grouped_ratios
-
         return tropo_counts
 
     def calc_shared_ratios(self, tps=None): 
@@ -936,10 +897,10 @@ class GlobalData():
                     else:
                         d_mxr = None  # integrated values of high resolution data
 
-                    func = dcts.get_fct_substance(dcts.get_substances(col_name=substance)[0].short_name)
                     # Find extreme events
                     plot = False if 'plot' not in kwargs else kwargs.get('plot')
-                    tmp = outliers.find_ol(func, time, mxr, d_mxr, flag=None,  # here
+                    tmp = outliers.find_ol(dcts.get_subs(col_name=substance).function, 
+                                           time, mxr, d_mxr, flag=None,  # here
                                            direction='p', verbose=False,
                                            plot=plot, limit=0.1, ctrl_plots=False)
 
@@ -1118,8 +1079,6 @@ class Caribic(GlobalData):
         """ Create dataframe with all possible coordinates but
         no measurement / substance values """
         # merge lists of coordinates for all pfxs in the object
-        coords = [y for pfx in self.pfxs for y in dcts.coord_dict(pfx)] + [
-            'p', 'geometry', 'Flight number']
         if 'GHG' in self.pfxs:
             # copy bc don't want to overwrite data
             df = self.data['GHG'].copy()
@@ -1127,6 +1086,8 @@ class Caribic(GlobalData):
             df = pd.DataFrame()
         for pfx in [pfx for pfx in self.pfxs if pfx != 'GHG']:
             df = df.combine_first(self.data[pfx].copy())
+
+        coords = ['Flight number'] + [c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)]
         df.drop([col for col in df.columns if col not in coords],
                 axis=1, inplace=True)  # remove non-met / non-coord data
 
@@ -1173,7 +1134,7 @@ class Caribic(GlobalData):
         if detr: 
             self.detrend_substance(subs)
         subs_cols = [c for c in self.df
-                     if any(i in dcts.get_subs_columns(short_name=subs) 
+                     if any(i in [s.col_name for s in dcts.get_substances(short_name=subs)]
                             for i in [c, c[5:], c[6:], c[8:]])]
 
         df = self.df[list(self.met_data.columns) + subs_cols]

@@ -193,7 +193,7 @@ def minimise_tps(tps) -> list:
     [tp_to_remove.append(tp) for tp in tps
      if tp.col_name in ['int_CARIBIC2_H_rel_TP', 'int_O3']]
     [tp_to_remove.append(tp) for tp in tps if tp.pvu == 1.5]  # 6
-    for tp in tps:  # 67
+    for tp in tps:  # 7
         try:
             rel_tp = dcts.get_coord(rel_to_tp=True, model=tp.model, tp_def=tp.tp_def,
                                     pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)

@@ -28,7 +28,7 @@ from toolpac.conv.times import datetime_to_fractionalyear
 
 from tools import get_lin_fit
 from tropFilter import pre_flag, chemical, dynamical, thermal
-from dictionaries import get_fct_substance, get_col_name, substance_list
+from dictionaries import get_fct_substance, get_col_name
 
 #!!! TO-DO:
     # implement different trop / strat filter to be used to extract trop data only
