@@ -28,6 +28,7 @@ from metpy import calc
 from metpy.units import units
 import dill
 import copy
+import keyring
 
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
@@ -35,6 +36,11 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
+
+# from toolpac.readwrite import sql_data_import #TODO add ghost data 
+from toolpac.readwrite.sql_data_import import client_data_choice
+
+#TODO make it possible to add multiple GlobalData objects (!)
 
 import dictionaries as dcts
 import tools
@@ -980,7 +986,7 @@ class Caribic(GlobalData):
         print(f'Reading Caribic - {pfx} - {yr}')
         # Collect data from individual flights for current year
         df_yr = pd.DataFrame()
-        for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir)[1:]:
+        for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir): #[1:]:
             flight_nr = int(str(current_dir)[-12:-9])
 
             f = find.find_file(f'{pfx}_*', current_dir)
@@ -1005,9 +1011,6 @@ class Caribic(GlobalData):
         # Convert longitude and latitude into geometry objects
         geodata = [Point(lon, lat) for lon, lat in zip(
             df_yr['lon'], df_yr['lat'])]
-        # geodata = [Point(lat, lon) for lon, lat in zip(
-        #     df_yr['lon'],
-        #     df_yr['lat'])]
         gdf_yr = geopandas.GeoDataFrame(df_yr, geometry=geodata)
 
         # Drop cols which are saved within datetime, geometry
@@ -1583,6 +1586,135 @@ class Mozart(GlobalData):
     @property
     def SF6(self) -> xr.Dataset:
         return self.data['SF6']
+
+def do_campaign(ghost_campaign):
+    # Database access
+    user = {"host": "141.2.225.99", "user": "Datenuser", "pwd": "AG-Engel1!"}
+    
+    instruments = dcts.instruments_per_campaign(ghost_campaign)
+    
+    special, flights, ghost_ms_substances, n2o_instr, n2o_substances = definitions(ghost_campaign)
+    time, fractional_year, meteo, ecd, ms, n2o, ozone = read(user, ghost_campaign, special, flights, ghost_ms_substances, n2o_instr, n2o_substances)
+
+    data = {}
+
+    for instr in [ecd, ms]:
+
+        # create one dataframe for ECD and one for MS
+        Ghost=pd.concat([time, fractional_year, meteo[['P', 'LAT', 'LON', 'TH', 'STRAT_O3']], instr, n2o, ozone], axis=1)
+        # simpler than resampling:
+        Ghost=Ghost.dropna(subset=["P"])
+
+        if instr.name=='MS':
+            # some magic to have only one measurement of GhOST with mean value of UMAQS data
+            # resampling for GhOST MS data from Markus
+            time_cols=['DATETIME', 'year_frac']
+            Ghost = SF6_GhOST_resample.ghost_resample_mod(Ghost, ghost_ms_substances, time_cols)
+            Ghost = Ghost.dropna(subset=["P"])  # should not be necessary
+        elif instr.name=='ECD':
+            Ghost = Ghost.dropna(subset=["SF6"])
+
+        # have two datasets: ST_ECD and ST_MS
+        # save
+        return Ghost
+        # Ghost.to_csv(f'{ghost_campaign}_{instr.name}.csv', index=False, na_rep='NaN', sep=';')
+    return data
+
+class HALOCampaign(GlobalData): 
+    """ Stores data for a single HALO campaign.
+
+    Class attributes:
+        years: arr
+        source: str
+        ID: str - campaign (STH, ATOM, PGS, TACTS, WISE)
+        campaign: str
+        df: Pandas GeoDataFrame
+    """
+
+    def __init__(self, campaign, grid_size=5, v_limits=None):
+        """ Initialise HALO_campaign object. 
+        
+        column names of dataframe are [original_name]_[instrument], no harmonisation at this point
+        """
+        years = dcts.years_per_campaign(campaign)
+        super().__init__(years, grid_size)
+
+        self.years = years
+        self.source = 'HALO' if campaign in ['SHTR', 'WISE', 'PGS', 'TACTS'] else campaign
+        self.ID = campaign
+        self.instruments = dcts.instruments_per_campaign(campaign)
+        self.variables = {instr : dcts.variables_per_instrument(instr) for instr in self.instruments} # if measured on the specific campaign
+
+        self.data = {}
+        self.get_data()
+
+    def get_data(self): 
+        """ Import campaign data per instrument from SQL Database. 
+        
+        campaign dictionary: 
+            ST all - SOUTHTRAC
+            PGS all - PGS
+            WISE all - WISE
+            TACTS / CARIBIC
+        
+        """
+        for instr in self.instruments: 
+            print(instr)
+            for var in self.variables[instr]: 
+                print('  '+var)
+
+        user = keyring.get_password('IAU_SQL', 'username_key')
+        log_in = {"host": '141.2.225.99', "user": user, 
+                  "pwd": keyring.get_password('IAU_SQL', user)}
+
+
+    def read(campaign, log_in):
+        defs = dcts.campaign_definitions(campaign)
+        
+        meteo_data = client_data_choice(
+              log_in,
+              campaign = campaign,
+              special = defs.get('special'),  # all flights
+              meteo = True,
+              flights = defs.get('flights'))
+        
+        time_data = client_data_choice(
+                log_in,
+                campaign=campaign,
+                special = defs.get('special'),   # all flights
+                time=True,
+                flights = defs.get('flights'))
+        
+        ghost_ms_data = client_data_choice(log_in = log_in,
+                                            instrument="GHOST_MS", 
+                                            campaign = campaign, 
+                                            special = defs.get('special'),
+                                            substances = defs.get('ghost_ms_substances'),
+                                            flights = None,
+                                            **defs)
+        
+        ghost_ecd_data = client_data_choice(log_in = log_in, 
+                                            instrument="GHOST_ECD",
+                                            special = defs.get('special'),
+                                            substances = ['SF6', 'CFC12'],
+                                            flights = None,
+                                            **defs)
+    
+
+
+class HALO(GlobalData): 
+    """ Stores combined data from all HALO campaigns specified. 
+    
+    Class attributes: 
+        years: arr
+        source: str
+        substance: str
+        instruments: tuple
+        campaigns: tuple
+    """
+    def __init__(self): 
+        """ Initialise combined aircraft campaigns object. """
+        
 
 # %% Local data
 class LocalData():
