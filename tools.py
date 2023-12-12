@@ -81,7 +81,6 @@ def ds_to_gdf(ds) -> pd.DataFrame:
 
     return gdf
 
-
 def rename_columns(columns) -> (dict, dict):
     """ Create dictionary relating column name with AMES_variable object
 
@@ -105,7 +104,6 @@ def rename_columns(columns) -> (dict, dict):
             col_dict.update({col_name: coord})
 
     return col_dict, rename_dict
-
 
 def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Choose which variables to keep when importing EMAC data .
