@@ -25,7 +25,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cmasher as cmr
-
+import pickle
 
 # %% Coordinates
 class Coordinate:
@@ -368,6 +368,150 @@ def get_subs(*args, **kwargs):
         raise Warning(f'Multiple columns fulfill the conditions: {substances}')
     return substances[0]
 
+#%% Aircraft campaigns
+
+def harmonise_instruments(old_name):
+    """ Harmonise campaign-speficic instrument names. """
+    new_names = {
+        'CLAMS_MET' : 'CLAMS', 
+        'TRAJ_2PV' : 'CLAMS', 
+        'TRAJ_WMO' : 'CLAMS',
+        'TRIHOP_N2O' : 'TRIHOP', 
+        'TRIHOP_CO' : 'TRIHOP', 
+        'TRIHOP_CO2' : 'TRIHOP', 
+        'TRIHOP_CH4' : 'TRIHOP', 
+        'HAGARV_LI' : 'HAGAR',
+         }
+    if old_name in new_names: 
+        return new_names[old_name]
+    return old_name
+
+def instrument_df():
+    """ Get dataframe containing all info about all substance variables """
+    with open('instruments.csv', 'rb') as f:
+        instruments = pd.read_csv(f)
+    return instruments
+
+
+def variables_per_instrument(instr: str = None) -> list: 
+    """ Returns all possible measured / modelled substances per given instrument - harmonised. """
+    variable_dict = {
+        'GCECD' : ['N2O', 'N2Oe', 'SF6', 'SF6e', 'CH4', 'CH4e'],
+        'MMS' : ['P', 'T', 'G_LAT', 'G_LON', 'G_ALT', 'POT'],
+        'UCATS-O3' : ['O3'],
+        'CLAMS_MET' : ['EQLAT', 'PV', 'P', 'P_WMO', 'TH', 'TH_WMO', 'TH_PV'],
+        'CLAMS' : ['EQLAT', 'P', 'P_TROP', 'TH', 'TH_TROP', 'D_2_0PVU_BOT'],
+        'TRAJ_2PV' : ['P', 'LAT', 'DTH', 'DP'],
+        'TRAJ_WMO' : ['P', 'PV', 'LAT', 'DTH', 'DP'],
+        'BAHAMAS' : ['ALT', 'LAT', 'LON', 'POT'],
+        'FAIRO' : ['O3'],
+        'GHOST_ECD' : ['SF6'],
+        'TRIHOP' : ['N2O', 'CH4', 'CO2'],
+        'TRIHOP_N2O' : ['N2O'],
+        'TRIHOP_CO2' : ['CO2'],
+        'TRIHOP_CH4' : ['CH4'],
+        'HAGAR' : ['CO2'], 
+        'HAGARV_LI' : ['CO2', 'CO2_err'],
+        'HAGARV_ECD' : ['CH4'],
+        'HAI14' : ['P'], 
+        'HAI26' : ['P'], 
+        'UMAQS' : ['N2O', 'CO2', 'CH4'],
+        'GLORIA' : ['lapse_rate', 'altitude'],
+        }
+
+    if instr not in variable_dict: 
+        raise KeyError(f'Could not retrieve list of variables for {instr}.')
+    return variable_dict[instr]
+
+
+class Instrument: 
+    """ Defines an instrument that may have flown on an aircraft campaign. """
+    
+    def __init__(self, original_name, **kwargs): 
+        """ Initialise instrument class instance. """
+        self.original_name = original_name
+        self.name = harmonise_instruments(original_name)
+
+        instr_info = instrument_df().loc[instrument_df()['original_name'] == original_name]
+
+        self.campaigns = [c for c in instr_info if True]
+        self.variables = variables_per_instrument(original_name)
+
+        self.__dict__.update(kwargs)
+
+    def __repr__(self):
+        return f'Instrument : {self.original_name} - {self.variables}'
+
+
+#%%% SQL Database / HALO stuff
+def campaign_definitions(campaign: str) -> dict:
+    """  Returns parameters needed for client_data_choice per campaign.
+
+    Parameters: 
+        ghost_campaign (str): Name of the campaign, e.g. SOUTHTRAC
+    """
+    
+    campaign_dicts = {
+        "SOUTHTRAC" : dict(
+            special = "ST all",
+            ghost_ms_substances = ['HFC125', 'HFC134a', 'H1211', 'HCFC22'],
+            n2o_instr = "UMAQS",
+            n2o_substances = ["N2O", "CO", "CH4", "CO2"],
+            flights=None),
+
+        "TACTS" : dict(
+            ghost_ms_substances = ['H1211'],
+            flights = ["T1", "T2", "T3", "T4", "T5", "T6"],
+            special = None,
+            n2o_instr = ["TRIHOP_N2O", "TRIHOP_CO", "TRIHOP_CO2"],
+            n2o_substances = [["N2O"], ["CO"], ["CO2"]]),
+        
+        "WISE" : dict(
+            special = "WISE all",
+            ghost_ms_substances = ['H1211'],
+            n2o_instr = "UMAQS",
+            n2o_substances = ["N2O", "CO"],
+            flights=None),
+
+        "PGS" : dict(
+            special = "PGS all",
+            ghost_ms_substances = ['H1211'],
+            flights=None,
+            n2o_instr = "TRIHOP",
+            n2o_substances = ["N2O", "CO", "CH4"]),
+        }
+
+    if campaign not in campaign_dicts: 
+        raise KeyError(f'{campaign} is not a valid GHoST campaign for SQL database access.')
+    
+    return campaign_dicts[campaign]
+
+def years_per_campaign(campaign: str) -> tuple: 
+    """ Return years of specified campaign as tuple. """
+    year_dict = {
+        'HIPPO' : (2009, 2010, 2011),
+        'TACTS' : (2012),
+        'PGS' : (2015, 2016),
+        'WISE' : (2017),
+        'SHTR' : (2019),
+        'ATOM' : (2016, 2017, 2018), 
+        }
+    if campaign not in year_dict: 
+        raise NotImplementedError(f'Campaign {campaign} does not have a year list.')
+    return year_dict[campaign]
+
+def instruments_per_campaign(campaign: str) -> tuple: 
+    """ Returns tuple of relevant instruments for a given campaign. """
+    instr_dict = {
+        'TACTS' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'TRIHOP_CO', 'TRIHOP_N2O', 'TRIHOP_CO2', 'TRIHOP_CH4', 'TRAJ_2PV', 'TRAJ_WMO'),
+        'PGS' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'TRIHOP', 'HAGAR', 'HAI14', 'HAI16', 'CLAMS'),
+        'WISE' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'UMAQS', 'HAGARV_LI', 'HAI14', 'HAI16', 'CLAMS_MET', 'HAGARV_ECD'),
+        'SHTR' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'UMAQS', 'HAGARV_LI', 'CLAMS_MET', 'GLORIA'),
+        'ATOM' : ('GCECD', 'MMS', 'UCATS-O3', 'CLAMS_MET'),
+        }
+    if campaign not in instr_dict: 
+        raise NotImplementedError(f'Campaign {campaign} does not have an instrument list.')
+    return instr_dict[campaign]
 
 # %% Misc
 def dict_season():
@@ -376,8 +520,8 @@ def dict_season():
             'name_2': 'Summer (JJA)', 'color_2': '#AA3377',  # yellow
             'name_3': 'Autumn (SON)', 'color_3': '#CCBB44',  # red
             'name_4': 'Winter (DJF)', 'color_4': '#4477AA'}  # green
-    # 'color_1': 'blue', 'color_2': 'orange',
-    # 'color_3': 'green', 'color_4': 'red'}
+            # 'color_1': 'blue', 'color_2': 'orange',
+            # 'color_3': 'green', 'color_4': 'red'}
 
 
 def dict_colors():
