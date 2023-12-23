@@ -25,7 +25,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cmasher as cmr
-import pickle
 
 # %% Coordinates
 class Coordinate:

@@ -1612,41 +1612,10 @@ class Mozart(GlobalData):
     def SF6(self) -> xr.Dataset:
         return self.data['SF6']
 
-# =============================================================================
-# def do_campaign(ghost_campaign):
-#     # Database access
-#     user = {"host": "141.2.225.99", "user": "Datenuser", "pwd": "AG-Engel1!"}
-#     
-#     instruments = dcts.instruments_per_campaign(ghost_campaign)
-#     
-#     special, flights, ghost_ms_substances, n2o_instr, n2o_substances = np.nan # definitions(ghost_campaign)
-#     time, fractional_year, meteo, ecd, ms, n2o, ozone = np.nan # read(user, ghost_campaign, special, flights, ghost_ms_substances, n2o_instr, n2o_substances)
-# 
-#     data = {}
-# 
-#     for instr in [ecd, ms]:
-# 
-#         # create one dataframe for ECD and one for MS
-#         Ghost=pd.concat([time, fractional_year, meteo[['P', 'LAT', 'LON', 'TH', 'STRAT_O3']], instr, n2o, ozone], axis=1)
-#         # simpler than resampling:
-#         Ghost=Ghost.dropna(subset=["P"])
-# 
-#         if instr.name=='MS':
-#             # some magic to have only one measurement of GhOST with mean value of UMAQS data
-#             # resampling for GhOST MS data from Markus
-#             time_cols=['DATETIME', 'year_frac']
-#             Ghost = SF6_GhOST_resample.ghost_resample_mod(Ghost, ghost_ms_substances, time_cols)
-#             Ghost = Ghost.dropna(subset=["P"])  # should not be necessary
-#         elif instr.name=='ECD':
-#             Ghost = Ghost.dropna(subset=["SF6"])
-# 
-#         # have two datasets: ST_ECD and ST_MS
-#         # save
-#         return Ghost
-#         # Ghost.to_csv(f'{ghost_campaign}_{instr.name}.csv', index=False, na_rep='NaN', sep=';')
-#     return data
-# =============================================================================
+#TODO ATOM flight & latitude selection
+#TODO proper col names for variables I'm unsure about (eg DTH_PV from ATOM.CLAMS_MET)
 
+# HALO and ATOM campaigns from SQL Database
 class CampaignData(GlobalData): 
     """ Stores data for a single HALO campaign.
 
@@ -1671,9 +1640,6 @@ class CampaignData(GlobalData):
         # {instr : dcts.variables_per_instrument(instr) for instr in self.instruments} # if measured on the specific campaign
 
         self.data = {}
-        # campaign : dataframe
-        # campaign_dict : {i:Instrument, s:Substances}
-        
         self.get_data(**kwargs)
 
         if 'flight_id' in self.df: 
@@ -1698,6 +1664,8 @@ class CampaignData(GlobalData):
             'SHTR' : 'ST all', 
             'WISE' : 'WISE all', 
             'PGS' : 'PGS all',
+            'ATOM' : None,
+            'TACTS' : None,
             }
         return special_dct.get(self.ID)
 
@@ -1829,22 +1797,6 @@ class CampaignData(GlobalData):
         if 'df' in self.data:
             return self.data['df']
         return self.create_df()
-
-class HALO(GlobalData): 
-    """ Stores combined data from all HALO campaigns specified. 
-    
-    Class attributes: 
-        years: arr
-        source: str
-        substance: str
-        instruments: tuple
-        campaigns: tuple
-    """
-    def __init__(self): 
-        """ Initialise combined aircraft campaigns object. """
-        self.data = {}
-        # self.data['campaign_name'] = 'pd.DataFrame'
-        self.meta_data = None # ? 
 
 # %% Local data
 class LocalData():
