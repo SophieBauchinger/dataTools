@@ -370,31 +370,39 @@ def get_subs(*args, **kwargs):
 
 #%% Aircraft campaigns
 
-def harmonise_instruments(old_name):
-    """ Harmonise campaign-speficic instrument names. """
-    new_names = {
-        'CLAMS_MET' : 'CLAMS', 
-        'TRAJ_2PV' : 'CLAMS', 
-        'TRAJ_WMO' : 'CLAMS',
-        'TRIHOP_N2O' : 'TRIHOP', 
-        'TRIHOP_CO' : 'TRIHOP', 
-        'TRIHOP_CO2' : 'TRIHOP', 
-        'TRIHOP_CH4' : 'TRIHOP', 
-        'HAGARV_LI' : 'HAGAR',
-         }
-    if old_name in new_names: 
-        return new_names[old_name]
-    return old_name
-
-def instrument_df():
+def instrument_df() -> pd.DataFrame:
     """ Get dataframe containing all info about all substance variables """
     with open('instruments.csv', 'rb') as f:
         instruments = pd.read_csv(f)
     return instruments
 
+def instr_vars_per_ID_df() -> pd.DataFrame: 
+    """ Import information on variables available per instrument per campaign. """
+    # variable names as stored on databank
+    with open('instr_vars_per_ID.csv', 'rb') as f: 
+        instr_vars_per_ID_df = pd.read_csv(f)
+    return instr_vars_per_ID_df
+
+def get_instruments(ID: str) -> set:
+    """ Return all instruments and variables for a given ID / campaign. """
+    df = instr_vars_per_ID_df()
+    if ID not in df.columns: 
+        raise KeyError(f'Could not retrieve instruments / variable info for {ID}.')
+    instruments = set(df[df[ID] == True]['instrument'])
+    return instruments
+
+def get_variables(ID: str, instr: str) -> set: 
+    """ Return all instruments and variables for a given ID / campaign. Harmonised. """
+    df = instr_vars_per_ID_df()
+    if instr not in get_instruments(ID):
+        raise KeyError(f'Could not retrieve variables for {instr} in {ID}.')
+    df = df[df[ID]] # choose only rows where ID value is True
+    df = df[df['instrument'] == instr] # choose only rows of given instrument
+    variables = set(df['variable'])
+    return variables
 
 def variables_per_instrument(instr: str = None) -> list: 
-    """ Returns all possible measured / modelled substances per given instrument - harmonised. """
+    """ Returns all possible measured / modelled substances for original instrument name. """
     variable_dict = {
         'GCECD' : ['N2O', 'N2Oe', 'SF6', 'SF6e', 'CH4', 'CH4e'],
         'MMS' : ['P', 'T', 'G_LAT', 'G_LON', 'G_ALT', 'POT'],
@@ -423,6 +431,46 @@ def variables_per_instrument(instr: str = None) -> list:
         raise KeyError(f'Could not retrieve list of variables for {instr}.')
     return variable_dict[instr]
 
+def harmonise_instruments(old_name):
+    """ Harmonise campaign-speficic instrument names. """
+    new_names = {
+        'CLAMS_MET' : 'CLAMS', 
+        'TRAJ_2PV' : 'CLAMS', 
+        'TRAJ_WMO' : 'CLAMS',
+        'TRIHOP_N2O' : 'TRIHOP', 
+        'TRIHOP_CO' : 'TRIHOP', 
+        'TRIHOP_CO2' : 'TRIHOP', 
+        'TRIHOP_CH4' : 'TRIHOP', 
+        'HAGARV_LI' : 'HAGAR',
+        'GHOST_ECD' : 'GHOST', 
+        'UCATS-O3' : 'UCATS',
+         }
+    if old_name in new_names: 
+        return new_names[old_name]
+    return old_name
+
+def harmonise_variables(instr, var_name): 
+    """ Harmonise campaign-specific variable names. """
+    df = instr_vars_per_ID_df()
+    df = df[df['instrument'] == instr]
+    
+    if len(df) == 0: 
+        raise KeyError(f'Instrument list does not contain {instr}.')
+    df = df[df['variable'] == var_name]
+
+    col_names = set(df['col_name'].values)
+
+    if len(col_names) == 1: 
+        new_name = col_names.pop()
+
+    elif len(col_names) == 0: 
+        if not var_name=='flight_id': 
+            print(f'Could not find an entry for {instr}, {var_name}.')
+        new_name = var_name
+    elif len(col_names) > 1:
+        raise Exception(f'Found multiple instrument + variable combinations: {instr}, {var_name} -> {col_names}')
+
+    return new_name
 
 class Instrument: 
     """ Defines an instrument that may have flown on an aircraft campaign. """
@@ -434,7 +482,7 @@ class Instrument:
 
         instr_info = instrument_df().loc[instrument_df()['original_name'] == original_name]
 
-        self.campaigns = [c for c in instr_info if True]
+        self.campaigns = [c for c in instr_info if instr_info[c].values == True]
         self.variables = variables_per_instrument(original_name)
 
         self.__dict__.update(kwargs)

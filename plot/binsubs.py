@@ -1535,11 +1535,10 @@ class BinPlotter3D(BinPlotter):
         cmap = dcts.dict_colors()[bin_attr]
         world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
         
-        # if tp.rel_to_tp:
-        #     title = f'Horizontal cross section relative in {} to {tp.label(filter_label=True)} Tropopause'
-        # else: 
-        #     title = f' in {tp.label()}'
-        title = ''
+        if tp.rel_to_tp:
+            title = f'Cross section binned relative to {tp.label(filter_label=True)} Tropopause'
+        else: 
+            title = '' # f' in {tp.label()}'
 
         for iz in range(binned_data.nz):
             data2d = data3d[:,:,iz]

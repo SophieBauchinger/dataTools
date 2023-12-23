@@ -53,50 +53,48 @@ def do_campaign(ghost_campaign):
         # Ghost.to_csv(f'{ghost_campaign}_{instr.name}.csv', index=False, na_rep='NaN', sep=';')
     return data
 
-# =============================================================================
-# #%%
-# def campaign_definitions(campaign):
-#     """  Returns parameters needed for client_data_choice per campaign.
-# 
-#     Parameters: 
-#         ghost_campaign (str): Name of the campaign, e.g. SOUTHTRAC
-#     """
-#     
-#     campaign_dicts = {
-#         "SOUTHTRAC" : dict(
-#             special = "ST all",
-#             ghost_ms_substances = ['HFC125', 'HFC134a', 'H1211', 'HCFC22'],
-#             n2o_instr = "UMAQS",
-#             n2o_substances = ["N2O", "CO", "CH4", "CO2"],
-#             flights=None),
-# 
-#         "TACTS" : dict(
-#             ghost_ms_substances = ['H1211'],
-#             flights = ["T1", "T2", "T3", "T4", "T5", "T6"],
-#             special = None,
-#             n2o_instr = ["TRIHOP_N2O", "TRIHOP_CO", "TRIHOP_CO2"],
-#             n2o_substances = [["N2O"], ["CO"], ["CO2"]]),
-#         
-#         "WISE" : dict(
-#             special = "WISE all",
-#             ghost_ms_substances = ['H1211'],
-#             n2o_instr = "UMAQS",
-#             n2o_substances = ["N2O", "CO"],
-#             flights=None),
-# 
-#         "PGS" : dict(
-#             special = "PGS all",
-#             ghost_ms_substances = ['H1211'],
-#             flights=None,
-#             n2o_instr = "TRIHOP",
-#             n2o_substances = ["N2O", "CO", "CH4"]),
-#         }
-# 
-#     if campaign not in campaign_dicts: 
-#         raise KeyError(f'{campaign} is not a valid GHoST campaign for SQL database access.')
-#     
-#     return campaign_dicts[campaign]
-# =============================================================================
+#%%
+def campaign_definitions(campaign):
+    """  Returns parameters needed for client_data_choice per campaign.
+
+    Parameters: 
+        ghost_campaign (str): Name of the campaign, e.g. SOUTHTRAC
+    """
+    
+    campaign_dicts = {
+        "SOUTHTRAC" : dict(
+            special = "ST all",
+            ghost_ms_substances = ['HFC125', 'HFC134a', 'H1211', 'HCFC22'],
+            n2o_instr = "UMAQS",
+            n2o_substances = ["N2O", "CO", "CH4", "CO2"],
+            flights=None),
+
+        "TACTS" : dict(
+            ghost_ms_substances = ['H1211'],
+            flights = ["T1", "T2", "T3", "T4", "T5", "T6"],
+            special = None,
+            n2o_instr = ["TRIHOP_N2O", "TRIHOP_CO", "TRIHOP_CO2"],
+            n2o_substances = [["N2O"], ["CO"], ["CO2"]]),
+        
+        "WISE" : dict(
+            special = "WISE all",
+            ghost_ms_substances = ['H1211'],
+            n2o_instr = "UMAQS",
+            n2o_substances = ["N2O", "CO"],
+            flights=None),
+
+        "PGS" : dict(
+            special = "PGS all",
+            ghost_ms_substances = ['H1211'],
+            flights=None,
+            n2o_instr = "TRIHOP",
+            n2o_substances = ["N2O", "CO", "CH4"]),
+        }
+
+    if campaign not in campaign_dicts: 
+        raise KeyError(f'{campaign} is not a valid GHoST campaign for SQL database access.')
+    
+    return campaign_dicts[campaign]
 
 #%% 
 
