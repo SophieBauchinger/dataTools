@@ -163,6 +163,11 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     return ds[variables]
 
 
+def process_caribic(ds): 
+    # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
+    variables = [v for v in ds.variables if ds[v].dims == ('time',)]
+    return ds[variables]
+
 # %% Data selection
 def minimise_tps(tps) -> list:
     """ Returns a reduced list of tropopause coordinates.

@@ -11,24 +11,26 @@ from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 
 #%% Test changes to FFI1001ReadHeader, FFI1001DataReader
-fnames = [
-    r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/b47_cryosampler_GCMS_ECD_PIC_w_cat.csv',
-    r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/ACinst_GUF003_202108122119_RA.ict',
-    r'E:\CARIBIC\Caribic2data\Flight148_20060428\GHG_20060428_148_MNL_CAN_V11.txt',
-    ]
-
-cryo = FFI1001DataReader(fnames[0], sep_header=';', df=True, flatten_vnames=False)
-ac = FFI1001DataReader(fnames[1], sep_header=',', df=True)
-ac_flat = FFI1001DataReader(fnames[1], sep_header=',', df=True, flatten_vnames=False)
-c = FFI1001DataReader(fnames[2], sep_variables=';', df=True)
-
-print(cryo.df.shape, cryo.df.columns[:4])
-print(ac.df.shape, ac.df.columns[:4])
-print(ac_flat.df.shape, ac_flat.df.columns[:4])
-print(c.df.shape, c.df.columns[:4])
+# =============================================================================
+# fnames = [
+#     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/b47_cryosampler_GCMS_ECD_PIC_w_cat.csv',
+#     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/ACinst_GUF003_202108122119_RA.ict',
+#     r'E:\CARIBIC\Caribic2data\Flight148_20060428\GHG_20060428_148_MNL_CAN_V11.txt',
+#     ]
+# 
+# cryo = FFI1001DataReader(fnames[0], sep_header=';', df=True, flatten_vnames=False)
+# ac = FFI1001DataReader(fnames[1], sep_header=',', df=True)
+# ac_flat = FFI1001DataReader(fnames[1], sep_header=',', df=True, flatten_vnames=False)
+# c = FFI1001DataReader(fnames[2], sep_variables=';', df=True)
+# 
+# print(cryo.df.shape, cryo.df.columns[:4])
+# print(ac.df.shape, ac.df.columns[:4])
+# print(ac_flat.df.shape, ac_flat.df.columns[:4])
+# print(c.df.shape, c.df.columns[:4])
+# =============================================================================
 
 #%%
-from data import GlobalData
+from data import GlobalData, Caribic
 import pandas as pd
 import tools
 import dictionaries as dcts
@@ -36,8 +38,91 @@ import geopandas
 from shapely.geometry import Point
 import os
 import dill
+import xarray as xr
+"""
+Hi, sorry, mir sind doch noch Ungereimtheiten in den WSM Daten aufgefallen. 
+Und zwar stimmen die Werte für p und alt nicht mit denen aus den GHG / INT / INTtpc files 
+"""
+def process_caribic(ds): 
+    # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
+    variables = [v for v in ds.variables if ds[v].dims == ('time',)]
+    
+    ds['time'] = pd.to_datetime(ds['time'])
+    
+    return ds[variables]
 
-class CaribicTest(GlobalData): 
+class CaribicNetCDF(Caribic):
+    """ """
+    def __init__(self, years=range(2005, 2020), pfxs=('GHG', 'HCF', 'INT', 'INTtpc')):
+        
+        self.source = 'Caribic'
+        self.pfxs = pfxs
+
+        self.data = {}
+        self.get_data()
+        
+        self.get_df()
+        self.years = set(self.df.index.year)
+        
+    def get_df(self): 
+        """ Create dataframe from all pfxs"""
+        # df = pd.DataFrame()
+        # for pfx in [pfx for pfx in self.pfxs]:
+        #     df = df.combine_first(self.data[pfx].copy())
+            
+        # self.data['df'] = df
+        self.data['met_data'] = self.df
+        
+    def get_data(self, **kwargs):
+        """ """
+        if not ('ds' in locals()): 
+            with xr.open_mfdataset('misc_data/WSM_output_20240110/WSM*.nc', parallel=True, preprocess = process_caribic) as ds: 
+                ds = ds
+
+        self.data['ds'] = ds
+
+        if not ('df' in locals()): 
+            df = ds.to_dataframe()
+        
+        self.data['df'] = df
+        
+        geodata = [Point(lon, lat) for lon, lat in zip(
+            df['lon'], df['lat'])]
+        df = geopandas.GeoDataFrame(df, geometry=geodata)
+        df.drop(columns=['lon', 'lat'], inplace=True)
+
+        # self.data['df'] = df
+        
+        ghg_vars = ['p', 'alt', 'geometry'] + [c for c in df.columns if c.startswith('ghg_')]
+        ghg_df = df[ghg_vars]
+        ghg_df.rename(columns = {k:k[4:] for k in [c for c in df.columns if c.startswith('ghg_')]}, 
+                      inplace=True)
+        
+        self.data['GHG'] = ghg_df
+        
+        int_vars = ['p', 'alt', 'geometry'] + [c for c in df.columns if c.startswith('int_')]
+        int_df = df[int_vars]
+        int_df.rename(columns = {k:k[4:] for k in [c for c in df.columns if c.startswith('int_')]}, 
+                      inplace=True)
+        
+        self.data['INT'] = int_df
+        
+        hcf_vars = ['p', 'alt', 'geometry'] + [c for c in df.columns if c.startswith('hcf_')]
+        hcf_df = df[hcf_vars]
+        hcf_df.rename(columns = {k:k[4:] for k in [c for c in df.columns if c.startswith('hcf_')]}, 
+                      inplace=True)
+
+        self.data['HCF'] = hcf_df
+
+        if not ('tpc_df' in locals()): 
+            caribic = Caribic()
+            tpc_df = caribic.INTtpc
+            self.data['INTtpc'] = tpc_df
+            del caribic
+        else: 
+            self.data['INTpc'] = tpc_df
+
+class CaribicINTtpc(GlobalData): 
     """ """
     def __init__(self, years=range(2005, 2020), pfxs=('INTtpc')):
         super().__init__([yr for yr in years if yr > 2004], 5)
