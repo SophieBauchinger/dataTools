@@ -30,7 +30,6 @@ import dill
 import copy
 import keyring
 import traceback
-
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
@@ -50,6 +49,8 @@ import tools
 import warnings
 from pandas.errors import SettingWithCopyWarning
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
+
+#TODO CampaignData df is not a geodataframe!! 
 
 # %% Global data
 class GlobalData():
@@ -108,6 +109,23 @@ class GlobalData():
         self.status = {}  # use this dict to keep track of changes made to data
         self.source = self.ID = None
         self.data = {}
+
+    def pickle_data(self, fname:str, pdir=r'misc_data'):
+        """ Save data dictionary using dill. """
+        if len(fname.split('.')) < 2: 
+            fname = fname + '.pkl'
+        with open(pdir + '/' + fname, 'wb') as f:
+            dill.dump(self.data, f)
+            print(f'{self.ID} Data dictionary saved to {pdir}\{fname}')
+
+    def combine(self, glob_obj): 
+        """ Combine two GlobalData objects into one. Keep only main dataframes. """
+        out = type(self).__new__(self.__class__)  # new class instance
+
+        for attribute_key in self.__dict__:  # copy attributes
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+
+        out.data = self.data.copy()  # stops self.data being overwritten
 
     def binned_1d(self, subs, **kwargs) -> (list, list):
         """
@@ -534,7 +552,7 @@ class GlobalData():
 
         dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame)]
         if subs.col_name not in [c for k in dataframes for c in self.data[k].columns]:
-            print('Cannot find {subs.col_name} anywhere in the data.')
+            print(f'Cannot find {subs.col_name} anywhere in the data.')
 
         # find the dataframe that has the column in it
         if self.source == 'Caribic':
@@ -925,6 +943,9 @@ class GlobalData():
         out.status.update({'EE_filter': True})
         return out
 
+class CombinedData(GlobalData): 
+    """ Stores combination of multiple """ 
+
 # Caribic
 class Caribic(GlobalData):
     """ Stores all available information from Caribic datafiles and allows further analysis.
@@ -952,7 +973,7 @@ class Caribic(GlobalData):
             verbose (bool) : print additional debugging information
             recalculate (bool) : get data from pre-combined file or parent directory
         """
-        # no caribic data before 2005, takes too long to check so cheesing it
+        # no caribic phase-2 data before 2005
         super().__init__([yr for yr in years if yr > 2004], grid_size)
 
         self.source = 'Caribic'
@@ -965,13 +986,14 @@ class Caribic(GlobalData):
                 self.create_tp_coords()
             except Exception: 
                 traceback.print_exc()
-        for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-            if subs not in self.data:
-                try: 
-                    self.create_substance_df(subs)
-                except Exception: 
-                    traceback.print_exc()
-
+# =============================================================================
+#         for subs in ['sf6', 'n2o', 'co2', 'ch4']:
+#             if subs not in self.data:
+#                 try: 
+#                     self.create_substance_df(subs)
+#                 except Exception: 
+#                     traceback.print_exc()
+# =============================================================================
         if detrend_all: 
             try: 
                 self.detrend_all()
@@ -984,14 +1006,14 @@ class Caribic(GlobalData):
     years: {self.years}
     status: {self.status}"""
 
-    def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> pd.DataFrame:
+    def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> (pd.DataFrame, dict):
         """ Data import for a single year """
         if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
             # removes current year from class attribute if there's no data
             self.years = np.delete(self.years, np.where(self.years == yr))
             if verbose: print(f'No data found for {yr} in {self.source}. \
                               Removing {yr} from list of years')
-            return pd.DataFrame()
+            return pd.DataFrame(), dict()
 
         print(f'Reading Caribic - {pfx} - {yr}')
         # Collect data from individual flights for current year
@@ -1102,7 +1124,11 @@ class Caribic(GlobalData):
         for pfx in [pfx for pfx in self.pfxs if pfx != 'GHG']:
             df = df.combine_first(self.data[pfx].copy())
 
-        coords = ['Flight number'] + [c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)]
+        coords = ['Flight number', 'p', 'geometry'] + [
+            c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)
+            if c.col_name not in ['Flight number', 'p', 'geometry']]
+        # if 'GHG' not in self.pfxs: 
+        #     coords = coords + ['p', 'geometry']
         df.drop([col for col in df.columns if col not in coords],
                 axis=1, inplace=True)  # remove non-met / non-coord data
 
@@ -1787,7 +1813,7 @@ class CampaignData(GlobalData):
             geodata = [Point(lon, lat) for lon, lat in zip(
                 data[lon_cols[0]], data[lat_cols[0]])]
             gdf = geopandas.GeoDataFrame(data, geometry=geodata)
-
+            self.data['df'] = gdf
             return gdf
 
         return data

@@ -59,10 +59,10 @@ transform = ccrs.PlateCarree()
 def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwargs):
     """ Scatter plots of timeseries data incl. monthly averages of chosen substances. """
     data = glob_obj.df
-    df_mm = tools.monthly_mean(data)
+    df_mm = tools.time_mean(data, 'M')
     substances = [dcts.get_subs(col_name=c) for c in data.columns
                   if c in [s.col_name for s in dcts.get_substances(detr=detr, **subs_kwargs)]
-                  and not c.startswith('d_')]
+                  and not (c.startswith('d_') or '_d_' in c)]
 
     for subs in substances:
         col = subs.col_name
@@ -143,7 +143,7 @@ def scatter_lat_lon_binned(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs
     data = glob_obj.df
     substances = [dcts.get_subs(col_name=c) for c in data.columns
                   if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
-                  and not c.startswith('d_')]
+                  and not (c.startswith('d_') or '_d_' in c)]
 
     nplots = len(glob_obj.years)
     nrows = nplots if nplots <= 4 else math.ceil(nplots / 3)
@@ -219,7 +219,7 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
     data = glob_obj.df
     substances = [dcts.get_subs(col_name=c) for c in data.columns
                   if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
-                  and not c.startswith('d_')]
+                  and not (c.startswith('d_') or '_d_' in c)]
 
     for subs in (substances if not bin_attr=='vcount' else [dcts.get_subs(col_name='N2O')]): 
         fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
@@ -246,30 +246,31 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
 
         img_data = getattr(out, bin_attr)
         
-        if projection is not None: 
-            lat0 = 0
-            lon0 = 0
-            map = Basemap(projection=projection, lat_0=lat0,lon_0=lon0,resolution='l')
-            # # draw coastlines, country boundaries, fill continents.
-            # map.drawcoastlines(linewidth=0.25, zorder=10)
-            # map.drawcountries(linewidth=0.25, zorder=10)
+        #!!! projections not yet implemented
+        # if projection is not None: 
+        #     lat0 = 0
+        #     lon0 = 0
+        #     map = Basemap(projection=projection, lat_0=lat0,lon_0=lon0,resolution='l')
+        #     # # draw coastlines, country boundaries, fill continents.
+        #     # map.drawcoastlines(linewidth=0.25, zorder=10)
+        #     # map.drawcountries(linewidth=0.25, zorder=10)
 
-            xpt,ypt = map(out.xintm, out.yintm)
-            print(out.yintm, xpt)
+        #     xpt,ypt = map(out.xintm, out.yintm)
+        #     print(out.yintm, xpt)
 
-            # img = map.pcolormesh(ypt, xpt,
-            #     #bci.yintm, bci.xintm,
-            #                      img_data.T, 
-            #                      cmap=cmap, 
-            #                      norm=norm,
-            #                      # origin='lower',
-            #                     # extent=[out.ybmin-lat0, out.ybmax-lat0, out.xbmin-lon0, out.xbmax-lon0],
-            #                     zorder=30)
-        else: 
-            world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
-            img = ax.imshow(img_data, cmap=cmap, norm=norm, origin='lower',
-                            extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
+        #     # img = map.pcolormesh(ypt, xpt,
+        #     #     #bci.yintm, bci.xintm,
+        #     #                      img_data.T, 
+        #     #                      cmap=cmap, 
+        #     #                      norm=norm,
+        #     #                      # origin='lower',
+        #     #                     # extent=[out.ybmin-lat0, out.ybmax-lat0, out.xbmin-lon0, out.xbmax-lon0],
+        #     #                     zorder=30)
+        # else: 
+        world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+        world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+        img = ax.imshow(img_data, cmap=cmap, norm=norm, origin='lower',
+                        extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
         
         if hide_lats:
             ax.hlines(30, -180, 180, color='k', lw=1, ls='dashed')
@@ -303,7 +304,7 @@ def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs)
     data = glob_obj.df
     substances = [dcts.get_subs(col_name=c) for c in data.columns
                   if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
-                  and not c.startswith('d_')]
+                  and not (c.startswith('d_') or '_d_' in c)]
 
     for subs in substances:  
         nplots = len(glob_obj.years)
