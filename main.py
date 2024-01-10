@@ -7,7 +7,7 @@ Main script for Caribic measurement analysis routine. Theoretically.
 """
 import matplotlib.pyplot as plt
 
-from data import Caribic, Mozart, EMAC, TropopauseData, MaunaLoa, MaceHead
+from data import Caribic, Mozart, EMAC, TropopauseData, MaunaLoa, MaceHead, CampaignData
 import dictionaries as dcts
 import tools
 
@@ -24,7 +24,12 @@ mhd = MaceHead() # only 2012 data available
 mzt = Mozart() # only available up to 2008
 caribic = Caribic()
 emac = EMAC()
-tpause = TropopauseData()
+# tpause = TropopauseData()
+shtr = CampaignData('SHTR')
+wise = CampaignData('WISE')
+pgs = CampaignData('PGS')
+tacts = CampaignData('TACTS')
+atom = CampaignData('ATOM')
 
 #%% Get main coordinates and substances
 tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
