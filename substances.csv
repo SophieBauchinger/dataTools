@@ -1,85 +1,85 @@
-﻿col_name,long_name,short_name,unit,ID,source,model,function,detr
-tracer_gp_CH4_at_fl,tracer GP CH4,ch4,mol mol-1,EMAC,EMAC,EMAC,h,FALSE
-tracer_gp_CO2_at_fl,tracer GP CO2,co2,mol mol-1,EMAC,EMAC,EMAC,h,FALSE
-detr_tracer_gp_CH4_at_fl,tracer GP CH4 - detrended wrt. Mauna Loa 2005,detr_ch4,mol mol-1,EMAC,EMAC,EMAC,h,TRUE
-detr_tracer_gp_CO2_at_fl,tracer GP CO2 - detrended wrt. Mauna Loa 2005,detr_co2,mol mol-1,EMAC,EMAC,EMAC,h,TRUE
-detr_tracer_gp_N2O_at_fl,tracer GP N2O - detrended wrt. Mauna Loa 2005,detr_n2o,mol mol-1,EMAC,EMAC,EMAC,s,TRUE
-detr_tracer_gp_SF6_at_fl,tracer GP SF6 - detrended wrt. Mauna Loa 2005,detr_sf6,mol mol-1,EMAC,EMAC,EMAC,q,TRUE
-tracer_gp_N2O_at_fl,tracer GP N2O,n2o,mol mol-1,EMAC,EMAC,EMAC,s,FALSE
-tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,,FALSE
-tracer_gp_SF6_at_fl,tracer GP SF6,sf6,mol mol-1,EMAC,EMAC,EMAC,q,FALSE
-CH4,CH4 mixing ratio,ch4,ppb,GHG,Caribic,MSMT,h,FALSE
-CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h,FALSE
-d_CH4,absolute precision of CH4,d_ch4,ppb,GHG,Caribic,MSMT,,FALSE
-d_CO2,absolute precision of CO2,d_co2,ppm,GHG,Caribic,MSMT,,FALSE
-d_N2O,absolute precision of N2O,d_n2o,ppb,GHG,Caribic,MSMT,,FALSE
-d_SF6,absolute precision of SF6,d_sf6,ppt,GHG,Caribic,MSMT,,FALSE
-detr_CH4,CH4 mixing ratio - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,GHG,Caribic,MSMT,h,TRUE
-detr_CO2,CO2 mixing ratio - detrended wrt. Mauna Loa 2005,detr_co2,ppm,GHG,Caribic,MSMT,h,TRUE
-detr_N2O,N2O mixing ratio - detrended wrt. Mauna Loa 2005,detr_n2o,ppb,GHG,Caribic,MSMT,s,TRUE
-detr_SF6,SF6 mixing ratio - detrended wrt. Mauna Loa 2005,detr_sf6,ppt,GHG,Caribic,MSMT,q,TRUE
-N2O,N2O mixing ratio,n2o,ppb,GHG,Caribic,MSMT,s,FALSE
-SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q,FALSE
-int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h,FALSE
-int_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INT,Caribic,MSMT,h,FALSE
-int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h,FALSE
-detr_int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,INT,Caribic,MSMT,h,TRUE
-detr_int_CO,CO integrated over flask sampling time from 1s resolution measurements - detrended wrt. Mauna Loa 2005,detr_co,ppb,INT,Caribic,MSMT,h,TRUE
-detr_int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_co2,ppm,INT,Caribic,MSMT,h,TRUE
-int_H2O_gas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INT,Caribic,MSMT,,FALSE
-int_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INT,Caribic,MSMT,,FALSE
-int_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INT,Caribic,MSMT,,FALSE
-int_O3,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INT,Caribic,MSMT,,FALSE
-int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INTtpc,Caribic,CLAMS,h,FALSE
-int_CARIBIC2_CH4,replacement for CH4,ch4,ppbV,INTtpc,Caribic,MSMT,h,FALSE
-int_CLaMS_CO,CO (CLaMS),co,ppb,INTtpc,Caribic,CLAMS,q,FALSE
-int_CARIBIC2_CO,Carbon monoxide mixing ratio,co,ppbv,INTtpc,Caribic,MSMT,q,FALSE
-int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INTtpc,Caribic,CLAMS,h,FALSE
-int_CARIBIC2_CO2,replacement for CO2,co2,ppmV,INTtpc,Caribic,MSMT,h,FALSE
-detr_int_CLaMS_CH4,CH4 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,INTtpc,Caribic,CLAMS,h,TRUE
-detr_int_CARIBIC2_CH4,replacement for CH4 - detrended wrt. Mauna Loa 2005,detr_ch4,ppbV,INTtpc,Caribic,MSMT,h,TRUE
-detr_int_CLaMS_CO,CO (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co,ppb,INTtpc,Caribic,CLAMS,q,TRUE
-detr_int_CARIBIC2_CO,Carbon monoxide mixing ratio - detrended wrt. Mauna Loa 2005,detr_co,ppbv,INTtpc,Caribic,MSMT,q,TRUE
-detr_int_CLaMS_CO2,CO2 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co2,ppm,INTtpc,Caribic,CLAMS,h,TRUE
-detr_int_CARIBIC2_CO2,replacement for CO2 - detrended wrt. Mauna Loa 2005,detr_co2,ppmV,INTtpc,Caribic,MSMT,h,TRUE
-detr_int_CLaMS_N2O,N2O (CLaMS) - detrended wrt. Mauna Loa 2005,detr_n2o,ppb,INTtpc,Caribic,CLAMS,s,TRUE
-int_CLaMS_F11,F11 (CLaMS),f11,ppt,INTtpc,Caribic,CLAMS,,FALSE
-int_CLaMS_F12,F12 (CLaMS),f12,ppt,INTtpc,Caribic,CLAMS,,FALSE
-int_CLaMS_H2O,H2O  (CLaMS),h2o,ppm,INTtpc,Caribic,CLAMS,,FALSE
-int_CARIBIC2_H2Ogas,gaseous H2O volume mixing ratio,h2o,ppmv,INTtpc,Caribic,MSMT,,FALSE
-int_CLaMS_N2O,N2O (CLaMS),n2o,ppb,INTtpc,Caribic,CLAMS,s,FALSE
-int_CARIBIC2_NO,NO volume mixing ratio,no,ppbv,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_NOy,NOy volume mixing ratio,noy,ppbv,INTtpc,Caribic,MSMT,,FALSE
-int_CLaMS_O3,O3 (CLaMS),o3,ppb,INTtpc,Caribic,CLAMS,,FALSE
-int_CARIBIC2_Ozone,replacement for Ozone,o3,ppbV,INTtpc,Caribic,MSMT,,FALSE
-SF6_MHD,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q,FALSE
-ch4_MLO,measured_mole_fraction_of_ch4_in_dry_air,ch4,ppb,MLO,Mauna_Loa,MSMT,h,FALSE
-co_MLO,CO CCGG (Individual Flasks),co,ppb,MLO,Mauna_Loa,MSMT,h,FALSE
-co2_MLO,measured_mole_fraction_of_co2_in_dry_air,co2,ppm,MLO,Mauna_Loa,MSMT,h,FALSE
-ch4_std_dev_MLO,standard_deviation_in_reported_ch4_value,d_ch4,ppb,MLO,Mauna_Loa,MSMT,,FALSE
-co2_std_dev_MLO,standard_deviation_in_reported_co2_value,d_co2,ppm,MLO,Mauna_Loa,MSMT,,FALSE
-N2OcatsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_n2o,ppb,MLO,Mauna_Loa,MSMT,,FALSE
-N2OcatsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_n2o,ppb,MLO,Mauna_Loa,MSMT,,FALSE
-SF6catsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_sf6,ppt,MLO,Mauna_Loa,MSMT,,FALSE
-SF6catsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_sf6,ppt,MLO,Mauna_Loa,MSMT,,FALSE
-N2OcatsMLOm,"Nitrous Oxide (N2O) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: NOAA 2006A",n2o,ppb,MLO,Mauna_Loa,MSMT,s,FALSE
-SF6catsMLOm,"Sulfur hexaflouride (SF6) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: WMO X2014",sf6,ppt,MLO,Mauna_Loa,MSMT,q,FALSE
-detr_SF6_MZT,Annual mean SF6 dry air mole fraction - detrended wrt. Mauna Loa 2005 ,detr_sf6,pmol mol-1,MZT,Mozart,MOZART,q,TRUE
-SF6_MZT,Annual mean SF6 dry air mole fraction,sf6,pmol mol-1,MZT,Mozart,MOZART,q,FALSE
-FAIRO_O3,"Ozone, volume mixing ratio (ppbv)",o3,ppbv,FAIRO ,HALO,MSMT,,FALSE
-GCECD_CH4,CH4 dry mole fraction mixing ratio (ppb),ch4,ppb,GCECD,ATOM,MSMT,h,FALSE
-GCECD_d_CH4,CH4 dry mole fraction mixing ratio error 1-s (ppb),d_ch4,ppb,GCECD,ATOM,MSMT,,FALSE
-GCECD_d_N2O,N2O dry mole fraction mixing ratio error 1-s (ppb),d_n2o,ppb,GCECD,ATOM,MSMT,,FALSE
-GCECD_d_SF6,SF6 dry mole fraction mixing ratio error 1-s (ppt),d_sf6,ppt,GCECD,ATOM,MSMT,,FALSE
-GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),n2o,ppb,GCECD,ATOM,MSMT,s,FALSE
-GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q,FALSE
-HAGAR_CO2,Carbon dioxide [ppm - inferred],co2,ppm,HAGAR,HALO,MSMT,h,FALSE
-HAGAR_d_CO2,Carbon dioxide error [ppm - inferred],d_co2,ppm,HAGAR,HALO,MSMT,,FALSE
-TRIHOP_CH4,Methane [ppb - inferred],ch4,ppb,TRIHOP,HALO,MSMT,h,FALSE
-TRIHOP_CO,Carbon monoxide,co,,TRIHOP,HALO,MSMT,h,FALSE
-TRIHOP_CO2,Carbon dioxide,co2,,TRIHOP,HALO,MSMT,h,FALSE
-TRIHOP_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,TRIHOP,HALO,MSMT,s,FALSE
-UMAQS_CH4,Methane [ppb - inferred],ch4,ppb,UMAQS,HALO,MSMT,h,FALSE
-UMAQS_CO2,Carbon dioxide [ppm - inferred],co2,ppm,UMAQS,HALO,MSMT,h,FALSE
-UMAQS_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,UMAQS,HALO,MSMT,s,FALSE
-GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt]",sf6,ppt,GHOST,HALO,MSMT,q,FALSE
+﻿col_name,long_name,short_name,unit,ID,source,model,function,detr,,,
+tracer_gp_CH4_at_fl,tracer GP CH4,ch4,mol mol-1,EMAC,EMAC,EMAC,h,FALSE,,,
+tracer_gp_CO2_at_fl,tracer GP CO2,co2,mol mol-1,EMAC,EMAC,EMAC,h,FALSE,,,
+detr_tracer_gp_CH4_at_fl,tracer GP CH4 - detrended wrt. Mauna Loa 2005,detr_ch4,mol mol-1,EMAC,EMAC,EMAC,h,TRUE,,,
+detr_tracer_gp_CO2_at_fl,tracer GP CO2 - detrended wrt. Mauna Loa 2005,detr_co2,mol mol-1,EMAC,EMAC,EMAC,h,TRUE,,,
+detr_tracer_gp_N2O_at_fl,tracer GP N2O - detrended wrt. Mauna Loa 2005,detr_n2o,mol mol-1,EMAC,EMAC,EMAC,s,TRUE,,,
+detr_tracer_gp_SF6_at_fl,tracer GP SF6 - detrended wrt. Mauna Loa 2005,detr_sf6,mol mol-1,EMAC,EMAC,EMAC,q,TRUE,,,
+tracer_gp_N2O_at_fl,tracer GP N2O,n2o,mol mol-1,EMAC,EMAC,EMAC,s,FALSE,,,
+tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,,FALSE,,,
+tracer_gp_SF6_at_fl,tracer GP SF6,sf6,mol mol-1,EMAC,EMAC,EMAC,q,FALSE,,,
+CH4,CH4 mixing ratio,ch4,ppb,GHG,Caribic,MSMT,h,FALSE,,,
+CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h,FALSE,,,
+d_CH4,absolute precision of CH4,d_ch4,ppb,GHG,Caribic,MSMT,,FALSE,,,
+d_CO2,absolute precision of CO2,d_co2,ppm,GHG,Caribic,MSMT,,FALSE,,,
+d_N2O,absolute precision of N2O,d_n2o,ppb,GHG,Caribic,MSMT,,FALSE,,,
+d_SF6,absolute precision of SF6,d_sf6,ppt,GHG,Caribic,MSMT,,FALSE,,,
+detr_CH4,CH4 mixing ratio - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,GHG,Caribic,MSMT,h,TRUE,,,
+detr_CO2,CO2 mixing ratio - detrended wrt. Mauna Loa 2005,detr_co2,ppm,GHG,Caribic,MSMT,h,TRUE,,,
+detr_N2O,N2O mixing ratio - detrended wrt. Mauna Loa 2005,detr_n2o,ppb,GHG,Caribic,MSMT,s,TRUE,,,
+detr_SF6,SF6 mixing ratio - detrended wrt. Mauna Loa 2005,detr_sf6,ppt,GHG,Caribic,MSMT,q,TRUE,,,
+N2O,N2O mixing ratio,n2o,ppb,GHG,Caribic,MSMT,s,FALSE,,,
+SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q,FALSE,,,
+int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h,FALSE,,,
+int_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INT,Caribic,MSMT,h,FALSE,,,
+int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h,FALSE,,,
+detr_int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,INT,Caribic,MSMT,h,TRUE,,,
+detr_int_CO,CO integrated over flask sampling time from 1s resolution measurements - detrended wrt. Mauna Loa 2005,detr_co,ppb,INT,Caribic,MSMT,h,TRUE,,,
+detr_int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_co2,ppm,INT,Caribic,MSMT,h,TRUE,,,
+int_H2O_gas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INT,Caribic,MSMT,,FALSE,,,
+int_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INT,Caribic,MSMT,,FALSE,,,
+int_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INT,Caribic,MSMT,,FALSE,,,
+int_O3,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INT,Caribic,MSMT,,FALSE,,,
+int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INTtpc,Caribic,CLAMS,h,FALSE,,,
+int_CARIBIC2_CH4,replacement for CH4,ch4,ppbV,INTtpc,Caribic,MSMT,h,FALSE,,,
+int_CLaMS_CO,CO (CLaMS),co,ppb,INTtpc,Caribic,CLAMS,q,FALSE,,,
+int_CARIBIC2_CO,Carbon monoxide mixing ratio,co,ppbv,INTtpc,Caribic,MSMT,q,FALSE,,,
+int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INTtpc,Caribic,CLAMS,h,FALSE,,,
+int_CARIBIC2_CO2,replacement for CO2,co2,ppmV,INTtpc,Caribic,MSMT,h,FALSE,,,
+detr_int_CLaMS_CH4,CH4 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,INTtpc,Caribic,CLAMS,h,TRUE,,,
+detr_int_CARIBIC2_CH4,replacement for CH4 - detrended wrt. Mauna Loa 2005,detr_ch4,ppbV,INTtpc,Caribic,MSMT,h,TRUE,,,
+detr_int_CLaMS_CO,CO (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co,ppb,INTtpc,Caribic,CLAMS,q,TRUE,,,
+detr_int_CARIBIC2_CO,Carbon monoxide mixing ratio - detrended wrt. Mauna Loa 2005,detr_co,ppbv,INTtpc,Caribic,MSMT,q,TRUE,,,
+detr_int_CLaMS_CO2,CO2 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co2,ppm,INTtpc,Caribic,CLAMS,h,TRUE,,,
+detr_int_CARIBIC2_CO2,replacement for CO2 - detrended wrt. Mauna Loa 2005,detr_co2,ppmV,INTtpc,Caribic,MSMT,h,TRUE,,,
+detr_int_CLaMS_N2O,N2O (CLaMS) - detrended wrt. Mauna Loa 2005,detr_n2o,ppb,INTtpc,Caribic,CLAMS,s,TRUE,,,
+int_CLaMS_F11,F11 (CLaMS),f11,ppt,INTtpc,Caribic,CLAMS,,FALSE,,,
+int_CLaMS_F12,F12 (CLaMS),f12,ppt,INTtpc,Caribic,CLAMS,,FALSE,,,
+int_CLaMS_H2O,H2O  (CLaMS),h2o,ppm,INTtpc,Caribic,CLAMS,,FALSE,,,
+int_CARIBIC2_H2Ogas,gaseous H2O volume mixing ratio,h2o,ppmv,INTtpc,Caribic,MSMT,,FALSE,,,
+int_CLaMS_N2O,N2O (CLaMS),n2o,ppb,INTtpc,Caribic,CLAMS,s,FALSE,,,
+int_CARIBIC2_NO,NO volume mixing ratio,no,ppbv,INTtpc,Caribic,MSMT,,FALSE,,,
+int_CARIBIC2_NOy,NOy volume mixing ratio,noy,ppbv,INTtpc,Caribic,MSMT,,FALSE,,,
+int_CLaMS_O3,O3 (CLaMS),o3,ppb,INTtpc,Caribic,CLAMS,,FALSE,,,
+int_CARIBIC2_Ozone,replacement for Ozone,o3,ppbV,INTtpc,Caribic,MSMT,,FALSE,,,
+SF6_MHD,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q,FALSE,,,
+ch4_MLO,measured_mole_fraction_of_ch4_in_dry_air,ch4,ppb,MLO,Mauna_Loa,MSMT,h,FALSE,,,
+co_MLO,CO CCGG (Individual Flasks),co,ppb,MLO,Mauna_Loa,MSMT,h,FALSE,,,
+co2_MLO,measured_mole_fraction_of_co2_in_dry_air,co2,ppm,MLO,Mauna_Loa,MSMT,h,FALSE,,,
+ch4_std_dev_MLO,standard_deviation_in_reported_ch4_value,d_ch4,ppb,MLO,Mauna_Loa,MSMT,,FALSE,,,
+co2_std_dev_MLO,standard_deviation_in_reported_co2_value,d_co2,ppm,MLO,Mauna_Loa,MSMT,,FALSE,,,
+N2OcatsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_n2o,ppb,MLO,Mauna_Loa,MSMT,,FALSE,,,
+N2OcatsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_n2o,ppb,MLO,Mauna_Loa,MSMT,,FALSE,,,
+SF6catsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_sf6,ppt,MLO,Mauna_Loa,MSMT,,FALSE,,,
+SF6catsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_sf6,ppt,MLO,Mauna_Loa,MSMT,,FALSE,,,
+N2OcatsMLOm,"Nitrous Oxide (N2O) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: NOAA 2006A",n2o,ppb,MLO,Mauna_Loa,MSMT,s,FALSE,,,
+SF6catsMLOm,"Sulfur hexaflouride (SF6) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: WMO X2014",sf6,ppt,MLO,Mauna_Loa,MSMT,q,FALSE,,,
+detr_SF6_MZT,Annual mean SF6 dry air mole fraction - detrended wrt. Mauna Loa 2005 ,detr_sf6,pmol mol-1,MZT,Mozart,MOZART,q,TRUE,,,
+SF6_MZT,Annual mean SF6 dry air mole fraction,sf6,pmol mol-1,MZT,Mozart,MOZART,q,FALSE,,,
+FAIRO_O3,"Ozone, volume mixing ratio (ppbv)",o3,ppbv,FAIRO ,HALO,MSMT,,FALSE,,,
+GCECD_CH4,CH4 dry mole fraction mixing ratio (ppb),ch4,ppb,GCECD,ATOM,MSMT,h,FALSE,,,
+GCECD_d_CH4,CH4 dry mole fraction mixing ratio error 1-s (ppb),d_ch4,ppb,GCECD,ATOM,MSMT,,FALSE,,,
+GCECD_d_N2O,N2O dry mole fraction mixing ratio error 1-s (ppb),d_n2o,ppb,GCECD,ATOM,MSMT,,FALSE,,,
+GCECD_d_SF6,SF6 dry mole fraction mixing ratio error 1-s (ppt),d_sf6,ppt,GCECD,ATOM,MSMT,,FALSE,,,
+GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),n2o,ppb,GCECD,ATOM,MSMT,s,FALSE,,,
+GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q,FALSE,,,
+HAGAR_CO2,Carbon dioxide [ppm - inferred],co2,ppm,HAGAR,HALO,MSMT,h,FALSE,,,
+HAGAR_d_CO2,Carbon dioxide error [ppm - inferred],d_co2,ppm,HAGAR,HALO,MSMT,,FALSE,,,
+TRIHOP_CH4,Methane [ppb - inferred],ch4,ppb,TRIHOP,HALO,MSMT,h,FALSE,,,
+TRIHOP_CO,Carbon monoxide,co,ppb,TRIHOP,HALO,MSMT,h,FALSE,,,
+TRIHOP_CO2,Carbon dioxide,co2,ppm,TRIHOP,HALO,MSMT,h,FALSE,,,
+TRIHOP_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,TRIHOP,HALO,MSMT,s,FALSE,,,
+UMAQS_CH4,Methane [ppb - inferred],ch4,ppb,UMAQS,HALO,MSMT,h,FALSE,,,
+UMAQS_CO2,Carbon dioxide [ppm - inferred],co2,ppm,UMAQS,HALO,MSMT,h,FALSE,,,
+UMAQS_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,UMAQS,HALO,MSMT,s,FALSE,,,
+GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt]",sf6,ppt,GHOST,HALO,MSMT,q,FALSE,,,
