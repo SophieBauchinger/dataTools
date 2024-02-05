@@ -16,10 +16,6 @@ BinPlotter1D:
 
 """
 
-
-
-
-
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -36,6 +32,7 @@ import toolpac.calc.dev_binprocessor as bp
 
 import dictionaries as dcts
 import tools
+from data import GlobalData
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
@@ -91,7 +88,7 @@ class BinPlotter():
         bin_1d_seasonal(subs, coord, bin_equi1d, xbsize)
         bin_2d_seasonal(subs, xcoord, ycoord, bin_equi2d, xbsize, ybsize)
     """
-    def __init__(self, glob_obj, **kwargs):
+    def __init__(self, glob_obj: GlobalData, **kwargs):
         """ Initialise class instances. 
         Paramters: 
             glob_obj (GlobalData)
@@ -129,7 +126,8 @@ based on {self.glob_obj.__repr__()}'
     def df(self) -> pd.DataFrame:
         return self.data['df']
 
-    def get_vlimit(self, subs, bin_attr) -> tuple: 
+    def get_vlimit(self, subs: dcts.Substance, 
+                   bin_attr: str) -> tuple: 
         """ Get colormap limits for given substance and bin attribute. """
         if 'vlims' in self.kwargs:
             vlims = self.kwargs.get('vlims')
@@ -145,7 +143,7 @@ based on {self.glob_obj.__repr__()}'
                 raise KeyError('Could not generate colormap limits.')
         return vlims
 
-    def get_coord_lims(self, coord, xyz=None) -> tuple: 
+    def get_coord_lims(self, coord, xyz: str = None) -> tuple: 
         """ Get coordinate limits for plotting. """
         if xyz=='x': 
             if 'xlims' in self.kwargs: 
@@ -163,7 +161,7 @@ based on {self.glob_obj.__repr__()}'
                      np.ceil(np.nanmax(self.df[coord.col_name])))
         return lims
 
-    def _get_bsize(self, coord, xyz=None) -> float: 
+    def _get_bsize(self, coord, xyz: str = None) -> float: 
         """ Get bin size for given coordinate. """
         if xyz=='x' and 'xbsize' in self.kwargs: 
             bsize = self.kwargs.get('xbsize')
@@ -183,7 +181,7 @@ based on {self.glob_obj.__repr__()}'
                     bsize=0.5
         return bsize
 
-    def filter_non_shared_indices(self, tps):
+    def filter_non_shared_indices(self, tps: list):
         """ Filter dataframe for datapoints that don't exist for all tps or are zero. """
         print('Filtering out non-shared indices. ')
         cols = [tp.col_name for tp in tps]
@@ -191,7 +189,7 @@ based on {self.glob_obj.__repr__()}'
         self.data['df'] = self.data['df'][self.data['df'] != 0].dropna(subset=cols)
         return self.data['df']
 
-    def bin_1d(self, subs, coord, bin_equi1d=None, xbsize=None): 
+    def bin_1d(self, subs, coord, bin_equi1d=None, xbsize: float = None): 
         """ Bin substance data onto bins of coord. """
         if not xbsize:
             xbsize = self._get_bsize(coord)
@@ -217,7 +215,9 @@ based on {self.glob_obj.__repr__()}'
 
         return out
 
-    def bin_2d(self, subs, xcoord, ycoord, bin_equi2d=None, xbsize=None, ybsize=None, df=None): 
+    def bin_2d(self, subs, xcoord, ycoord, bin_equi2d=None, 
+               xbsize: float = None, ybsize: float = None, 
+               df: pd.DataFrame = None): 
         """ Bin substance data onto x-y grid. """
         if not xbsize:
             xbsize = self._get_bsize(xcoord, 'x')
@@ -254,7 +254,8 @@ based on {self.glob_obj.__repr__()}'
         return out
 
     def bin_3d(self, subs, zcoord, bin_equi3d=None, 
-               xbsize=None, ybsize=None, zbsize=None, df=None): 
+               xbsize: float = None, ybsize: float = None, zbsize: float = None, 
+               df: pd.DataFrame = None): 
         """ Bin substance data onto longitude-latitude-z grid. """
         if not xbsize:
             xbsize = self.glob_obj.grid_size
@@ -315,7 +316,7 @@ based on {self.glob_obj.__repr__()}'
         
         return out
 
-    def bin_1d_seasonal(self, subs, coord, bin_equi1d=None, xbsize=None) -> dict:
+    def bin_1d_seasonal(self, subs, coord, bin_equi1d=None, xbsize: float = None) -> dict:
         """ Bin the data onto coord for each season. """
         out_dict = {}
         if not xbsize:
@@ -346,7 +347,7 @@ based on {self.glob_obj.__repr__()}'
 
     def bin_2d_seasonal(self, subs, xcoord, ycoord,
                      bin_equi2d = None,
-                     xbsize=None, ybsize=None) -> dict:
+                     xbsize: float = None, ybsize: float = None) -> dict:
         """ Bin the dataframe per season. """
         out_dict = {}
         if not xbsize:
@@ -421,21 +422,23 @@ class BinPlotter1D(BinPlotter):
     def __init__(self, glob_obj, **kwargs):
         super().__init__(glob_obj, **kwargs)
 
-    def flight_height_histogram(self, tp, alpha=0.7, ax=None, **kwargs): 
+    def flight_height_histogram(self, tp, alpha: float = 0.7, ax=None, **kwargs): 
         """ Make a histogram of the number of datapoints for each tp bin. """
         if ax is None: 
             fig, ax = plt.subplots(dpi=250, figsize=(6,4))
             ax.set_ylabel(tp.label())
-            
-        ax.set_title('Distribution of CARIBIC measurements relative to tropopause')
-        rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (self.glob_obj.df[tp.col_name].min(), 
-                                                                      self.glob_obj.df[tp.col_name].max())
-        hist = ax.hist(self.glob_obj.df[tp.col_name].values, 
-                       bins=30, range=rlims, alpha=alpha, 
-                       orientation='horizontal',
-                       **kwargs)
+        
+        data = self.glob_obj.df[tp.col_name].dropna()
+
+        ax.set_title(f'Distribution of {self.glob_obj.source} measurements')
+        rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (data.min(), 
+                                                                      data.max())
+        hist = ax.hist(data.values, 
+                        bins=30, range=rlims, alpha=alpha, 
+                        orientation='horizontal',
+                        **kwargs)
         ax.grid(ls='dotted')
-        if tp.rel_to_tp and ax is not None: 
+        if (tp.rel_to_tp is True) and ax is not None: 
             ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
         ax.set_xlabel('# Datapoints')
         
@@ -444,20 +447,23 @@ class BinPlotter1D(BinPlotter):
             ax.hlines(320.459, max(hist[0]), 0, color='k', ls='dashed', lw=0.5)
         return hist
 
-    def overlapping_histograms(self, tps): 
+    def overlapping_histograms(self, tps: list): 
         """ """
-        tps = [tp for tp in tps if tp.vcoord=='pt']
+        # tps = [tp for tp in tps if tp.vcoord=='pt']
         fig, ax = plt.subplots(dpi=250, figsize=(6,4))
         for tp in tps: 
             hist = self.flight_height_histogram(tp, alpha=0.6, ax=ax,
                                                 label=tp.label(True))
             
         ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
-        ax.set_ylabel('$\Delta\,\Theta$ relative to Tropopause')
+        if all((tp.rel_to_tp and tp.vcoord=='pt') for tp in tps): 
+            ax.set_ylabel('$\Delta\,\Theta$ relative to Tropopause')
         ax.legend(fontsize=7)
 
-    def plot_vertial_profile_variability_comparison(self, subs, tps, rel=True, 
-                                                    bin_attr='vstdv', seasons = [1,3],
+    def plot_vertial_profile_variability_comparison(self, subs, tps: list, 
+                                                    rel: bool = True, 
+                                                    bin_attr: str = 'vstdv', 
+                                                    seasons: list[int] = [1,3],
                                                     **kwargs): 
         """ Compare relative mixing ratio varibility between tropopause definitions. """
         fig, ax = plt.subplots(dpi=500, figsize=(4,5))
@@ -504,8 +510,10 @@ class BinPlotter1D(BinPlotter):
         ax.set_axisbelow(True)
         ax.set_ylim(-70, 70)
 
-    def plot_1d_seasonal_gradient(self, subs, coord, bin_attr='vmean', 
-                                  add_stdv=False, **kwargs):
+    def plot_1d_seasonal_gradient(self, subs, coord, 
+                                  bin_attr: str = 'vmean', 
+                                  add_stdv: bool = False, 
+                                  **kwargs):
         """ Plot gradient per season onto one plot. """
         big = kwargs.pop('big') if 'big' in kwargs else False
         bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
@@ -632,7 +640,7 @@ class BinPlotter1D(BinPlotter):
 
         fig.set_size_inches(8,5)
 
-    def plot_vertical_profile_mean_vstdv(self, subs, tps=None, **kwargs): 
+    def plot_vertical_profile_mean_vstdv(self, subs, tps: list = None, **kwargs): 
         """ Scatter plot of mean seasnoal variability for troopause definitions """
         if tps is None: 
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True))
@@ -720,7 +728,8 @@ class BinPlotter1D(BinPlotter):
             ax.set_xlabel(f'Mean variability of {subs.label(name_only=True)}')
             ax.legend(loc='lower right')
 
-    def make_bar_plot(self, subs, xcoord, tp, bin_attr, percent_deviation=False, **kwargs) -> tuple: 
+    def make_bar_plot(self, subs, xcoord, tp, bin_attr: str, 
+                      percent_deviation: bool = False, **kwargs) -> tuple: 
         """ Plot histograms showing differences between TPs. 
         bin over xcoord
         overall alpha plot for average value, split up into latitude bands ? 
@@ -1170,7 +1179,7 @@ class BinPlotter2D(BinPlotter):
 
         xcoord = dcts.get_coord(col_name='geometry.x')
         ycoord = dcts.get_coord(col_name='geometry.y')
-        xbsize, ybsize = self.get_bsize(subs, xcoord, ycoord)
+        xbsize, ybsize = self._get_bsize(subs, xcoord, ycoord)
         bin_equi2d = bp.Bin_equi2d(-180, 180, xbsize, 
                                    -90, 90, ybsize)
         
@@ -1280,7 +1289,7 @@ class BinPlotter2D(BinPlotter):
 
     def plot_mixing_ratios(self, **kwargs):
         """ Plot all possible permutations of subs, xcoord, ycoord. """
-        permutations = list(itertools.product(self.substances,
+        permutations = list(itertools.product(self.glob_obj.substances,
                                               # self.x_coordinates,
                                               [dcts.get_coord(col_name='int_ERA5_EQLAT')],
                                               # self.y_coordinates
