@@ -162,11 +162,42 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
-
 def process_caribic(ds): 
     # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
+
+def process_clams(ds): 
+    variables = [
+                 # 'Lat', # BAHAMAS
+                 # 'Lon',
+                 # 'PAlt', # BAHAMAS
+                 # 'Pres', 
+                 # 'Theta',
+                 # 'Temp',
+
+                 'ERA5_TEMP',
+                 'ERA5_PRESS',
+                 'ERA5_THETA',
+                 'ERA5_GPH',
+                 'ERA5_PV',
+                 'ERA5_EQLAT',
+
+                 'ERA5_TROP1_THETA',
+                 'ERA5_TROP1_PRESS',
+                 'ERA5_TROP1_Z',
+                 'ERA5_PRESS_2_0_Main',
+                 'ERA5_PRESS_3_5_Main',
+                 'ERA5_THETA_2_0_Main',
+                 'ERA5_THETA_3_5_Main',
+                 'ERA5_GPH_2_0_Main',
+                 'ERA5_GPH_3_5_Main',]
+
+    return ds[variables]
+
+# ValueError: Failed to decode variable 'ATom_End_LAS': unable to decode time 
+# units 'seconds since midnight' with 'the default calendar'. Try opening your 
+# dataset with decode_times=False or installing cftime if it is not installed.
 
 # %% Data selection
 def minimise_tps(tps) -> list:
