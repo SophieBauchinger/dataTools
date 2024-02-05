@@ -75,7 +75,7 @@ class Coordinate:
             vcoord = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
 
             if self.tp_def is not np.nan:
-                vcoord = f'$\Delta${vcoord}$_T_P$' if self.rel_to_tp else vcoord
+                vcoord = f'$\Delta${vcoord}$_{{TP}}$' if self.rel_to_tp else vcoord
 
                 pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
                 crit = '%s' % (', ' + ''.join(
@@ -111,8 +111,8 @@ class Coordinate:
             raise NotImplementedError('Cannot create label, this should not have happened.')
 
         if coord_only:
-            vcoord = f'$\Delta${self.vcoord}$_T_P$' if self.rel_to_tp else f'{self.vcoord}'
-            if self.vcoord == 'pt': vcoord = '$\Delta\Theta_T_P$' if self.rel_to_tp else '$\Theta$'
+            vcoord = f'$\Delta${self.vcoord}$_{{TP}}$' if self.rel_to_tp else f'{self.vcoord}'
+            if self.vcoord == 'pt': vcoord = '$\Delta\Theta_{{TP}}$' if self.rel_to_tp else '$\Theta$'
             label = f'{vcoord} [{self.unit}]'
 
         return label
@@ -229,12 +229,13 @@ class Substance():
             return code
 
         if self.model == 'MSMT':
-            identifier = self.source
+            identifier = self.source if not self.source=='HALO' else self.ID
         elif self.model == 'CLAMS':
             identifier = 'CLaMS'
         else:
             identifier = self.model
-        if len(get_substances(short_name=self.short_name, source=self.source, model=self.model)) > 1:
+        if self.source!='HALO' and len(get_substances(
+                short_name=self.short_name, source=self.source, model=self.model)) > 1:
             identifier += f' - {self.ID}'
 
         unit = self.unit if not self.unit in special_names else special_names[self.unit]
@@ -274,6 +275,7 @@ class Substance():
                 'detr_co2': (370, 395),
                 'detr_ch4': (1650, 1970),
                 'detr_n2o': (290, 330),
+                'detr_co': (50, 150)
             }
 
             if bin_attr == 'vmean':
@@ -322,8 +324,10 @@ class Substance():
             if bin_attr == 'vcount':
                 return (1, np.nan)
 
-        return get_vlims(self.short_name, bin_attr, atm_layer)
-
+        if not self.short_name.startswith('d_'):
+            return get_vlims(self.short_name, bin_attr, atm_layer)
+        else:
+            return (0, 1)
 
 def substance_df():
     """ Get dataframe containing all info about all substance variables """
@@ -375,22 +379,22 @@ def instrument_df() -> pd.DataFrame:
         instruments = pd.read_csv(f)
     return instruments
 
-def instr_vars_per_ID_df() -> pd.DataFrame: 
+def instr_vars_per_ID_df() -> pd.DataFrame:
     """ Import information on variables available per instrument per campaign. """
     # variable names as stored on databank
-    with open('instr_vars_per_ID.csv', 'rb') as f: 
+    with open('instr_vars_per_ID.csv', 'rb') as f:
         instr_vars_per_ID_df = pd.read_csv(f)
     return instr_vars_per_ID_df
 
 def get_instruments(ID: str) -> set:
     """ Return all instruments and variables for a given ID / campaign. """
     df = instr_vars_per_ID_df()
-    if ID not in df.columns: 
+    if ID not in df.columns:
         raise KeyError(f'Could not retrieve instruments / variable info for {ID}.')
     instruments = set(df[df[ID] == True]['instrument'])
     return instruments
 
-def get_variables(ID: str, instr: str) -> set: 
+def get_variables(ID: str, instr: str) -> set:
     """ Return all instruments and variables for a given ID / campaign. Harmonised. """
     df = instr_vars_per_ID_df()
     if instr not in get_instruments(ID):
@@ -400,7 +404,7 @@ def get_variables(ID: str, instr: str) -> set:
     variables = set(df['variable'])
     return variables
 
-def variables_per_instrument(instr: str = None) -> list: 
+def variables_per_instrument(instr: str = None) -> list:
     """ Returns all possible measured / modelled substances for original instrument name. """
     variable_dict = {
         'GCECD' : ['N2O', 'N2Oe', 'SF6', 'SF6e', 'CH4', 'CH4e'],
@@ -417,53 +421,53 @@ def variables_per_instrument(instr: str = None) -> list:
         'TRIHOP_N2O' : ['N2O'],
         'TRIHOP_CO2' : ['CO2'],
         'TRIHOP_CH4' : ['CH4'],
-        'HAGAR' : ['CO2'], 
+        'HAGAR' : ['CO2'],
         'HAGARV_LI' : ['CO2', 'CO2_err'],
         'HAGARV_ECD' : ['CH4'],
-        'HAI14' : ['P'], 
-        'HAI26' : ['P'], 
+        'HAI14' : ['P'],
+        'HAI26' : ['P'],
         'UMAQS' : ['N2O', 'CO2', 'CH4'],
         'GLORIA' : ['lapse_rate', 'altitude'],
         }
 
-    if instr not in variable_dict: 
+    if instr not in variable_dict:
         raise KeyError(f'Could not retrieve list of variables for {instr}.')
     return variable_dict[instr]
 
 def harmonise_instruments(old_name):
     """ Harmonise campaign-speficic instrument names. """
     new_names = {
-        'CLAMS_MET' : 'CLAMS', 
-        'TRAJ_2PV' : 'CLAMS', 
+        'CLAMS_MET' : 'CLAMS',
+        'TRAJ_2PV' : 'CLAMS',
         'TRAJ_WMO' : 'CLAMS',
-        'TRIHOP_N2O' : 'TRIHOP', 
-        'TRIHOP_CO' : 'TRIHOP', 
-        'TRIHOP_CO2' : 'TRIHOP', 
-        'TRIHOP_CH4' : 'TRIHOP', 
+        'TRIHOP_N2O' : 'TRIHOP',
+        'TRIHOP_CO' : 'TRIHOP',
+        'TRIHOP_CO2' : 'TRIHOP',
+        'TRIHOP_CH4' : 'TRIHOP',
         'HAGARV_LI' : 'HAGAR',
-        'GHOST_ECD' : 'GHOST', 
+        'GHOST_ECD' : 'GHOST',
         'UCATS-O3' : 'UCATS',
          }
-    if old_name in new_names: 
+    if old_name in new_names:
         return new_names[old_name]
     return old_name
 
-def harmonise_variables(instr, var_name): 
+def harmonise_variables(instr, var_name):
     """ Harmonise campaign-specific variable names. """
     df = instr_vars_per_ID_df()
     df = df[df['instrument'] == instr]
-    
-    if len(df) == 0: 
+
+    if len(df) == 0:
         raise KeyError(f'Instrument list does not contain {instr}.')
     df = df[df['variable'] == var_name]
 
     col_names = set(df['col_name'].values)
 
-    if len(col_names) == 1: 
+    if len(col_names) == 1:
         new_name = col_names.pop()
 
-    elif len(col_names) == 0: 
-        if not var_name=='flight_id': 
+    elif len(col_names) == 0:
+        if not var_name in ['flight_id', 'measurement_id']:
             print(f'Could not find an entry for {instr}, {var_name}.')
         new_name = var_name
     elif len(col_names) > 1:
@@ -471,10 +475,10 @@ def harmonise_variables(instr, var_name):
 
     return new_name
 
-class Instrument: 
+class Instrument:
     """ Defines an instrument that may have flown on an aircraft campaign. """
-    
-    def __init__(self, original_name, **kwargs): 
+
+    def __init__(self, original_name, **kwargs):
         """ Initialise instrument class instance. """
         self.original_name = original_name
         self.name = harmonise_instruments(original_name)
@@ -494,10 +498,10 @@ class Instrument:
 def campaign_definitions(campaign: str) -> dict:
     """  Returns parameters needed for client_data_choice per campaign.
 
-    Parameters: 
+    Parameters:
         ghost_campaign (str): Name of the campaign, e.g. SOUTHTRAC
     """
-    
+
     campaign_dicts = {
         "SOUTHTRAC" : dict(
             special = "ST all",
@@ -512,7 +516,7 @@ def campaign_definitions(campaign: str) -> dict:
             special = None,
             n2o_instr = ["TRIHOP_N2O", "TRIHOP_CO", "TRIHOP_CO2"],
             n2o_substances = [["N2O"], ["CO"], ["CO2"]]),
-        
+
         "WISE" : dict(
             special = "WISE all",
             ghost_ms_substances = ['H1211'],
@@ -528,12 +532,12 @@ def campaign_definitions(campaign: str) -> dict:
             n2o_substances = ["N2O", "CO", "CH4"]),
         }
 
-    if campaign not in campaign_dicts: 
+    if campaign not in campaign_dicts:
         raise KeyError(f'{campaign} is not a valid GHoST campaign for SQL database access.')
-    
+
     return campaign_dicts[campaign]
 
-def years_per_campaign(campaign: str) -> tuple: 
+def years_per_campaign(campaign: str) -> tuple:
     """ Return years of specified campaign as tuple. """
     year_dict = {
         'HIPPO' : (2009, 2010, 2011),
@@ -541,13 +545,13 @@ def years_per_campaign(campaign: str) -> tuple:
         'PGS' : (2015, 2016),
         'WISE' : (2017),
         'SHTR' : (2019),
-        'ATOM' : (2016, 2017, 2018), 
+        'ATOM' : (2016, 2017, 2018),
         }
-    if campaign not in year_dict: 
+    if campaign not in year_dict:
         raise NotImplementedError(f'Campaign {campaign} does not have a year list.')
     return year_dict[campaign]
 
-def instruments_per_campaign(campaign: str) -> tuple: 
+def instruments_per_campaign(campaign: str) -> tuple:
     """ Returns tuple of relevant instruments for a given campaign. """
     instr_dict = {
         'TACTS' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'TRIHOP_CO', 'TRIHOP_N2O', 'TRIHOP_CO2', 'TRIHOP_CH4', 'TRAJ_2PV', 'TRAJ_WMO'),
@@ -556,7 +560,7 @@ def instruments_per_campaign(campaign: str) -> tuple:
         'SHTR' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'UMAQS', 'HAGARV_LI', 'CLAMS_MET', 'GLORIA'),
         'ATOM' : ('GCECD', 'MMS', 'UCATS-O3', 'CLAMS_MET'),
         }
-    if campaign not in instr_dict: 
+    if campaign not in instr_dict:
         raise NotImplementedError(f'Campaign {campaign} does not have an instrument list.')
     return instr_dict[campaign]
 
