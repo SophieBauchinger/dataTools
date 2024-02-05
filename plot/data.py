@@ -60,9 +60,10 @@ def timeseries_global(glob_obj, detr=False, colorful=True, note='', **subs_kwarg
     """ Scatter plots of timeseries data incl. monthly averages of chosen substances. """
     data = glob_obj.df
     df_mm = tools.time_mean(data, 'M')
-    substances = [dcts.get_subs(col_name=c) for c in data.columns
-                  if c in [s.col_name for s in dcts.get_substances(detr=detr, **subs_kwargs)]
-                  and not (c.startswith('d_') or '_d_' in c)]
+    # substances = [dcts.get_subs(col_name=c) for c in data.columns
+    #               if c in [s.col_name for s in dcts.get_substances(detr=detr, **subs_kwargs)]
+    #               and not (c.startswith('d_') or '_d_' in c)]
+    substances = glob_obj.substances
 
     for subs in substances:
         col = subs.col_name
@@ -217,9 +218,10 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
                    projection='moll', **subs_kwargs): 
     """ 2D plot of binned substance data for all years at once. """
     data = glob_obj.df
-    substances = [dcts.get_subs(col_name=c) for c in data.columns
-                  if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
-                  and not (c.startswith('d_') or '_d_' in c)]
+    # substances = [dcts.get_subs(col_name=c) for c in data.columns
+    #               if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
+    #               and not (c.startswith('d_') or '_d_' in c)]
+    substances = glob_obj.substances
 
     for subs in (substances if not bin_attr=='vcount' else [dcts.get_subs(col_name='N2O')]): 
         fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
@@ -290,8 +292,8 @@ def plot_binned_2d(glob_obj, bin_attr='vmean', hide_lats=False,
         # cbar.ax.tick_params(labelsize=15, which='both')
         # cbar.ax.minorticks_on()
 
-        # ax.set_title(subs.label()
-        #              if bin_attr != 'vcount' else 'Distribution of greenhouse gas flask measurements')
+        ax.set_title((subs.label() + ('' if not glob_obj.source=='HALO' else ' - ' + glob_obj.ID))
+                      if bin_attr != 'vcount' else 'Distribution of greenhouse gas flask measurements')
 
 def yearly_plot_binned_2d(glob_obj, detr=False, bin_attr='vmean', **subs_kwargs):
     # glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
@@ -417,22 +419,24 @@ def mxr_vs_vcoord(glob_obj, subs, vcoord):
 
     fig, ax = plt.subplots(dpi=200)
     for s in set(glob_obj.df['season'].tolist()):
-        df = glob_obj.df[glob_obj.df['season'] == s].dropna(subset='int_ERA5_D_TROP1_THETA', how='all')
-        
+        df = glob_obj.df[glob_obj.df['season'] == s].dropna(subset=[vcoord.col_name, subs.col_name], how='any')
+        if len(df) == 0: 
+            continue
+
         x = df[subs.col_name]
         y = df[vcoord.col_name]
-        
-        if vcoord.rel_to_tp: 
-            ax.set_ylim(-70, 90)
+
+        # if vcoord.rel_to_tp: 
+        #     ax.set_ylim(-70, 90)
         if subs.col_name=='detr_SF6': 
             ax.set_xlim(5,7)
-        
+
         ax.scatter(x, y, 
-                   marker='.',
-                   label = dcts.dict_season()[f'name_{s}'],
-                   c=dcts.dict_season()[f'color_{s}'])
-        # ax.legend()
-        
+                    marker='.',
+                    label = dcts.dict_season()[f'name_{s}'],
+                    c=dcts.dict_season()[f'color_{s}'])
+        ax.legend()
+
     ax.set_ylabel(vcoord.label())
     ax.set_xlabel(subs.label())
 
