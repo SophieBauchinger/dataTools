@@ -15,6 +15,10 @@ Classes:
     Mauna_Loa
     Mace_Head
 """
+
+#TODO TACTS.CLAMS.THETA muss noch ausm netz gezogen werden 
+#TODO make it possible to add multiple GlobalData objects (!)
+
 import datetime as dt
 import geopandas
 import numpy as np
@@ -37,10 +41,7 @@ from toolpac.conv.times import fractionalyear_to_datetime
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
-# from toolpac.readwrite import sql_data_import #TODO add ghost data 
 from toolpac.readwrite.sql_data_import import client_data_choice
-
-#TODO make it possible to add multiple GlobalData objects (!)
 
 import dictionaries as dcts
 import tools
@@ -50,7 +51,33 @@ import warnings
 from pandas.errors import SettingWithCopyWarning
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
-#TODO CampaignData df is not a geodataframe!! 
+
+#%%% 
+def CLaMSnetcdf(campaign, pdir = None): 
+    """ Creates dataframe for CLaMS data from netcdf files. Common file structure. 
+    
+    Parameters: 
+        campaign: str. (STH, ATOM, WISE, HIPPO)
+    """
+    
+    campaign_dir_dict = {
+        'SHTR': 'SouthtracTPChange', 
+        'WISE': 'WiseTPChange',
+        'ATOM': 'AtomTPChange', 
+        'HIPPO': 'HippoTPChange', 
+        }
+    
+    pdir = r'E:/TPChange/' + campaign_dir_dict[campaign] if pdir is None else pdir
+    
+    print(pdir)
+    
+    fnames = pdir + "/*.nc"
+    # extract data, each file goes through preprocess first to filter variables & convert units
+    with xr.open_mfdataset(fnames, decode_times=False if campaign=='ATOM' else True) as ds:
+        ds = ds
+    df = ds.to_dataframe()
+    return ds
+
 
 # %% Global data
 class GlobalData():
@@ -112,13 +139,41 @@ class GlobalData():
 
     def pickle_data(self, fname:str, pdir=r'misc_data'):
         """ Save data dictionary using dill. """
-        if len(fname.split('.')) < 2: 
+        if len(fname.split('.')) < 2:
             fname = fname + '.pkl'
         with open(pdir + '/' + fname, 'wb') as f:
             dill.dump(self.data, f)
             print(f'{self.ID} Data dictionary saved to {pdir}\{fname}')
 
-    def combine(self, glob_obj): 
+    def get_variables(self, category):
+        """ Returns list of variables from chosen category with column in self.df """
+        if 'df' not in self.data:
+            raise KeyError(f'self.data.df not found, cannot return {category} variables.')
+        variables = []
+        for column in [c for c in self.data['df'] if not c=='geometry']:
+            try:
+                if category=='subs':
+                    var = dcts.get_subs(col_name=column)
+                elif category=='coords':
+                    var = dcts.get_coord(col_name=column)
+                else:
+                    continue
+                variables.append(var)
+            except:
+                continue
+        return variables
+
+    @property
+    def substances(self):
+        """ Returns list of substances in self.df """
+        return self.get_variables('subs')
+
+    @property
+    def coordinates(self):
+        """ Returns list of non-substance variables in self.df """
+        return self.get_variables('coords')
+
+    def combine(self, glob_obj):
         """ Combine two GlobalData objects into one. Keep only main dataframes. """
         out = type(self).__new__(self.__class__)  # new class instance
 
@@ -143,25 +198,25 @@ class GlobalData():
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
 
-    def get_shared_indices(self, tps=None, df=True): 
+    def get_shared_indices(self, tps=None, df=True):
         """ Make reference for shared indices of chosen tropopause definitions. """
-        if not 'df_sorted' in self.data: 
+        if not 'df_sorted' in self.data:
             self.create_df_sorted()
-        if not tps: 
+        if not tps:
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        
+
         data = self.df_sorted if not df else self.df
         prefix = 'tropo_' if not df else ''
-            
+
         tropo_cols = [prefix+tp.col_name for tp in tps if prefix+tp.col_name in data]
         indices = data.dropna(subset=tropo_cols, how='any').index
-        
+
         return indices
 
-    def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame: 
+    def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
         """ Flag each datapoint according to its distance to specific tropopause definitions. """
-        #TODO implement this 
-        #!!! implement this 
+        #TODO implement this
+        #!!! implement this
 
     def detrend_substance(self, substance, loc_obj=None, ID=None,
                           save=True, plot=False, note='') -> np.ndarray:
@@ -276,22 +331,22 @@ class GlobalData():
 
         return df_detr, popt
 
-    def detrend_all(self, verbose=False): 
+    def detrend_all(self, verbose=False):
         """ Add detrended data wherever possible for all available substances. """
-        substances = [dcts.get_subs(col_name = col) for col in self.df.columns 
+        substances = [dcts.get_subs(col_name = col) for col in self.df.columns
                       if col in [s.col_name for s in dcts.get_substances()
                                  if not s.short_name.startswith(('detr_', 'd_'))]]
-        detr_subs = set([s.short_name for s in substances 
-                         if any(subs.ID in ['MLO'] for subs 
+        detr_subs = set([s.short_name for s in substances
+                         if any(subs.ID in ['MLO'] for subs
                                 in dcts.get_substances(short_name=s.short_name))])
-        for subs in detr_subs: 
+        for subs in detr_subs:
             if verbose: print(f'Detrending all {subs} data. ')
             self.detrend_substance(subs, loc_obj=None, ID=None, save=True, plot=False)
 
     def sel_subset(self, **kwargs):
-        """ Allows making multiple selections at once. 
+        """ Allows making multiple selections at once.
 
-        Parameters: 
+        Parameters:
             key year (list or int)
             key latitude (Tuple[float, float])
             key eqlat (Tuple[float, float])
@@ -299,30 +354,30 @@ class GlobalData():
             key tropo / strato (dict)
         """
         # check function input
-        if any([f'sel_{k}' not in self.__dir__() for k in kwargs]): 
+        if any([f'sel_{k}' not in self.__dir__() for k in kwargs]):
             raise KeyError('Subset selection is not possible with the following parameters:\
                             {}'.format([k for k in kwargs if f'sel_{k}' not in self.__dir__() ]))
-        
+
         out = type(self).__new__(self.__class__)  # new class instance
         for attribute_key in self.__dict__:  # copy attributes
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()  # stops self.data being overwritten
-        
+
         def get_fctn(class_inst, selection):
             if f'sel_{selection}' in class_inst.__dir__():
                 return getattr(class_inst, f'sel_{selection}')
             else: raise KeyError(f'sel_{selection}')
 
-        for selection in kwargs: 
-            if isinstance(kwargs.get(selection), (int, str)): 
+        for selection in kwargs:
+            if isinstance(kwargs.get(selection), (int, str)):
                 out = get_fctn(out, selection)(kwargs.get(selection))
             if isinstance(kwargs.get(selection), (set, list, tuple)):
                 out = get_fctn(out, selection)(*kwargs.get(selection))
-            if isinstance(kwargs.get(selection), dict): 
+            if isinstance(kwargs.get(selection), dict):
                 out = get_fctn(out, selection)(**kwargs.get(selection))
-        
-        return out 
-        
+
+        return out
+
     def sel_year(self, *years: int):
         """ Returns GlobalData object containing only data for selected years. """
 
@@ -461,8 +516,8 @@ class GlobalData():
 
     def sel_season(self, *seasons):
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
-        
-        Parameters: 
+
+        Parameters:
             season (List[int]): list of multiple of 1,2,3,4
                 1 - spring, 2 - summer, 3 - autumn, 4 - winter """
         if 'season' in self.status:
@@ -614,13 +669,13 @@ class GlobalData():
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
-    def o3_filter(self, **kwargs) -> pd.DataFrame: 
+    def o3_filter(self, **kwargs) -> pd.DataFrame:
         """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
         subs = dcts.get_subs('o3', ID='INT')
-        if not subs.col_name in self.df.columns: 
+        if not subs.col_name in self.df.columns:
             raise KeyError(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
         df_sorted = pd.DataFrame(index = self.df.index)
-        df_sorted.loc[self.df[subs.col_name].lt(60), 
+        df_sorted.loc[self.df[subs.col_name].lt(60),
                       (f'strato_{subs.col_name}', f'tropo_{subs.col_name}')] = (False, True)
         return df_sorted
 
@@ -662,7 +717,7 @@ class GlobalData():
                 continue
 
             # if rel_to_tp coordinate exists, take that one and remove the other one
-            if not tp.rel_to_tp:  
+            if not tp.rel_to_tp:
                 coord_dct = {k: v for k, v in tp.__dict__.items()
                              if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu']}
                 try:
@@ -704,7 +759,7 @@ class GlobalData():
             df_sorted[strato] = tp_sorted[strato]
 
         # flag tropospheric ozone below 60 ppb as tropospheric
-        try: 
+        try:
             o3_sorted = self.o3_filter()
             o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
             o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
@@ -712,7 +767,7 @@ class GlobalData():
                 o3_sorted[f'tropo_{tp.col_name}'] = o3_tropo
                 o3_sorted[f'strato_{tp.col_name}'] = o3_strato
                 df_sorted.update(o3_sorted, overwrite=False)
-        except KeyError: 
+        except KeyError:
             print('Ozone data not found. ')
 
         df_sorted = df_sorted.convert_dtypes()
@@ -736,9 +791,9 @@ class GlobalData():
         tropo_counts = pd.concat([tropo_counts, ratio_df])
         return tropo_counts
 
-    def calc_shared_ratios(self, tps=None): 
+    def calc_shared_ratios(self, tps=None):
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
-        if not tps: 
+        if not tps:
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
 
@@ -754,10 +809,10 @@ class GlobalData():
         ratio_df.loc['ratios'] = ratios  # set col
 
         tropo_counts = pd.concat([tropo_counts, ratio_df])
-        
+
         return tropo_counts
 
-    def calc_non_shared_ratios(self, tps=None): 
+    def calc_non_shared_ratios(self, tps=None):
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
         tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
@@ -779,7 +834,7 @@ class GlobalData():
 
     def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
         """ Calculate overall variability of stratospheric and tropospheric air. """
-        if not tps: 
+        if not tps:
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
 
@@ -791,22 +846,22 @@ class GlobalData():
 
         subs_data = self.df[self.df.index.isin(shared_df.index)][subs.col_name]
 
-        for tp in tps: 
+        for tp in tps:
             t_stdv = subs_data[shared_df['tropo_'+tp.col_name]].std(skipna=True)
             s_stdv = subs_data[shared_df['strato_'+tp.col_name]].std(skipna=True)
-            
+
             t_mean = subs_data[shared_df['tropo_'+tp.col_name]].mean(skipna=True)
             s_mean = subs_data[shared_df['tropo_'+tp.col_name]].mean(skipna=True)
 
             stdv_df['tropo_stdv'][tp.col_name] = t_stdv
             stdv_df['strato_stdv'][tp.col_name] = s_stdv
-            
+
             stdv_df['tropo_mean'][tp.col_name] = t_mean
             stdv_df['strato_mean'][tp.col_name] = s_mean
-            
-            stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv/t_mean * 100 
+
+            stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv/t_mean * 100
             stdv_df['rel_strato_stdv'][tp.col_name] = s_stdv/s_mean * 100
-        
+
         return stdv_df
 
     @property
@@ -925,7 +980,7 @@ class GlobalData():
 
                     # Find extreme events
                     plot = False if 'plot' not in kwargs else kwargs.get('plot')
-                    tmp = outliers.find_ol(dcts.get_subs(col_name=substance).function, 
+                    tmp = outliers.find_ol(dcts.get_subs(col_name=substance).function,
                                            time, mxr, d_mxr, flag=None,  # here
                                            direction='p', verbose=False,
                                            plot=plot, limit=0.1, ctrl_plots=False)
@@ -943,8 +998,8 @@ class GlobalData():
         out.status.update({'EE_filter': True})
         return out
 
-class CombinedData(GlobalData): 
-    """ Stores combination of multiple """ 
+class CombinedData(GlobalData):
+    """ Stores combination of multiple """
 
 # Caribic
 class Caribic(GlobalData):
@@ -980,24 +1035,18 @@ class Caribic(GlobalData):
         self.pfxs = pfxs
         self.flights = ()
         self.get_data(verbose=verbose, recalculate=recalculate)  # creates self.data dictionary
+
         if 'met_data' not in self.data:
-            try: 
+            try:
                 self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
                 self.create_tp_coords()
-            except Exception: 
+            except Exception:
                 traceback.print_exc()
-# =============================================================================
-#         for subs in ['sf6', 'n2o', 'co2', 'ch4']:
-#             if subs not in self.data:
-#                 try: 
-#                     self.create_substance_df(subs)
-#                 except Exception: 
-#                     traceback.print_exc()
-# =============================================================================
-        if detrend_all: 
-            try: 
+
+        if detrend_all:
+            try:
                 self.detrend_all()
-            except Exception: 
+            except Exception:
                 traceback.print_exc()
 
     def __repr__(self):
@@ -1060,13 +1109,13 @@ class Caribic(GlobalData):
         gdf_pfx = geopandas.GeoDataFrame()
         for yr in self.years:
             gdf_yr, col_dict = self.get_year_data(pfx, yr, parent_dir, verbose)
-            
+
             gdf_pfx = pd.concat([gdf_pfx, gdf_yr])
             if pfx == 'GHG':  # rmv case-sensitive distinction in cols
                 cols = ['SF6', 'CH4', 'CO2', 'N2O']
                 for col in cols + ['d_' + c for c in cols]:
                     if col.lower() in gdf_pfx.columns:
-                        if not col in gdf_pfx.columns: 
+                        if not col in gdf_pfx.columns:
                             gdf_pfx[col] = np.nan
                         gdf_pfx[col] = gdf_pfx[col].combine_first(gdf_pfx[col.lower()])
                         gdf_pfx.drop(columns=col.lower(), inplace=True)
@@ -1127,7 +1176,7 @@ class Caribic(GlobalData):
         coords = ['Flight number', 'p', 'geometry'] + [
             c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)
             if c.col_name not in ['Flight number', 'p', 'geometry']]
-        # if 'GHG' not in self.pfxs: 
+        # if 'GHG' not in self.pfxs:
         #     coords = coords + ['p', 'geometry']
         df.drop([col for col in df.columns if col not in coords],
                 axis=1, inplace=True)  # remove non-met / non-coord data
@@ -1151,13 +1200,11 @@ class Caribic(GlobalData):
 
             if met_col in df.columns and minus_col in df.columns:
                 df[coord.col_name] = df[met_col] - df[minus_col]
-            elif coord.var == 'geopot': 
-                
-                df[coord.col_name] = calc.geopotential_to_height(df[met_col])
-                
-                # ds = ds.assign(ECHAM5_height=calc.geopotential_to_height(ds['ECHAM5_geopot'])).metpy.dequantify()
-                # ds['ECHAM5_height'] = ds['ECHAM5_height'].metpy.convert_units(units.km)
-                # ds['ECHAM5_height'] = ds['ECHAM5_height'].metpy.dequantify()
+
+            elif coord.var == 'geopot':
+                met_data = df[met_col].values * units(dcts.get_coord(col_name=coord.var1).unit)
+                df[coord.col_name] = calc.geopotential_to_height(met_data)
+
             else:
                 print(f'Could not generate {coord.col_name} as precursors are not available')
 
@@ -1179,7 +1226,7 @@ class Caribic(GlobalData):
 
     def create_substance_df(self, subs, detr=True):
         """ Create dataframe containing all met.+ msmt. data for a substance """
-        if detr: 
+        if detr:
             self.detrend_substance(subs)
         subs_cols = [c for c in self.df
                      if any(i in [s.col_name for s in dcts.get_substances(short_name=subs)]
@@ -1189,9 +1236,9 @@ class Caribic(GlobalData):
         df.dropna(subset = subs_cols, how='all', inplace=True)
 
         try: # reordering the columns
-            df = df[['Flight number', 'p'] 
-                    + [c for c in df.columns 
-                       if c not in ['Flight number', 'p', 'geometry']] 
+            df = df[['Flight number', 'p']
+                    + [c for c in df.columns
+                       if c not in ['Flight number', 'p', 'geometry']]
                     + ['geometry']]
 
         except KeyError: pass
@@ -1261,16 +1308,17 @@ class EMAC(GlobalData):
 
     def get_data(self, years, s4d: bool, s4d_s: bool, tp: bool, df: bool, recalculate=False) -> dict:
         """ Preprocess EMAC model output and create datasets """
+
         if not recalculate:
             if s4d:
-                with xr.open_dataset(r'misc_data\emac_ds.nc', mmap=False) as ds:
+                with xr.open_dataset(r'misc_data\emac_ds.nc') as ds:
                     self.data['s4d'] = ds
             if s4d_s:
-                with xr.open_dataset(r'misc_data\emac_ds_s.nc', mmap=False) as ds_s:
+                with xr.open_dataset(r'misc_data\emac_ds_s.nc') as ds_s:
                     self.data['s4d_s'] = ds_s
             if tp:
                 if os.path.exists(r'misc_data\emac_tp.nc'):
-                    with xr.open_dataset(r'misc_data\emac_tp.nc', mmap=False) as tp:
+                    with xr.open_dataset(r'misc_data\emac_tp.nc') as tp:
                         self.data['tp'] = tp
                 else:
                     self.create_tp()
@@ -1483,7 +1531,7 @@ class TropopauseData(GlobalData):
             finally:
                 self.create_df_sorted(save=True)
 
-        if detrend_all or input('Detrend all? [Y/N] ').upper()=='Y': 
+        if detrend_all or input('Detrend all? [Y/N] ').upper()=='Y':
             self.detrend_all()
 
     def __repr__(self):
@@ -1642,8 +1690,8 @@ class Mozart(GlobalData):
 #TODO proper col names for variables I'm unsure about (eg DTH_PV from ATOM.CLAMS_MET)
 
 # HALO and ATOM campaigns from SQL Database
-class CampaignData(GlobalData): 
-    """ Stores data for a single HALO campaign.
+class CampaignData(GlobalData):
+    """ Stores data for a single HALO / ATom campaign.
 
     Class attributes:
         years: arr
@@ -1662,33 +1710,33 @@ class CampaignData(GlobalData):
         self.source = 'HALO' if campaign in ['SHTR', 'WISE', 'PGS', 'TACTS'] else campaign
         self.ID = campaign
         self.instruments = list(dcts.get_instruments(self.ID)) # dcts.instruments_per_campaign(campaign)
-        self.variables = [var for instr in self.instruments for var in list(dcts.get_variables(campaign, instr))] 
+        # self.variables = [var for instr in self.instruments for var in list(dcts.get_variables(campaign, instr))]
         # {instr : dcts.variables_per_instrument(instr) for instr in self.instruments} # if measured on the specific campaign
 
         self.data = {}
         self.get_data(**kwargs)
 
-        if 'flight_id' in self.df: 
+        if 'flight_id' in self.df:
             self.flights = set(self.data['df']['flight_id'].values)
-        if 'Flight number' in self.df: 
+        if 'Flight number' in self.df:
             self.flights = set(self.data['df']['Flight number'].values)
-            
+
         self.years = list(set(self.data['df'].index.year))
 
     @property
-    def _log_in(self, **kwargs): 
+    def _log_in(self, **kwargs):
         user = keyring.get_password('IAU_SQL', 'username_key')
-        log_in = {"host": '141.2.225.99', 
-                  "user": user, 
+        log_in = {"host": '141.2.225.99',
+                  "user": user,
                   "pwd": keyring.get_password('IAU_SQL', user)}
         return log_in
 
     @property
-    def _special(self): 
+    def _special(self):
         """ Get special kwarg for campaign data import. """
         special_dct = {
-            'SHTR' : 'ST all', 
-            'WISE' : 'WISE all', 
+            'SHTR' : 'ST all',
+            'WISE' : 'WISE all',
             'PGS' : 'PGS all',
             'ATOM' : None,
             'TACTS' : None,
@@ -1696,29 +1744,29 @@ class CampaignData(GlobalData):
         return special_dct.get(self.ID)
 
     @property
-    def _default_flights(self): 
+    def _default_flights(self):
         """ Get default flight kwarg for campaign data import. """
         all_flights_dct = {
-            'ATOM' : 
+            'ATOM' :
                 [f'AT1_{i}' for i in range(1,12)] + [
                 f'AT2_{i}' for i in range(1,12)] + [
                 f'AT3_{i}' for i in range(1,14)] + [
                 f'AT4_{i}' for i in range(1,14)],
 
-            'TACTS' : 
+            'TACTS' :
                 [f'T{i}' for i in range(1, 7)],
             }
         return all_flights_dct.get(self.ID)
 
-    def get_data(self, **kwargs) -> dict: 
-        """ Import campaign data per instrument from SQL Database. 
-        
-        campaign dictionary: 
+    def get_data(self, **kwargs) -> dict:
+        """ Import campaign data per instrument from SQL Database.
+
+        campaign dictionary:
             ST all - SOUTHTRAC
             PGS all - PGS
             WISE all - WISE
             TACTS / CARIBIC
-        
+
         """
         fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
         if not kwargs.get('recalculate') and os.path.exists(r'misc_data/'+fname):
@@ -1735,8 +1783,8 @@ class CampaignData(GlobalData):
                     time = True,
                     flights = self._default_flights,
                     )
-    
-            if kwargs.get('verbose'): 
+
+            if kwargs.get('verbose'):
                 print('Imported time data')
             time_df = time_data._data['DATETIME']
             time_df.index += 1 # measurement_id
@@ -1744,27 +1792,27 @@ class CampaignData(GlobalData):
 
             self.data['time'] = time_df
 
-            for instr in self.instruments: 
-                if kwargs.get('verbose'): 
+            for instr in self.instruments:
+                if kwargs.get('verbose'):
                     print('Importing data for ', instr)
                 self.get_instrument_data(instr, time = time_df, **kwargs)
 
-        if not 'df' in self.data: 
+        if not 'df' in self.data:
             self.create_df()
-            
+
         return self.data
 
-    def get_instrument_data(self, instr: str, time: pd.Series, **kwargs) -> pd.DataFrame: 
+    def get_instrument_data(self, instr: str, time: pd.Series, **kwargs) -> pd.DataFrame:
         """ Import data for given instrument. """
         variables = list(dcts.get_variables(self.ID, instr))
-        if kwargs.get('verbose'): 
+        if kwargs.get('verbose'):
             print('  ', variables)
         variables += ['measurement_id', 'flight_id']
-        
-        data = client_data_choice(log_in = self._log_in, 
-                                  instrument = instr, 
-                                  campaign = self.ID, 
-                                  substances = variables, 
+
+        data = client_data_choice(log_in = self._log_in,
+                                  instrument = instr,
+                                  campaign = self.ID,
+                                  substances = variables,
                                   flights = self._default_flights,
                                   special = self._special,
                                   )
@@ -1772,8 +1820,8 @@ class CampaignData(GlobalData):
         df = data._data['data']
         df.index = time
 
-        for col in df.columns: 
-            if kwargs.get('verbose'): 
+        for col in df.columns:
+            if kwargs.get('verbose'):
                 print(f'Renaming: {col} -> {dcts.harmonise_variables(instr, col)}')
             df[dcts.harmonise_variables(instr, col)] = df.pop(col)
 
@@ -1781,35 +1829,89 @@ class CampaignData(GlobalData):
         self.data[data_key] = df
         return df
 
+    def get_met_data(self, met_pdir = None): 
+        """ Creates dataframe for CLaMS data from netcdf files. """
+        
+        campaign_dir_dict = {
+            'SHTR': 'SouthtracTPChange', 
+            'WISE': 'WiseTPChange',
+            'ATOM': 'AtomTPChange', 
+            'HIPPO': 'HippoTPChange', 
+            }
+
+        def process_clams(ds): 
+            variables = [
+                #          'Lat', # BAHAMAS
+                #          'Lon',
+                #          'PAlt', 
+                #          'Pres', 
+                #          'Theta',
+                #          'Temp',
+                         'ERA5_TEMP',
+                         'ERA5_PRESS',
+                         'ERA5_THETA',
+                         'ERA5_GPH',
+                         'ERA5_PV',
+                         'ERA5_EQLAT',
+                         'ERA5_TROP1_THETA',
+                         'ERA5_TROP1_PRESS',
+                         'ERA5_TROP1_Z',
+                         'ERA5_PRESS_2_0_Main',
+                         'ERA5_PRESS_3_5_Main',
+                         'ERA5_THETA_2_0_Main',
+                         'ERA5_THETA_3_5_Main',
+                         'ERA5_GPH_2_0_Main',
+                         'ERA5_GPH_3_5_Main',]
+            return ds[variables]
+
+        
+        met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
+        fnames = met_pdir + "/*.nc"
+
+        # extract data, each file goes through preprocess first to filter variables & convert units
+        with xr.open_mfdataset(fnames, decode_times=False if self.ID=='ATOM' else True,
+                               preprocess = process_clams) as ds:
+            ds = ds
+        
+        self.data['met_ds'] = ds
+        
+        df = ds.to_dataframe()
+        
+        self.data['met_data'] = df
+        
+        return df
+
     def create_df(self) -> pd.DataFrame:
         """ Combine available data into single dataframe. """
-        
-        if 'df' in self.data: 
-            if input('Recalculate joint dataframe? [Y/N]\n').upper() != 'Y': 
+
+        if 'df' in self.data:
+            if input('Recalculate joint dataframe? [Y/N]\n').upper() != 'Y':
                 return self.data['df']
 
         time = self.data['time']
         measurement_id = time.index
 
         data = pd.DataFrame(measurement_id, index = time)
-        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
+
+        met_data = self.get_met_data()
+        data.join(met_data, rsuffix='_dupe')
         
+        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
         # combine data
-        for df in dataframes: 
+        for df in dataframes:
             data = data.join(df, rsuffix='_dupe')
             data = data.drop(columns = [c for c in data.columns if 'dupe' in c])
-        
-        
-        if 'flight_id' in data.columns: 
+
+        if 'flight_id' in data.columns:
             data['Flight number'] = data.pop('flight_id')
-        
+            
         self.data['df'] = data
 
-        # Create GeoDataFrame using available geodata 
+        # Create GeoDataFrame using available geodata
         lon_cols = [c for c in data.columns if 'LON' in c]
         lat_cols = [c for c in data.columns if 'LAT' in c]
-        
-        if len(lon_cols)>0 and len(lat_cols)>0: 
+
+        if len(lon_cols)>0 and len(lat_cols)>0:
             geodata = [Point(lon, lat) for lon, lat in zip(
                 data[lon_cols[0]], data[lat_cols[0]])]
             gdf = geopandas.GeoDataFrame(data, geometry=geodata)
@@ -1920,7 +2022,7 @@ class MaunaLoa(LocalData):
             'co2': '/co2_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
             'ch4': '/ch4_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
             }
-        
+
         path = path_dir + fnames[subs]
 
         # 'ch4', 'co', 'co2' : 1st line has header_lines
@@ -1992,7 +2094,7 @@ class MaunaLoa(LocalData):
 class MaceHead(LocalData):
     """ Stores data for SF6 measurements at Mace Head. """
 
-    def __init__(self, years=(2012), substances='all', 
+    def __init__(self, years=(2012), substances='all',
                  path=r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\MHD-medusa_2012.dat'):
         """ Initialise Mace Head with (daily and) monthly data in dataframes """
 
