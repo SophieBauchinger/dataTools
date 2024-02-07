@@ -7,6 +7,7 @@
 """
 import numpy as np
 import datetime as dt
+import os
 import pandas as pd
 import geopandas
 from shapely.geometry import Point
@@ -167,6 +168,7 @@ def process_caribic(ds):
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
+
 def process_clams(ds): 
     variables = [
                  # 'Lat', # BAHAMAS
@@ -195,6 +197,56 @@ def process_clams(ds):
 
     return ds[variables]
 
+from toolpac.conv.times import secofday_to_datetime, datetime_to_fractionalyear
+
+def process_atom_clams(ds):
+    """ Additional time values for ATom as otherwise the function breaks """    
+    variables = ['ATom_UTC_Start', 'ATom_UTC_Stop',
+    
+                 'ERA5_TEMP', 'ERA5_PRESS', 'ERA5_THETA',
+                 'ERA5_GPH', 'ERA5_PV', 'ERA5_EQLAT',
+    
+                 'ERA5_TROP1_THETA',
+                 'ERA5_TROP1_PRESS',
+                 'ERA5_TROP1_Z',
+                 'ERA5_PRESS_2_0_Main',
+                 'ERA5_PRESS_3_5_Main',
+                 'ERA5_THETA_2_0_Main',
+                 'ERA5_THETA_3_5_Main',
+                 'ERA5_GPH_2_0_Main',
+                 'ERA5_GPH_3_5_Main',]
+    ds = ds[variables]
+    
+    # find flight date from file name
+    filepath = ds['ATom_UTC_Start'].encoding['source']
+    fname = os.path.basename(filepath)
+    date_string = fname.split('_')[1]
+    date = dt.datetime(year = int(date_string[:4]), 
+                        month = int(date_string[4:6]), 
+                        day = int(date_string[-2:]))
+    
+    # generate datetimes for each timestamp
+    datetimes = [secofday_to_datetime(date, secofday + 5) for secofday in ds['ATom_UTC_Start'].values]
+    ds = ds.assign(Time = datetimes) 
+    
+    return ds
+
+# add meta information 
+# ds.timestamp['units'] = "seconds since {}-{}-{} 00:00:00".format(date_string[:4], date_string[4:6], date_string[-2:])
+# ds.timestamp['standard_name'] = 'time'
+# ds.timestamp['standard_units'] = 's'
+
+# ds = ds.assign(timestamp = ds['ATom_UTC_Start'] + 5)
+# ds = ds.set_index(Time='timestamp')
+
+# ds = ds.assign(fyear = [datetime_to_fractionalyear(dt) for dt in datetimes])
+
+# find midpoint of start and stop
+# ds = ds.assign(timestamp = float(date.timestamp()) + ds['ATom_UTC_Start'] + 5 ) # should be 5 seconds but just in case
+
+# set new timestamp as index
+# ds = ds.set_index(Time ='datetimes')
+
 # ValueError: Failed to decode variable 'ATom_End_LAS': unable to decode time 
 # units 'seconds since midnight' with 'the default calendar'. Try opening your 
 # dataset with decode_times=False or installing cftime if it is not installed.
@@ -215,7 +267,8 @@ def minimise_tps(tps) -> list:
     tp_to_remove = []
     for tp in tps:  # 1
         try:
-            dcts.get_coord(vcoord='pt', model=tp.model, tp_def=tp.tp_def,
+            dcts.get_coord(vcoord='pt', model=tp.model, source=tp.source,
+                           tp_def=tp.tp_def,
                            pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
         except KeyError:
             continue
@@ -229,7 +282,8 @@ def minimise_tps(tps) -> list:
     [tp_to_remove.append(tp) for tp in tps if tp.pvu == 1.5]  # 6
     for tp in tps:  # 7
         try:
-            rel_tp = dcts.get_coord(rel_to_tp=True, model=tp.model, tp_def=tp.tp_def,
+            rel_tp = dcts.get_coord(rel_to_tp=True, model=tp.model, source=tp.source,
+                                    tp_def=tp.tp_def,
                                     pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)
         except KeyError:
             continue
