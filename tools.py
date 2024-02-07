@@ -15,6 +15,7 @@ from metpy.units import units
 
 import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
+from toolpac.conv.times import secofday_to_datetime
 
 import dictionaries as dcts
 
@@ -197,15 +198,11 @@ def process_clams(ds):
 
     return ds[variables]
 
-from toolpac.conv.times import secofday_to_datetime, datetime_to_fractionalyear
-
 def process_atom_clams(ds):
     """ Additional time values for ATom as otherwise the function breaks """    
-    variables = ['ATom_UTC_Start', 'ATom_UTC_Stop',
-    
+    variables = ['ATom_UTC_Start', 
                  'ERA5_TEMP', 'ERA5_PRESS', 'ERA5_THETA',
                  'ERA5_GPH', 'ERA5_PV', 'ERA5_EQLAT',
-    
                  'ERA5_TROP1_THETA',
                  'ERA5_TROP1_PRESS',
                  'ERA5_TROP1_Z',
@@ -230,26 +227,6 @@ def process_atom_clams(ds):
     ds = ds.assign(Time = datetimes) 
     
     return ds
-
-# add meta information 
-# ds.timestamp['units'] = "seconds since {}-{}-{} 00:00:00".format(date_string[:4], date_string[4:6], date_string[-2:])
-# ds.timestamp['standard_name'] = 'time'
-# ds.timestamp['standard_units'] = 's'
-
-# ds = ds.assign(timestamp = ds['ATom_UTC_Start'] + 5)
-# ds = ds.set_index(Time='timestamp')
-
-# ds = ds.assign(fyear = [datetime_to_fractionalyear(dt) for dt in datetimes])
-
-# find midpoint of start and stop
-# ds = ds.assign(timestamp = float(date.timestamp()) + ds['ATom_UTC_Start'] + 5 ) # should be 5 seconds but just in case
-
-# set new timestamp as index
-# ds = ds.set_index(Time ='datetimes')
-
-# ValueError: Failed to decode variable 'ATom_End_LAS': unable to decode time 
-# units 'seconds since midnight' with 'the default calendar'. Try opening your 
-# dataset with decode_times=False or installing cftime if it is not installed.
 
 # %% Data selection
 def minimise_tps(tps) -> list:
