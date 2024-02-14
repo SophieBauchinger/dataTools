@@ -1386,6 +1386,7 @@ class CampaignData(GlobalData):
             'PGS': 'PGS all',
             'ATOM': None,
             'TACTS': None,
+            'HIPPO': None,
         }
         return special_dct.get(self.ID)
 
@@ -1395,12 +1396,19 @@ class CampaignData(GlobalData):
         all_flights_dct = {
             'ATOM':
                 [f'AT1_{i}' for i in range(1, 12)] + [
-                    f'AT2_{i}' for i in range(1, 12)] + [
-                    f'AT3_{i}' for i in range(1, 14)] + [
-                    f'AT4_{i}' for i in range(1, 14)],
+                 f'AT2_{i}' for i in range(1, 12)] + [
+                 f'AT3_{i}' for i in range(1, 14)] + [
+                 f'AT4_{i}' for i in range(1, 14)],
 
             'TACTS':
                 [f'T{i}' for i in range(1, 7)],
+
+            'HIPPO': 
+                [f'H1_{i}' for i in range(2, 12)] + [
+                 f'H2_{i}' for i in range(-1, 12)] + [
+                 f'H3_{i}' for i in range(1, 12)] + [
+                 f'H4_{i}' for i in range(0, 13)] + [
+                 f'H5_{i}' for i in range(1, 15)],
         }
         return all_flights_dct.get(self.ID)
 
