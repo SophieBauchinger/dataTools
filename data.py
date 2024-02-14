@@ -15,9 +15,11 @@ Classes:
     Mauna_Loa
     Mace_Head
 """
+# TODO TACTS.CLAMS.THETA muss noch ausm netz gezogen werden
+# TODO make it possible to add multiple GlobalData objects
 
-#TODO TACTS.CLAMS.THETA muss noch ausm netz gezogen werden 
-#TODO make it possible to add multiple GlobalData objects (!)
+# TODO ATOM flight & latitude selection
+# proper col names for variables I'm unsure about (eg DTH_PV from ATOM.CLAMS_MET)
 
 import datetime as dt
 import geopandas
@@ -33,6 +35,7 @@ from metpy.units import units
 import dill
 import copy
 import keyring
+from abc import abstractmethod
 import traceback
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
@@ -49,34 +52,9 @@ import tools
 # TODO: fix the underlying problem in toolpac rather than just suppressing stuff
 import warnings
 from pandas.errors import SettingWithCopyWarning
+
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
-
-#%%% 
-def CLaMSnetcdf(campaign, pdir = None): 
-    """ Creates dataframe for CLaMS data from netcdf files. Common file structure. 
-    
-    Parameters: 
-        campaign: str. (STH, ATOM, WISE, HIPPO)
-    """
-    
-    campaign_dir_dict = {
-        'SHTR': 'SouthtracTPChange', 
-        'WISE': 'WiseTPChange',
-        'ATOM': 'AtomTPChange', 
-        'HIPPO': 'HippoTPChange', 
-        }
-    
-    pdir = r'E:/TPChange/' + campaign_dir_dict[campaign] if pdir is None else pdir
-    
-    print(pdir)
-    
-    fnames = pdir + "/*.nc"
-    # extract data, each file goes through preprocess first to filter variables & convert units
-    with xr.open_mfdataset(fnames, decode_times=False if campaign=='ATOM' else True) as ds:
-        ds = ds
-    df = ds.to_dataframe()
-    return ds
 
 # %% Global data
 class GlobalData:
@@ -236,12 +214,12 @@ class GlobalData:
         if not 'df_sorted' in self.data:
             self.create_df_sorted()
         if not tps:
-            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
 
         data = self.df_sorted if not df else self.df
         prefix = 'tropo_' if not df else ''
 
-        tropo_cols = [prefix+tp.col_name for tp in tps if prefix+tp.col_name in data]
+        tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
         indices = data.dropna(subset=tropo_cols, how='any').index
 
         return indices
@@ -328,8 +306,9 @@ class GlobalData:
 
                 if save:
                     columns = [f'detr_{subs.col_name}',
-                               f'delta_{subs.col_name}',
-                               f'detrFit_{subs.col_name}']
+                               # f'delta_{subs.col_name}',
+                               # f'detrFit_{subs.col_name}',
+                               ]
 
                     # add to data, then move geometry column to the end again
                     self.data[k][columns] = df_detr_subs[columns]
@@ -463,7 +442,7 @@ class GlobalData:
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()
 
-        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO']:
+        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM']:
             df_list = [k for k in self.data
                        if isinstance(self.data[k], geopandas.GeoDataFrame)]  # needed for latitude selection
             for k in df_list:  # delete everything that isn't the chosen lat range
@@ -619,7 +598,7 @@ class GlobalData:
 
     def n2o_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
-        if self.source not in ['Caribic', 'TP', 'EMAC']:
+        if self.source not in ['Caribic', 'TP', 'EMAC', 'HALO']:
             raise NotImplementedError(f'N2O sorting not available for {self.source}')
 
         loc_obj = MaunaLoa(self.years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
@@ -630,6 +609,11 @@ class GlobalData:
             ID = 'GHG'
         elif self.source == 'TP' and not dcts.get_subs('n2o', ID='GHG').col_name in self.df.columns:
             raise Warning('Please specify an ID to narrow down which data to use for the N2O filter.')
+        elif self.source == 'HALO':
+            if self.ID == 'SHTR':
+                ID = 'UMAQS'
+            else:
+                raise NotImplementedError(f'HALO Campaign {self.ID} not yet implemented')
         else:
             ID = self.source if not hasattr(self, 'ID') else self.ID
 
@@ -704,9 +688,16 @@ class GlobalData:
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
-    def o3_filter(self, **kwargs) -> pd.DataFrame:
+    def o3_filter_lt60(self, **kwargs) -> pd.DataFrame:
         """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
-        subs = dcts.get_subs('o3', ID='INT')
+        if self.source == 'Caribic':
+            subs = dcts.get_subs('o3', ID='INT')
+        else:
+            o3_substances = [s for s in self.substances if s.short_name=='o3']
+            if len(o3_substances) > 1:
+                raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
+            else:
+                subs = o3_substances[0]
         if not subs.col_name in self.df.columns:
             raise KeyError(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
         df_sorted = pd.DataFrame(index=self.df.index)
@@ -719,7 +710,7 @@ class GlobalData:
         If no kwargs are specified, df_sorted is calculated for all possible definitions
         df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
         """
-        if self.source in ['Caribic', 'EMAC', 'TP']:
+        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO']:  # TODO implement for HALO
             data = self.df.copy()
         else:
             raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
@@ -728,15 +719,16 @@ class GlobalData:
                                  index=data.index)
 
         # apply necessary changes to kwargs to only get appropriate tps
-        if not 'source' in kwargs and self.source in ['Caribic', 'EMAC']:
-            kwargs.update({'source': self.source})
-        if not 'tp_def' in kwargs: kwargs.update({'tp_def': 'not_nan'})  # rmv irrelevant stuff
-        if not 'vcoord' in kwargs: kwargs.update({'vcoord': 'not_nan'})  # rmv var='frac'
+        # if not 'source' in kwargs and self.source in ['Caribic', 'EMAC', 'HALO']:
+        #     kwargs.update({'source': self.source})
+        # if not 'tp_def' in kwargs: kwargs.update({'tp_def': 'not_nan'})  # rmv irrelevant stuff
+        # if not 'vcoord' in kwargs: kwargs.update({'vcoord': 'not_nan'})  # rmv var='frac'
 
-        tps = dcts.get_coordinates(**kwargs)
-        tps = [tp for tp in tps
-               if (not tp.tp_def in ['combo', 'cpt']
-                   and not tp.vcoord == 'lev')]
+        tps = [c for c in self.coordinates if (
+            str(c.tp_def) != 'nan' and c.var != 'geopot')]
+        # print('Tropopause coordinates: \n', tps)
+
+        # TODO something is not quite working here
 
         # adding bool columns for each tp coordinate to df_sorted
         for tp in [tp for tp in tps if tp.crit == 'n2o']:  # N2O filter
@@ -746,21 +738,25 @@ class GlobalData:
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
 
         for tp in [tp for tp in tps if not tp.vcoord == 'mxr']:
+            if kwargs.get('verbose'): 
+                print(f'Sorting {tp}')
+
             # All other tropopause definitions
             if not tp.col_name in data.columns:
                 print(f'Note: {tp.col_name} not found, continuing.')
                 continue
 
-            # if rel_to_tp coordinate exists, take that one and remove the other one
+            # if rel_to_tp coordinate exists, take that one and remove the other one from the tps list
             if not tp.rel_to_tp:
                 coord_dct = {k: v for k, v in tp.__dict__.items()
                              if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu']}
+
                 try:
                     rel_coord = dcts.get_coord(**coord_dct, rel_to_tp=True)
                     if rel_coord.col_name in data.columns:
                         tps.remove(tp)
                         continue  # skip current tp if it exists as relative too
-                finally:
+                except: 
                     if kwargs.get('verbose'):
                         print('Using non-relative TP: ', tp)
 
@@ -794,19 +790,19 @@ class GlobalData:
             df_sorted[strato] = tp_sorted[strato]
 
         # flag tropospheric ozone below 60 ppb as tropospheric
-        try:
-            o3_sorted = self.o3_filter()
+        # (only really makes sense for caribic but leaving it in anyway)
+        if any(tp.crit == 'o3' for tp in tps): 
+            o3_sorted = self.o3_filter_lt60()
             o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
             o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
             for tp in [tp for tp in tps if tp.crit == 'o3' and tp.vcoord == 'z']:
                 o3_sorted[f'tropo_{tp.col_name}'] = o3_tropo
                 o3_sorted[f'strato_{tp.col_name}'] = o3_strato
                 df_sorted.update(o3_sorted, overwrite=False)
-        except KeyError:
-            print('Ozone data not found. ')
 
         df_sorted = df_sorted.convert_dtypes()
-        if save: self.data['df_sorted'] = df_sorted
+        if save: 
+            self.data['df_sorted'] = df_sorted
         return df_sorted
 
     def calc_ratios(self, group_vc=False) -> pd.DataFrame:
@@ -1522,12 +1518,13 @@ class CampaignData(GlobalData):
     def get_met_data(self, met_pdir=None) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
 
-        if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO']:
+        if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
             campaign_dir_dict = {
                 'SHTR': 'SouthtracTPChange',
                 'WISE': 'WiseTPChange',
                 'ATOM': 'AtomTPChange',
                 'HIPPO': 'HippoTPChange',
+                'PGS' : 'PolstraccTPChange',
             }
 
             met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
@@ -1652,7 +1649,7 @@ class EMAC(GlobalData):
         create_df()
             Create pandas dataframe from time-dependent data
     """
-    
+
     def __init__(self, years=range(2005, 2020), s4d=True, s4d_s=True, tp=True, df=True, pdir=None):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if 2000 <= yr <= 2019])
@@ -1660,16 +1657,16 @@ class EMAC(GlobalData):
         self.ID = 'EMAC'
         self.pdir = '{}'.format(r'E:/MODELL/EMAC/TPChange/' if pdir is None else pdir)
         self.get_data(years, s4d, s4d_s, tp, df)
-    
+
     def __repr__(self):
         self.years.sort()
         return f'EMACData object\n\
             years: {self.years}\n\
             status: {self.status}'
-    
+
     def get_data(self, years, s4d: bool, s4d_s: bool, tp: bool, df: bool, recalculate=False) -> dict:
         """ Preprocess EMAC model output and create datasets """
-    
+
         if not recalculate:
             if s4d:
                 with xr.open_dataset(r'misc_data\emac_ds.nc') as ds:
@@ -1689,7 +1686,7 @@ class EMAC(GlobalData):
                         self.data['df'] = dill.load(f)
                 elif tp:
                     self.create_df()
-    
+
         else:
             # print('No ready-made files found. Calculating it anew')
             if s4d:  # preprocess: process_s4d
@@ -1704,13 +1701,13 @@ class EMAC(GlobalData):
                     self.data['s4d_s'] = ds
             if tp: self.create_tp()
             if tp and df: self.create_df()
-    
+
         # update years according to available data
         self.years = list(set(pd.to_datetime(self.data['{}'.format('s4d' if s4d else 's4d_s')]['time'].values).year))
-    
+
         self.data = self.sel_year(*years).data  # needed if data is loaded from file
         return self.data
-    
+
     def create_tp(self) -> xr.Dataset:
         """ Create dataset with tropopause relevant parameters from s4d and s4d_s"""
         ds = self.data['s4d'].copy()
