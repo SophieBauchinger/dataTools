@@ -1317,6 +1317,331 @@ class Caribic(GlobalData):
             return self.data['df']
         return self.create_df()
 
+
+# HALO and ATOM campaigns from SQL Database
+class CampaignData(GlobalData):
+    """ Stores data for a single HALO / ATom campaign.
+    
+    Class attributes:
+        years: arr
+        source: str
+        ID: str - campaign (STH, ATOM, PGS, TACTS, WISE)
+        campaign: str
+        df: Pandas GeoDataFrame
+    """
+
+    def __init__(self, campaign, grid_size=5, v_limits=None, **kwargs):
+        """ Initialise HALO_campaign object. """
+        years = dcts.years_per_campaign(campaign)
+        super().__init__(years, grid_size)
+
+        self.years = years
+
+        source_dict = {
+            'SHTR' : 'HALO',
+            'WISE': 'HALO',
+            'PGS' : 'HALO',
+            'TACTS' : 'HALO',
+            'ATOM' : 'ATOM',
+            'HIPPO': 'HIAPER', }
+        self.source = source_dict[campaign]
+
+        self.ID = campaign
+        self.instruments = list(dcts.get_instruments(self.ID))
+        self.data = {}
+        self.get_data(**kwargs)
+        
+        self.create_df()
+
+        if 'flight_id' in self.df:
+            self.flights = set(self.data['df']['flight_id'].values)
+        if 'Flight number' in self.df:
+            self.flights = set(self.data['df']['Flight number'].values)
+
+        self.years = list(set(self.data['df'].index.year))
+
+    def __repr__(self):
+        """ Show instance details representing dataset. """
+        if 'instruments' in self.__dict__:
+            return (
+    f"""{self.__class__}
+    instruments: {self.instruments}
+    status: {self.status}""" )
+
+        else:
+            return (
+    f"""{self.__class__}
+    status: {self.status}""" )
+
+    @property
+    def _log_in(self, **kwargs):
+        user = keyring.get_password('IAU_SQL', 'username_key')
+        log_in = {"host": '141.2.225.99',
+                  "user": user,
+                  "pwd": keyring.get_password('IAU_SQL', user)}
+        return log_in
+
+    @property
+    def _special(self):
+        """ Get special kwarg for campaign data import. """
+        special_dct = {
+            'SHTR': 'ST all',
+            'WISE': 'WISE all',
+            'PGS': 'PGS all',
+            'ATOM': None,
+            'TACTS': None,
+        }
+        return special_dct.get(self.ID)
+
+    @property
+    def _default_flights(self):
+        """ Get default flight kwarg for campaign data import. """
+        all_flights_dct = {
+            'ATOM':
+                [f'AT1_{i}' for i in range(1, 12)] + [
+                    f'AT2_{i}' for i in range(1, 12)] + [
+                    f'AT3_{i}' for i in range(1, 14)] + [
+                    f'AT4_{i}' for i in range(1, 14)],
+
+            'TACTS':
+                [f'T{i}' for i in range(1, 7)],
+        }
+        return all_flights_dct.get(self.ID)
+
+    def get_data(self, **kwargs) -> dict:
+        """ Import campaign data per instrument from SQL Database.
+    
+        campaign dictionary:
+            ST all - SOUTHTRAC
+            PGS all - PGS
+            WISE all - WISE
+            TACTS / CARIBIC
+    
+        """
+        fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
+        if not kwargs.get('recalculate') and os.path.exists(r'misc_data/' + fname):
+            with open(r'misc_data/' + fname, 'rb') as f:
+                self.data = dill.load(f)
+
+            if not 'df' in self.data:
+                if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
+                    self.get_data(recalculate=True)
+
+        else:
+            print('Importing Campaign Data from SQL Database.')
+
+            time_data = client_data_choice(
+                log_in=self._log_in,
+                campaign=self.ID,
+                special=self._special,
+                time=True,
+                flights=self._default_flights,
+            )
+
+            if kwargs.get('verbose'):
+                print('Imported time data')
+            time_df = time_data._data['DATETIME']
+            time_df.index += 1  # measurement_id
+            time_df.index.name = 'measurement_id'
+
+            self.data['time'] = time_df
+
+            for instr in self.instruments:
+                if kwargs.get('verbose'):
+                    print('Importing data for ', instr)
+                self.get_instrument_data(instr, time=time_df, **kwargs)
+
+            self.merge_instr_data() # Merge data from all instruments, create .df
+            self.get_met_data() # Get meteorological data, create .met_data
+
+        return self.data
+
+    def get_instrument_data(self, instr: str, time: pd.Series, **kwargs) -> pd.DataFrame:
+        """ Import data for given instrument. """
+        variables = list(dcts.get_variables(self.ID, instr))
+        if kwargs.get('verbose'):
+            print('  ', variables)
+        variables += ['measurement_id', 'flight_id']
+
+        print(instr, variables)
+
+        data = client_data_choice(log_in=self._log_in,
+                                  instrument=instr,
+                                  campaign=self.ID,
+                                  substances=variables,
+                                  flights=self._default_flights,
+                                  special=self._special,
+                                  )
+
+        df = data._data['data']
+        df.index = time
+
+        for col in df.columns:
+            if kwargs.get('verbose'):
+                print(f'Renaming: {col} -> {dcts.harmonise_variables(instr, col)}')
+            df[dcts.harmonise_variables(instr, col)] = df.pop(col)
+
+        data_key = dcts.harmonise_instruments(instr)
+        self.data[data_key] = df
+        return df
+
+    def merge_instr_data(self) -> pd.DataFrame:
+        """ Combine available data into single dataframe. """
+
+        time = self.data['time']
+        measurement_id = time.index
+
+        data = pd.DataFrame(measurement_id, index=time)
+
+        # met_data = self.get_met_data()
+        # data.join(met_data, rsuffix='_dupe')
+
+        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
+        # combine data
+        for df in dataframes:
+            data = data.join(df, rsuffix='_dupe')
+            data = data.drop(columns=[c for c in data.columns if 'dupe' in c])
+
+        if 'flight_id' in data.columns:
+            data['Flight number'] = data.pop('flight_id')
+
+        # Create GeoDataFrame using available geodata
+        lon_cols = [c for c in data.columns if 'LON' in c]
+        lat_cols = [c for c in data.columns if 'LAT' in c]
+
+        if not (len(lon_cols) > 0 and len(lat_cols) > 0):
+            self.data['df'] = data
+            return data
+
+        geodata = [Point(lon, lat) for lon, lat in zip(
+            data[lon_cols[0]], data[lat_cols[0]])]
+        gdf = geopandas.GeoDataFrame(data, geometry=geodata)
+        self.data['df'] = gdf
+        return gdf
+
+    def get_met_data(self, met_pdir=None) -> pd.DataFrame:
+        """ Creates dataframe for CLaMS data from netcdf files. """
+
+        if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO']:
+            campaign_dir_dict = {
+                'SHTR': 'SouthtracTPChange',
+                'WISE': 'WiseTPChange',
+                'ATOM': 'AtomTPChange',
+                'HIPPO': 'HippoTPChange',
+            }
+
+            met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
+            fnames = met_pdir + "/*.nc"
+
+            # extract data, each file goes through preprocess first to filter variables & convert units
+            with xr.open_mfdataset(fnames, decode_times=False if self.ID == 'ATOM' else True,
+                                   preprocess=tools.process_atom_clams if self.ID == 'ATOM' else tools.process_clams) as ds:
+                ds = ds
+
+            self.data['met_ds'] = ds
+
+            met_df = ds.to_dataframe()
+
+        elif self.ID in ['TACTS'] and 'df' in self.data.keys():
+            met_cols = [c for c in self.df.columns if c in [
+                c.col_name for c in dcts.get_coordinates() 
+                if not c.col_name=='geometry']]
+            met_df = self.df[met_cols]
+            
+        else: 
+            raise NotImplementedError(f'Cannot create met_data for {self.ID}')
+
+        self.data['met_data'] = met_df
+        return met_df
+
+    def create_df(self) -> pd.DataFrame:
+        """ Combine available data into single dataframe. """
+        
+        if not 'df' in self.data: 
+            self.merge_instr_data()
+
+        if not 'met_data' in self.data: 
+            self.get_met_data()
+
+        if not 'met_data' in self.data: 
+            raise Exception('Oi', self.data)
+
+        data = self.data['df']
+        met_data = self.data['met_data']
+        times = self.data['time'].values
+
+        try: interpolated_met_data = interpolate_onto_timestamps(met_data, times)
+        except: 
+            print('Interpolation unsuccessful. ')
+            interpolated_met_data = met_data
+
+        # met_data = self.get_met_data()
+        data.join(interpolated_met_data, rsuffix='_dupe')
+
+        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
+        # combine data
+        for df in dataframes:
+            data = data.join(df, rsuffix='_dupe')
+            data = data.drop(columns=[c for c in data.columns if 'dupe' in c])
+
+        if 'flight_id' in data.columns:
+            data['Flight number'] = data.pop('flight_id')
+
+        self.data['df'] = data
+
+        # Create GeoDataFrame using available geodata
+        lon_cols = [c for c in data.columns if 'LON' in c]
+        lat_cols = [c for c in data.columns if 'LAT' in c]
+
+        if len(lon_cols) > 0 and len(lat_cols) > 0:
+            geodata = [Point(lon, lat) for lon, lat in zip(
+                data[lon_cols[0]], data[lat_cols[0]])]
+            gdf = geopandas.GeoDataFrame(data, geometry=geodata)
+            self.data['df'] = gdf
+            return gdf
+
+        return data
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """ Combined dataframe with measurement and modelled data. """
+        if 'df' in self.data:
+            return self.data['df']
+        return self.create_df()
+    
+    @property
+    def met_data(self) -> pd.DataFrame: 
+        """ Meteorological Parameters along the flight track. """
+        if 'met_data' in self.data: 
+            return self.data['met_data']
+        return self.get_met_data()
+
+def interpolate_onto_timestamps(dataframe, times) -> pd.DataFrame: 
+    """ Interpolate met data onto given measurement timestamps. 
+    
+    Parameters: 
+        met_data (pd.DataFrame): dataframe to be interpolated
+        times (array, list): Timestamps to be used for interpolating onto
+    """
+    if isinstance(dataframe, geopandas.GeoDataFrame): 
+        dataframe = pd.DataFrame(dataframe[[c for c in dataframe.columns if c != 'geometry']])
+    
+    # add measurement timestamps to met_data
+    new_indices = [i for i in times if i not in dataframe.index]
+    
+    expanded_df = pd.concat([dataframe, pd.Series(index=new_indices, dtype='object')])
+    expanded_df.drop(columns=[0], inplace=True)
+    expanded_df.sort_index(inplace=True)
+    
+    try: 
+        expanded_df.interpolate(method='time', inplace=True, limit=2)  # , limit=500)
+    except TypeError: 
+        print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
+
+    regridded_met_data = expanded_df.loc[times] # return only measurement timestamps
+    return regridded_met_data
+
+
 # EMAC
 class EMAC(GlobalData):
     """ Data class holding information on Caribic-specific EMAC Model output.
@@ -1708,203 +2033,6 @@ class Mozart(GlobalData):
     def SF6(self) -> xr.Dataset:
         return self.data['SF6']
 
-# HALO and ATOM campaigns from SQL Database
-class CampaignData(GlobalData):
-    """ Stores data for a single HALO / ATom campaign.
-    
-    Class attributes:
-        years: arr
-        source: str
-        ID: str - campaign (STH, ATOM, PGS, TACTS, WISE)
-        campaign: str
-        df: Pandas GeoDataFrame
-    """
-    
-    def __init__(self, campaign, grid_size=5, v_limits=None, **kwargs):
-        """ Initialise HALO_campaign object. """
-        years = dcts.years_per_campaign(campaign)
-        super().__init__(years, grid_size)
-    
-        self.years = years
-        self.source = 'HALO' if campaign in ['SHTR', 'WISE', 'PGS', 'TACTS'] else campaign
-        self.ID = campaign
-        self.instruments = list(dcts.get_instruments(self.ID)) # dcts.instruments_per_campaign(campaign)
-        # self.variables = [var for instr in self.instruments for var in list(dcts.get_variables(campaign, instr))]
-        # {instr : dcts.variables_per_instrument(instr) for instr in self.instruments} # if measured on the specific campaign
-    
-        self.data = {}
-        self.get_data(**kwargs)
-    
-        if 'flight_id' in self.df:
-            self.flights = set(self.data['df']['flight_id'].values)
-        if 'Flight number' in self.df:
-            self.flights = set(self.data['df']['Flight number'].values)
-    
-        self.years = list(set(self.data['df'].index.year))
-    
-    @property
-    def _log_in(self, **kwargs):
-        user = keyring.get_password('IAU_SQL', 'username_key')
-        log_in = {"host": '141.2.225.99',
-                  "user": user,
-                  "pwd": keyring.get_password('IAU_SQL', user)}
-        return log_in
-    
-    @property
-    def _special(self):
-        """ Get special kwarg for campaign data import. """
-        special_dct = {
-            'SHTR' : 'ST all',
-            'WISE' : 'WISE all',
-            'PGS' : 'PGS all',
-            'ATOM' : None,
-            'TACTS' : None,
-            }
-        return special_dct.get(self.ID)
-    
-    @property
-    def _default_flights(self):
-        """ Get default flight kwarg for campaign data import. """
-        all_flights_dct = {
-            'ATOM' :
-                [f'AT1_{i}' for i in range(1,12)] + [
-                f'AT2_{i}' for i in range(1,12)] + [
-                f'AT3_{i}' for i in range(1,14)] + [
-                f'AT4_{i}' for i in range(1,14)],
-    
-            'TACTS' :
-                [f'T{i}' for i in range(1, 7)],
-            }
-        return all_flights_dct.get(self.ID)
-    
-    def get_data(self, **kwargs) -> dict:
-        """ Import campaign data per instrument from SQL Database.
-    
-        campaign dictionary:
-            ST all - SOUTHTRAC
-            PGS all - PGS
-            WISE all - WISE
-            TACTS / CARIBIC
-    
-        """
-        fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
-        if not kwargs.get('recalculate') and os.path.exists(r'misc_data/'+fname):
-            with open(r'misc_data/'+fname, 'rb') as f:
-                self.data = dill.load(f)
-    
-        else:
-            print('Importing Campaign Data from SQL Database.')
-    
-            time_data = client_data_choice(
-                    log_in = self._log_in,
-                    campaign = self.ID,
-                    special = self._special,
-                    time = True,
-                    flights = self._default_flights,
-                    )
-    
-            if kwargs.get('verbose'):
-                print('Imported time data')
-            time_df = time_data._data['DATETIME']
-            time_df.index += 1 # measurement_id
-            time_df.index.name = 'measurement_id'
-    
-            self.data['time'] = time_df
-    
-            for instr in self.instruments:
-                if kwargs.get('verbose'):
-                    print('Importing data for ', instr)
-                self.get_instrument_data(instr, time = time_df, **kwargs)
-    
-        if not 'df' in self.data:
-            self.create_df()
-    
-        return self.data
-    
-    def get_instrument_data(self, instr: str, time: pd.Series, **kwargs) -> pd.DataFrame:
-        """ Import data for given instrument. """
-        variables = list(dcts.get_variables(self.ID, instr))
-        if kwargs.get('verbose'):
-            print('  ', variables)
-        variables += ['measurement_id', 'flight_id']
-    
-        data = client_data_choice(log_in = self._log_in,
-                                  instrument = instr,
-                                  campaign = self.ID,
-                                  substances = variables,
-                                  flights = self._default_flights,
-                                  special = self._special,
-                                  )
-    
-        df = data._data['data']
-        df.index = time
-    
-        for col in df.columns:
-            if kwargs.get('verbose'):
-                print(f'Renaming: {col} -> {dcts.harmonise_variables(instr, col)}')
-            df[dcts.harmonise_variables(instr, col)] = df.pop(col)
-    
-        data_key = dcts.harmonise_instruments(instr)
-        self.data[data_key] = df
-        return df
-    
-    def get_met_data(self, met_pdir = None): 
-        """ Creates dataframe for CLaMS data from netcdf files. """
-        
-        campaign_dir_dict = {
-            'SHTR': 'SouthtracTPChange', 
-            'WISE': 'WiseTPChange',
-            'ATOM': 'AtomTPChange', 
-            'HIPPO': 'HippoTPChange', 
-            }
-    
-        def process_clams(ds): 
-            variables = [
-                #          'Lat', # BAHAMAS
-                #          'Lon',
-                #          'PAlt', 
-                #          'Pres', 
-                #          'Theta',
-                #          'Temp',
-                         'ERA5_TEMP',
-                         'ERA5_PRESS',
-                         'ERA5_THETA',
-                         'ERA5_GPH',
-                         'ERA5_PV',
-                         'ERA5_EQLAT',
-                         'ERA5_TROP1_THETA',
-                         'ERA5_TROP1_PRESS',
-                         'ERA5_TROP1_Z',
-                         'ERA5_PRESS_2_0_Main',
-                         'ERA5_PRESS_3_5_Main',
-                         'ERA5_THETA_2_0_Main',
-                         'ERA5_THETA_3_5_Main',
-                         'ERA5_GPH_2_0_Main',
-                         'ERA5_GPH_3_5_Main',]
-            return ds[variables]
-            
-        met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
-        fnames = met_pdir + "/*.nc"
-    
-        # extract data, each file goes through preprocess first to filter variables & convert units
-        with xr.open_mfdataset(fnames, decode_times=False if self.ID=='ATOM' else True,
-                               preprocess = process_clams) as ds:
-            ds = ds
-            
-        self.data['met_ds'] = ds
-        
-        df = ds.to_dataframe()
-        
-        self.data['met_data'] = df
-        
-        return df
-    
-    def create_df(self) -> pd.DataFrame:
-        """ Combine available data into single dataframe. """
-    
-        if 'df' in self.data:
-            if input('Recalculate joint dataframe? [Y/N]\n').upper() != 'Y':
-                return self.data['df']
 
 # %% Local data
 class LocalData():
