@@ -7,7 +7,6 @@ Plotting Tropopause heights for different tropopauses different vertical coordin
 """
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import geopandas
 import math
 from shapely.geometry import Point
@@ -137,6 +136,65 @@ class TropopausePlotter(TropopauseData):
             plt.show()
             plt.close()
 
+    def tp_height_latitude_multiple_definitions(self, tps=None, rel=False): 
+        """ """
+        bci = bp.Bin_equi1d(-90, 90, self.grid_size)
+        outline = mpe.withStroke(linewidth=4, foreground='white')
+        
+        if tps is None: 
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', 
+                                                          rel_to_tp=rel, 
+                                                          source=self.source)) # CANNOT ask for this 
+
+        fig, ax = plt.subplots(dpi=250, figsize=(7,4))
+
+        data = self.df
+        data = data[data.index.isin(self.get_shared_indices(tps, df=True))]
+
+        for tp in tps:
+            label = tp.label(True)
+
+            bin1d = bp.Simple_bin_1d(data[tp.col_name],
+                                  np.array(data.geometry.y), bci,
+                                  count_limit = self.count_limit)
+            plot_kwargs = dict(
+                lw=2.5, path_effects = [outline])
+            
+            plot_kwargs.update(dict(
+                label = label, 
+                # color='dimgray', 
+                # ls = 'dashed', 
+                zorder=5))
+
+            ax.plot(bin1d.xintm, bin1d.vmean, **plot_kwargs)
+
+            if tp.vcoord in ['mxr', 'p']: 
+                ax.invert_yaxis()
+                if tp.vcoord=='p': 
+                    ax.set_yscale('log' if not tp.rel_to_tp else 'symlog')
+
+
+            # ax.set_ylabel(tp.label())# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
+            ax.set_ylabel(tp.label(coord_only=True))
+            ax.set_xlabel(dcts.axis_label('lat'))
+
+            ax.set_xticks(np.arange(30, 85, 5), minor=True)
+
+            if tp.vcoord=='pt' and tp.rel_to_tp: 
+                ax.set_yticks(np.arange(-30, 60, 15))
+                ax.set_ylim(-35, 60)
+            if tp.vcoord=='z' and tp.rel_to_tp: 
+                ax.set_ylim(-2.5,4.1)
+            ax.grid(True, ls='dotted')
+            ax.legend(loc='upper left' if tp.rel_to_tp else 'upper right', 
+                      fontsize=9)
+            
+            if tp.rel_to_tp: 
+                zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks()!=0)
+                for l in zero_lines: 
+                    l.set_color('xkcd:dark grey')
+                    l.set_linestyle('-.')
+
     def tp_height_latitude_binned_hlines(self, rel=False, note=''): 
         """ Plot latitude-binned tropoause heights with horizontal lines over bin. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
@@ -245,7 +303,7 @@ class TropopausePlotter(TropopauseData):
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
         
-        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel))
+        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel, source='Caribic'))
 
         for tp in tps:
             fig, ax = plt.subplots(dpi=250, figsize=(7*0.8,4*0.8))
