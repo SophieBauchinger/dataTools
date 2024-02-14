@@ -171,15 +171,7 @@ def process_caribic(ds):
 
 
 def process_clams(ds): 
-    variables = [
-                 # 'Lat', # BAHAMAS
-                 # 'Lon',
-                 # 'PAlt', # BAHAMAS
-                 # 'Pres', 
-                 # 'Theta',
-                 # 'Temp',
-
-                 'ERA5_TEMP',
+    variables = ['ERA5_TEMP',
                  'ERA5_PRESS',
                  'ERA5_THETA',
                  'ERA5_GPH',
@@ -226,7 +218,10 @@ def process_atom_clams(ds):
     datetimes = [secofday_to_datetime(date, secofday + 5) for secofday in ds['ATom_UTC_Start'].values]
     ds = ds.assign(Time = datetimes) 
     
+    ds = ds.drop_vars('ATom_UTC_Start')
+    
     return ds
+
 
 # %% Data selection
 def minimise_tps(tps) -> list:
