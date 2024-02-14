@@ -172,14 +172,48 @@ class GlobalData:
         """ Returns list of non-substance variables in self.df """
         return self.get_variables('coords')
 
-    def combine(self, glob_obj):
+    @property
+    @abstractmethod
+    def df(self) -> pd.DataFrame:
+        if 'df' in self.data:
+            return self.data['df']
+        return self.create_df()
+
+    @abstractmethod
+    def create_df(self):
+        """ Require existance of dataframe creation method for child classes. """
+        raise NotImplementedError('Child classes need to implement .create_gf()')
+
+    @property
+    @abstractmethod
+    def met_data(self):
+        if 'met_data' in self.data:
+            return self.data['met_data']
+        return self.get_met_data()
+
+    @abstractmethod
+    def get_met_data(self):
+        """ Require existance of dataframe creation method for child classes. """
+        raise NotImplementedError('Child classes need to implement .get_met_data()')
+
+    def __add__(self, glob_obj):
         """ Combine two GlobalData objects into one. Keep only main dataframes. """
-        out = type(self).__new__(self.__class__)  # new class instance
+        print('Combining objects: \n', self, '\n', glob_obj)
 
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+        out = type(self).__new__(GlobalData)  # new class instance
+        out.__init__(years=list(set(self.years + glob_obj.years)))
 
-        out.data = self.data.copy()  # stops self.data being overwritten
+        if isinstance(self.df.index, pd.core.indexes.multi.MultiIndex):
+            new_df = pd.concat(glob_obj.df, keys=[glob_obj.ID], names=['ID', 'DATETIME'])
+            combined_df = pd.concat([self.df, new_df])
+
+        else:
+            new_df = glob_obj.df
+            combined_df = pd.concat([self.df, new_df], keys=[self.ID, glob_obj.ID], names=['ID', 'DATETIME'])
+
+        out.data['df'] = combined_df  # stops self.data being overwritten
+
+        return out
 
     def binned_1d(self, subs, **kwargs) -> (list, list):
         """
@@ -998,11 +1032,6 @@ class GlobalData:
 
         out.status.update({'EE_filter': True})
         return out
-
-class CombinedData(GlobalData):
-    """ Stores combination of multiple """
-    def __init__(self): 
-        return 
 
 ## # Caribic
 class Caribic(GlobalData):
@@ -1876,45 +1905,7 @@ class CampaignData(GlobalData):
         if 'df' in self.data:
             if input('Recalculate joint dataframe? [Y/N]\n').upper() != 'Y':
                 return self.data['df']
-    
-        time = self.data['time']
-        measurement_id = time.index
-    
-        data = pd.DataFrame(measurement_id, index = time)
-    
-        met_data = self.get_met_data()
-        data.join(met_data, rsuffix='_dupe')
-        
-        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
-        # combine data
-        for df in dataframes:
-            data = data.join(df, rsuffix='_dupe')
-            data = data.drop(columns = [c for c in data.columns if 'dupe' in c])
-    
-        if 'flight_id' in data.columns:
-            data['Flight number'] = data.pop('flight_id')
-            
-        self.data['df'] = data
-    
-        # Create GeoDataFrame using available geodata
-        lon_cols = [c for c in data.columns if 'LON' in c]
-        lat_cols = [c for c in data.columns if 'LAT' in c]
-    
-        if len(lon_cols)>0 and len(lat_cols)>0:
-            geodata = [Point(lon, lat) for lon, lat in zip(
-                data[lon_cols[0]], data[lat_cols[0]])]
-            gdf = geopandas.GeoDataFrame(data, geometry=geodata)
-            self.data['df'] = gdf
-            return gdf
-    
-        return data
-    
-    @property
-    def df(self) -> pd.DataFrame:
-        if 'df' in self.data:
-            return self.data['df']
-        return self.create_df()
-    
+
 # %% Local data
 class LocalData():
     """ Contains time-series data from ground-based stations.
