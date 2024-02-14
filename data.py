@@ -79,7 +79,7 @@ def CLaMSnetcdf(campaign, pdir = None):
     return ds
 
 # %% Global data
-class GlobalData():
+class GlobalData:
     """ Contains global datasets with longitude/latitude for each datapoint.
 
     Attributes:
@@ -136,24 +136,24 @@ class GlobalData():
         self.source = self.ID = None
         self.data = {}
 
-    def pickle_data(self, fname:str, pdir=r'misc_data'):
+    def pickle_data(self, fname: str, pdir=r'misc_data'):
         """ Save data dictionary using dill. """
         if len(fname.split('.')) < 2:
             fname = fname + '.pkl'
         with open(pdir + '/' + fname, 'wb') as f:
             dill.dump(self.data, f)
-            print(f'{self.ID} Data dictionary saved to {pdir}\{fname}')
+            print(f'{self.ID} Data dictionary saved to {pdir}/{fname}')
 
     def get_variables(self, category):
         """ Returns list of variables from chosen category with column in self.df """
         if 'df' not in self.data:
             raise KeyError(f'self.data.df not found, cannot return {category} variables.')
         variables = []
-        for column in [c for c in self.data['df'] if not c=='geometry']:
+        for column in [c for c in self.data['df'] if not c == 'geometry']:
             try:
-                if category=='subs':
+                if category == 'subs':
                     var = dcts.get_subs(col_name=column)
-                elif category=='coords':
+                elif category == 'coords':
                     var = dcts.get_coord(col_name=column)
                 else:
                     continue
@@ -214,8 +214,8 @@ class GlobalData():
 
     def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
         """ Flag each datapoint according to its distance to specific tropopause definitions. """
-        #TODO implement this
-        #!!! implement this
+        # TODO implement this
+        # !!! implement this
 
     def detrend_substance(self, substance, loc_obj=None, ID=None,
                           save=True, plot=False, note='') -> np.ndarray:
@@ -258,7 +258,7 @@ class GlobalData():
             dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame) and
                           any(s for s in substances if s.col_name in self.data[k].columns)]
         subs_cols = set(c for k in dataframes for c in self.data[k].columns
-                         if c in [s.col_name for s in substances])
+                        if c in [s.col_name for s in substances])
 
         df_detr = pd.DataFrame()
 
@@ -332,7 +332,7 @@ class GlobalData():
 
     def detrend_all(self, verbose=False):
         """ Add detrended data wherever possible for all available substances. """
-        substances = [dcts.get_subs(col_name = col) for col in self.df.columns
+        substances = [dcts.get_subs(col_name=col) for col in self.df.columns
                       if col in [s.col_name for s in dcts.get_substances()
                                  if not s.short_name.startswith(('detr_', 'd_'))]]
         detr_subs = set([s.short_name for s in substances
@@ -355,7 +355,7 @@ class GlobalData():
         # check function input
         if any([f'sel_{k}' not in self.__dir__() for k in kwargs]):
             raise KeyError('Subset selection is not possible with the following parameters:\
-                            {}'.format([k for k in kwargs if f'sel_{k}' not in self.__dir__() ]))
+                            {}'.format([k for k in kwargs if f'sel_{k}' not in self.__dir__()]))
 
         out = type(self).__new__(self.__class__)  # new class instance
         for attribute_key in self.__dict__:  # copy attributes
@@ -365,7 +365,8 @@ class GlobalData():
         def get_fctn(class_inst, selection):
             if f'sel_{selection}' in class_inst.__dir__():
                 return getattr(class_inst, f'sel_{selection}')
-            else: raise KeyError(f'sel_{selection}')
+            else:
+                raise KeyError(f'sel_{selection}')
 
         for selection in kwargs:
             if isinstance(kwargs.get(selection), (int, str)):
@@ -434,7 +435,8 @@ class GlobalData():
             for k in df_list:  # delete everything that isn't the chosen lat range
                 out.data[k] = out.data[k].cx[-180:180, lat_min:lat_max]
                 out.data[k].sort_index(inplace=True)
-            for k in [k for k in self.data if k not in df_list and isinstance(self.data[k], pd.DataFrame)]: # non-geodataframes
+            for k in [k for k in self.data if
+                      k not in df_list and isinstance(self.data[k], pd.DataFrame)]:  # non-geodataframes
                 indices = [index for df_indices in [out.data[k].index for k in df_list] for index in
                            df_indices]  # all indices in the Geo-dataframes
                 out.data[k] = out.data[k].loc[out.data[k].index.isin(indices)]
@@ -468,8 +470,8 @@ class GlobalData():
                 out.status['latitude'] = (lat_min, lat_max)
 
         elif self.source == 'Mozart':
-            out.df = out.df.query(f'latitude > {lat_min}')
-            out.df = out.df.query(f'latitude < {lat_max}')
+            out.data['df'] = out.df.query(f'latitude > {lat_min}')
+            out.data['df'] = out.df.query(f'latitude < {lat_max}')
             out.years = list(set(out.df.index.year))
 
             if hasattr(out, 'ds'):
@@ -633,7 +635,7 @@ class GlobalData():
         df_sorted.dropna(subset=[subs.col_name], inplace=True)
 
         mxr = df_sorted[subs.col_name]  # measured mixing ratios
-        d_mxr = None if not f'd_{subs.col_name}' in df_sorted.columns else df_sorted[f'd_{subs.col_name}']
+        d_mxr = None if f'd_{subs.col_name}' not in df_sorted.columns else df_sorted[f'd_{subs.col_name}']
         t_obs_tot = np.array(datetime_to_fractionalyear(df_sorted.index, method='exact'))
 
         # Check if units of data and reference data match, if not change data
@@ -673,9 +675,9 @@ class GlobalData():
         subs = dcts.get_subs('o3', ID='INT')
         if not subs.col_name in self.df.columns:
             raise KeyError(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
-        df_sorted = pd.DataFrame(index = self.df.index)
+        df_sorted = pd.DataFrame(index=self.df.index)
         df_sorted.loc[self.df[subs.col_name].lt(60),
-                      (f'strato_{subs.col_name}', f'tropo_{subs.col_name}')] = (False, True)
+        (f'strato_{subs.col_name}', f'tropo_{subs.col_name}')] = (False, True)
         return df_sorted
 
     def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
@@ -732,7 +734,7 @@ class GlobalData():
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
             if tp.tp_def == 'dyn':  # dynamic TP only outside the tropics - latitude filter
-                pass# tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
+                pass  # tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
             if tp.tp_def == 'cpt':  # cold point TP only in the tropics
                 tp_df = tp_df[np.array([(30 > i > -30) for i in np.array(tp_df.geometry.y)])]
 
@@ -746,11 +748,11 @@ class GlobalData():
 
             # tropo: high p (gt 0), low everything else (lt 0)
             tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].lt(0),
-                          (strato, tropo)] = (False, True)
+            (strato, tropo)] = (False, True)
 
             # strato: low p (lt 0), high everything else (gt 0)
             tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].gt(0),
-                          (strato, tropo)] = (True, False)
+            (strato, tropo)] = (True, False)
 
             # # add data for current tp def to df_sorted
             tp_sorted = tp_sorted.convert_dtypes()
@@ -762,7 +764,7 @@ class GlobalData():
             o3_sorted = self.o3_filter()
             o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
             o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
-            for tp in [tp for tp in tps if tp.crit=='o3' and tp.vcoord=='z']:
+            for tp in [tp for tp in tps if tp.crit == 'o3' and tp.vcoord == 'z']:
                 o3_sorted[f'tropo_{tp.col_name}'] = o3_tropo
                 o3_sorted[f'strato_{tp.col_name}'] = o3_strato
                 df_sorted.update(o3_sorted, overwrite=False)
@@ -794,7 +796,7 @@ class GlobalData():
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
         if not tps:
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+        tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
         shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
         # shared_df = shared_df[shared_df != 0].dropna(subset=tropo_cols)
@@ -814,10 +816,10 @@ class GlobalData():
     def calc_non_shared_ratios(self, tps=None):
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
         tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+        tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
         shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
-        non_shared_df = self.df_sorted[ ~ self.df_sorted.index.isin(shared_df.index)]
+        non_shared_df = self.df_sorted[~ self.df_sorted.index.isin(shared_df.index)]
 
         tropo_counts = non_shared_df[tropo_cols].apply(pd.value_counts)
         tropo_counts.dropna(axis=1, inplace=True)
@@ -835,22 +837,22 @@ class GlobalData():
         """ Calculate overall variability of stratospheric and tropospheric air. """
         if not tps:
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        tropo_cols = ['tropo_'+tp.col_name for tp in tps if 'tropo_'+tp.col_name in self.df_sorted]
+        tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
         shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
-        stdv_df = pd.DataFrame(columns= ['tropo_stdv', 'strato_stdv',
-                                         'tropo_mean', 'strato_mean',
-                                         'rel_tropo_stdv', 'rel_strato_stdv'],
-                               index = [tp.col_name for tp in tps])
+        stdv_df = pd.DataFrame(columns=['tropo_stdv', 'strato_stdv',
+                                        'tropo_mean', 'strato_mean',
+                                        'rel_tropo_stdv', 'rel_strato_stdv'],
+                               index=[tp.col_name for tp in tps])
 
         subs_data = self.df[self.df.index.isin(shared_df.index)][subs.col_name]
 
         for tp in tps:
-            t_stdv = subs_data[shared_df['tropo_'+tp.col_name]].std(skipna=True)
-            s_stdv = subs_data[shared_df['strato_'+tp.col_name]].std(skipna=True)
+            t_stdv = subs_data[shared_df['tropo_' + tp.col_name]].std(skipna=True)
+            s_stdv = subs_data[shared_df['strato_' + tp.col_name]].std(skipna=True)
 
-            t_mean = subs_data[shared_df['tropo_'+tp.col_name]].mean(skipna=True)
-            s_mean = subs_data[shared_df['tropo_'+tp.col_name]].mean(skipna=True)
+            t_mean = subs_data[shared_df['tropo_' + tp.col_name]].mean(skipna=True)
+            s_mean = subs_data[shared_df['tropo_' + tp.col_name]].mean(skipna=True)
 
             stdv_df['tropo_stdv'][tp.col_name] = t_stdv
             stdv_df['strato_stdv'][tp.col_name] = s_stdv
@@ -858,8 +860,8 @@ class GlobalData():
             stdv_df['tropo_mean'][tp.col_name] = t_mean
             stdv_df['strato_mean'][tp.col_name] = s_mean
 
-            stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv/t_mean * 100
-            stdv_df['rel_strato_stdv'][tp.col_name] = s_stdv/s_mean * 100
+            stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv / t_mean * 100
+            stdv_df['rel_strato_stdv'][tp.col_name] = s_stdv / s_mean * 100
 
         return stdv_df
 
@@ -1017,7 +1019,7 @@ class Caribic(GlobalData):
         create_substance_df(detr=False):
             Combine met_data with all substance info, optionally incl. detrended
     """
-    
+
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INTtpc'),
                  grid_size=5, verbose=False, recalculate=False, detrend_all=True):
         """ Constructs attributes for Caribic object and creates data dictionary.
@@ -1031,31 +1033,32 @@ class Caribic(GlobalData):
         """
         # no caribic phase-2 data before 2005
         super().__init__([yr for yr in years if yr > 2004], grid_size)
-        
+
         self.source = 'Caribic'
+        self.ID = 'CAR'
         self.pfxs = pfxs
         self.flights = ()
         self.get_data(verbose=verbose, recalculate=recalculate)  # creates self.data dictionary
-    
+
         if 'met_data' not in self.data:
             try:
                 self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
                 self.create_tp_coords()
             except Exception:
                 traceback.print_exc()
-    
+
         if detrend_all:
             try:
                 self.detrend_all()
             except Exception:
                 traceback.print_exc()
-    
+
     def __repr__(self):
         return f"""{self.__class__}
     data: {self.pfxs}
     years: {self.years}
     status: {self.status}"""
-    
+
     def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> (pd.DataFrame, dict):
         """ Data import for a single year """
         if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
@@ -1064,13 +1067,14 @@ class Caribic(GlobalData):
             if verbose: print(f'No data found for {yr} in {self.source}. \
                               Removing {yr} from list of years')
             return pd.DataFrame(), dict()
-    
+
         print(f'Reading Caribic - {pfx} - {yr}')
         # Collect data from individual flights for current year
         df_yr = pd.DataFrame()
-        for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir): #[1:]:
+        col_dict = {}
+        for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir):  # [1:]:
             flight_nr = int(str(current_dir)[-12:-9])
-    
+
             f = find.find_file(f'{pfx}_*', current_dir)
             if not f or len(f) == 0:  # no files found
                 if verbose: print(f'No {pfx} File found for \
@@ -1078,23 +1082,23 @@ class Caribic(GlobalData):
                 continue
             if len(f) > 1:
                 f.sort()  # sort to get most recent v
-    
+
             f_data = FFI1001DataReader(f[-1], df=True, xtype='secofday',
                                        sep_variables=';')
             df_flight = f_data.df  # index = Datetime
             df_flight.insert(0, 'Flight number',
                              [flight_nr] * df_flight.shape[0])
-    
+
             col_dict, rename_dict = tools.rename_columns(f_data.VNAME)
             # set names to their short version
             df_flight.rename(columns=rename_dict, inplace=True)
             df_yr = pd.concat([df_yr, df_flight])
-    
+
         # Convert longitude and latitude into geometry objects
         geodata = [Point(lon, lat) for lon, lat in zip(
             df_yr['lon'], df_yr['lat'])]
         gdf_yr = geopandas.GeoDataFrame(df_yr, geometry=geodata)
-    
+
         # Drop cols which are saved within datetime, geometry
         if not gdf_yr['geometry'].empty:
             filter_cols = ['TimeCRef', 'year', 'month', 'day',
@@ -1102,15 +1106,16 @@ class Caribic(GlobalData):
             del_column_names = [gdf_yr.filter(
                 regex='^' + c).columns[0] for c in filter_cols]
             gdf_yr.drop(del_column_names, axis=1, inplace=True)
-    
+
         return gdf_yr, col_dict
-    
+
     def get_pfx_data(self, pfx, parent_dir, verbose) -> pd.DataFrame:
         """ Data import for chosen prefix. """
         gdf_pfx = geopandas.GeoDataFrame()
+        col_dict = {}
         for yr in self.years:
             gdf_yr, col_dict = self.get_year_data(pfx, yr, parent_dir, verbose)
-    
+
             gdf_pfx = pd.concat([gdf_pfx, gdf_yr])
             if pfx == 'GHG':  # rmv case-sensitive distinction in cols
                 cols = ['SF6', 'CH4', 'CO2', 'N2O']
@@ -1127,7 +1132,7 @@ class Caribic(GlobalData):
                 gdf_pfx.drop(columns=['int_CARIBIC2_Ac',
                                       'int_CARIBIC2_AN'], inplace=True)
         return gdf_pfx, col_dict
-    
+
     def get_data(self, verbose=False, recalculate=False) -> dict:
         """ Imports Caribic data in the form of geopandas dataframes.
     
@@ -1136,32 +1141,32 @@ class Caribic(GlobalData):
         """
         self.data = {}  # easiest way of keeping info which file the data comes from
         parent_dir = r'E:\CARIBIC\Caribic2data'
-    
+
         if not recalculate and os.path.exists(r'misc_data\caribic_data_dict.pkl'):
             with open(r'misc_data\caribic_data_dict.pkl', 'rb') as f:
                 self.data = dill.load(f)
             self.data = self.sel_year(*self.years).data
-    
+
         else:
             print('Importing Caribic Data from remote files.')
             for pfx in self.pfxs:  # can include different prefixes here too
                 gdf_pfx, col_dict = self.get_pfx_data(pfx, parent_dir, verbose)
-    
+
                 if gdf_pfx.empty: print("Data extraction unsuccessful. \
                                         Please check your input data"); return
-    
+
                 # Remove dropped columns from dictionary
                 pop_cols = [i for i in col_dict if i not in gdf_pfx.columns]
                 for key in pop_cols: col_dict.pop(key)
-    
+
                 self.data[pfx] = gdf_pfx
                 self.data[f'{pfx}_dict'] = col_dict
-    
+
         self.flights = list(set(pd.concat(
             [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
-    
+
         return self.data
-    
+
     def coord_combo(self) -> pd.DataFrame:
         """ Create dataframe with all possible coordinates but
         no measurement / substance values """
@@ -1173,7 +1178,7 @@ class Caribic(GlobalData):
             df = pd.DataFrame()
         for pfx in [pfx for pfx in self.pfxs if pfx != 'GHG']:
             df = df.combine_first(self.data[pfx].copy())
-    
+
         coords = ['Flight number', 'p', 'geometry'] + [
             c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)
             if c.col_name not in ['Flight number', 'p', 'geometry']]
@@ -1181,37 +1186,37 @@ class Caribic(GlobalData):
         #     coords = coords + ['p', 'geometry']
         df.drop([col for col in df.columns if col not in coords],
                 axis=1, inplace=True)  # remove non-met / non-coord data
-    
+
         # reorder columns
         self.data['met_data'] = df[list(['Flight number', 'p']
                                         + [col for col in df.columns
                                            if col not in ['Flight number', 'p', 'geometry']]
                                         + ['geometry'])]
         return self.data['met_data']
-    
+
     def create_tp_coords(self) -> pd.DataFrame:
         """ Add calculated relative / absolute tropopause values to .met_data """
         df = self.met_data.copy()
         new_coords = dcts.get_coordinates(**{'ID': 'calc', 'source': 'Caribic'})
-    
+
         for coord in new_coords:
             # met = tp + rel -> MET - MINUS for either one
             met_col = coord.var1
             minus_col = coord.var2
-    
+
             if met_col in df.columns and minus_col in df.columns:
                 df[coord.col_name] = df[met_col] - df[minus_col]
-    
+
             elif coord.var == 'geopot':
                 met_data = df[met_col].values * units(dcts.get_coord(col_name=coord.var1).unit)
                 df[coord.col_name] = calc.geopotential_to_height(met_data)
-    
+
             else:
                 print(f'Could not generate {coord.col_name} as precursors are not available')
-    
+
         self.data['met_data'] = df
         return df
-    
+
     def create_df(self) -> pd.DataFrame:
         df = self.met_data.copy()
         for pfx in self.pfxs:
@@ -1224,7 +1229,7 @@ class Caribic(GlobalData):
                     df = df.drop(columns=f'{c}_{pfx}')
         self.data['df'] = df
         return df
-    
+
     def create_substance_df(self, subs, detr=True):
         """ Create dataframe containing all met.+ msmt. data for a substance """
         if detr:
@@ -1232,50 +1237,51 @@ class Caribic(GlobalData):
         subs_cols = [c for c in self.df
                      if any(i in [s.col_name for s in dcts.get_substances(short_name=subs)]
                             for i in [c, c[5:], c[6:], c[8:]])]
-    
+
         df = self.df[list(self.met_data.columns) + subs_cols]
-        df.dropna(subset = subs_cols, how='all', inplace=True)
-    
-        try: # reordering the columns
+        df.dropna(subset=subs_cols, how='all', inplace=True)
+
+        try:  # reordering the columns
             df = df[['Flight number', 'p']
                     + [c for c in df.columns
                        if c not in ['Flight number', 'p', 'geometry']]
                     + ['geometry']]
-    
-        except KeyError: pass
+
+        except KeyError:
+            pass
         self.data[f'{subs}'] = df
         return self
-    
+
     @property
     def GHG(self) -> pd.DataFrame:
         if 'GHG' in self.data:
             return self.data['GHG']
         raise Warning('No GHG data available')
-    
+
     @property
     def INT(self) -> pd.DataFrame:
         if 'INT' in self.data:
             return self.data['INT']
         raise Warning('No INT data available')
-    
+
     @property
     def INT2(self) -> pd.DataFrame:
         if 'INT2' in self.data:
             return self.data['INT2']
         raise Warning('No INT2 data available')
-    
+
     @property
     def INTtpc(self) -> pd.DataFrame:
         if 'INTtpc' in self.data:
             return self.data['INTtpc']
         raise Warning('No INTtpc data available')
-    
+
     @property
     def met_data(self) -> pd.DataFrame:
         if 'met_data' in self.data:
             return self.data['met_data']
         return self.coord_combo()
-    
+
     @property
     def df(self) -> pd.DataFrame:
         if 'df' in self.data:
@@ -1355,11 +1361,11 @@ class EMAC(GlobalData):
         """ Create dataset with tropopause relevant parameters from s4d and s4d_s"""
         ds = self.data['s4d'].copy()
         ds_s = self.data['s4d_s'].copy()  # subsampled flight level values
-    
+
         # remove floating point errors for datasets that mess up joining them up
         ds['time'] = ds.time.dt.round('S')
         ds_s['time'] = ds_s.time.dt.round('S')
-    
+
         for dataset in [ds, ds_s]:
             for var in dataset.variables:
                 if hasattr(dataset[var], 'units'):
@@ -1368,25 +1374,25 @@ class EMAC(GlobalData):
                     elif dataset[var].units == 'm':
                         dataset[var] = dataset[var].metpy.convert_units(units.km)
                     dataset[var] = dataset[var].metpy.dequantify()  # makes units an attribute again
-    
+
         # get geopotential height from geopotential (s4d & s4d_s for _at_fl)
         # ^ metpy.dequantify allows putting the units back into being attributes
         print('Calculating ECHAM5_height')
         ds = ds.assign(ECHAM5_height=calc.geopotential_to_height(ds['ECHAM5_geopot'])).metpy.dequantify()
         ds['ECHAM5_height'] = ds['ECHAM5_height'].metpy.convert_units(units.km)
         ds['ECHAM5_height'] = ds['ECHAM5_height'].metpy.dequantify()
-    
+
         print('Calculating ECHAM5_height_at_fl')
         ds_s = ds_s.assign(
             ECHAM5_height_at_fl=calc.geopotential_to_height(ds_s['ECHAM5_geopot_at_fl'])).metpy.dequantify()
         ds_s['ECHAM5_height_at_fl'] = ds_s['ECHAM5_height_at_fl'].metpy.convert_units(units.km)
         ds_s['ECHAM5_height_at_fl'] = ds_s['ECHAM5_height_at_fl'].metpy.dequantify()
-    
+
         new_coords = dcts.get_coordinates(**{'ID': 'calc', 'source': 'EMAC', 'var1': 'not_tpress', 'var2': 'not_nan'})
         abs_coords = [c for c in new_coords if c.var2.endswith('_i')]  # get eg. value of pt at tp
         rel_coords = list(dcts.get_coordinates(**{'ID': 'calc', 'source': 'EMAC', 'var1': 'tpress', 'var2': 'not_nan'})
                           + [c for c in new_coords if c not in abs_coords])  # eg. pt distance to tp
-    
+
         # copy relevant data into new dataframe
         vars_at_fl = ['longitude', 'latitude', 'tpress',
                       'tropop_PV_at_fl', 'e5vdiff_tpot_at_fl',
@@ -1394,12 +1400,12 @@ class EMAC(GlobalData):
                       'ECHAM5_press_at_fl', 'ECHAM5_height_at_fl'] + [
                          v for v in ds_s.variables if v.startswith('tracer_')]
         tp_ds = ds_s[vars_at_fl].copy()
-    
+
         tp_vars = [v.col_name for v in dcts.get_coordinates(**{'ID': 'EMAC', 'tp_def': 'not_nan'})
                    if not v.col_name.endswith(('_i', '_f')) and v.col_name in ds.variables]
         for var in tp_vars:
             tp_ds[var] = ds[var].copy()
-    
+
         for coord in abs_coords:
             # e.g. potential temperature at the tropopause (get from index)
             print(f'Calculating {coord.col_name}')
@@ -1407,7 +1413,7 @@ class EMAC(GlobalData):
             met_at_tp = met.sel(lev=ds[coord.var2], method='nearest')
             # remove unnecessary level dimension when adding to tp_ds
             tp_ds[coord.col_name] = met_at_tp.drop_vars('lev')
-    
+
         for coord in rel_coords:
             # mostly depend on abs_coords so order matters (eg. dp wrt. tp_dyn)
             print(f'Calculating {coord.col_name}')
@@ -1423,10 +1429,10 @@ class EMAC(GlobalData):
             # units aren't propagated when subtracting so add them back
             rel = (met - tp) * units(met.units)
             tp_ds[coord.col_name] = rel.metpy.dequantify()  # makes attr 'units'
-    
+
         self.data['tp'] = tp_ds
         return self.data['tp']
-    
+
     def create_df(self, tp=True) -> pd.DataFrame:
         """ Create dataframe from time-dependent variables in dataset """
         if tp:
@@ -1436,7 +1442,7 @@ class EMAC(GlobalData):
             dataset = self.data['tp']
         else:
             dataset = self.ds_s
-    
+
         df = dataset.to_dataframe()
         # drop rows without geodata
         df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
@@ -1448,28 +1454,28 @@ class EMAC(GlobalData):
         df.index = df.index.round('S')
         self.data['df'] = geopandas.GeoDataFrame(df, geometry=geodata)
         return self.data['df']
-    
+
     @property
     def ds(self) -> xr.Dataset:
         """ Allow accessing dataset as class attribute """
         if 's4d' in self.data:
             return self.data['s4d']
         raise Warning('No s4d dataset found')
-    
+
     @property
     def ds_s(self) -> xr.Dataset:
         """ Allow accessing dataset as class attribute """
         if 's4d_s' in self.data:
             return self.data['s4d_s']
         raise Warning('No s4d_s found')
-    
+
     @property
     def tp(self) -> xr.Dataset:
         """ Returns dataset with tropopause relevant parameters  """
         if 'tp' not in self.data:
             self.create_tp()
         return self.data['tp']  # tropopause relevant parameters, only time-dependent
-    
+
     @property
     def df(self) -> pd.DataFrame:
         """ Return dataframe based on subsampled EMAC Data """
@@ -1479,13 +1485,13 @@ class EMAC(GlobalData):
                 return self.create_df()
             return pd.DataFrame()
         return self.data['df']
-    
+
     def save_to_dir(self):
         """ Save emac data etc to files """
         dt.datetime.now().strftime("%Y_%m_%d-%p%I_%M_%S")
         pdir = f'misc_data/Emac-{dt.datetime.now().strftime("%Y_%m_%d-%I_%M_%S")}'
         os.mkdir(pdir)
-    
+
         with open(pdir + '/Emac_inst.pkl', 'wb') as f:
             dill.dump(self, f)
         if 's4d' in self.data: self.ds.to_netcdf(pdir + '/ds.nc')
@@ -1495,11 +1501,12 @@ class EMAC(GlobalData):
             with open(pdir + '/df.pkl', 'wb') as f:
                 dill.dump(self.df, f)
         return self
-    
+
+
 # Combine Caribic and EMAC
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
-    
+
     def __init__(self, years=range(2005, 2020), interp=True, method='n', df_sorted=True, detrend_all=True):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if 2000 <= yr <= 2019])
@@ -1508,23 +1515,23 @@ class TropopauseData(GlobalData):
         # NB select year on this object afterwards bc otherwise interpolation is missing surrounding values
         if interp: self.interpolate_emac(method)
         self.data = self.sel_year(*years).data
-    
+
         if df_sorted:
             try:
                 with open('misc_data/tpdata_df_sorted.pkl', 'rb') as f:
                     self.data['df_sorted'] = dill.load(f)
             finally:
                 self.create_df_sorted(save=True)
-    
-        if detrend_all or input('Detrend all? [Y/N] ').upper()=='Y':
+
+        if detrend_all or input('Detrend all? [Y/N] ').upper() == 'Y':
             self.detrend_all()
-    
+
     def __repr__(self):
         self.years.sort()
         return f'{self.__class__}\n\
     years: {self.years}\n\
     status: {self.status}'
-    
+
     def get_data(self) -> pd.DataFrame:
         """ Return merged dataframe with interpolated EMAC / Caribic data """
         caribic = Caribic(detrend_all=False)
@@ -1534,7 +1541,7 @@ class TropopauseData(GlobalData):
         df = pd.merge(df_caribic, df_emac, how='outer', sort=True,
                       left_index=True, right_index=True)
         df.geometry = df_caribic.geometry.combine_first(df_emac.geometry)
-    
+
         df = df.drop(columns=['geometry_x', 'geometry_y'])
         df['Flight number'].interpolate(method='nearest', inplace=True)
         df['Flight number'].interpolate(inplace=True, limit_direction='both')  # fill in first two timestamps too
@@ -1542,7 +1549,7 @@ class TropopauseData(GlobalData):
         self.data['df'] = df
         self.flights = list(set(df['Flight number']))
         return df
-    
+
     def interpolate_emac(self, method: str, verbose=False) -> dict:
         """ Add interpolated EMAC data to joint df to match caribic timestamps.
     
@@ -1559,7 +1566,7 @@ class TropopauseData(GlobalData):
         tps_emac = [i.col_name for i in dcts.get_coordinates(source='EMAC') if i.col_name in self.df.columns] + [
             i for i in ['ECHAM5_tm1_at_fl', 'ECHAM5_tpoteq_at_fl', 'ECHAM5_press_at_fl'] if i in self.df.columns]
         subs_emac = [i.col_name for i in dcts.get_substances(source='EMAC') if i.col_name in self.df.columns]
-    
+
         nan_count_i = data[tps_emac[0]].isna().value_counts().loc[True]
         for c in tps_emac + subs_emac:
             if method == 'b':
@@ -1570,30 +1577,31 @@ class TropopauseData(GlobalData):
                 raise KeyError('Please choose either b-linear or n-nearest neighbour interpolation.')
             data[c] = data[c].astype(float)
         nan_count_f = data[tps_emac[0]].isna().value_counts().loc[True]
-    
+
         if verbose: print('{} NaNs in EMAC data filled using {} interpolation'.format(
             nan_count_i - nan_count_f, 'nearest neighbour' if method == 'n' else 'linear'))
-    
+
         self.data['df'] = data
         self.status['interp_emac'] = True
         return data
-    
+
     def sort_tropo_strato(self) -> pd.DataFrame:
         """ Returns dataframe with bool strato / tropo columns for various TP definitions. """
         return self.df_sorted
-    
+
     @property
     def df(self) -> pd.DataFrame:
         """ Combined dataframe for Caribic and EMAC (interpolated) data. """
         return self.data['df']
-    
+
     @property
     def df_sorted(self) -> pd.DataFrame:
         """ Bool dataset sorted into strato/tropo for various tropopauses. """
         if 'df_sorted' in self.data:
             return self.data['df_sorted']
         return self.create_df_sorted(save=True)
-    
+
+
 # Mozart
 class Mozart(GlobalData):
     """ Stores relevant Mozart data
@@ -1607,7 +1615,7 @@ class Mozart(GlobalData):
         x: arr, latitude
         y: arr, longitude (remapped to +-180 deg)
     """
-    
+
     def __init__(self, years=range(1980, 2009), grid_size=5, v_limits=None):
         """ Initialise Mozart object """
         super().__init__(years, grid_size)
@@ -1618,10 +1626,10 @@ class Mozart(GlobalData):
         self.v_limits = v_limits  # colorbar normalisation limits
         self.data = {}
         self.get_data()
-    
+
     def __repr__(self):
         return f'Mozart data, subs = {self.substance}'
-    
+
     def get_data(self, remap_lon=True, verbose=False,
                  fname=r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
         """ Create dataset from given file
@@ -1641,13 +1649,13 @@ class Mozart(GlobalData):
                               {[y for y in self.years if y not in ds.time]} \
                               in {self.source}')
             self.years = list(ds.time.values)  # only include actually available years
-    
+
         if remap_lon:  # set longitudes between 180 and 360 to start at -180 towards 0
             new_lon = (((ds.longitude.data + 180) % 360) - 180)
             ds = ds.assign_coords({'longitude': ('longitude', new_lon,
                                                  ds.longitude.attrs)})
             ds = ds.sortby(ds.longitude)  # reorganise values
-    
+
         self.data['ds'] = ds
         df = tools.ds_to_gdf(self.ds)
         df.rename(columns={'SF6': 'SF6_MZT'}, inplace=True)
@@ -1656,23 +1664,20 @@ class Mozart(GlobalData):
             self.data['SF6'] = self.data['df']['SF6_MZT']
         finally:
             pass
-    
+
         return ds  # xr.concat(datasets, dim = 'time')
-    
+
     @property
     def ds(self) -> xr.Dataset:
         return self.data['ds']
-    
+
     @property
     def df(self) -> pd.DataFrame:
         return self.data['df']
-    
+
     @property
     def SF6(self) -> xr.Dataset:
         return self.data['SF6']
-    
-#TODO ATOM flight & latitude selection
-#TODO proper col names for variables I'm unsure about (eg DTH_PV from ATOM.CLAMS_MET)
 
 # HALO and ATOM campaigns from SQL Database
 class CampaignData(GlobalData):
@@ -1920,13 +1925,14 @@ class LocalData():
         ID (str) : short identifier of the data source
         substances (List[str]) : compounds included in the data
         data (Dict[str:pd.DataFrame]) : dictionary of dataframes, keys of form 'co2'
-        df (pd.DataFrame) : combined information from all dataframes
+
     
     Methods:
+        df (pd.DataFrame) : combined information from all dataframes
         get_data(path):
             import time-series data from files in given path
     """
-    
+
     def __init__(self, years, substances):
         self.years = years
         if not hasattr(self, 'ID'): self.ID = None
@@ -1940,7 +1946,7 @@ class LocalData():
         else:
             raise TypeError(f'<substances> needs to be one of \'all\', \'list\', \'set\', not {type(substances)}')
         self.data = {}
-    
+
     def create_df(self) -> pd.DataFrame:
         """ Combine all available dataframes in data into one. """
         df = pd.DataFrame()
@@ -1948,16 +1954,17 @@ class LocalData():
             if isinstance(data_value, pd.DataFrame):
                 df = pd.concat([df, data_value], axis=1)
         return df
-    
+
     @property
     def df(self) -> pd.DataFrame:
         if 'df' in self.data:
             return self.data['df']  #
         return self.create_df()
-    
+
+
 class MaunaLoa(LocalData):
     """ Stores data for all substances measured at Mauna Loa. """
-    
+
     def __init__(self, years=range(1999, 2021), substances='all', data_D=False,
                  path_dir=r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
         """ Initialise Mauna Loa object with all available substance data. """
@@ -1966,10 +1973,10 @@ class MaunaLoa(LocalData):
         super().__init__(years=years, substances=substances)
         if data_D: self.data_D = {}
         self.get_data(path_dir, data_D)
-    
+
     def __repr__(self):
         return f'Mauna Loa - {self.substances}'
-    
+
     def get_data(self, path_dir: str, data_D=False):
         """ Add data for all substances in the given directory to data dictionary. """
         for subs in self.substances:
@@ -1981,7 +1988,7 @@ class MaunaLoa(LocalData):
                     print(f'No daily MLO data found for {subs}')
                     continue
         return self
-    
+
     def get_subs_data(self, path_dir: str, subs: dcts.Substance, freq='M') -> pd.DataFrame:
         """ Import data from Mauna Loa files.
     
@@ -1992,21 +1999,21 @@ class MaunaLoa(LocalData):
         """
         if subs not in ['sf6', 'n2o', 'ch4', 'co2', 'co']:
             raise NotImplementedError(f'Data format and filepaths not defined for {subs}')
-        
+
         if freq == 'D' and subs != 'sf6':
             raise Warning('Daily data from Mauna Loa only available for sf6.')
-    
+
         # get correct path for the chosen substance
         fnames = {
             'sf6': r'/mlo_SF6_{}.dat'.format('Day' if freq == 'D' else 'MM'),
             'n2o': '/mlo_N2O_MM.dat',
-            'co':  '/co_mlo_surface-flask_1_ccgg_month.txt',
+            'co': '/co_mlo_surface-flask_1_ccgg_month.txt',
             'co2': '/co2_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
             'ch4': '/ch4_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
-            }
-        
+        }
+
         path = path_dir + fnames[subs]
-    
+
         # 'ch4', 'co', 'co2' : 1st line has header_lines
         if subs in ['co2', 'ch4', 'co']:
             data_format = 'ccgg'
@@ -2014,7 +2021,7 @@ class MaunaLoa(LocalData):
                 header_lines = int(f.readline().split(' ')[-1].strip())
                 title = f.readlines()[header_lines - 2].split()
                 if title[0].startswith('#'): title = title[2:]  # CO data
-    
+
         elif subs in ['sf6', 'n2o']:
             data_format = 'CATS'
             header_lines = 0
@@ -2025,10 +2032,13 @@ class MaunaLoa(LocalData):
                     else:
                         title = line.split()
                         break
-    
+
+        else:
+            raise Exception('This cannot happen')
+
         mlo_data = np.genfromtxt(path, skip_header=header_lines)
         df = pd.DataFrame(mlo_data, columns=title, dtype=float)
-    
+
         # get names of year and month column (depends on substance)
         if data_format == 'CATS':
             yr_col = [x for x in df.columns if 'catsMLOyr' in x][0]
@@ -2036,10 +2046,12 @@ class MaunaLoa(LocalData):
         elif data_format == 'ccgg':
             yr_col = 'year'
             mon_col = 'month'
-    
+        else:
+            raise Exception('Data Format not valid. ')
+
         # keep only specified years
         df = df.loc[df[yr_col] > min(self.years) - 1].loc[df[yr_col] < max(self.years) + 1].reset_index()
-    
+
         if any('catsMLOday' in s for s in df.columns):  # check if data has day column
             day_col = [x for x in df.columns if 'catsMLOday' in x][0]
             time = [dt.datetime(int(y), int(m), int(d)) for y, m, d in zip(df[yr_col], df[mon_col], df[day_col])]
@@ -2047,48 +2059,49 @@ class MaunaLoa(LocalData):
         else:
             time = [dt.datetime(int(y), int(m), 15) for y, m in
                     zip(df[yr_col], df[mon_col])]  # choose middle of month for monthly data
-    
+
         if data_format == 'CATS':
             df = df.drop(df.iloc[:, :3], axis=1)  # get rid of now unnecessary time data
-    
+
         elif data_format == 'ccgg':
             filter_cols = [c for c in df.columns if c not in ['value', 'value_std_dev']]
             df.drop(filter_cols, axis=1, inplace=True)
             df.dropna(how='any', subset='value', inplace=True)
             df.rename(columns={'value': f'{subs}_{self.ID}', 'value_std_dev': f'{subs}_std_dev_{self.ID}'},
                       inplace=True)
-    
+
         df.astype(float)
         df['Date_Time'] = time
         df.set_index('Date_Time', inplace=True)  # make the datetime object the new index
         if data_format == 'CATS':
-            df.dropna(how='any', subset=str(subs.upper() + 'catsMLOm'), inplace=True)
+            df.dropna(how='any', subset=str(str(subs).upper() + 'catsMLOm'), inplace=True)
         if data_format == 'ccgg' and subs != 'co':
             df.replace([-999.999, -999.99, -99.99, -9], np.nan, inplace=True)
             df.dropna(how='any', subset=f'{subs}_{self.ID}', inplace=True)
-    
+
         if 'dict' not in self.data:
             self.data['dict'] = {}
         self.data['dict'].update({k: dcts.get_subs(col_name=k) for k in df.columns
                                   if k in [s.col_name for s in dcts.get_substances()]})
         return df
 
+
 class MaceHead(LocalData):
     """ Stores data for SF6 measurements at Mace Head. """
-    
+
     def __init__(self, years=(2012), substances='all',
                  path=r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\MHD-medusa_2012.dat'):
         """ Initialise Mace Head with (daily and) monthly data in dataframes """
-    
+
         self.source = 'Mace_Head'
         self.ID = 'MHD'
         super().__init__(years, substances=substances)
         self.path = path
         self.get_data()
-    
+
     def __repr__(self):
         return f'Mace Head - {self.substances}'
-    
+
     def get_data(self) -> pd.DataFrame:
         """ Import data from path definitely in init """
         if not hasattr(self, 'data'): self.data = {}
@@ -2099,27 +2112,27 @@ class MaceHead(LocalData):
                     title = list(f)[0].split()  # takes row below units, which is chill
                     header_lines = i + 2
                     break
-    
+
         # take only relevant substances and feed column info into dictionary
         column_dict = {f'{name}_{self.ID}':
                            dcts.get_subs(short_name=name.lower(), source=self.source)
                        for name in title if name.lower() in self.substances}
-    
+
         if 'dict' not in self.data:
             self.data['dict'] = column_dict
-    
+
         mhd_data = np.genfromtxt(self.path, skip_header=header_lines)
         df = pd.DataFrame(mhd_data, dtype=float,
                           columns=[f'{name}_{self.ID}' for name in title])
         df = df.replace(0, np.nan)  # replace 0 with nan for statistics
         df = df.drop(df.iloc[:, :7], axis=1)  # drop unnecessary time columns
         df = df.astype(float)
-    
+
         df['Date_Time'] = fractionalyear_to_datetime(mhd_data[:, 0])
         df.set_index('Date_Time', inplace=True)  # new index is datetime
         cols = list(column_dict)
         df = df[cols]
-    
+
         self.data_Hour = {'df': df}
         # self.data_Day = {'df': tools.time_mean(df, f='D')}
         # self.data['df'] = tools.time_mean(df, f='M')
