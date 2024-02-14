@@ -152,3 +152,6 @@ CLAMS_D_2_0PVU_THETA,Theta-distance to 2.0 PVU dynamical tropoause,K,CLAMS,CLAMS
 CLAMS_D_STROP_PRESS,Pressure distance to thermal tropopause,hPa,CLAMS,CLAMS,p,,,therm,TRUE,CLAMS,,,,
 CLAMS_D_STROP_THETA,Theta-distance to thermal tropopause,K,CLAMS,CLAMS,pt,,,therm,TRUE,CLAMS,,,,
 CLAMS_EQLAT,Equivalent latitude,deg N,CLAMS,CLAMS,,eql,,,,CLAMS,,,,
+GCECD_N2O,Pseudo coord: N2O dry mole fraction mixing ratio from GCECD (ppb),ppb,GCECD,ATOM,mxr,,,chem,FALSE,MSMT,,n2o,,
+TRIHOP_N2O,Pseudo coord: Nitrous oxide from TRIHOP [ppb - inferred],ppb,TRIHOP,HALO,mxr,,,chem,FALSE,MSMT,,n2o,,
+UMAQS_N2O,Pseudo coord: Nitrous oxide from UMAQS [ppb - inferred],ppb,UMAQS,HALO,mxr,,,chem,FALSE,MSMT,,n2o,,
