@@ -158,10 +158,6 @@ class GlobalData:
         flights = set(self.df[flight_columns[0]])
         return list(flights)
 
-        # # Caribic
-        # self.flights = list(set(pd.concat(
-        #     [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
-
     @property
     @abstractmethod
     def df(self) -> pd.DataFrame:
@@ -241,131 +237,117 @@ class GlobalData:
         # TODO implement this
         # !!! implement this
 
-    def detrend_substance(self, substance, loc_obj=None, ID=None,
-                          save=True, plot=False, note='') -> np.ndarray:
+    def calc_coordinates(self): 
+        """ Calculate coordinates as specified in through .var1 and .var2. """
+        calc_coords = [c for c in dcts.get_coordinates(ID='calc')]
+        
+        
+
+    def detrend_substance(self, subs, loc_obj=None, save=True, plot=False, note='', 
+                          **kwargs) -> (pd.DataFrame, np.ndarray):
         """
-        Remove multi-year linear trend from substance wrt. free troposphere measurements from all dataframes.
-        Returns the polyfit trend parameters as array.
-        (redefined from C_tools.detrend_subs)
+        Remove multi-year linear trend from substance wrt. free troposphere measurements from main dataframe.
+
+        Re-implementation of C_tools.detrend_subs. 
 
         Parameters:
-            substance (str): substance to detrend e.g. 'sf6'
-            loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa
-            ID (str): choose specific dataframe to detrend, e.g. 'GHG'
-            save (bool): add detrended values to stored data
-            plot (bool): show original, detrended and reference data
-            note (str): add note to plot
+            subs (Substance): Substance to detrend
+
+            loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa. Optional
+            save (bool): adds detrended values to main dataframe. Optional
+            plot (bool): show original, detrended and reference data. Optional
+            note (str): add note to plot. Optional
+            
+            Returns the polyfit trend parameters as array. 
         """
         # Prepare reference data
         if loc_obj is None:
-            loc_obj = MaunaLoa(substances=[substance],
+            loc_obj = MaunaLoa(substances=[subs.short_name],
                                years=range(2005, max(self.years) + 2))
 
         ref_df = loc_obj.df
-        ref_subs = dcts.get_subs(substance=substance, ID=loc_obj.ID)
-        if ref_subs is None: raise ValueError(f'No reference data found for {substance}')
-        # ignore reference data earlier and later than two years before/after msmts
-        # ref_df = ref_df[min(df.index)-dt.timedelta(356*2)
-        #                 : max(df.index)+dt.timedelta(356*2)]
+        ref_subs = dcts.get_subs(substance=subs.short_name, ID=loc_obj.ID)
         ref_df.dropna(how='any', subset=ref_subs.col_name, inplace=True)  # remove NaN rows
+
         c_ref = ref_df[ref_subs.col_name].values
         t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
 
         popt = np.polyfit(t_ref, c_ref, 2)
+
         c_fit = np.poly1d(popt)  # get popt, then make into fct
 
         # Prepare data to be detrended
-        substances = dcts.get_substances(short_name=substance)
-        if ID is not None:
-            dataframes = [ID]
-        else:
-            dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame) and
-                          any(s for s in substances if s.col_name in self.data[k].columns)]
-        subs_cols = set(c for k in dataframes for c in self.data[k].columns
-                        if c in [s.col_name for s in substances])
 
-        df_detr = pd.DataFrame()
+        df = self.df.copy()
+        # df_detr = pd.DataFrame()
 
-        for i, k in enumerate(dataframes):  # go through each dataframe and detrend
-            df = self.data[k].copy()
-            for subs in [s for s in substances if s.col_name in df.columns]:
-                df.dropna(axis=0, subset=[subs.col_name], inplace=True)
-                df.sort_index()
-                c_obs = df[subs.col_name].values
-                t_obs = np.array(datetime_to_fractionalyear(df.index, method='exact'))
+        df.dropna(axis=0, subset=[subs.col_name], inplace=True)
+        df.sort_index()
+        c_obs = df[subs.col_name].values
+        t_obs = np.array(datetime_to_fractionalyear(df.index, method='exact'))
 
-                # convert glob obj data to loc obs unit if units don't match
-                if str(subs.unit) != str(ref_subs.unit):
-                    # print(f'Units do not match : {subs.unit} vs {ref_subs.unit}')
-                    if subs.unit == 'mol mol-1':
-                        c_obs = tools.conv_molarity_PartsPer(c_obs, ref_subs.unit)
-                    elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
-                        pass
+        # convert data units to reference data units if they don't match
+        if str(subs.unit) != str(ref_subs.unit):
+            if kwargs.get('verbose'): 
+                print(f'Units do not match : {subs.unit} vs {ref_subs.unit}')
 
-                detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
-                c_obs_detr = c_obs - detrend_correction
-                # get variance (?) by subtracting offset from 0
-                c_obs_delta = c_obs_detr - c_fit(min(t_obs))
+            if subs.unit == 'mol mol-1':
+                c_obs = tools.conv_molarity_PartsPer(c_obs, ref_subs.unit)
+            elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
+                pass
 
-                df_detr_subs = pd.DataFrame({f'init_{subs.col_name}'   : c_obs,
-                                             f'detr_{subs.col_name}'   : c_obs_detr,
-                                             f'delta_{subs.col_name}'  : c_obs_delta,
-                                             f'detrFit_{subs.col_name}': c_fit(t_obs)},
-                                            index=df.index)
-                # maintain relationship between detr and fit columns
-                df_detr_subs[f'detrFit_{subs.col_name}'] = df_detr_subs[f'detrFit_{subs.col_name}'].where(
-                    ~df_detr_subs[f'detr_{subs.col_name}'].isnull(), np.nan)
+        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+        c_obs_detr = c_obs - detrend_correction
 
-                if save:
-                    columns = [f'detr_{subs.col_name}',
-                               # f'delta_{subs.col_name}',
-                               # f'detrFit_{subs.col_name}',
-                               ]
+        # get variance (?) by subtracting offset from 0
+        c_obs_delta = c_obs_detr - c_fit(min(t_obs))
 
-                    # add to data, then move geometry column to the end again
-                    self.data[k][columns] = df_detr_subs[columns]
-                    self.data[k]['geometry'] = self.data[k].pop('geometry')
+        df_detr = pd.DataFrame({f'DATA_{subs.col_name}'   : c_obs,
+                                f'detr_{subs.col_name}'   : c_obs_detr,
+                                f'delta_{subs.col_name}'  : c_obs_delta,
+                                f'detrFit_{subs.col_name}': c_fit(t_obs)},
+                               index=df.index)
 
-                df_detr = pd.concat([df_detr, df_detr_subs])
+        # maintain relationship between detr and fit columns
+        df_detr[f'detrFit_{subs.col_name}'] = df_detr[f'detrFit_{subs.col_name}'].where(
+            ~df_detr[f'detr_{subs.col_name}'].isnull(), np.nan)
 
+        if save:
+            self.df[f'detr_{subs.col_name}'] = df_detr[f'detr_{subs.col_name}']
+            
         if plot:
-            substances = [dcts.get_subs(col_name=s) for s in subs_cols
-                          if 'detr_' + s in df_detr.columns]
-            fig, axs = plt.subplots(len(substances), dpi=150, figsize=(6, 4 * len(substances)), sharex=True)
-            for subs, ax in zip(substances, axs.flatten()):
-                ax.scatter(df_detr.index, df_detr['init_' + subs.col_name], label='Flight data',
-                           color='orange', marker='.')
-                ax.scatter(df_detr.index, df_detr['detr_' + subs.col_name], label='trend removed',
-                           color='green', marker='.')
-                ax.scatter(ref_df.index, c_ref, label='MLO data',
-                           color='gray', alpha=0.4, marker='.')
+            fig, ax = plt.subplots(dpi=150, figsize=(6, 4))
 
-                df_detr.sort_index()
-                t_obs = np.array(datetime_to_fractionalyear(df_detr.index, method='exact'))
-                ax.plot(df_detr.index, c_fit(t_obs), label='trendline',
-                        color='black', ls='dashed')
+            ax.scatter(df_detr.index, df_detr['init_' + subs.col_name], label='Flight data',
+                       color='orange', marker='.')
+            ax.scatter(df_detr.index, df_detr['detr_' + subs.col_name], label='trend removed',
+                       color='green', marker='.')
+            ax.scatter(ref_df.index, c_ref, label=f'Reference {loc_obj.source}',
+                       color='gray', alpha=0.4, marker='.')
 
-                ax.set_ylabel(subs.label())  # ; ax.set_xlabel('Time')
-                # if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
-                if note != '':
-                    leg = ax.legend(title=note)
-                    leg._legend_box.align = "left"
-                else:
-                    ax.legend()
+            df_detr.sort_index()
+            # t_obs = np.array(datetime_to_fractionalyear(df_detr.index, method='exact'))
+            ax.plot(df_detr.index, c_fit(t_obs), label='trendline',
+                    color='black', ls='dashed')
+
+            ax.set_ylabel(subs.label())  # ; ax.set_xlabel('Time')
+            # if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
+            if note != '':
+                leg = ax.legend(title=note)
+                leg._legend_box.align = "left"
+            else:
+                ax.legend()
 
         return df_detr, popt
 
     def detrend_all(self, verbose=False):
         """ Add detrended data wherever possible for all available substances. """
-        substances = [dcts.get_subs(col_name=col) for col in self.df.columns
-                      if col in [s.col_name for s in dcts.get_substances()
-                                 if not s.short_name.startswith(('detr_', 'd_'))]]
-        detr_subs = set([s.short_name for s in substances
-                         if any(subs.ID in ['MLO'] for subs
-                                in dcts.get_substances(short_name=s.short_name))])
-        for subs in detr_subs:
-            if verbose: print(f'Detrending all {subs} data. ')
-            self.detrend_substance(subs, loc_obj=None, ID=None, save=True, plot=False)
+        ref_substances = set(s.short_name for s in dcts.get_substances(ID='MLO') 
+                                   if not s.short_name.startswith('d_'))
+        substances = [s for s in self.substances if s.short_name in ref_substances]
+        for subs in substances:
+            if verbose: print(f'Detrending {subs}. ')
+            self.detrend_substance(subs, save=True)
 
     def sel_subset(self, **kwargs):
         """ Allows making multiple selections at once.
@@ -471,13 +453,10 @@ class GlobalData:
                 out.years = list(set(out.data[df_list[-1]].index.year))
                 out.years.sort()
 
-                # if hasattr(out, 'flights'):
-                #     out.flights = list(set(out.data[df_list[-1]]['Flight number']))
-                #     out.flights.sort()
-
             # Datasets
             ds_list = [k for k in self.data
-                       if isinstance(self.data[k], xr.Dataset)]
+                       if (isinstance(self.data[k], xr.Dataset) 
+                           and 'latitude' in out.data[k].variables)]
 
             for k in ds_list:
                 out.data[k] = out.data[k].where(out.data[k]['latitude'] > lat_min)
@@ -486,7 +465,7 @@ class GlobalData:
             # update years if it hasn't happened with the dataframe already
             if 'df' not in self.data and self.source == 'EMAC':  # only dataset exists
                 self.years = list(set(pd.to_datetime(self.data['ds']['time'].values).year))
-
+                
             # update object status
             if 'latitude' in out.status:
                 out.status['latitude'] = (max([out.status['latitude'][0], lat_min]),
@@ -1064,11 +1043,11 @@ class Caribic(GlobalData):
             except Exception:
                 traceback.print_exc()
 
-        if detrend_all:
-            try:
-                self.detrend_all()
-            except Exception:
-                traceback.print_exc()
+        # if detrend_all:
+        #     try:
+        #         self.detrend_all()
+        #     except Exception:
+        #         traceback.print_exc()
 
     def __repr__(self):
         return f"""{self.__class__}
@@ -1305,6 +1284,29 @@ class Caribic(GlobalData):
             return self.data['df']
         return self.create_df()
 
+    def get_emac_data(self, **kwargs):
+        """ Get EMAC data as specified in class EMAC, then add relevant data to df. """
+        emac_df = EMAC(**kwargs).df
+        self.data['EMAC'] = emac_df
+
+    def interpolate_emac(self, merge_df: bool = True):
+        """ Interpolates EMAC data onto .df timestamps
+
+        Parameters:
+            merge_df (bool): Merges interpolated EMAC data into main dataframe
+        """
+        if 'EMAC' not in self.data:
+            self.get_emac_data()
+
+        # Interpolate and return EMAC data on Caribic timestamps
+        int_emac = interpolate_onto_timestamps(self.data['EMAC'], self.df.index.values)
+        self.data['int_EMAC'] = int_emac
+
+        if merge_df:
+            df = pd.merge(self.df, int_emac, how='outer', sort=True,
+                          left_index=True, right_index=True)
+            self.data['df'] = df
+        return int_emac
 
 # HALO and ATOM campaigns from SQL Database
 class CampaignData(GlobalData):
@@ -1478,7 +1480,12 @@ class CampaignData(GlobalData):
             df[dcts.harmonise_variables(instr, col)] = df.pop(col)
 
         data_key = dcts.harmonise_instruments(instr)
-        self.data[data_key] = df
+        if data_key in self.data: 
+            joined_data = self.data[data_key].join(df, rsuffix='_r')
+            joined_data.drop(columns=[c for c in joined_data.columns if c.endswith('_r')], inplace=True)
+            self.data[data_key] = joined_data
+        else: 
+            self.data[data_key] = df
         return df
 
     def merge_instr_data(self) -> pd.DataFrame:
@@ -1637,8 +1644,8 @@ def interpolate_onto_timestamps(dataframe, times) -> pd.DataFrame:
     except TypeError:
         print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
 
-    regridded_met_data = expanded_df.loc[times]  # return only measurement timestamps
-    return regridded_met_data
+    regridded_data = expanded_df.loc[times]  # return only measurement timestamps
+    return regridded_data
 
 
 # EMAC
@@ -1856,7 +1863,7 @@ class EMAC(GlobalData):
         return self
 
 
-# Combine Caribic and EMAC
+# DEPRECATED: Combine Caribic and EMAC
 class TropopauseData(GlobalData):
     """ Holds Caribic data and Caribic-specific EMAC Model output """
 
@@ -2215,9 +2222,8 @@ class MaceHead(LocalData):
         self.ID = 'MHD'
         super().__init__(years, substances=substances)
         self.path = path
-        self.get_data()
-
         self.data_Hour = {}
+        self.get_data()
 
     def __repr__(self):
         return f'Mace Head - {self.substances}'
