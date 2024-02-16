@@ -386,35 +386,6 @@ def add_zero_line(ax, axis='y'):
         ax.hlines(0, *xlims)
         ax.set_xlim(*xlims)
 
-
-# %% Caribic combine GHG measurements with INT and INT2 coordinates
-# def coord_merge_substance(c_obj, subs, save=True, detr=True):
-#     """ Insert msmt data into full coordinate df from coord_merge() """
-#     # create reference df if it doesn't exist
-#     if not 'met_data' in dir(c_obj): df = c_obj.coord_combo()
-#     else: df = c_obj.met_data.copy()
-
-#     if detr:
-#         try: c_obj.detrend(subs) # add detrended data to all dataframes
-#         except: print(f'Detrending unsuccessful for {subs.upper()}, proceeding without. ')
-
-#     subs_cols = dcts.get_substances(short_name=subs, source=c_obj.source)
-#     subs_cols.update(dcts.get_substances(short_name='d_'+subs, source=c_obj.source))
-
-#     for pfx in c_obj.pfxs:
-#         data = c_obj.data[pfx].sort_index()
-#         cols = [k for k,v in subs_cols.items() if v.ID == pfx and v.col_name in data.columns]
-#         df = df.join(data[cols])
-
-#     # Reorder columns to match initial dataframes & put substance to front
-#     df = df[list(['Flight number', 'p [mbar]'] + cols
-#                  + [c for c in df.columns if c not in
-#                     list(['Flight number', 'p [mbar]', 'geometry']+cols)]
-#                  + ['geometry'])]
-
-#     df.dropna(subset = subs_cols, how='all', inplace=True) # drop rows without any subs data
-#     return df
-
 # %% Binning of global data sets
 
 def bin_1d(glob_obj, subs, **kwargs) -> (list, list):
