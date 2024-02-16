@@ -371,6 +371,12 @@ def get_subs(*args, **kwargs):
         raise Warning(f'Multiple columns fulfill the conditions: {substances}')
     return substances[0]
 
+def lookup_fit_function(short_name):
+    """ Get appropriate fit function for the given substance. """
+    f_per_subs = dict(ch4='h', co='q', co2='h', n2o='s', sf6='q')
+    function_per_f = dict(h=fct.higher, s=fct.simple, q=fct.quadratic)
+    return function_per_f[f_per_subs[short_name]]
+
 #%% Aircraft campaigns
 
 def instrument_df() -> pd.DataFrame:
