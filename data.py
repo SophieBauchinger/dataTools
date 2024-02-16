@@ -15,11 +15,8 @@ Classes:
     Mauna_Loa
     Mace_Head
 """
-# TODO TACTS.CLAMS.THETA muss noch ausm netz gezogen werden
-# TODO make it possible to add multiple GlobalData objects
 
 # TODO ATOM flight & latitude selection
-# proper col names for variables I'm unsure about (eg DTH_PV from ATOM.CLAMS_MET)
 
 import datetime as dt
 import geopandas
@@ -136,7 +133,7 @@ class GlobalData:
                 else:
                     continue
                 variables.append(var)
-            except:
+            except KeyError:
                 continue
         return variables
 
@@ -149,6 +146,21 @@ class GlobalData:
     def coordinates(self):
         """ Returns list of non-substance variables in self.df """
         return self.get_variables('coords')
+
+    @property
+    def flights(self):
+        """ Returns list of flights (as names or numbers) in main dataframe. """
+        if 'df' not in self.data:
+            raise KeyError('Cannot return available flights without main dataframe.')
+        flight_columns = [c for c in self.df.columns if 'flight' in c.lower()]
+        if len(flight_columns) < 1:
+            raise KeyError('Flight information not available in dataframe.')
+        flights = set(self.df[flight_columns[0]])
+        return list(flights)
+
+        # # Caribic
+        # self.flights = list(set(pd.concat(
+        #     [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
 
     @property
     @abstractmethod
@@ -172,7 +184,7 @@ class GlobalData:
     @abstractmethod
     def get_met_data(self):
         """ Require existance of dataframe creation method for child classes. """
-        raise NotImplementedError('Child classes need to implement .get_met_data()')
+        raise NotImplementedError('Subclasses of GlobalData need to implement .get_met_data()')
 
     def __add__(self, glob_obj):
         """ Combine two GlobalData objects into one. Keep only main dataframes. """
@@ -295,9 +307,9 @@ class GlobalData:
                 # get variance (?) by subtracting offset from 0
                 c_obs_delta = c_obs_detr - c_fit(min(t_obs))
 
-                df_detr_subs = pd.DataFrame({f'init_{subs.col_name}': c_obs,
-                                             f'detr_{subs.col_name}': c_obs_detr,
-                                             f'delta_{subs.col_name}': c_obs_delta,
+                df_detr_subs = pd.DataFrame({f'init_{subs.col_name}'   : c_obs,
+                                             f'detr_{subs.col_name}'   : c_obs_detr,
+                                             f'delta_{subs.col_name}'  : c_obs_delta,
                                              f'detrFit_{subs.col_name}': c_fit(t_obs)},
                                             index=df.index)
                 # maintain relationship between detr and fit columns
@@ -414,9 +426,9 @@ class GlobalData:
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
                 out.data[k].sort_index(inplace=True)
 
-            if hasattr(out, 'flights'):
-                out.flights = list(set(out.data[df_list[-1]]['Flight number']))
-                out.flights.sort()
+            # if hasattr(out, 'flights'):
+            #     out.flights = list(set(out.data[df_list[-1]]['Flight number']))
+            #     out.flights.sort()
 
             # Datasets
             ds_list = [k for k in self.data
@@ -459,9 +471,9 @@ class GlobalData:
                 out.years = list(set(out.data[df_list[-1]].index.year))
                 out.years.sort()
 
-                if hasattr(out, 'flights'):
-                    out.flights = list(set(out.data[df_list[-1]]['Flight number']))
-                    out.flights.sort()
+                # if hasattr(out, 'flights'):
+                #     out.flights = list(set(out.data[df_list[-1]]['Flight number']))
+                #     out.flights.sort()
 
             # Datasets
             ds_list = [k for k in self.data
@@ -532,7 +544,7 @@ class GlobalData:
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
 
         Parameters:
-            season (List[int]): list of multiple of 1,2,3,4
+            seasons (List[int]): list of multiple of 1,2,3,4
                 1 - spring, 2 - summer, 3 - autumn, 4 - winter """
         if 'season' in self.status:
             if any(s == dcts.dict_season()[f'name_{s}'] for s in self.status['season']):
@@ -556,9 +568,9 @@ class GlobalData:
             out.data[k] = out.data[k].drop(columns=['season'])
             out.data[k].sort_index(inplace=True)
 
-        if hasattr(out, 'flights'):
-            out.flights = list(set(out.data[df_list[-1]]['Flight number']))
-            out.flights.sort()
+        # if hasattr(out, 'flights'):
+        #     out.flights = list(set(out.data[df_list[-1]]['Flight number']))
+        #     out.flights.sort()
 
         out.status['season'] = [dcts.dict_season()[f'name_{s}'] for s in seasons]
         return out
@@ -589,80 +601,66 @@ class GlobalData:
                 out.data[k]['Flight number'].isin(flights)]
             out.data[k].sort_index(inplace=True)
 
-        out.flights = flights  # update to chosen & available flights
+        # out.flights = flights  # update to chosen & available flights
         out.years = list(set(out.data['df'].index.year))
         out.years.sort()
-        out.flights.sort()
+        # out.flights.sort()
 
         return out
 
     def n2o_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
-        if self.source not in ['Caribic', 'TP', 'EMAC', 'HALO']:
-            raise NotImplementedError(f'N2O sorting not available for {self.source}')
 
-        loc_obj = MaunaLoa(self.years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
+        # Get data
+        data = self.df
 
-        if 'ID' in kwargs:
-            ID = kwargs.pop('ID')
-        elif 'GHG' in self.data or dcts.get_subs('n2o', ID='GHG').col_name in self.df.columns:
-            ID = 'GHG'
-        elif self.source == 'TP' and not dcts.get_subs('n2o', ID='GHG').col_name in self.df.columns:
-            raise Warning('Please specify an ID to narrow down which data to use for the N2O filter.')
-        elif self.source == 'HALO':
-            if self.ID == 'SHTR':
-                ID = 'UMAQS'
-            else:
-                raise NotImplementedError(f'HALO Campaign {self.ID} not yet implemented')
+        # Choose N2O data to use (Substance object)
+        if len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
+            n2o_coord = [c for c in self.coordinates if c.crit == 'n2o'][0]
+
         else:
-            ID = self.source if not hasattr(self, 'ID') else self.ID
+            default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', HIAPER='NWAS', EMAC='EMAC', TP='INT')
+            if self.source not in default_n2o_IDs.keys():
+                raise NotImplementedError(f'N2O sorting not available for {self.source}')
 
-        if 'crit' in kwargs: del kwargs['crit']  # needs to be n2o anyway & duplicated otherwise
+            n2o_coord = dcts.get_coord(crit='n2o', ID=default_n2o_IDs[self.source])
 
-        subs = dcts.get_subs('n2o', ID=ID)
+            if n2o_coord.col_name not in data.columns:
+                raise Warning(f'Could not find {n2o_coord.col_name} in {self.ID} data.')
+
+        # Get reference dataset
+        loc_obj = MaunaLoa(self.years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
         ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID)  # dcts.get_col_name(subs, loc_obj.source)
 
-        if kwargs.get('detr'): self.detrend_substance(subs.short_name, save=True)
-
-        dataframes = [k for k in self.data if isinstance(self.data[k], pd.DataFrame)]
-        if subs.col_name not in [c for k in dataframes for c in self.data[k].columns]:
-            print(f'Cannot find {subs.col_name} anywhere in the data.')
-
-        # find the dataframe that has the column in it
-        if self.source == 'Caribic':
-            data = self.data[ID]
-        else:
-            data = self.df
-
-        if subs.col_name not in data.columns:
-            raise Warning(f'Could not find {subs.col_name} in {ID} data.')
-
         if kwargs.get('verbose'):
-            print(f'N2O sorting: {subs} ')
+            print(f'N2O sorting: {n2o_coord} ')
+
+        n2o_column = n2o_coord.col_name
 
         df_sorted = pd.DataFrame(index=data.index)
         if 'Flight number' in data.columns: df_sorted['Flight number'] = data['Flight number']
-        df_sorted[subs.col_name] = data[subs.col_name]
+        df_sorted[n2o_column] = data[n2o_column]
 
-        if f'd_{subs.col_name}' in data.columns:
-            df_sorted[f'd_{subs.col_name}'] = data[f'd_{subs.col_name}']
-        if f'detr_{subs.col_name}' in data.columns:
-            df_sorted[f'detr_{subs.col_name}'] = data[f'detr_{subs.col_name}']
+        if f'd_{n2o_column}' in data.columns:
+            df_sorted[f'd_{n2o_column}'] = data[f'd_{n2o_column}']
+        if f'detr_{n2o_column}' in data.columns:
+            df_sorted[f'detr_{n2o_column}'] = data[f'detr_{n2o_column}']
 
         df_sorted.sort_index(inplace=True)
-        df_sorted.dropna(subset=[subs.col_name], inplace=True)
+        df_sorted.dropna(subset=[n2o_column], inplace=True)
 
-        mxr = df_sorted[subs.col_name]  # measured mixing ratios
-        d_mxr = None if f'd_{subs.col_name}' not in df_sorted.columns else df_sorted[f'd_{subs.col_name}']
+        mxr = df_sorted[n2o_column]  # measured mixing ratios
+        d_mxr = None if f'd_{n2o_column}' not in df_sorted.columns else df_sorted[f'd_{n2o_column}']
         t_obs_tot = np.array(datetime_to_fractionalyear(df_sorted.index, method='exact'))
 
         # Check if units of data and reference data match, if not change data
-        if str(subs.unit) != str(ref_subs.unit):
-            if kwargs.get('verbose'): print(f'Note units do not match: {subs.unit} vs {ref_subs.unit}')
-            if subs.unit == 'mol mol-1':
+        if str(n2o_coord.unit) != str(ref_subs.unit):
+            if kwargs.get('verbose'): print(f'Note units do not match: {n2o_coord.unit} vs {ref_subs.unit}')
+
+            if n2o_coord.unit == 'mol mol-1':
                 mxr = tools.conv_molarity_PartsPer(mxr, ref_subs.unit)
                 if d_mxr is not None: d_mxr = tools.conv_molarity_PartsPer(d_mxr, ref_subs.unit)
-            elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
+            elif n2o_coord.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
                 pass
             else:
                 raise NotImplementedError('No conversion between {subs.unit} and {ref_subs.unit}')
@@ -672,10 +670,12 @@ class GlobalData:
         df_flag = tools.pre_flag(mxr, ref_mxr, 'n2o', **kwargs)
         flag = df_flag['flag_n2o'] if 'flag_n2o' in df_flag.columns else None
 
-        strato = f'strato_{subs.col_name}'
-        tropo = f'tropo_{subs.col_name}'
+        strato = f'strato_{n2o_column}'
+        tropo = f'tropo_{n2o_column}'
 
-        ol = outliers.find_ol(subs.function, t_obs_tot, mxr, d_mxr,
+        fit_function = dcts.lookup_fit_function('n2o')
+
+        ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
                               flag=flag, verbose=False, plot=False,
                               limit=0.1, direction='n')
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
@@ -693,7 +693,7 @@ class GlobalData:
         if self.source == 'Caribic':
             subs = dcts.get_subs('o3', ID='INT')
         else:
-            o3_substances = [s for s in self.substances if s.short_name=='o3']
+            o3_substances = [s for s in self.substances if s.short_name == 'o3']
             if len(o3_substances) > 1:
                 raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
             else:
@@ -710,55 +710,47 @@ class GlobalData:
         If no kwargs are specified, df_sorted is calculated for all possible definitions
         df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
         """
-        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO']:  # TODO implement for HALO
+        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER']:
             data = self.df.copy()
         else:
             raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
+
         # create df_sorted with flight number if available
         df_sorted = pd.DataFrame(data['Flight number'] if 'Flight number' in data.columns else None,
                                  index=data.index)
 
-        # apply necessary changes to kwargs to only get appropriate tps
-        # if not 'source' in kwargs and self.source in ['Caribic', 'EMAC', 'HALO']:
-        #     kwargs.update({'source': self.source})
-        # if not 'tp_def' in kwargs: kwargs.update({'tp_def': 'not_nan'})  # rmv irrelevant stuff
-        # if not 'vcoord' in kwargs: kwargs.update({'vcoord': 'not_nan'})  # rmv var='frac'
-
+        # Get tropopause coordinates
         tps = [c for c in self.coordinates if (
-            str(c.tp_def) != 'nan' and c.var != 'geopot')]
-        # print('Tropopause coordinates: \n', tps)
+                str(c.tp_def) != 'nan' and c.var != 'geopot')]
 
-        # TODO something is not quite working here
+        if kwargs.get('verbose'): print('Tropopause coordinates: \n', tps)
 
-        # adding bool columns for each tp coordinate to df_sorted
-        for tp in [tp for tp in tps if tp.crit == 'n2o']:  # N2O filter
+        # N2O filter
+        for tp in [tp for tp in tps if tp.crit == 'n2o']:
             n2o_sorted = self.n2o_filter(**tp.__dict__)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
 
+        # Dyn / Therm / CPT / Combo tropopauses
         for tp in [tp for tp in tps if not tp.vcoord == 'mxr']:
-            if kwargs.get('verbose'): 
-                print(f'Sorting {tp}')
-
-            # All other tropopause definitions
-            if not tp.col_name in data.columns:
+            if tp.col_name not in data.columns:
                 print(f'Note: {tp.col_name} not found, continuing.')
                 continue
 
-            # if rel_to_tp coordinate exists, take that one and remove the other one from the tps list
+            if kwargs.get('verbose'): print(f'Sorting {tp}')
+
+            # Refer to relative tp coordinate if available
             if not tp.rel_to_tp:
                 coord_dct = {k: v for k, v in tp.__dict__.items()
-                             if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu']}
-
+                             if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu', 'source']}
                 try:
                     rel_coord = dcts.get_coord(**coord_dct, rel_to_tp=True)
                     if rel_coord.col_name in data.columns:
                         tps.remove(tp)
                         continue  # skip current tp if it exists as relative too
-                except: 
-                    if kwargs.get('verbose'):
-                        print('Using non-relative TP: ', tp)
+                except KeyError:
+                    if kwargs.get('verbose'): print('Using non-relative TP: ', tp)
 
             if kwargs.get('verbose'): print('TP sorting: ', tp)
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
@@ -773,7 +765,7 @@ class GlobalData:
             strato = 'strato_' + tp.col_name
 
             tp_sorted = pd.DataFrame({strato: pd.Series(np.nan),
-                                      tropo: pd.Series(np.nan)},
+                                      tropo : pd.Series(np.nan)},
                                      index=tp_df.index)
 
             # tropo: high p (gt 0), low everything else (lt 0)
@@ -789,9 +781,8 @@ class GlobalData:
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
 
-        # flag tropospheric ozone below 60 ppb as tropospheric
-        # (only really makes sense for caribic but leaving it in anyway)
-        if any(tp.crit == 'o3' for tp in tps): 
+        # Ozone: Flag O3 < 60 ppb as tropospheric
+        if any(tp.crit == 'o3' for tp in tps):
             o3_sorted = self.o3_filter_lt60()
             o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
             o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
@@ -801,7 +792,7 @@ class GlobalData:
                 df_sorted.update(o3_sorted, overwrite=False)
 
         df_sorted = df_sorted.convert_dtypes()
-        if save: 
+        if save:
             self.data['df_sorted'] = df_sorted
         return df_sorted
 
@@ -1029,6 +1020,7 @@ class GlobalData:
         out.status.update({'EE_filter': True})
         return out
 
+
 ## # Caribic
 class Caribic(GlobalData):
     """ Stores all available information from Caribic datafiles and allows further analsis. 
@@ -1062,7 +1054,7 @@ class Caribic(GlobalData):
         self.source = 'Caribic'
         self.ID = 'CAR'
         self.pfxs = pfxs
-        self.flights = ()
+        # self.flights = ()
         self.get_data(verbose=verbose, recalculate=recalculate)  # creates self.data dictionary
 
         if 'met_data' not in self.data:
@@ -1187,8 +1179,8 @@ class Caribic(GlobalData):
                 self.data[pfx] = gdf_pfx
                 self.data[f'{pfx}_dict'] = col_dict
 
-        self.flights = list(set(pd.concat(
-            [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
+        # self.flights = list(set(pd.concat(
+        #     [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
 
         return self.data
 
@@ -1335,9 +1327,9 @@ class CampaignData(GlobalData):
 
         source_dict = {
             'SHTR' : 'HALO',
-            'WISE': 'HALO',
-            'PGS' : 'HALO',
-            'TACTS' : 'HALO',
+            'WISE' : 'HALO',
+            'PGS'  : 'HALO',
+            'TACTS': 'HALO',
             'ATOM' : 'ATOM',
             'HIPPO': 'HIAPER', }
         self.source = source_dict[campaign]
@@ -1346,13 +1338,13 @@ class CampaignData(GlobalData):
         self.instruments = list(dcts.get_instruments(self.ID))
         self.data = {}
         self.get_data(**kwargs)
-        
+
         self.create_df()
 
-        if 'flight_id' in self.df:
-            self.flights = set(self.data['df']['flight_id'].values)
-        if 'Flight number' in self.df:
-            self.flights = set(self.data['df']['Flight number'].values)
+        # if 'flight_id' in self.df:
+        #     self.flights = set(self.data['df']['flight_id'].values)
+        # if 'Flight number' in self.df:
+        #     self.flights = set(self.data['df']['Flight number'].values)
 
         self.years = list(set(self.data['df'].index.year))
 
@@ -1360,56 +1352,56 @@ class CampaignData(GlobalData):
         """ Show instance details representing dataset. """
         if 'instruments' in self.__dict__:
             return (
-    f"""{self.__class__}
+                f"""{self.__class__}
     instruments: {self.instruments}
-    status: {self.status}""" )
+    status: {self.status}""")
 
         else:
             return (
-    f"""{self.__class__}
-    status: {self.status}""" )
+                f"""{self.__class__}
+    status: {self.status}""")
 
     @property
     def _log_in(self, **kwargs):
         user = keyring.get_password('IAU_SQL', 'username_key')
         log_in = {"host": '141.2.225.99',
                   "user": user,
-                  "pwd": keyring.get_password('IAU_SQL', user)}
+                  "pwd" : keyring.get_password('IAU_SQL', user)}
         return log_in
 
     @property
     def _special(self):
         """ Get special kwarg for campaign data import. """
         special_dct = {
-            'SHTR': 'ST all',
-            'WISE': 'WISE all',
-            'PGS': 'PGS all',
-            'ATOM': None,
+            'SHTR' : 'ST all',
+            'WISE' : 'WISE all',
+            'PGS'  : 'PGS all',
+            'ATOM' : None,
             'TACTS': None,
             'HIPPO': None,
-        }
+            }
         return special_dct.get(self.ID)
 
     @property
     def _default_flights(self):
         """ Get default flight kwarg for campaign data import. """
         all_flights_dct = {
-            'ATOM':
+            'ATOM' :
                 [f'AT1_{i}' for i in range(1, 12)] + [
-                 f'AT2_{i}' for i in range(1, 12)] + [
-                 f'AT3_{i}' for i in range(1, 14)] + [
-                 f'AT4_{i}' for i in range(1, 14)],
+                    f'AT2_{i}' for i in range(1, 12)] + [
+                    f'AT3_{i}' for i in range(1, 14)] + [
+                    f'AT4_{i}' for i in range(1, 14)],
 
             'TACTS':
                 [f'T{i}' for i in range(1, 7)],
 
-            'HIPPO': 
+            'HIPPO':
                 [f'H1_{i}' for i in range(2, 12)] + [
-                 f'H2_{i}' for i in range(-1, 12)] + [
-                 f'H3_{i}' for i in range(1, 12)] + [
-                 f'H4_{i}' for i in range(0, 13)] + [
-                 f'H5_{i}' for i in range(1, 15)],
-        }
+                    f'H2_{i}' for i in range(-1, 12)] + [
+                    f'H3_{i}' for i in range(1, 12)] + [
+                    f'H4_{i}' for i in range(0, 13)] + [
+                    f'H5_{i}' for i in range(1, 15)],
+            }
         return all_flights_dct.get(self.ID)
 
     def get_data(self, **kwargs) -> dict:
@@ -1440,7 +1432,7 @@ class CampaignData(GlobalData):
                 special=self._special,
                 time=True,
                 flights=self._default_flights,
-            )
+                )
 
             if kwargs.get('verbose'):
                 print('Imported time data')
@@ -1455,8 +1447,8 @@ class CampaignData(GlobalData):
                     print('Importing data for ', instr)
                 self.get_instrument_data(instr, time=time_df, **kwargs)
 
-            self.merge_instr_data() # Merge data from all instruments, create .df
-            self.get_met_data() # Get meteorological data, create .met_data
+            self.merge_instr_data()  # Merge data from all instruments, create .df
+            self.get_met_data()  # Get meteorological data, create .met_data
 
         return self.data
 
@@ -1528,12 +1520,12 @@ class CampaignData(GlobalData):
 
         if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
             campaign_dir_dict = {
-                'SHTR': 'SouthtracTPChange',
-                'WISE': 'WiseTPChange',
-                'ATOM': 'AtomTPChange',
+                'SHTR' : 'SouthtracTPChange',
+                'WISE' : 'WiseTPChange',
+                'ATOM' : 'AtomTPChange',
                 'HIPPO': 'HippoTPChange',
-                'PGS' : 'PolstraccTPChange',
-            }
+                'PGS'  : 'PolstraccTPChange',
+                }
 
             met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
             fnames = met_pdir + "/*.nc"
@@ -1549,11 +1541,11 @@ class CampaignData(GlobalData):
 
         elif self.ID in ['TACTS'] and 'df' in self.data.keys():
             met_cols = [c for c in self.df.columns if c in [
-                c.col_name for c in dcts.get_coordinates() 
-                if not c.col_name=='geometry']]
+                c.col_name for c in dcts.get_coordinates()
+                if not c.col_name == 'geometry']]
             met_df = self.df[met_cols]
-            
-        else: 
+
+        else:
             raise NotImplementedError(f'Cannot create met_data for {self.ID}')
 
         self.data['met_data'] = met_df
@@ -1561,22 +1553,23 @@ class CampaignData(GlobalData):
 
     def create_df(self) -> pd.DataFrame:
         """ Combine available data into single dataframe. """
-        
-        if not 'df' in self.data: 
+
+        if 'df' not in self.data:
             self.merge_instr_data()
 
-        if not 'met_data' in self.data: 
+        if 'met_data' not in self.data:
             self.get_met_data()
 
-        if not 'met_data' in self.data: 
+        if 'met_data' not in self.data:
             raise Exception('Oi', self.data)
 
         data = self.data['df']
         met_data = self.data['met_data']
         times = self.data['time'].values
 
-        try: interpolated_met_data = interpolate_onto_timestamps(met_data, times)
-        except: 
+        try:
+            interpolated_met_data = interpolate_onto_timestamps(met_data, times)
+        except:
             print('Interpolation unsuccessful. ')
             interpolated_met_data = met_data
 
@@ -1613,37 +1606,38 @@ class CampaignData(GlobalData):
         if 'df' in self.data:
             return self.data['df']
         return self.create_df()
-    
+
     @property
-    def met_data(self) -> pd.DataFrame: 
+    def met_data(self) -> pd.DataFrame:
         """ Meteorological Parameters along the flight track. """
-        if 'met_data' in self.data: 
+        if 'met_data' in self.data:
             return self.data['met_data']
         return self.get_met_data()
 
-def interpolate_onto_timestamps(dataframe, times) -> pd.DataFrame: 
+
+def interpolate_onto_timestamps(dataframe, times) -> pd.DataFrame:
     """ Interpolate met data onto given measurement timestamps. 
     
     Parameters: 
-        met_data (pd.DataFrame): dataframe to be interpolated
+        dataframe (pd.DataFrame): data to be interpolated
         times (array, list): Timestamps to be used for interpolating onto
     """
-    if isinstance(dataframe, geopandas.GeoDataFrame): 
+    if isinstance(dataframe, geopandas.GeoDataFrame):
         dataframe = pd.DataFrame(dataframe[[c for c in dataframe.columns if c != 'geometry']])
-    
+
     # add measurement timestamps to met_data
     new_indices = [i for i in times if i not in dataframe.index]
-    
+
     expanded_df = pd.concat([dataframe, pd.Series(index=new_indices, dtype='object')])
     expanded_df.drop(columns=[0], inplace=True)
     expanded_df.sort_index(inplace=True)
-    
-    try: 
+
+    try:
         expanded_df.interpolate(method='time', inplace=True, limit=2)  # , limit=500)
-    except TypeError: 
+    except TypeError:
         print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
 
-    regridded_met_data = expanded_df.loc[times] # return only measurement timestamps
+    regridded_met_data = expanded_df.loc[times]  # return only measurement timestamps
     return regridded_met_data
 
 
@@ -1906,7 +1900,7 @@ class TropopauseData(GlobalData):
         df['Flight number'].interpolate(inplace=True, limit_direction='both')  # fill in first two timestamps too
         df['Flight number'] = df['Flight number'].astype(int)
         self.data['df'] = df
-        self.flights = list(set(df['Flight number']))
+        # self.flights = list(set(df['Flight number']))
         return df
 
     def interpolate_emac(self, method: str, verbose=False) -> dict:
@@ -2047,7 +2041,7 @@ class LocalData():
         years (List[int]) : years included in the stored data
         source (str) : data source, e.g. 'Mauna_Loa'
         ID (str) : short identifier of the data source
-        substances (List[str]) : compounds included in the data
+        substances (List[str]) : compounds for which measurements are available
         data (Dict[str:pd.DataFrame]) : dictionary of dataframes, keys of form 'co2'
 
     
@@ -2131,10 +2125,10 @@ class MaunaLoa(LocalData):
         fnames = {
             'sf6': r'/mlo_SF6_{}.dat'.format('Day' if freq == 'D' else 'MM'),
             'n2o': '/mlo_N2O_MM.dat',
-            'co': '/co_mlo_surface-flask_1_ccgg_month.txt',
+            'co' : '/co_mlo_surface-flask_1_ccgg_month.txt',
             'co2': '/co2_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
             'ch4': '/ch4_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
-        }
+            }
 
         path = path_dir + fnames[subs]
 
@@ -2223,6 +2217,8 @@ class MaceHead(LocalData):
         self.path = path
         self.get_data()
 
+        self.data_Hour = {}
+
     def __repr__(self):
         return f'Mace Head - {self.substances}'
 
@@ -2257,7 +2253,7 @@ class MaceHead(LocalData):
         cols = list(column_dict)
         df = df[cols]
 
-        self.data_Hour = {'df': df}
+        self.data_Hour['df'] = df
         # self.data_Day = {'df': tools.time_mean(df, f='D')}
         # self.data['df'] = tools.time_mean(df, f='M')
         return df
