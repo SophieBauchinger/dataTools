@@ -74,8 +74,8 @@ CLAMS_D_STROP_THETA,Theta-distance to thermal tropopause,K,CLAMS,CLAMS,pt,,,ther
 CLAMS_EQLAT,Equivalent latitude,deg N,CLAMS,CLAMS,,eql,,,,CLAMS,,,,
 ERA5_EQLAT,Equivalent latitude (ERA5),deg N,CLAMS,CLAMS,,eql,,,,ERA5,,,,
 ERA5_GPH,Geopotential (ERA5),m2s-2,CLAMS,CLAMS,,,gepot,,,ERA5,,,,
-ERA5_GPH_2_0_Main,Geopotential at main 2.0 PVU surface,m2s-2,CLAMS,CLAMS,z,,gepot,dyn,FALSE,ERA5,2,,,
-ERA5_GPH_3_5_Main,Geopotential at main 3.5 PVU surface,m2s-2,CLAMS,CLAMS,z,,gepot,dyn,FALSE,ERA5,3.5,,,
+ERA5_GPH_2_0_Main,Geopotential at main 2.0 PVU surface,m2s-2,CLAMS,CLAMS,,,gepot,dyn,FALSE,ERA5,2,,,
+ERA5_GPH_3_5_Main,Geopotential at main 3.5 PVU surface,m2s-2,CLAMS,CLAMS,,,gepot,dyn,FALSE,ERA5,3.5,,,
 ERA5_PRESS,Pressure (ERA5),hPa,CLAMS,CLAMS,p,,,,,ERA5,,,,
 ERA5_PRESS_2_0_Main,Pressure at main 2.0 PVU surface,hPa,CLAMS,CLAMS,p,,,dyn,FALSE,ERA5,2,,,
 ERA5_PRESS_3_5_Main,Pressure at main 3.5 PVU surface,hPa,CLAMS,CLAMS,p,,,dyn,FALSE,ERA5,3.5,,,
@@ -87,6 +87,7 @@ ERA5_THETA_3_5_Main,Potential temperature at main 3.5 PVU surface,K,CLAMS,CLAMS,
 ERA5_TROP1_PRESS,Pressure of local lapse rate tropopause (ERA5),hPa,CLAMS,CLAMS,p,,,therm,FALSE,ERA5,,,,
 ERA5_TROP1_THETA,Pot. temperature of local lapse rate tropopause (ERA5),K,CLAMS,CLAMS,pt,,,therm,FALSE,ERA5,,,,
 ERA5_TROP1_Z,Height of local lapse rate tropopause (ERA5),km,CLAMS,CLAMS,z,,,therm,FALSE,ERA5,,,,
+CLAMS_PV,Potential Vorticity (CLAMS),PVU,CLAMS,CLAMS,pv,,,,,ERA5,,,,
 e5vdiff_tpot,potential temperature,K,EMAC,EMAC,pt,,,,,EMAC,,,,
 e5vdiff_tpot_at_fl,potential temperature at flight level,K,EMAC,EMAC,pt,,,,,EMAC,,,,
 ECHAM5_aclc,large scale cloud cover,,EMAC,EMAC,,,aclc,,,EMAC,,,,
@@ -152,7 +153,6 @@ BAHAMAS_LAT,Latitude position above WGS84,deg N,BAHAMAS,HALO,,lat,,,,MSMT,,,,
 BAHAMAS_LON,Longitude position above WGS84,deg E,BAHAMAS,HALO,,lon,,,,MSMT,,,,
 BAHAMAS_POT,Potential Temperature,K,BAHAMAS,HALO,pt,,,,,MSMT,,,,
 BAHAMAS_PSTAT,Static Pressure (Bahamas) ,hPa,BAHAMAS,HALO,p,,,,,MSMT,,,,
-CLAMS_PV,Potential Vorticity (CLAMS),PVU,CLAMS,HALO,pv,,,,,ERA5,,,,
 GLORIA_altitude,measured altitude ,km,GLORIA,HALO,alt,,,,,MSMT,,,,
 GLORIA_lapse_rate,measured lapse rate,K km-1,GLORIA,HALO,,,lapse_rate,,,MSMT,,,,
 TRIHOP_N2O,Pseudo coord: Nitrous oxide from TRIHOP [ppb - inferred],ppb,TRIHOP,HALO,mxr,,,chem,FALSE,MSMT,,n2o,,
@@ -164,3 +164,15 @@ hiaper_MET_PALT,PALT - Pressure altitude [m],m,MET,HIAPER,p,,,,,MSMT,,,,
 hiaper_MET_PRESS,PSXC - Reference static pressure: research static pressure corrected for airflow effects [hPa],hPa,MET,HIAPER,p,,,,,MSMT,,,,
 hiaper_MET_THETA,THETA - Potential temperature [K],K,MET,HIAPER,pt,,,,,MSMT,,,,
 NWAS_N2O,"Nitrous oxide from flask (N2O, NWAS)",ppb,NWAS,HIAPER,mxr,,,chem,FALSE,MSMT,,n2o,,
+ERA5_PRESS_2_0,Pressure distance to 2.0 PVU surface from ERA5,hPa,calc,CLAMS,p,,,dyn,TRUE,ERA5,2,,ERA5_PRESS,ERA5_PRESS_2_0_Main
+ERA5_PRESS_3_5,Pressure distance to 2.0 PVU surface from ERA5,hPa,calc,CLAMS,p,,,dyn,TRUE,ERA5,3.5,,ERA5_PRESS,ERA5_PRESS_3_5_Main
+ERA5_PRESS_therm,Pressure distance to lapse rate tropopause from ERA5,hPa,calc,CLAMS,p,,,therm,TRUE,ERA5,,,ERA5_PRESS,ERA5_TROP1_PRESS
+ERA5_THETA_2_0,Potential temperature distance to 2.0 PVU surface from ERA5,K,calc,CLAMS,pt,,,dyn,TRUE,ERA5,2,,ERA5_THETA,ERA5_THETA_2_0_Main
+ERA5_THETA_3_5,Potential temperature distance to 2.0 PVU surface from ERA5,K,calc,CLAMS,pt,,,dyn,TRUE,ERA5,3.5,,ERA5_THETA,ERA5_THETA_3_5_Main
+ERA5_THETA_therm,Potential temperature distance to lapse rate tropopause from ERA5,K,calc,CLAMS,pt,,,therm,TRUE,ERA5,,,ERA5_THETA,ERA5_TROP1_THETA
+ERA5_Z,Geopotential height (ERA5),km,calc,CLAMS,z,,,,,ERA5,,,ERA5_GPH,
+ERA5_2_0PVU_Z,Geopotential height at main 2.0 PVU surface,km,calc,CLAMS,z,,,dyn,FALSE,ERA5,2,,ERA5_GPH_2_0_Main,
+ERA5_3_5PVU_Z,Geopotential height at main 3.5 PVU surface,km,calc,CLAMS,z,,,dyn,FALSE,ERA5,3.5,,ERA5_GPH_3_5_Main,
+ERA5_D_STROP_Z,Height difference to lapse rate tropopause (ERA5),km,calc,CLAMS,z,,,therm,TRUE,ERA5,,,ERA5_Z,ERA5_TROP1_Z
+ERA5_D_2_0PVU_Z,Height difference to main 2.0 PVU surface,km,calc,CLAMS,z,,,dyn,TRUE,ERA5,2,,ERA5_Z,ERA5_2_0PVU_Z
+ERA5_D_3_5PVU_Z,Height difference to main 3.5 PVU surface,km,calc,CLAMS,z,,,dyn,TRUE,ERA5,3.5,,ERA5_Z,ERA5_3_5PVU_Z
