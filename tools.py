@@ -24,7 +24,7 @@ import dictionaries as dcts
 
 def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
     """ Group values by time and return the respective averages.
-    Parameters: 
+    Parameters:
         df (pd.DataFrame): Input data to be averaged
         f (str): Frequency. One of 'D', 'M', 'Y'
         first_of_month (bool): Set day column to 1
@@ -164,86 +164,104 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
-def process_caribic(ds): 
+def process_caribic(ds):
     # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
+clams_variables = [
+    'ERA5_PV',
+    'ERA5_EQLAT',
+    'ERA5_TEMP',
 
-def process_clams(ds): 
-    variables = ['ERA5_TEMP',
-                 'ERA5_PRESS',
-                 'ERA5_THETA',
-                 'ERA5_GPH',
-                 'ERA5_PV',
-                 'ERA5_EQLAT',
+    'ERA5_PRESS',
+    'ERA5_THETA',
+    'ERA5_GPH',
 
-                 'ERA5_TROP1_THETA',
-                 'ERA5_TROP1_PRESS',
-                 'ERA5_TROP1_Z',
-                 'ERA5_PRESS_2_0_Main',
-                 'ERA5_PRESS_3_5_Main',
-                 'ERA5_THETA_2_0_Main',
-                 'ERA5_THETA_3_5_Main',
-                 'ERA5_GPH_2_0_Main',
-                 'ERA5_GPH_3_5_Main',]
+    'ERA5_TROP1_PRESS',
+    'ERA5_TROP1_THETA',
+    'ERA5_TROP1_Z',
 
+    'ERA5_PRESS_1_5_Main',
+    'ERA5_THETA_1_5_Main',
+    'ERA5_GPH_1_5_Main',
+
+    'ERA5_PRESS_2_0_Main',
+    'ERA5_THETA_2_0_Main',
+    'ERA5_GPH_2_0_Main',
+
+    'ERA5_PRESS_3_5_Main',
+    'ERA5_THETA_3_5_Main',
+    'ERA5_GPH_3_5_Main',
+    ]
+
+def process_clams(ds):
+    """ Select certain variables to import from CLaMS Data for aircraft campaigns. """
+    variables = clams_variables
     return ds[variables]
 
 def process_atom_clams(ds):
-    """ Additional time values for ATom as otherwise the function breaks """    
-    variables = ['ATom_UTC_Start', 
-                 'ERA5_TEMP', 'ERA5_PRESS', 'ERA5_THETA',
-                 'ERA5_GPH', 'ERA5_PV', 'ERA5_EQLAT',
-                 'ERA5_TROP1_THETA',
-                 'ERA5_TROP1_PRESS',
-                 'ERA5_TROP1_Z',
-                 'ERA5_PRESS_2_0_Main',
-                 'ERA5_PRESS_3_5_Main',
-                 'ERA5_THETA_2_0_Main',
-                 'ERA5_THETA_3_5_Main',
-                 'ERA5_GPH_2_0_Main',
-                 'ERA5_GPH_3_5_Main',]
+    """ Additional time values for ATom as otherwise the function breaks """
+    variables = ['ATom_UTC_Start'] + clams_variables
+
     ds = ds[variables]
-    
+
     # find flight date from file name
     filepath = ds['ATom_UTC_Start'].encoding['source']
     fname = os.path.basename(filepath)
     date_string = fname.split('_')[1]
-    date = dt.datetime(year = int(date_string[:4]), 
-                        month = int(date_string[4:6]), 
+    date = dt.datetime(year = int(date_string[:4]),
+                        month = int(date_string[4:6]),
                         day = int(date_string[-2:]))
-    
+
     # generate datetimes for each timestamp
     datetimes = [secofday_to_datetime(date, secofday + 5) for secofday in ds['ATom_UTC_Start'].values]
-    ds = ds.assign(Time = datetimes) 
-    
+    ds = ds.assign(Time = datetimes)
+
     ds = ds.drop_vars('ATom_UTC_Start')
-    
+
     return ds
 
 
 # %% Data selection
-def minimise_tps(tps) -> list:
+def minimise_tps(tps, vcoord=None) -> list:
     """ Returns a reduced list of tropopause coordinates.
-    
-    1. Remove vcoords != pt if tp exists with pt
+
+    1. Remove tps with other vertical coords if vcoord is specified
     2. remove all cpt, combo tp
-    3. remove all ECMWF tps 
+    3. remove all ECMWF tps
     4. Remove modelled N2O tp
-    5. Remove duplicates of O3 tp 
+    5. Remove duplicates of O3 tp
     6. Remove 1.5 PVU ERA5 dyn tp
     7. Remove non-relative tps if relative exists in tps
     """
-    # check if coord exists with pt, remove if it does 
+    # 1. Remove all non-tropopause related coordinates
+    while len([tp for tp in tps if str(tp.tp_def)=='nan']) > 0: # repeat until none left 
+        print('hi')
+        [tps.remove(tp) for tp in tps if str(tp.tp_def) == 'nan']
+    
+    # 2. Remove all coordinates with vcoords other than the specified one
+    if vcoord: [tps.remove(tp) for tp in tps if tp.vcoord != vcoord]
+    
+    [tps.remove(tp) for tp in tps if (
+        tp.model in ['EMAC', 'ECMWF'] or
+        tp.tp_def in ['cpt', 'combo'] or
+        tp.pvu == 1.5
+        )]
+    
+    # check if coord exists with pt, remove if it does
     tp_to_remove = []
     for tp in tps:  # 1
         try:
             dcts.get_coord(vcoord='pt', model=tp.model, source=tp.source,
-                           tp_def=tp.tp_def,
+                           tp_def=tp.tp_def, ID=tp.ID, 
                            pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)
         except KeyError:
             continue
+        except ValueError: 
+            print('ValueError', dcts.get_coordinates(vcoord='pt', model=tp.model, source=tp.source,
+                           tp_def=tp.tp_def,
+                           pvu=tp.pvu, crit=tp.crit, rel_to_tp=tp.rel_to_tp)); continue
         if not tp.vcoord == 'pt': tp_to_remove.append(tp)
     [tp_to_remove.append(tp) for tp in tps if tp.tp_def in ['cpt', 'combo']]  # 2
     [tp_to_remove.append(tp) for tp in tps if tp.model in ['ECMWF', 'EMAC']]  # 3
@@ -255,10 +273,12 @@ def minimise_tps(tps) -> list:
     for tp in tps:  # 7
         try:
             rel_tp = dcts.get_coord(rel_to_tp=True, model=tp.model, source=tp.source,
-                                    tp_def=tp.tp_def,
+                                    tp_def=tp.tp_def, ID=tp.ID,
                                     pvu=tp.pvu, crit=tp.crit, vcoord=tp.vcoord)
         except KeyError:
             continue
+        except ValueError: 
+            print('ValueError2'); continue
         if (any(tp.col_name == rel_tp.col_name for tp in tps)
                 and tp.rel_to_tp is False):
             tp_to_remove.append(tp)
@@ -372,9 +392,9 @@ def conv_PartsPer_molarity(x, unit):
 
 # %% Plotting tools
 def add_zero_line(ax, axis='y'):
-    """ Highlight the gridline at 0 for the chosen axis on the given Axes object. 
+    """ Highlight the gridline at 0 for the chosen axis on the given Axes object.
 
-    Call when everything else has been plotted already, otherwise the limits will be messy. 
+    Call when everything else has been plotted already, otherwise the limits will be messy.
     """
     zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks() != 0)
     for l in zero_lines:
@@ -389,11 +409,11 @@ def add_zero_line(ax, axis='y'):
 # %% Binning of global data sets
 
 def bin_1d(glob_obj, subs, **kwargs) -> (list, list):
-    """ 
+    """
     Returns 1D binned objects for each year as lists (lat / lon)
 
     Parameters:
-        subs (dictionaries.Substance) 
+        subs (dictionaries.Substance)
 
     Optional parameters:
         c_pfx (str): caribic file pfx, required for caribic data
