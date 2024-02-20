@@ -137,6 +137,7 @@ class GlobalData:
                 continue
         return variables
 
+    
     @property
     def substances(self):
         """ Returns list of substances in self.df """
@@ -177,29 +178,148 @@ class GlobalData:
             return self.data['met_data']
         return self.get_met_data()
 
-    @abstractmethod
-    def get_met_data(self):
-        """ Require existance of dataframe creation method for child classes. """
-        raise NotImplementedError('Subclasses of GlobalData need to implement .get_met_data()')
-
     def __add__(self, glob_obj):
         """ Combine two GlobalData objects into one. Keep only main dataframes. """
         print('Combining objects: \n', self, '\n', glob_obj)
 
         out = type(self).__new__(GlobalData)  # new class instance
         out.__init__(years=list(set(self.years + glob_obj.years)))
-
+        out.__dict__['source'] = 'MULTI'
+        
         if isinstance(self.df.index, pd.core.indexes.multi.MultiIndex):
-            new_df = pd.concat(glob_obj.df, keys=[glob_obj.ID], names=['ID', 'DATETIME'])
-            combined_df = pd.concat([self.df, new_df])
+            new_df = pd.concat(glob_obj.data['df_combined'], 
+                               keys=[glob_obj.ID], 
+                               names=['ID', 'DATETIME'])
+            combined_df = pd.concat([self.data['df_combined'], new_df])
 
         else:
-            new_df = glob_obj.df
-            combined_df = pd.concat([self.df, new_df], keys=[self.ID, glob_obj.ID], names=['ID', 'DATETIME'])
+            new_df = glob_obj.data['df_combined']
+            combined_df = pd.concat([self.data['df_combined'], new_df], 
+                                    keys=[self.ID, glob_obj.ID], 
+                                    names=['ID', 'DATETIME'])
 
-        out.data['df'] = combined_df  # stops self.data being overwritten
+        out.data['df_combined'] = combined_df  
+        out.data['df'] = combined_df.reset_index().set_index('DATETIME')
 
         return out
+
+    @abstractmethod
+    def get_met_data(self):
+        """ Require existance of dataframe creation method for child classes. """
+        if self.ID in ['CAR', 'ATOM', 'HIPPO', 'SHTR', 'PGS', 'WISE']: 
+            return self.get_era5_data()
+        else: 
+            raise NotImplementedError('Subclasses of GlobalData need to implement .get_met_data()')
+
+    def get_era5_data(self, met_pdir=None, save_ds=False) -> pd.DataFrame:
+        """ Creates dataframe for CLaMS data from netcdf files. """
+
+        if self.ID in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
+            campaign_dir_dict = {
+                'CAR'  : 'CaribicTPChange',
+                'SHTR' : 'SouthtracTPChange',
+                'WISE' : 'WiseTPChange',
+                'ATOM' : 'AtomTPChange',
+                'HIPPO': 'HippoTPChange',
+                'PGS'  : 'PolstraccTPChange',
+                }
+
+            met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
+            fnames = met_pdir + "/*.nc"
+
+            if self.ID == 'CAR': 
+                # directories = find.find_dir('2*', met_pdir) 
+                fnames = met_pdir + "2*/*.nc"
+                
+            # extract data, each file goes through preprocess first to filter variables & convert units
+            with xr.open_mfdataset(fnames, decode_times=False if self.ID == 'ATOM' else True,
+                                   preprocess=tools.process_atom_clams if self.ID == 'ATOM' else tools.process_clams) as ds:
+                ds = ds
+
+            if save_ds: 
+                self.data['met_ds'] = ds
+
+            met_df = ds.to_dataframe()
+
+            self.data['met_data'] = met_df
+            return met_df
+
+    # Calculate variables from within the data
+    def calc_coordinates(self, **kwargs): 
+        """ Calculate coordinates as specified in through .var1 and .var2. """
+        data = self.df
+        
+        if kwargs.get('recalculate'): 
+            data.drop(columns = [c.col_name for c in self.coordinates if c.ID=='calc'], 
+                      inplace=True)
+
+        # Firstly calculate geopotential height from geopotential
+        geopot_coords = [c for c in dcts.get_coordinates(ID='calc') if (
+            c.var1 in data.columns and str(c.var2) == 'nan' )]
+        
+        for coord in geopot_coords: 
+            
+            met_data = data[coord.var1].values * units(dcts.get_coord(col_name=coord.var1).unit)
+            
+            # geopot_values = data[coord.var1].values
+            # geopot = units.Quantity(geopot_values, 'm^2/s^2')
+            
+            height_m = calc.geopotential_to_height(met_data) # meters
+            height_km = height_m * 1e-3
+            
+            if coord.unit == 'm': 
+                data[coord.col_name] = height_m
+            elif coord.unit == 'km': 
+                data[coord.col_name] = height_km
+
+        # Now calculate TP / distances to TP coordinates 
+        calc_coords = [c for c in dcts.get_coordinates(ID='calc') if 
+            all(col in data.columns for col in [c.var1, c.var2])]
+        
+        for coord in calc_coords: 
+            if kwargs.get('verbose'): 
+                print('Calculating ', coord.long_name, 'from \n', 
+                  dcts.get_coord(col_name=coord.var1), '\n', # met
+                  dcts.get_coord(col_name=coord.var2)) # tp
+            
+            met_coord = dcts.get_coord(col_name = coord.var1)
+            tp_coord = dcts.get_coord(col_name = coord.var2)
+            
+            met_data = data[coord.var1]
+            tp_data = data[coord.var2]
+            
+            if tp_coord.unit != met_coord.unit: 
+                if all(unit in ['hPa', 'mbar'] for unit in [tp_coord.unit, met_coord.unit]):
+                    pass
+                elif all(unit in ['km', 'm'] for unit in [tp_coord.unit, met_coord.unit]): 
+                    print('UNIT MISMATCH when calculating ', coord.long_name, 'from \n', 
+                      dcts.get_coord(col_name=coord.var1), '\n', # met
+                      dcts.get_coord(col_name=coord.var2)) # tp
+                else: 
+                    print(f'HALT STOPP: units do not match on {met_coord} and {tp_coord}.')
+                    continue
+            
+            coord_data = (met_data - tp_data)
+            data[coord.col_name] = coord_data
+
+        self.data['df'] = data
+        return data
+    
+    # Data selection and basic binning
+    def get_shared_indices(self, tps=None, df=True):
+        """ Make reference for shared indices of chosen tropopause definitions. """
+        if not 'df_sorted' in self.data:
+            self.create_df_sorted()
+        if not tps:
+            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
+
+        data = self.df_sorted if not df else self.df
+        prefix = 'tropo_' if not df else ''
+
+        tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
+        indices = data.dropna(subset=tropo_cols, how='any').index
+
+        return indices
 
     def binned_1d(self, subs, **kwargs) -> (list, list):
         """
@@ -216,33 +336,8 @@ class GlobalData:
             subs (Substance): dcts.Substance instance
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
-
-    def get_shared_indices(self, tps=None, df=True):
-        """ Make reference for shared indices of chosen tropopause definitions. """
-        if not 'df_sorted' in self.data:
-            self.create_df_sorted()
-        if not tps:
-            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
-
-        data = self.df_sorted if not df else self.df
-        prefix = 'tropo_' if not df else ''
-
-        tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
-        indices = data.dropna(subset=tropo_cols, how='any').index
-
-        return indices
-
-    def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
-        """ Flag each datapoint according to its distance to specific tropopause definitions. """
-        # TODO implement this
-        # !!! implement this
-
-    def calc_coordinates(self): 
-        """ Calculate coordinates as specified in through .var1 and .var2. """
-        calc_coords = [c for c in dcts.get_coordinates(ID='calc')]
-        
-        
-
+    
+    # Detrend substance mixing ratios
     def detrend_substance(self, subs, loc_obj=None, save=True, plot=False, note='', 
                           **kwargs) -> (pd.DataFrame, np.ndarray):
         """
@@ -349,6 +444,7 @@ class GlobalData:
             if verbose: print(f'Detrending {subs}. ')
             self.detrend_substance(subs, save=True)
 
+    # Make data selections 
     def sel_subset(self, **kwargs):
         """ Allows making multiple selections at once.
 
@@ -400,17 +496,16 @@ class GlobalData:
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()  # stops self.data being overwritten
 
-        if self.source in ['Caribic', 'EMAC', 'TP']:
+        if self.source == 'MULTI': 
+            out.data['df'] = out.data['df'][out.data['df'].index.year.isin(yr_list)]
+
+        elif self.source in ['Caribic', 'EMAC', 'TP']:
             # Dataframes
             df_list = [k for k in self.data
                        if isinstance(self.data[k], pd.DataFrame)]  # or Geo-dataframe
             for k in df_list:  # only take data from chosen years
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
                 out.data[k].sort_index(inplace=True)
-
-            # if hasattr(out, 'flights'):
-            #     out.flights = list(set(out.data[df_list[-1]]['Flight number']))
-            #     out.flights.sort()
 
             # Datasets
             ds_list = [k for k in self.data
@@ -434,9 +529,13 @@ class GlobalData:
         out = type(self).__new__(self.__class__)
         for attribute_key in self.__dict__:
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-        out.data = self.data.copy()
 
-        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM']:
+        out.data = self.data.copy()
+        
+        if self.source == 'MULTI' and isinstance(self.data['df'], geopandas.GeoDataFrame): 
+            out.data['df'] = out.data['df'].cx[-180:180, lat_min:lat_max]
+
+        elif self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM']:
             df_list = [k for k in self.data
                        if isinstance(self.data[k], geopandas.GeoDataFrame)]  # needed for latitude selection
             for k in df_list:  # delete everything that isn't the chosen lat range
@@ -587,6 +686,7 @@ class GlobalData:
 
         return out
 
+    # Filters for stratosphere / troposphere
     def n2o_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
 
@@ -933,6 +1033,12 @@ class GlobalData:
         """ Returns Caribic object containing only tropospheric data points. """
         return self.sel_atm_layer('strato', **kwargs)
 
+    def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
+        """ Flag each datapoint according to its distance to specific tropopause definitions. """
+        # TODO implement this
+        # !!! implement this
+
+    # Filter for extreme events in tropospheric air
     def filter_extreme_events(self, **kwargs):
         """ Filter out all tropospheric extreme events.
 
@@ -1342,6 +1448,7 @@ class CampaignData(GlobalData):
         self.get_data(**kwargs)
 
         self.create_df()
+        self.calc_coordinates()
 
         # if 'flight_id' in self.df:
         #     self.flights = set(self.data['df']['flight_id'].values)
@@ -1449,7 +1556,7 @@ class CampaignData(GlobalData):
                     print('Importing data for ', instr)
                 self.get_instrument_data(instr, time=time_df, **kwargs)
 
-            self.merge_instr_data()  # Merge data from all instruments, create .df
+            # self.merge_instr_data()  # Merge data from all instruments, create .df
             self.get_met_data()  # Get meteorological data, create .met_data
 
         return self.data
@@ -1499,7 +1606,8 @@ class CampaignData(GlobalData):
         # met_data = self.get_met_data()
         # data.join(met_data, rsuffix='_dupe')
 
-        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
+        dataframes = [df for k, df in self.data.items() if (
+            isinstance(df, pd.DataFrame) and k!='df')]
         # combine data
         for df in dataframes:
             data = data.join(df, rsuffix='_dupe')
@@ -1524,27 +1632,8 @@ class CampaignData(GlobalData):
 
     def get_met_data(self, met_pdir=None) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
-
         if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
-            campaign_dir_dict = {
-                'SHTR' : 'SouthtracTPChange',
-                'WISE' : 'WiseTPChange',
-                'ATOM' : 'AtomTPChange',
-                'HIPPO': 'HippoTPChange',
-                'PGS'  : 'PolstraccTPChange',
-                }
-
-            met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
-            fnames = met_pdir + "/*.nc"
-
-            # extract data, each file goes through preprocess first to filter variables & convert units
-            with xr.open_mfdataset(fnames, decode_times=False if self.ID == 'ATOM' else True,
-                                   preprocess=tools.process_atom_clams if self.ID == 'ATOM' else tools.process_clams) as ds:
-                ds = ds
-
-            self.data['met_ds'] = ds
-
-            met_df = ds.to_dataframe()
+            return self.get_era5_data()
 
         elif self.ID in ['TACTS'] and 'df' in self.data.keys():
             met_cols = [c for c in self.df.columns if c in [
@@ -1559,53 +1648,29 @@ class CampaignData(GlobalData):
         return met_df
 
     def create_df(self) -> pd.DataFrame:
-        """ Combine available data into single dataframe. """
+        """ Combine available data into single dataframe, interpolate ERA5 data. """
 
-        if 'df' not in self.data:
-            self.merge_instr_data()
-
-        if 'met_data' not in self.data:
-            self.get_met_data()
-
-        if 'met_data' not in self.data:
-            raise Exception('Oi', self.data)
-
-        data = self.data['df']
-        met_data = self.data['met_data']
+        data = self.df if 'df' in self.data else self.merge_instr_data()
+        met_data = self.data['met_data'] if 'met_data' in self.data else self.get_met_data()
         times = self.data['time'].values
 
         try:
-            interpolated_met_data = interpolate_onto_timestamps(met_data, times)
+            interpolated_met_data = interpolate_onto_timestamps(met_data, times, 'int_')
         except:
             print('Interpolation unsuccessful. ')
             interpolated_met_data = met_data
 
+        # Drop non-int columns
+        int_cols = [c[4:] for c in interpolated_met_data.columns if (
+            c.startswith('int_') and c[4:] in data.columns)]
+        data.drop(columns = int_cols, inplace=True)
+        
         # met_data = self.get_met_data()
-        data.join(interpolated_met_data, rsuffix='_dupe')
+        df = data.join(interpolated_met_data, rsuffix='_dupe')
+        df.drop(columns = [c for c in df.columns if '_dupe' in c], inplace=True)
 
-        dataframes = [df for df in self.data.values() if isinstance(df, pd.DataFrame)]
-        # combine data
-        for df in dataframes:
-            data = data.join(df, rsuffix='_dupe')
-            data = data.drop(columns=[c for c in data.columns if 'dupe' in c])
-
-        if 'flight_id' in data.columns:
-            data['Flight number'] = data.pop('flight_id')
-
-        self.data['df'] = data
-
-        # Create GeoDataFrame using available geodata
-        lon_cols = [c for c in data.columns if 'LON' in c]
-        lat_cols = [c for c in data.columns if 'LAT' in c]
-
-        if len(lon_cols) > 0 and len(lat_cols) > 0:
-            geodata = [Point(lon, lat) for lon, lat in zip(
-                data[lon_cols[0]], data[lat_cols[0]])]
-            gdf = geopandas.GeoDataFrame(data, geometry=geodata)
-            self.data['df'] = gdf
-            return gdf
-
-        return data
+        self.data['df'] = df
+        return df
 
     @property
     def df(self) -> pd.DataFrame:
@@ -1622,7 +1687,7 @@ class CampaignData(GlobalData):
         return self.get_met_data()
 
 
-def interpolate_onto_timestamps(dataframe, times) -> pd.DataFrame:
+def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
     """ Interpolate met data onto given measurement timestamps. 
     
     Parameters: 
@@ -1645,6 +1710,11 @@ def interpolate_onto_timestamps(dataframe, times) -> pd.DataFrame:
         print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
 
     regridded_data = expanded_df.loc[times]  # return only measurement timestamps
+    
+    # Rename columns using prefix
+    regridded_data.rename(columns = {col:prefix+col for col in regridded_data.columns}, 
+                          inplace=True)
+    
     return regridded_data
 
 
