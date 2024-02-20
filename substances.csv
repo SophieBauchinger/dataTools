@@ -13,9 +13,6 @@ d_N2O,absolute precision of N2O,d_n2o,ppb,GHG,Caribic,MSMT,,FALSE
 d_SF6,absolute precision of SF6,d_sf6,ppt,GHG,Caribic,MSMT,,FALSE
 detr_CH4,CH4 mixing ratio - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,GHG,Caribic,MSMT,h,TRUE
 detr_CO2,CO2 mixing ratio - detrended wrt. Mauna Loa 2005,detr_co2,ppm,GHG,Caribic,MSMT,h,TRUE
-detr_int_CARIBIC2_CH4,replacement for CH4 - detrended wrt. Mauna Loa 2005,detr_ch4,ppbV,INTtpc,Caribic,MSMT,h,TRUE
-detr_int_CARIBIC2_CO,Carbon monoxide mixing ratio - detrended wrt. Mauna Loa 2005,detr_co,ppbv,INTtpc,Caribic,MSMT,q,TRUE
-detr_int_CARIBIC2_CO2,replacement for CO2 - detrended wrt. Mauna Loa 2005,detr_co2,ppmV,INTtpc,Caribic,MSMT,h,TRUE
 detr_int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,INT,Caribic,MSMT,h,TRUE
 detr_int_CLaMS_CH4,CH4 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_ch4,ppb,INTtpc,Caribic,CLAMS,h,TRUE
 detr_int_CLaMS_CO,CO (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co,ppb,INTtpc,Caribic,CLAMS,q,TRUE
@@ -25,13 +22,6 @@ detr_int_CO,CO integrated over flask sampling time from 1s resolution measuremen
 detr_int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_co2,ppm,INT,Caribic,MSMT,h,TRUE
 detr_N2O,N2O mixing ratio - detrended wrt. Mauna Loa 2005,detr_n2o,ppb,GHG,Caribic,MSMT,s,TRUE
 detr_SF6,SF6 mixing ratio - detrended wrt. Mauna Loa 2005,detr_sf6,ppt,GHG,Caribic,MSMT,q,TRUE
-int_CARIBIC2_CH4,replacement for CH4,ch4,ppbV,INTtpc,Caribic,MSMT,h,FALSE
-int_CARIBIC2_CO,Carbon monoxide mixing ratio,co,ppbv,INTtpc,Caribic,MSMT,q,FALSE
-int_CARIBIC2_CO2,replacement for CO2,co2,ppmV,INTtpc,Caribic,MSMT,h,FALSE
-int_CARIBIC2_H2Ogas,gaseous H2O volume mixing ratio,h2o,ppmv,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_NO,NO volume mixing ratio,no,ppbv,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_NOy,NOy volume mixing ratio,noy,ppbv,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_Ozone,replacement for Ozone,o3,ppbV,INTtpc,Caribic,MSMT,,FALSE
 int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h,FALSE
 int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INTtpc,Caribic,CLAMS,h,FALSE
 int_CLaMS_CO,CO (CLaMS),co,ppb,INTtpc,Caribic,CLAMS,q,FALSE
