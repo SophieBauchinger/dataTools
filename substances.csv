@@ -5,6 +5,9 @@ GCECD_d_N2O,N2O dry mole fraction mixing ratio error 1-s (ppb),d_n2o,ppb,GCECD,A
 GCECD_d_SF6,SF6 dry mole fraction mixing ratio error 1-s (ppt),d_sf6,ppt,GCECD,ATOM,MSMT,,FALSE
 GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),n2o,ppb,GCECD,ATOM,MSMT,s,FALSE
 GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q,FALSE
+detr_GCECD_CH4,SF6 dry mole fraction mixing ratio error 1-s (ppt),detr_ch4,ppt,GCECD,ATOM,MSMT,,TRUE
+detr_GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),detr_n2o,ppb,GCECD,ATOM,MSMT,s,TRUE
+detr_GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),detr_sf6,ppt,GCECD,ATOM,MSMT,q,TRUE
 CH4,CH4 mixing ratio,ch4,ppb,GHG,Caribic,MSMT,h,FALSE
 CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h,FALSE
 d_CH4,absolute precision of CH4,d_ch4,ppb,GHG,Caribic,MSMT,,FALSE
