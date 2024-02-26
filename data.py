@@ -139,14 +139,25 @@ class GlobalData:
 
     
     @property
-    def substances(self):
+    def substances(self) -> list:
         """ Returns list of substances in self.df """
         return self.get_variables('subs')
 
     @property
-    def coordinates(self):
+    def coordinates(self) -> list:
         """ Returns list of non-substance variables in self.df """
         return self.get_variables('coords')
+    
+    def tp_coords(self, **tp_kwargs) -> list: 
+        """ Returns a list of vertical dynamic coordinates. """
+        tp_coords = [c for c in self.coordinates if (
+            str(c.tp_def) != 'nan' and 
+            c.var != 'geopot' and 
+            (c.vcoord =='mxr' or c.rel_to_tp) ) ]
+        # tp_coords = [c for c in self.coordinates if (str(c.tp_def)!='nan')]
+        for item in tp_kwargs: 
+            tp_coords = [tp for tp in tp_coords if str(getattr(tp, item)) == str(tp_kwargs.get(item))]
+        return tp_coords
 
     @property
     def flights(self):
@@ -184,23 +195,36 @@ class GlobalData:
 
         out = type(self).__new__(GlobalData)  # new class instance
         out.__init__(years=list(set(self.years + glob_obj.years)))
-        out.__dict__['source'] = 'MULTI'
-        
-        if isinstance(self.df.index, pd.core.indexes.multi.MultiIndex):
-            new_df = pd.concat(glob_obj.data['df_combined'], 
-                               keys=[glob_obj.ID], 
-                               names=['ID', 'DATETIME'])
+        setattr(out, 'source', 'MULTI')
+        setattr(out, 'ID', 'MULTI')
+
+        if 'df_combined' in self.data: 
+            if 'df_combined' not in glob_obj.data:
+                # add ID as index / column
+                new_df = pd.concat([glob_obj.df], 
+                                   keys=[glob_obj.ID], 
+                                   names=['ID', 'DATETIME'])
+            else: 
+                new_df = glob_obj.data['df_combined']
             combined_df = pd.concat([self.data['df_combined'], new_df])
 
         else:
-            new_df = glob_obj.data['df_combined']
-            combined_df = pd.concat([self.data['df_combined'], new_df], 
+            new_df = glob_obj.data['df']
+            combined_df = pd.concat([self.data['df'], new_df], 
                                     keys=[self.ID, glob_obj.ID], 
                                     names=['ID', 'DATETIME'])
 
-        out.data['df_combined'] = combined_df  
-        out.data['df'] = combined_df.reset_index().set_index('DATETIME')
+        out.data['df_combined'] = combined_df
+        
+        df = combined_df.reset_index().set_index('DATETIME')
+        
+        if any(df.index.duplicated()):
+            dropped_rows = df[df.index.duplicated()]
+            print(f'Dropping {sum(df.index.duplicated())} duplicated timestamps.', dropped_rows)
+            df = df[~ df.index.duplicated()]
 
+        out.data['df'] = df
+        out.data['ID_per_timestamp'] = combined_df.reset_index().set_index('DATETIME')['ID']
         return out
 
     @abstractmethod
@@ -689,13 +713,14 @@ class GlobalData:
     # Filters for stratosphere / troposphere
     def n2o_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
-
-        # Get data
         data = self.df
 
         # Choose N2O data to use (Substance object)
-        if len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
-            n2o_coord = [c for c in self.coordinates if c.crit == 'n2o'][0]
+        if 'coord' in kwargs: 
+            n2o_coord = kwargs.get('coord')
+        
+        elif len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
+            [n2o_coord] = [c for c in self.coordinates if c.crit == 'n2o']
 
         else:
             default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', HIAPER='NWAS', EMAC='EMAC', TP='INT')
@@ -788,8 +813,13 @@ class GlobalData:
         """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
         If no kwargs are specified, df_sorted is calculated for all possible definitions
         df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
+        
+        Parameters: 
+            key verbose (bool): Make the function more talkative
+            key relative_only (bool): Skip non-relative coords if rel. is available
+        
         """
-        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER']:
+        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER', 'MULTI']:
             data = self.df.copy()
         else:
             raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
@@ -799,14 +829,16 @@ class GlobalData:
                                  index=data.index)
 
         # Get tropopause coordinates
-        tps = [c for c in self.coordinates if (
-                str(c.tp_def) != 'nan' and c.var != 'geopot')]
-
-        if kwargs.get('verbose'): print('Tropopause coordinates: \n', tps)
-
+        tps = self.tp_coords()
+        # tps = [c for c in self.coordinates if (
+        #     str(c.tp_def) != 'nan' and
+        #     c.var != 'geopot' and
+        #     (c.vcoord =='mxr' or c.rel_to_tp) ) ] # use relative ones bc abs. makes no sense
+        
         # N2O filter
         for tp in [tp for tp in tps if tp.crit == 'n2o']:
-            n2o_sorted = self.n2o_filter(**tp.__dict__)
+            if self.source == 'MULTI': break
+            n2o_sorted = self.n2o_filter(coord=tp)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
@@ -819,23 +851,10 @@ class GlobalData:
 
             if kwargs.get('verbose'): print(f'Sorting {tp}')
 
-            # Refer to relative tp coordinate if available
-            if not tp.rel_to_tp:
-                coord_dct = {k: v for k, v in tp.__dict__.items()
-                             if k in ['tp_def', 'model', 'vcoord', 'crit', 'pvu', 'source']}
-                try:
-                    rel_coord = dcts.get_coord(**coord_dct, rel_to_tp=True)
-                    if rel_coord.col_name in data.columns:
-                        tps.remove(tp)
-                        continue  # skip current tp if it exists as relative too
-                except KeyError:
-                    if kwargs.get('verbose'): print('Using non-relative TP: ', tp)
-
-            if kwargs.get('verbose'): print('TP sorting: ', tp)
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
 
             if tp.tp_def == 'dyn':  # dynamic TP only outside the tropics - latitude filter
-                pass  # tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
+                tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
             if tp.tp_def == 'cpt':  # cold point TP only in the tropics
                 tp_df = tp_df[np.array([(30 > i > -30) for i in np.array(tp_df.geometry.y)])]
 
@@ -854,14 +873,15 @@ class GlobalData:
             # strato: low p (lt 0), high everything else (gt 0)
             tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].gt(0),
             (strato, tropo)] = (True, False)
-
+                
             # # add data for current tp def to df_sorted
             tp_sorted = tp_sorted.convert_dtypes()
+            
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
 
         # Ozone: Flag O3 < 60 ppb as tropospheric
-        if any(tp.crit == 'o3' for tp in tps):
+        if any(tp.crit == 'o3' for tp in tps) and not self.source == 'MULTI':
             o3_sorted = self.o3_filter_lt60()
             o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
             o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
@@ -894,8 +914,8 @@ class GlobalData:
 
     def calc_shared_ratios(self, tps=None):
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
-        if not tps:
-            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+        # if not tps:
+        #     tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
         shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
@@ -936,6 +956,7 @@ class GlobalData:
     def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
         """ Calculate overall variability of stratospheric and tropospheric air. """
         if not tps:
+            
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
@@ -972,7 +993,7 @@ class GlobalData:
             self.create_df_sorted(save=True)
         return self.data['df_sorted']
 
-    def sel_atm_layer(self, atm_layer: str, **kwargs):
+    def sel_atm_layer(self, atm_layer: str, tp=None, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
 
         Parameters:
@@ -988,14 +1009,15 @@ class GlobalData:
         for attribute_key in self.__dict__:  # copy stuff like pfxs
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
 
-        if 'source' not in kwargs and self.source in ['Caribic', 'EMAC']:
-            kwargs.update({'source': self.source})
-
-        if 'rel_to_tp' not in kwargs and any(
-                c.rel_to_tp for c in dcts.get_coordinates(**kwargs)):
-            kwargs.update({'rel_to_tp': True})
-
-        tp = dcts.get_coord(**kwargs)
+        if not tp: 
+            if 'source' not in kwargs and self.source in ['Caribic', 'EMAC']:
+                kwargs.update({'source': self.source})
+    
+            if 'rel_to_tp' not in kwargs and any(
+                    c.rel_to_tp for c in dcts.get_coordinates(**kwargs)):
+                kwargs.update({'rel_to_tp': True})
+    
+            tp = dcts.get_coord(**kwargs)
 
         if 'df_sorted' not in self.data:
             df_sorted = self.create_df_sorted(save=False, **kwargs)
@@ -1009,9 +1031,11 @@ class GlobalData:
 
         # Filter all dataframes to only include indices in df_sorted
         df_list = [k for k in self.data
-                   if isinstance(self.data[k], pd.DataFrame)]  # list of all datasets to cut
+                   if isinstance(self.data[k], pd.DataFrame)
+                   and k not in ['df_sorted']]  # list of all datasets to cut
         for k in df_list:
-            out.data[k] = out.data[k][df_sorted[atm_layer_col]]
+            out.data[k] = out.data[k][out.data[k].index.isin(df_sorted.index)]
+            out.data[k] = out.data[k][df_sorted[atm_layer_col].loc[out.data[k].index]]
 
         if self.source == 'Caribic':
             out.pfxs = [k for k in out.data if k in self.pfxs]
@@ -1025,13 +1049,13 @@ class GlobalData:
 
         return out
 
-    def sel_tropo(self, **kwargs):
+    def sel_tropo(self, tp=None, **kwargs):
         """ Returns Caribic object containing only tropospheric data points. """
-        return self.sel_atm_layer('tropo', **kwargs)
+        return self.sel_atm_layer('tropo', tp, **kwargs)
 
-    def sel_strato(self, **kwargs):
+    def sel_strato(self, tp=None, **kwargs):
         """ Returns Caribic object containing only tropospheric data points. """
-        return self.sel_atm_layer('strato', **kwargs)
+        return self.sel_atm_layer('strato', tp, **kwargs)
 
     def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
         """ Flag each datapoint according to its distance to specific tropopause definitions. """
