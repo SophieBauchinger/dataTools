@@ -33,6 +33,34 @@ count_limit = 5
 
 #TODO Add disclaimer to dyn and cpt to show reduced latitude ranges 
 
+def substance_strato_tropo(DataObj, tp, subs):
+    fig, (ax1, ax2) = plt.subplots(2, dpi=250, figsize=(15, 9), sharex=True)
+    # tp = dcts.get_coord(col_name='int_ERA5_D_TROP1_PRESS')
+    fig.suptitle(tp.label(filter_label=True) + ' tropopause', fontsize=15, y=0.95)
+    
+    subs_data = DataObj.df[subs.col_name]
+    df_sorted = DataObj.df_sorted
+    
+    if 'tropo_'+tp.col_name not in df_sorted.columns: 
+        raise KeyError(f'{tp} not found in df_sorted')
+    
+    t_subs = subs_data[df_sorted['tropo_' + tp.col_name]].dropna()
+    s_subs = subs_data[df_sorted['strato_' + tp.col_name]].dropna()
+    
+    ax1.set_title('Stratospheric')
+    ax1.scatter(subs_data.index, subs_data, color='grey', label='background')
+    ax1.scatter(s_subs.index, s_subs, color='blue', label='strato')
+    ax1.set_ylabel(subs.label())
+    
+    ax2.set_title('Tropospheric')
+    ax2.scatter(subs_data.index, subs_data, color='grey', label='background')
+    ax2.scatter(t_subs.index, t_subs, color='orange', label='tropo')
+    ax2.set_ylabel(subs.label())
+    
+    # ax1.legend(); ax2.legend()
+    plt.show()
+    
+
 #%% Define TropopausePlotter
 class TropopausePlotter(TropopauseData):
     """ Add plotting functionality to tropopause data objects """
@@ -44,9 +72,20 @@ class TropopausePlotter(TropopauseData):
             super().__init__(years, interp, method, df_sorted)
         self.detrend_all()
 
+        self.tps = self.set_tps()
+
+    def set_tps(self, **kwargs): 
+        """ Set default tropopause definitions to plot. """
+        coords = self.coordinates
+        self.tps = [tp for tp in coords if (
+            str(tp.tp_def)!='nan' and 
+            tp.col_name in [c.col_name for c in dcts.get_coordinates(**kwargs)])]
+        return self.tps
+
     def tp_height_global_scatter(self, rel=False):
         """ """
-        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel))
+        
+        tps = tools.minimise_tps(self.coordinates)
 
         for tp in tps: 
             fig, ax = plt.subplots(dpi=150, figsize=(10,5))
@@ -142,9 +181,7 @@ class TropopausePlotter(TropopauseData):
         outline = mpe.withStroke(linewidth=4, foreground='white')
         
         if tps is None: 
-            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', 
-                                                          rel_to_tp=rel, 
-                                                          source=self.source)) # CANNOT ask for this 
+            tps = tools.minimise_tps(self.coordinates, rel=rel) # CANNOT ask for this 
 
         fig, ax = plt.subplots(dpi=250, figsize=(7,4))
 
@@ -178,7 +215,7 @@ class TropopausePlotter(TropopauseData):
             ax.set_ylabel(tp.label(coord_only=True))
             ax.set_xlabel(dcts.axis_label('lat'))
 
-            ax.set_xticks(np.arange(30, 85, 5), minor=True)
+            ax.set_xticks(np.arange(-90, 85, 5), minor=True)
 
             if tp.vcoord=='pt' and tp.rel_to_tp: 
                 ax.set_yticks(np.arange(-30, 60, 15))
@@ -472,18 +509,22 @@ class TropopausePlotter(TropopauseData):
         if shared is False: 
             tropo_counts = self.calc_ratios() # dataframe
             note += ' all'
-        if shared is True: 
+        elif shared is True: 
             tropo_counts = self.calc_shared_ratios()
             # note += ' shared'
-        if shared == 'No': 
+        elif shared == 'No': 
             tropo_counts = self.calc_non_shared_ratios()
             note += ' non-shared'
+        else: 
+            raise KeyError(f'Invalid value for shared: {shared}')
+            
+        tps = [tp for tp in tps if tp.col_name in tropo_counts.columns] # not all tps have ratios (chekkkk)
 
-        if not tps: 
-            tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
-                   if c in [c.col_name for c in dcts.get_coordinates() 
-                            if c.tp_def not in ['combo', 'cpt']]]
-            tps = tools.minimise_tps(tps)
+        # if not tps: 
+        #     tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
+        #            if c in [c.col_name for c in dcts.get_coordinates() 
+        #                     if c.tp_def not in ['combo', 'cpt']]]
+        #     tps = tools.minimise_tps(tps)
 
         tropo_counts.drop(index='ratios', inplace=True)
         tropo_counts = tropo_counts[[tp.col_name for tp in tps if tp.col_name in tropo_counts.columns]]
@@ -508,6 +549,8 @@ class TropopausePlotter(TropopauseData):
         bar_params = dict(align='center', edgecolor='k',  rasterized=True,
                           alpha=0.65, zorder=10)
         nums = range(len(bar_labels))
+
+        print(nums, len(bar_labels), len(tp_labels), len(tropo_bar_vals))
 
         t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
         s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
