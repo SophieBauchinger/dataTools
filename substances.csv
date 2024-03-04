@@ -86,6 +86,7 @@ GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q,FAL
 SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q,FALSE
 tracer_gp_SF6_at_fl,tracer GP SF6,sf6,mol mol-1,EMAC,EMAC,EMAC,q,FALSE
 GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt]",sf6,ppt,GHOST,HALO,MSMT,q,FALSE
+detr_GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt] detrended",detr_sf6,ppt,GHOST,HALO,MSMT,q,TRUE
 awas_SF6,awas Sulfur hexafluoride from flask (SF6) - U. Miami ,sf6,pptv,AWAS ,HIAPER,MSMT,q,FALSE
 nwas_SF6,nwas Sulfur hexafluoride  from flask (SF6) - noaa,sf6,ppt,NWAS,HIAPER,MSMT,q,FALSE
 panther_SF6,Sulfur hexafluoride ECD (SF6) - noaa,sf6,pptv,PANTHER,HIAPER,MSMT,q,FALSE
