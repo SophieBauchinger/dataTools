@@ -19,20 +19,25 @@ import tools
 # from tools import data_selection
 
 #%% Get Data
-mlo = MaunaLoa()
-mhd = MaceHead() # only 2012 data available
-mzt = Mozart() # only available up to 2008
+# mlo = MaunaLoa()
+# mhd = MaceHead() # only 2012 data available
+# mzt = Mozart() # only available up to 2008
 caribic = Caribic()
-emac = EMAC()
-# tpause = TropopauseData()
+# emac = EMAC()
+# tpause = TropopauseData()+
 shtr = CampaignData('SHTR')
 wise = CampaignData('WISE')
 pgs = CampaignData('PGS')
-tacts = CampaignData('TACTS')
+# tacts = CampaignData('TACTS')
 atom = CampaignData('ATOM')
+# hippo = CampaignData('HIPPO') #!!! would have to implement in toolpac
+
+# sql_objs = [shtr, wise, atom] # pgs, tacts
+
+all_data = caribic + shtr + wise + pgs
 
 #%% Get main coordinates and substances
-tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+caribic_tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source='Caribic'))
 pt = dcts.get_coord(vcoord='pt', model='MSMT')
 
 lat = dcts.get_coord(hcoord='lat', ID='GHG')
