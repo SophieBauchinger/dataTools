@@ -243,11 +243,11 @@ class Substance():
         if not self.detr:
             return f'{code} [{unit}] ({identifier})'
 
-        elif self.detr and not delta:
-            return f'{code} detrended wrt. 2005 [{unit}]'
+        elif self.detr:# and not delta:
+            return f'{code} rel. to BGD [{unit}]'
 
-        elif self.detr and delta:
-            return f'{code} ' + r'(-$\Delta_{2005}$)' + f' [{unit}]'
+        # elif self.detr and delta:
+        #     return f'{code} ' + r'(-$\Delta_{2005}$)' + f' [{unit}]'
 
         else:
             raise KeyError('Could not generate a label')
@@ -323,6 +323,9 @@ class Substance():
 
             if bin_attr == 'vcount':
                 return (1, np.nan)
+            
+            else: 
+                raise KeyError(f'Unrecognised bin attribute: {bin_attr}')
 
         if not self.short_name.startswith('d_'):
             return get_vlims(self.short_name, bin_attr, atm_layer)
