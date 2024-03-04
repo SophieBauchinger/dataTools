@@ -618,7 +618,7 @@ class TropopausePlotter(TropopauseData):
                                         for tp in tps]))
 
         fig, ax = plt.subplots(dpi=240, figsize=(8,6))
-        ax.set_title('Ratio of tropospheric / stratospheric datapoints in Caribic-2')
+        ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {self.ID}')
 
         # tp_defs = set([tp.tp_def for tp in tps])
         # ax.grid(True, axis='x', c='k', alpha=0.3)
@@ -749,11 +749,13 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     Returns:
         tropospheric, stratospheric standard deviations within each bin as list for each tp coordinate
     """
-    tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
-           if 'tropo_'+tp.col_name in glob_obj.df_sorted.columns]
+    # tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
+    #        if 'tropo_'+tp.col_name in glob_obj.df_sorted.columns]
+    
+    # if minimise_tps:
+    #     tps = tools.minimise_tps(tps)
 
-    if minimise_tps:
-        tps = tools.minimise_tps(tps)
+    tps = glob_obj.tp_coords()
 
     lat_bmin, lat_bmax = 30, 90 # np.nanmin(lat), np.nanmax(lat)
     lat_bci = bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size)
@@ -769,6 +771,9 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     for i, tp in enumerate(tps):
         # troposphere
         tropo_data = glob_obj.sel_tropo(**tp.__dict__).df
+        shared_indices = glob_obj.sel_tropo(**tp.__dict__).get_shared_indices()
+        tropo_data = tropo_data.loc[shared_indices]
+        
         tropo_lat = np.array([tropo_data.geometry[i].y for i in range(len(tropo_data.index))]) # lat
         tropo_out_lat = bp.Simple_bin_1d(tropo_data[substance.col_name], tropo_lat, 
                                          lat_bci, count_limit = glob_obj.count_limit)
@@ -783,6 +788,9 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
         
         # stratosphere
         strato_data = glob_obj.sel_strato(**tp.__dict__).df
+        shared_indices = glob_obj.sel_strato(**tp.__dict__).get_shared_indices()
+        tropo_data = strato_data.loc[shared_indices]
+        
         strato_lat = np.array([strato_data.geometry[i].y for i in range(len(strato_data.index))]) # lat
         strato_out_lat = bp.Simple_bin_1d(strato_data[substance.col_name], strato_lat, 
                                           lat_bci, count_limit = glob_obj.count_limit)
