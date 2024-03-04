@@ -137,7 +137,6 @@ class GlobalData:
                 continue
         return variables
 
-    
     @property
     def substances(self) -> list:
         """ Returns list of substances in self.df """
@@ -330,19 +329,41 @@ class GlobalData:
         return data
     
     # Data selection and basic binning
-    def get_shared_indices(self, tps=None, df=True):
+    def get_shared_indices(self, tps=None, df=False):
         """ Make reference for shared indices of chosen tropopause definitions. """
         if not 'df_sorted' in self.data:
             self.create_df_sorted()
-        if not tps:
-            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
-
+            
         data = self.df_sorted if not df else self.df
         prefix = 'tropo_' if not df else ''
+        
+        if not tps:
+            tps = self.tp_coords() #tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
+        
+        if self.source != 'MULTI': 
+            tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
+            indices = data.dropna(subset=tropo_cols, how='any').index
 
-        tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
-        indices = data.dropna(subset=tropo_cols, how='any').index
-
+        else: 
+            # Cannot do this without mashing together all the n2o / o3 tropopauses!
+            tps_non_chem = [tp for tp in tps if not tp.tp_def == 'chem']
+            tropo_cols_non_chem = [prefix + tp.col_name for tp in tps_non_chem if prefix + tp.col_name in data]
+            indices_non_chem = data.dropna(subset=tropo_cols_non_chem, 
+                                           how='any').index
+            # Combine N2O tropopauses. (ignore Caribic O3 tropopause bc only one source)
+            tps_n2o = [tp for tp in tps if tp.crit == 'n2o']
+            tropo_cols_n2o = [prefix + tp.col_name for tp in tps_n2o if prefix + tp.col_name in data]
+            n2o_indices = data.dropna(subset=tropo_cols_n2o,
+                                      how='all').index
+            
+            print('Getting shared indices using\nN2O measurements: {} and dropping O3 TPs: {}'.format(
+                [str(tp)+'\n' for tp in tps_non_chem], 
+                [tp for tp in tps if tp not in tps_n2o + tps_non_chem]))
+            
+            indices = indices_non_chem[[i in n2o_indices for i in indices_non_chem]]
+            
+            # indices = [i for i in indices_non_chem if i in n2o_indices]
+        
         return indices
 
     def binned_1d(self, subs, **kwargs) -> (list, list):
@@ -392,13 +413,10 @@ class GlobalData:
         t_ref = np.array(datetime_to_fractionalyear(ref_df.index, method='exact'))
 
         popt = np.polyfit(t_ref, c_ref, 2)
-
         c_fit = np.poly1d(popt)  # get popt, then make into fct
 
         # Prepare data to be detrended
-
         df = self.df.copy()
-        # df_detr = pd.DataFrame()
 
         df.dropna(axis=0, subset=[subs.col_name], inplace=True)
         df.sort_index()
@@ -414,22 +432,28 @@ class GlobalData:
                 c_obs = tools.conv_molarity_PartsPer(c_obs, ref_subs.unit)
             elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
                 pass
+            else: 
+                raise NotImplementedError(f'Units do not match: \
+                                          {subs.unit} vs {ref_subs.unit} \n\
+                                              Solution not yet available. ')
 
-        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
+        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs)) 
         c_obs_detr = c_obs - detrend_correction
 
         # get variance (?) by subtracting offset from 0
         c_obs_delta = c_obs_detr - c_fit(min(t_obs))
 
         df_detr = pd.DataFrame({f'DATA_{subs.col_name}'   : c_obs,
-                                f'detr_{subs.col_name}'   : c_obs_detr,
+                                f'DETRtmin_{subs.col_name}'   : c_obs_detr,
                                 f'delta_{subs.col_name}'  : c_obs_delta,
-                                f'detrFit_{subs.col_name}': c_fit(t_obs)},
+                                f'detrFit_{subs.col_name}': c_fit(t_obs), 
+                                f'detr_{subs.col_name}' : c_obs / c_fit(t_obs)},
                                index=df.index)
 
         # maintain relationship between detr and fit columns
         df_detr[f'detrFit_{subs.col_name}'] = df_detr[f'detrFit_{subs.col_name}'].where(
             ~df_detr[f'detr_{subs.col_name}'].isnull(), np.nan)
+            
 
         if save:
             self.df[f'detr_{subs.col_name}'] = df_detr[f'detr_{subs.col_name}']
@@ -437,7 +461,7 @@ class GlobalData:
         if plot:
             fig, ax = plt.subplots(dpi=150, figsize=(6, 4))
 
-            ax.scatter(df_detr.index, df_detr['init_' + subs.col_name], label='Flight data',
+            ax.scatter(df_detr.index, df_detr['DATA_' + subs.col_name], label='Flight data',
                        color='orange', marker='.')
             ax.scatter(df_detr.index, df_detr['detr_' + subs.col_name], label='trend removed',
                        color='green', marker='.')
@@ -780,7 +804,7 @@ class GlobalData:
         fit_function = dcts.lookup_fit_function('n2o')
 
         ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
-                              flag=flag, verbose=False, plot=False,
+                              flag=flag, verbose=False, plot=False, ctrl_plots=False, 
                               limit=0.1, direction='n')
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
         df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
@@ -830,14 +854,10 @@ class GlobalData:
 
         # Get tropopause coordinates
         tps = self.tp_coords()
-        # tps = [c for c in self.coordinates if (
-        #     str(c.tp_def) != 'nan' and
-        #     c.var != 'geopot' and
-        #     (c.vcoord =='mxr' or c.rel_to_tp) ) ] # use relative ones bc abs. makes no sense
         
         # N2O filter
         for tp in [tp for tp in tps if tp.crit == 'n2o']:
-            if self.source == 'MULTI': break
+            # if self.source == 'MULTI': break
             n2o_sorted = self.n2o_filter(coord=tp)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
@@ -914,7 +934,8 @@ class GlobalData:
 
     def calc_shared_ratios(self, tps=None):
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
-        # if not tps:
+        if not tps:
+            tps = self.tp_coords()
         #     tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
