@@ -414,10 +414,11 @@ def lonlat_1d(mzt_obj, subs='sf6',
         ax2.set_ylabel('')
         plt.show()
 
-def mxr_vs_vcoord(glob_obj, subs, vcoord): 
+def mxr_vs_vcoord(glob_obj, subs, vcoord, tick_params, ax=None, note=None): 
     glob_obj.data['df']['season'] = tools.make_season(glob_obj.data['df'].index.month)
 
-    fig, ax = plt.subplots(dpi=200)
+    if not ax:
+        fig, ax = plt.subplots(dpi=200)
     for s in set(glob_obj.df['season'].tolist()):
         df = glob_obj.df[glob_obj.df['season'] == s].dropna(subset=[vcoord.col_name, subs.col_name], how='any')
         if len(df) == 0: 
@@ -428,17 +429,93 @@ def mxr_vs_vcoord(glob_obj, subs, vcoord):
 
         # if vcoord.rel_to_tp: 
         #     ax.set_ylim(-70, 90)
-        if subs.col_name=='detr_SF6': 
-            ax.set_xlim(5,7)
+        # if subs.col_name=='detr_SF6': 
+        #     ax.set_xlim(5,7)
 
         ax.scatter(x, y, 
                     marker='.',
                     label = dcts.dict_season()[f'name_{s}'],
-                    c=dcts.dict_season()[f'color_{s}'])
-        ax.legend()
+                    c=dcts.dict_season()[f'color_{s}'], 
+                    zorder=2, 
+                    lw=0.1)
+        # ax.legend()
 
     ax.set_ylabel(vcoord.label())
-    ax.set_xlabel(subs.label())
+    if tick_params.get('bottom'): 
+        ax.set_xlabel(subs.label())
+    
+    ax.tick_params(**tick_params)
+    if note: 
+        ax.text(**dcts.note_dict(ax, y = 0.05, s= note))
+        
+    ax.grid(True, zorder=0, ls='dashed', alpha=0.5)
+    
+    
+def plot_sf6_detrend_reltp_progression(obj, bp1=None):    
+    fig, ((ax11, ax12), (ax21, ax22)) = plt.subplots(2, 2, dpi=300, figsize=(9,6))
+    
+    s11 = dcts.get_subs(col_name='SF6')
+    c11 = dcts.get_coord(col_name='int_ERA5_THETA')
+    
+    s12 = dcts.get_subs(col_name='detr_SF6')
+    c12 = c11
+    
+    s22 = s12
+    c22 = dcts.get_coord(col_name='int_ERA5_D_TROP1_THETA')
+    
+    mxr_vs_vcoord(caribic, s11, c11, 
+                  ax = ax11, 
+                  tick_params  = dict(top=True, labeltop=True, bottom=True, labelbottom=True),
+                  )
+    ax11.set_xlabel(s11.label(), loc='center')
+    ax11.set_ylabel(c11.label(), loc='center')
+    ax11.set_xlim(5,11.6)
+    
+    mxr_vs_vcoord(caribic, s12, c12, 
+                  ax=ax12,
+                  tick_params  = dict(top=True, labeltop=True, bottom=False, labelbottom=False), 
+                  )
+    ax12.set_xlabel(s12.label(), loc='center')
+    ax12.set_ylabel(c12.label(), loc='center')
+    
+    
+    mxr_vs_vcoord(caribic, s22, c22, 
+                  ax=ax22,
+                  tick_params  = dict(top=False, labeltop=False, bottom=True, labelbottom=True),
+                  )
+    ax22.set_xlabel(s22.label(), loc='center')
+    ax22.set_ylabel(c22.label(), loc='center')
+    
+    plt.subplots_adjust(wspace=0, hspace=0)
+    
+    ax12.yaxis.tick_right()
+    ax12.yaxis.set_label_position("right")
+    ax22.yaxis.tick_right()
+    ax22.yaxis.set_label_position("right")
+    
+    ax21.set_visible(False)
+    
+    # if bp1:
+    #     df12 = bp1.rms_seasonal_vstdv(s12, c12)
+    #     ax12_twin = ax12.twinx()
+        
+    #     ax12_twin.plot(df12['rms_vstdv'], df12.index)
+    #     ax12_twin.set_xlim(0,0.5)
+    
+    plt.show()
+
+if False: from data import Caribic; caribic = Caribic()
+if False: from plot.data import BinPlotter1D; bp1 = BinPlotter1D(caribic)
+plot_sf6_detrend_reltp_progression(caribic, bp1)
+
+# =============================================================================
+# notes = ['$\Theta$ vs. SF$_6$',
+#          '$\Theta$ vs. SF$_6$',
+#          '$\Delta\Theta_{TP}$ vs. detrended SF$_6$']
+# for note in notes: 
+#     fig = plt.figure()
+#     plt.text(**dcts.note_dict(fig, y = 0.05, s= note))
+# =============================================================================
 
 # %% LocalData
 
