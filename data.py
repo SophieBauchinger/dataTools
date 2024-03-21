@@ -976,12 +976,18 @@ class GlobalData:
 
     def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
         """ Calculate overall variability of stratospheric and tropospheric air. """
+        
+        #TODO seasonal!! 
+        
         if not tps:
-            
             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
         tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
 
-        shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+        # shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+        
+        shared_indices = self.get_shared_indices(tps)
+        shared_df = self.df_sorted[self.df_sorted.index.isin(shared_indices)]
+        
         stdv_df = pd.DataFrame(columns=['tropo_stdv', 'strato_stdv',
                                         'tropo_mean', 'strato_mean',
                                         'rel_tropo_stdv', 'rel_strato_stdv'],
@@ -1004,6 +1010,27 @@ class GlobalData:
 
             stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv / t_mean * 100
             stdv_df['rel_strato_stdv'][tp.col_name] = s_stdv / s_mean * 100
+        
+        if kwargs.get('seasonal'):
+            for s in set(self.df.season): 
+                data = subs_data[subs_data.season == s]
+                tp_df = shared_df[shared_df.index.isin(subs_data.index)]
+                for tp in tps:
+                    t_stdv = data[shared_df['tropo_' + tp.col_name + f'_{s}']].std(skipna=True)
+                    s_stdv = data[shared_df['strato_' + tp.col_name + f'_{s}']].std(skipna=True)
+    
+                    t_mean = data[shared_df['tropo_' + tp.col_name + f'_{s}']].mean(skipna=True)
+                    s_mean = data[shared_df['tropo_' + tp.col_name + f'_{s}']].mean(skipna=True)
+    
+                    stdv_df['tropo_stdv'][tp.col_name + f'_{s}'] = t_stdv
+                    stdv_df['strato_stdv'][tp.col_name + f'_{s}'] = s_stdv
+    
+                    stdv_df['tropo_mean'][tp.col_name + f'_{s}'] = t_mean
+                    stdv_df['strato_mean'][tp.col_name + f'_{s}'] = s_mean
+    
+                    stdv_df['rel_tropo_stdv'][tp.col_name + f'_{s}'] = t_stdv / t_mean * 100
+                    stdv_df['rel_strato_stdv'][tp.col_name + f'_{s}'] = s_stdv / s_mean * 100
+                
 
         return stdv_df
 
