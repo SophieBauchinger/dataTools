@@ -243,11 +243,11 @@ class Substance():
         if not self.detr:
             return f'{code} [{unit}] ({identifier})'
 
-        elif self.detr and not delta:
-            return f'{code} detrended wrt. 2005 [{unit}]'
+        elif self.detr:# and not delta:
+            return f'{code} rel. to BGD [{unit}]'
 
-        elif self.detr and delta:
-            return f'{code} ' + r'(-$\Delta_{2005}$)' + f' [{unit}]'
+        # elif self.detr and delta:
+        #     return f'{code} ' + r'(-$\Delta_{2005}$)' + f' [{unit}]'
 
         else:
             raise KeyError('Could not generate a label')
@@ -271,7 +271,7 @@ class Substance():
                 'f11': (130, 250),
                 'f12': (400, 540),
 
-                'detr_sf6': (5.5, 6.5),
+                'detr_sf6': (0.95, 1.05), # (5.5, 6.5),
                 'detr_co2': (370, 395),
                 'detr_ch4': (1650, 1970),
                 'detr_n2o': (290, 330),
@@ -285,12 +285,13 @@ class Substance():
                     raise KeyError(f'No default vlims for {subs_short}. ')
 
             vlims_stdv_total = {
-                'detr_sf6': (0, 0.3),
+                'detr_sf6': (0, 0.05),
                 'sf6': (0, 2),
                 'detr_n2o': (0, 13),
                 'detr_co': (10, 30),
                 'detr_co2': (0.8, 3.0),
                 'detr_ch4': (16, 60),
+                'o3' : (0, 200),
             }
 
             vlims_stdv_tropo = {
@@ -323,6 +324,9 @@ class Substance():
 
             if bin_attr == 'vcount':
                 return (1, np.nan)
+            
+            else: 
+                raise KeyError(f'Unrecognised bin attribute: {bin_attr}')
 
         if not self.short_name.startswith('d_'):
             return get_vlims(self.short_name, bin_attr, atm_layer)
@@ -585,7 +589,7 @@ def dict_colors():
     """ Get colorbars and colors for various variables. """
     return {
         'vmean': plt.cm.viridis,
-        'vstdv': cmr.get_sub_cmap('summer_r', 0.1, 1),
+        'vstdv': cmr.get_sub_cmap('hot_r', 0.1, 1),
         'vstdv_tropo': cmr.get_sub_cmap('YlOrBr', 0, 0.75),
         'vstdv_strato': plt.cm.BuPu,
         'diff': plt.cm.PiYG,
