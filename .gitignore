@@ -136,3 +136,4 @@ misc_data/emac_ds.nc
 .idea/iau-caribic.iml
 .idea/modules.xml
 .idea/other.xml
+misc_data/all_data_dict.pkl
