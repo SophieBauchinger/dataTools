@@ -618,7 +618,7 @@ class TropopausePlotter(TropopauseData):
                                         for tp in tps]))
 
         fig, ax = plt.subplots(dpi=240, figsize=(8,6))
-        ax.set_title('Ratio of tropospheric / stratospheric datapoints in Caribic-2')
+        ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {self.ID}')
 
         # tp_defs = set([tp.tp_def for tp in tps])
         # ax.grid(True, axis='x', c='k', alpha=0.3)
@@ -661,7 +661,8 @@ class TropopausePlotter(TropopauseData):
         else: 
             stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' not in c]]
         
-        stdv_df = stdv_df.astype(float).round(2 if kwargs.get('rel') else 3)
+        
+        stdv_df = stdv_df.astype(float).round(3 if kwargs.get('rel') else 3)
         stdv_df.sort_index()
         
         fig, ax = plt.subplots(dpi=250)
@@ -675,6 +676,70 @@ class TropopausePlotter(TropopauseData):
         table.set_fontsize(14)
         table.scale(1,4)
         ax.axis('off')
+        
+    def strato_tropo_stdv_mean_seasonal_table(self, subs, tps=None, **kwargs):
+        """ Creates a table with the """
+        
+        self.df['season'] = tools.make_season(self.df.index.month)
+        
+        stdv_df_dict = {}
+        
+        for season in set(self.df.season):
+            
+            stdv_df = self.sel_season(season).strato_tropo_stdv(subs, tps)
+            
+            if kwargs.get('rel'): 
+                stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' in c]]
+            else: 
+                stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' not in c]]
+            
+            stdv_df = stdv_df.astype(float).round(3 if kwargs.get('rel') else 3)
+            stdv_df.sort_index()
+            
+            stdv_df_dict[season] = stdv_df.rename(columns = {c:c +f'_{season}' for c in stdv_df.columns})
+            
+            fig, ax = plt.subplots(dpi=250)
+            # ax.set_title(f'Season : {season}')
+            
+            ax.text(**dcts.note_dict(ax, s = f'season : {season}'))
+    
+            rowLabels = [dcts.get_coord(col_name=c).label(True) for c in stdv_df.index]
+            colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
+            table = ax.table(stdv_df.values, 
+                              rowLabels=rowLabels, 
+                              colLabels = colLabels,
+                             loc='center')
+            table.set_fontsize(14)
+            table.scale(1,4)
+            ax.axis('off')
+        
+        # RMS of seasonal relative standard deviation
+        import pandas as pd
+        df = pd.concat(stdv_df_dict.values(), axis=1)
+        df['rel_strato_av'] = (df['rel_strato_stdv_1'] + df['rel_strato_stdv_2'] + df['rel_strato_stdv_3'] + df['rel_strato_stdv_4']) / 4
+        df['rel_tropo_av'] = (df['rel_tropo_stdv_1'] + df['rel_tropo_stdv_2'] + df['rel_tropo_stdv_3'] + df['rel_tropo_stdv_4']) / 4
+        
+        df = df[['rel_tropo_av', 'rel_strato_av']]
+        
+        df = df.astype(float).round(3 if kwargs.get('rel') else 3)
+        
+        fig, ax = plt.subplots(dpi=250)
+        # ax.set_title(f'Season : {season}')
+        
+        # ax.text(**dcts.note_dict(ax, s = f'season : {season}'))
+
+        rowLabels = [dcts.get_coord(col_name=c).label(True) for c in df.index]
+        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
+        table = ax.table(df.values, 
+                          rowLabels=rowLabels, 
+                          colLabels = colLabels,
+                         loc='center')
+        table.set_fontsize(14)
+        table.scale(1,4)
+        ax.axis('off')
+        
+        return stdv_df_dict
+        
 
 #%% N2O filter
 def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
@@ -749,11 +814,13 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     Returns:
         tropospheric, stratospheric standard deviations within each bin as list for each tp coordinate
     """
-    tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
-           if 'tropo_'+tp.col_name in glob_obj.df_sorted.columns]
+    # tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
+    #        if 'tropo_'+tp.col_name in glob_obj.df_sorted.columns]
+    
+    # if minimise_tps:
+    #     tps = tools.minimise_tps(tps)
 
-    if minimise_tps:
-        tps = tools.minimise_tps(tps)
+    tps = glob_obj.tp_coords()
 
     lat_bmin, lat_bmax = 30, 90 # np.nanmin(lat), np.nanmax(lat)
     lat_bci = bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size)
@@ -769,6 +836,9 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     for i, tp in enumerate(tps):
         # troposphere
         tropo_data = glob_obj.sel_tropo(**tp.__dict__).df
+        shared_indices = glob_obj.sel_tropo(**tp.__dict__).get_shared_indices()
+        tropo_data = tropo_data.loc[shared_indices]
+        
         tropo_lat = np.array([tropo_data.geometry[i].y for i in range(len(tropo_data.index))]) # lat
         tropo_out_lat = bp.Simple_bin_1d(tropo_data[substance.col_name], tropo_lat, 
                                          lat_bci, count_limit = glob_obj.count_limit)
@@ -783,6 +853,9 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
         
         # stratosphere
         strato_data = glob_obj.sel_strato(**tp.__dict__).df
+        shared_indices = glob_obj.sel_strato(**tp.__dict__).get_shared_indices()
+        tropo_data = strato_data.loc[shared_indices]
+        
         strato_lat = np.array([strato_data.geometry[i].y for i in range(len(strato_data.index))]) # lat
         strato_out_lat = bp.Simple_bin_1d(strato_data[substance.col_name], strato_lat, 
                                           lat_bci, count_limit = glob_obj.count_limit)
