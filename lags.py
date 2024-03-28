@@ -14,7 +14,7 @@ import pandas as pd
 from toolpac.age import calculate_lag as cl
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from dictionaries import get_col_name
+from dataTools.dictionaries import get_col_name
 
 def calc_time_lags(c_obj, ref_obj, years, substance='sf6', pfx='GHG',
                    ref_min=2003, ref_max=2020, plot_yr=False, plot_all=True,

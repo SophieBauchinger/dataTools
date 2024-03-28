@@ -7,9 +7,9 @@ Main script for Caribic measurement analysis routine. Theoretically.
 """
 import matplotlib.pyplot as plt
 
-from data import Caribic, Mozart, EMAC, TropopauseData, MaunaLoa, MaceHead, CampaignData
-import dictionaries as dcts
-import tools
+from dataTools.data import Caribic, Mozart, EMAC, TropopauseData, MaunaLoa, MaceHead, CampaignData
+import dataTools.dictionaries as dcts
+import dataTools.tools
 
 # from data import detrend_substance
 # import plot.data

@@ -17,7 +17,7 @@ import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 from toolpac.conv.times import secofday_to_datetime
 
-import dictionaries as dcts
+import dataTools.dictionaries as dcts
 
 
 # %% Data extraction
@@ -169,27 +169,28 @@ def process_caribic(ds):
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
-clams_variables = [
+def clams_variables(): 
+    return [
     'ERA5_PV',
     'ERA5_EQLAT',
     'ERA5_TEMP',
-
+    
     'ERA5_PRESS',
     'ERA5_THETA',
     'ERA5_GPH',
-
+    
     'ERA5_TROP1_PRESS',
     'ERA5_TROP1_THETA',
     'ERA5_TROP1_Z',
-
+    
     'ERA5_PRESS_1_5_Main',
     'ERA5_THETA_1_5_Main',
     'ERA5_GPH_1_5_Main',
-
+    
     'ERA5_PRESS_2_0_Main',
     'ERA5_THETA_2_0_Main',
     'ERA5_GPH_2_0_Main',
-
+    
     'ERA5_PRESS_3_5_Main',
     'ERA5_THETA_3_5_Main',
     'ERA5_GPH_3_5_Main',
@@ -197,12 +198,12 @@ clams_variables = [
 
 def process_clams(ds):
     """ Select certain variables to import from CLaMS Data for aircraft campaigns. """
-    variables = clams_variables
+    variables = clams_variables()
     return ds[variables]
 
 def process_atom_clams(ds):
     """ Additional time values for ATom as otherwise the function breaks """
-    variables = ['ATom_UTC_Start'] + clams_variables
+    variables = ['ATom_UTC_Start'] + clams_variables()
 
     ds = ds[variables]
 
@@ -222,6 +223,57 @@ def process_atom_clams(ds):
 
     return ds
 
+def clams_variables_v03(): 
+    met_vars = [
+    'ERA5_PV',
+    'ERA5_EQLAT',
+    'ERA5_TEMP',
+    
+    'ERA5_PRESS',
+    'ERA5_THETA',
+    'ERA5_PHI', #!!! used to be ERA5_GPH
+    ]
+    
+    dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
+               for pvu in ['1_5', '2_0', '3_5'] 
+               for vcoord in ['PHI', 'THETA', 'PRESS']]
+
+    therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
+               for vcoord in ['Z', 'THETA', 'PRESS']]
+    
+    return met_vars + dyn_tps + therm_tps
+
+def process_clams_v03(ds): 
+    """ 
+    Preprocess CLaMS datasets for e.g. CARIBIC-2 renalayis data version .03
+    Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+    
+    (for CARIBIC: 
+         function call needs to include 
+         drop_variables = 'CARIBIC2_LocalTime'
+         if decode_times = True )
+    
+    """
+    
+    # ds = ds.drop_vars('CARIBIC2_LocalTime')
+    
+    TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+    TP_qualifier_dict = {0 : '_Main', 
+                         1 : '_Second', 
+                         2 : '_Third'}
+    
+    for variable in TP_vars: 
+        [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+        
+        for TP_value in ds[variable][TP_dim].values: 
+            ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+        
+        ds = ds.drop_vars(variable)
+    
+    
+        
+    return ds[[v for v in clams_variables_v03() if v in ds.variables]]
+    
 
 # %% Data selection
 def minimise_tps(tps, vcoord=None) -> list:

@@ -30,9 +30,9 @@ import geopandas
 
 import toolpac.calc.dev_binprocessor as bp
 
-import dictionaries as dcts
-import tools
-from data import GlobalData
+import dataTools.dictionaries as dcts
+import dataTools.tools
+from dataTools.data import GlobalData
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")

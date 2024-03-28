@@ -42,8 +42,8 @@ if '..' not in sys.path:
 
 import toolpac.calc.dev_binprocessor as bp
 
-import tools
-import dictionaries as dcts
+import dataTools.tools
+import dataTools.dictionaries as dcts
 
 # supress a gui backend userwarning, not really advisable
 warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')

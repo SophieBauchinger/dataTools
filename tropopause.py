@@ -22,9 +22,9 @@ import toolpac.calc.dev_binprocessor as bp
 # from toolpac.calc.binprocessor import Bin_equi1d, Simple_bin_1d, Bin_equi2d, Simple_bin_2d
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-import dictionaries as dcts
-from data import TropopauseData
-import tools
+import dataTools.dictionaries as dcts
+from dataTools.data import TropopauseData
+import dataTools.tools
 
 world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}

@@ -19,7 +19,7 @@ import warnings; warnings.filterwarnings("ignore", category=UserWarning,
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
-from dictionaries import get_col_name, get_fct_substance
+from dataTools.dictionaries import get_col_name, get_fct_substance
 
 if False: mlo_data = {}
 

@@ -43,10 +43,10 @@ from toolpac.conv.times import datetime_to_fractionalyear
 
 from toolpac.readwrite.sql_data_import import client_data_choice
 
-import dictionaries as dcts
-import tools
+import dataTools.dictionaries as dcts
+import dataTools.tools
 
-# TODO: fix the underlying problem in toolpac rather than just suppressing stuff
+#!! TODO: fix the underlying problem in toolpac rather than just suppressing stuff
 import warnings
 from pandas.errors import SettingWithCopyWarning
 
@@ -230,11 +230,15 @@ class GlobalData:
     def get_met_data(self):
         """ Require existance of dataframe creation method for child classes. """
         if self.ID in ['CAR', 'ATOM', 'HIPPO', 'SHTR', 'PGS', 'WISE']: 
-            return self.get_era5_data()
+            return self.get_clams_data()
         else: 
             raise NotImplementedError('Subclasses of GlobalData need to implement .get_met_data()')
 
-    def get_era5_data(self, met_pdir=None, save_ds=False) -> pd.DataFrame:
+    #!!! TODO Caribic met_data dataset V03 - integration
+    # with xr.open_dataset(path+ '\caribic_clams_V03.nc') as ds_loaded: 
+    #     ds_loaded = ds_loaded
+
+    def get_clams_data(self, met_pdir=None, save_ds=False) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
 
         if self.ID in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
@@ -247,17 +251,34 @@ class GlobalData:
                 'PGS'  : 'PolstraccTPChange',
                 }
 
+            preprocess_fcts = {
+                'CAR' : tools.process_clams_v03, 
+                'ATOM' : tools.process_atom_clams
+                }
+
             met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
             fnames = met_pdir + "/*.nc"
-
+            
             if self.ID == 'CAR': 
-                # directories = find.find_dir('2*', met_pdir) 
-                fnames = met_pdir + "2*/*.nc"
-                
-            # extract data, each file goes through preprocess first to filter variables & convert units
-            with xr.open_mfdataset(fnames, decode_times=False if self.ID == 'ATOM' else True,
-                                   preprocess=tools.process_atom_clams if self.ID == 'ATOM' else tools.process_clams) as ds:
-                ds = ds
+                fnames = met_pdir + "/2*/*.nc"
+            
+            if self.ID == 'ATOM': 
+                with xr.open_mfdataset(fnames, decode_times=False if self.ID in ('ATOM') else True,
+                                       preprocess = 
+                                       preprocess_fcts[self.ID] if self.ID in preprocess_fcts.keys() 
+                                       else tools.process_clams,
+                                       drop_variables = 'CARIBIC2_LocalTime' if self.ID =='CAR' else None,
+                                       ) as ds:
+                    ds = ds
+            
+            else: 
+                # extract data, each file goes through preprocess first to filter variables & convert units
+                with xr.open_mfdataset(fnames, decode_times = True,
+                                       preprocess = preprocess_fcts[self.ID] if self.ID in preprocess_fcts.keys() 
+                                       else tools.process_clams,
+                                       drop_variables = 'CARIBIC2_LocalTime' if self.ID =='CAR' else None,
+                                       ) as ds:
+                    ds = ds
 
             if save_ds: 
                 self.data['met_ds'] = ds
@@ -1705,7 +1726,7 @@ class CampaignData(GlobalData):
     def get_met_data(self, met_pdir=None) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
         if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
-            return self.get_era5_data()
+            return self.get_clams_data()
 
         elif self.ID in ['TACTS'] and 'df' in self.data.keys():
             met_cols = [c for c in self.df.columns if c in [

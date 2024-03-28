@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 import toolpac.calc.binprocessor as bp
 
-import tools
-import dictionaries as dcts
+import dataTools.tools
+import dataTools.dictionaries as dcts
 
 #%% Plotting Gradient by season
 def plot_gradient_by_season(glob_obj, substance, ycoord,

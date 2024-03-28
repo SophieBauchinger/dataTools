@@ -21,8 +21,8 @@ from toolpac.outliers import outliers
 from toolpac.outliers.outliers import fit_data
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-import tools
-import dictionaries as dcts
+import dataTools.tools
+import dataTools.dictionaries as dcts
 
 # from tools import get_lin_fit, assign_t_s
 
