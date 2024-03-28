@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@Author: Sophie Bauchimger, IAU
+@Author: Sophie Bauchinger, IAU
 @Date: 
 
 using fct from 'outliers' created on Tue Apr 11 09:28:22 2023
@@ -20,8 +20,9 @@ from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
 
 from dataTools.dictionaries import get_col_name, get_fct_substance
+from dataTools.data import MaunaLoa
 
-if False: mlo_data = {}
+mlo_data = MaunaLoa().data
 
 tp_kwargs = {
     'tp_def' : 'chem', 

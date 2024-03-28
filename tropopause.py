@@ -24,7 +24,7 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
 import dataTools.dictionaries as dcts
 from dataTools.data import TropopauseData
-import dataTools.tools
+from dataTools import tools
 
 world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}
@@ -802,7 +802,7 @@ def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
 #     }
 
 def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
-                           atm_layer='both', savefig=False) -> (np.array, np.array):
+                           atm_layer='both', savefig=False):
     """
     Create matrix plot showing variability per latitude bin per tropopause definition
 

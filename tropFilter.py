@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 # default='warn' - otherwise df[j] = val gives a warning (outliers.outliers)
 pd.options.mode.chained_assignment = None
-# supress a gui backend userwarning
+# suppress a gui backend userwarning
 import matplotlib.pyplot as plt
 import warnings; warnings.filterwarnings("ignore", category=UserWarning,
                                          module='matplotlib')
@@ -21,7 +21,7 @@ from toolpac.outliers import outliers
 from toolpac.outliers.outliers import fit_data
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
-import dataTools.tools
+from dataTools import tools
 import dataTools.dictionaries as dcts
 
 # from tools import get_lin_fit, assign_t_s

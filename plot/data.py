@@ -42,7 +42,7 @@ if '..' not in sys.path:
 
 import toolpac.calc.dev_binprocessor as bp
 
-import dataTools.tools
+from dataTools import tools
 import dataTools.dictionaries as dcts
 
 # supress a gui backend userwarning, not really advisable
@@ -451,7 +451,7 @@ def mxr_vs_vcoord(glob_obj, subs, vcoord, tick_params, ax=None, note=None):
     ax.grid(True, zorder=0, ls='dashed', alpha=0.5)
     
     
-def plot_sf6_detrend_reltp_progression(obj, bp1=None):    
+def plot_sf6_detrend_reltp_progression(glob_obj, bp1=None):    
     fig, ((ax11, ax12), (ax21, ax22)) = plt.subplots(2, 2, dpi=300, figsize=(9,6))
     
     s11 = dcts.get_subs(col_name='SF6')
@@ -463,7 +463,7 @@ def plot_sf6_detrend_reltp_progression(obj, bp1=None):
     s22 = s12
     c22 = dcts.get_coord(col_name='int_ERA5_D_TROP1_THETA')
     
-    mxr_vs_vcoord(caribic, s11, c11, 
+    mxr_vs_vcoord(glob_obj, s11, c11, 
                   ax = ax11, 
                   tick_params  = dict(top=True, labeltop=True, bottom=True, labelbottom=True),
                   )
@@ -471,7 +471,7 @@ def plot_sf6_detrend_reltp_progression(obj, bp1=None):
     ax11.set_ylabel(c11.label(), loc='center')
     ax11.set_xlim(5,11.6)
     
-    mxr_vs_vcoord(caribic, s12, c12, 
+    mxr_vs_vcoord(glob_obj, s12, c12, 
                   ax=ax12,
                   tick_params  = dict(top=True, labeltop=True, bottom=False, labelbottom=False), 
                   )
@@ -479,7 +479,7 @@ def plot_sf6_detrend_reltp_progression(obj, bp1=None):
     ax12.set_ylabel(c12.label(), loc='center')
     
     
-    mxr_vs_vcoord(caribic, s22, c22, 
+    mxr_vs_vcoord(glob_obj, s22, c22, 
                   ax=ax22,
                   tick_params  = dict(top=False, labeltop=False, bottom=True, labelbottom=True),
                   )
@@ -504,9 +504,7 @@ def plot_sf6_detrend_reltp_progression(obj, bp1=None):
     
     plt.show()
 
-if False: from data import Caribic; caribic = Caribic()
-if False: from plot.data import BinPlotter1D; bp1 = BinPlotter1D(caribic)
-plot_sf6_detrend_reltp_progression(caribic, bp1)
+# plot_sf6_detrend_reltp_progression(caribic, bp1)
 
 # =============================================================================
 # notes = ['$\Theta$ vs. SF$_6$',

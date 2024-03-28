@@ -17,7 +17,7 @@ import cmasher as cmr
 import toolpac.calc.dev_binprocessor as bp
 
 import dataTools.dictionaries as dcts
-import dataTools.tools
+from dataTools import tools
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
@@ -85,7 +85,7 @@ class BinPlotter():
     def df(self) -> pd.DataFrame:
         return self.data['df']
 
-    def get_limits(self, subs, xcoord, ycoord=None, bin_attr='vmean') -> (tuple, tuple, tuple):
+    def get_limits(self, subs, xcoord, ycoord=None, bin_attr='vmean'):
         """ Check kwargs for limits, otherwise set default values """
 
         if 'vlims' in self.kwargs:
@@ -117,7 +117,7 @@ class BinPlotter():
         else: 
             return vlims, xlims
 
-    def get_bsize(self, subs, xcoord, ycoord=None) -> (float, float):
+    def get_bsize(self, subs, xcoord, ycoord=None):
         """ Get bin size for x- and y-coordinates. """
         if ycoord: 
             vlims, xlims, ylims = self.get_limits(subs, xcoord, ycoord)

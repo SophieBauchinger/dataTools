@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from dataTools.data import Caribic, Mozart, EMAC, TropopauseData, MaunaLoa, MaceHead, CampaignData
 import dataTools.dictionaries as dcts
-import dataTools.tools
+from dataTools import tools
 
 # from data import detrend_substance
 # import plot.data
