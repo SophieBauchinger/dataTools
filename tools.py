@@ -5,14 +5,14 @@
 @Date: Fri Apr 28 09:51:49 2023
 
 """
-import numpy as np
 import datetime as dt
-import os
-import pandas as pd
-import pkgutil
 import geopandas
-from shapely.geometry import Point
+import importlib
 from metpy.units import units
+import numpy as np
+import pandas as pd
+import os
+from shapely.geometry import Point
 
 import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
@@ -20,12 +20,16 @@ from toolpac.conv.times import secofday_to_datetime
 
 import dataTools.dictionaries as dcts
 
-
 # %% 
-def get_path():
-    """ Get current package path to make accessing files etc easier. Probably a hack. """
-    loader = pkgutil.get_loader("dataTools")
-    path = os.path.dirname(loader.load_module("dataTools").__file__)
+def get_path(subdir=None):
+    """ Get parent directory of current module, i.e. location of dataTools. """
+    # loader = pkgutil.get_loader("dataTools")
+    # path = os.path.dirname(loader.load_module("dataTools").__file__)
+    # print("cwd : ", os.getcwd()) # current working directory
+    # loader = importlib.util.find_spec("dataTools")
+    # path = loader.submodule_search_locations
+    path = os.path.dirname(os.path.abspath(__file__)) + "\\"
+    if subdir: path = path + subdir
     return path
 
 # %% Data extraction
@@ -91,7 +95,7 @@ def ds_to_gdf(ds) -> pd.DataFrame:
 
     return gdf
 
-def rename_columns(columns) -> (dict, dict):
+def rename_columns(columns) -> tuple[dict, dict]:
     """ Create dictionary relating column name with AMES_variable object
 
     Relate dataframe column name with all information in
@@ -217,7 +221,7 @@ def process_atom_clams(ds):
 
     # find flight date from file name
     filepath = ds['ATom_UTC_Start'].encoding['source']
-    fname = os.path.basename(filepath)
+    fname = os.path.basename(filepath) # get just the file name (contains info)
     date_string = fname.split('_')[1]
     date = dt.datetime(year = int(date_string[:4]),
                         month = int(date_string[4:6]),
@@ -468,7 +472,7 @@ def add_zero_line(ax, axis='y'):
 
 # %% Binning of global data sets
 
-def bin_1d(glob_obj, subs, **kwargs) -> (list, list):
+def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
     """
     Returns 1D binned objects for each year as lists (lat / lon)
 

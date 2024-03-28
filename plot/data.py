@@ -10,7 +10,9 @@ or LocalData as defined in data_classes
 import sys
 import warnings
 from calendar import monthrange
+import cartopy.crs as ccrs
 import datetime as dt
+import geopandas
 import math
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -21,12 +23,17 @@ from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch, Rectangle
 # from matplotlib.pyplot import pcolormesh as pcm
 import numpy as np
-import cartopy.crs as ccrs
 
-import geopandas
+# if '..' not in sys.path:
+#     sys.path.append('..')
+
 from mpl_toolkits.axes_grid1 import AxesGrid
-
 from mpl_toolkits.basemap import Basemap
+import toolpac.calc.binprocessor as bp
+
+from dataTools import tools
+import dataTools.dictionaries as dcts
+
 """
 # set up orthographic map projection with perspective of satellite looking 
 # down at 50N, 100W. use low resolution coastlines.
@@ -36,14 +43,6 @@ map = Basemap(projection='ortho',lat_0=50,lon_0=8,resolution='l')
 map.drawcoastlines(linewidth=0.25)
 map.drawcountries(linewidth=0.25)
 """
-
-if '..' not in sys.path:
-    sys.path.append('..')
-
-import toolpac.calc.dev_binprocessor as bp
-
-from dataTools import tools
-import dataTools.dictionaries as dcts
 
 # supress a gui backend userwarning, not really advisable
 warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')

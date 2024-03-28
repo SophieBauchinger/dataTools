@@ -25,14 +25,13 @@ import pandas as pd
 import pkgutil
 import matplotlib.pyplot as plt
 import cmasher as cmr
+import os
 
 from toolpac.outliers import ol_fit_functions as fct
 
 def get_path():
-    """ Get current package path to make accessing files etc easier. Probably a hack. """
-    loader = pkgutil.get_loader("dataTools")
-    path = os.path.dirname(loader.load_module("dataTools").__file__) + "\\"
-    return path
+    """ Get parent directory of current module, i.e. location of dataTools. """
+    return os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 # %% Coordinates
 class Coordinate:

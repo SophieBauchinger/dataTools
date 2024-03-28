@@ -28,10 +28,10 @@ import itertools
 from mpl_toolkits.axes_grid1 import AxesGrid
 import geopandas
 
-import toolpac.calc.dev_binprocessor as bp
+import toolpac.calc.binprocessor as bp
 
 import dataTools.dictionaries as dcts
-import dataTools.tools
+from dataTools import tools
 from dataTools.data import GlobalData
 
 import warnings

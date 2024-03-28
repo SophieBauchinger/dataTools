@@ -14,14 +14,15 @@ import pandas as pd
 import itertools
 
 import cmasher as cmr
-import toolpac.calc.dev_binprocessor as bp
+import toolpac.calc.binprocessor as bp
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
-
+ 
+ #%% 
 tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
 eql = dcts.get_coord(hcoord='eql', model='ERA5')
 

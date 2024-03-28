@@ -17,30 +17,29 @@ Classes:
 """
 
 # TODO ATOM flight & latitude selection
-
+from abc import abstractmethod
+import copy
 import datetime as dt
-import geopandas
-import numpy as np
-import pandas as pd
-from shapely.geometry import Point
-import xarray as xr
-import os
+import dill
 from functools import partial
+import geopandas
+import keyring
 import matplotlib.pyplot as plt
 from metpy import calc
 from metpy.units import units
-import dill
-import copy
-import keyring
-from abc import abstractmethod
+import numpy as np
+import os
+import pandas as pd
+from shapely.geometry import Point
 import traceback
+import xarray as xr
+
 # from toolpac.calc import bin_1d_2d
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 from toolpac.conv.times import fractionalyear_to_datetime
 from toolpac.outliers import outliers
 from toolpac.conv.times import datetime_to_fractionalyear
-
 from toolpac.readwrite.sql_data_import import client_data_choice
 
 import dataTools.dictionaries as dcts
@@ -2154,14 +2153,15 @@ class Mozart(GlobalData):
     def __repr__(self):
         return f'Mozart data, subs = {self.substance}'
 
-    def get_data(self, remap_lon=True, verbose=False,
-                 fname=r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc'):
+    def get_data(self, remap_lon=True, verbose=False, fname=None):
         """ Create dataset from given file
     
         Parameters:
             remap_lon (bool): convert longitude from 0-360 to ±180 degrees
             verbose (bool): make the function more talkative
         """
+        if not fname: fname = tools.get_path('misc_data\\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc')
+        
         with xr.open_dataset(fname) as ds:
             ds = ds.isel(level=27)
         try:
@@ -2254,13 +2254,13 @@ class LocalData():
 class MaunaLoa(LocalData):
     """ Stores data for all substances measured at Mauna Loa. """
 
-    def __init__(self, years=range(1999, 2021), substances='all', data_D=False,
-                 path_dir=r'C:\Users\sophie_bauchinger\Documents\GitHub\iau-caribic\misc_data'):
+    def __init__(self, years=range(1999, 2021), substances='all', data_D=False, path_dir=None):
         """ Initialise Mauna Loa object with all available substance data. """
         self.source = 'Mauna_Loa'
         self.ID = 'MLO'
         super().__init__(years=years, substances=substances)
         if data_D: self.data_D = {}
+        if not path_dir: path_dir = tools.get_path("misc_data")
         self.get_data(path_dir, data_D)
 
     def __repr__(self):
@@ -2294,11 +2294,11 @@ class MaunaLoa(LocalData):
 
         # get correct path for the chosen substance
         fnames = {
-            'sf6': r'/mlo_SF6_{}.dat'.format('Day' if freq == 'D' else 'MM'),
-            'n2o': '/mlo_N2O_MM.dat',
-            'co' : '/co_mlo_surface-flask_1_ccgg_month.txt',
-            'co2': '/co2_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
-            'ch4': '/ch4_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
+            'sf6': r'\\mlo_SF6_{}.dat'.format('Day' if freq == 'D' else 'MM'),
+            'n2o': '\\mlo_N2O_MM.dat',
+            'co' : '\\co_mlo_surface-flask_1_ccgg_month.txt',
+            'co2': '\\co2_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
+            'ch4': '\\ch4_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
             }
 
         path = path_dir + fnames[subs]
@@ -2378,13 +2378,13 @@ class MaunaLoa(LocalData):
 class MaceHead(LocalData):
     """ Stores data for SF6 measurements at Mace Head. """
 
-    def __init__(self, years=(2012), substances='all',
-                 path=r'C:\Users\sophie_bauchinger\Documents\Github\iau-caribic\misc_data\MHD-medusa_2012.dat'):
+    def __init__(self, years=(2012), substances='all', path=None):
         """ Initialise Mace Head with (daily and) monthly data in dataframes """
 
         self.source = 'Mace_Head'
         self.ID = 'MHD'
         super().__init__(years, substances=substances)
+        if not path: path = tools.get_path('misc_data\\MHD-medusa_2012.dat') 
         self.path = path
         self.data_Hour = {}
         self.get_data()
