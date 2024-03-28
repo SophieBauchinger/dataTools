@@ -20,11 +20,19 @@ validated_input: let user try again if input was not in choices
 choose_column: let user choose from available columns per specification
 
 """
-from toolpac.outliers import ol_fit_functions as fct
 import numpy as np
 import pandas as pd
+import pkgutil
 import matplotlib.pyplot as plt
 import cmasher as cmr
+
+from toolpac.outliers import ol_fit_functions as fct
+
+def get_path():
+    """ Get current package path to make accessing files etc easier. Probably a hack. """
+    loader = pkgutil.get_loader("dataTools")
+    path = os.path.dirname(loader.load_module("dataTools").__file__) + "\\"
+    return path
 
 # %% Coordinates
 class Coordinate:
@@ -141,7 +149,7 @@ class Coordinate:
 
 def coordinate_df():
     """ Get dataframe containing all info about all coordinate variables """
-    with open('coordinates.csv', 'rb') as f:
+    with open(get_path() + 'coordinates.csv', 'rb') as f:
         coord_df = pd.read_csv(f)
         if 'pvu' in coord_df.columns:
             coord_df['pvu'] = coord_df['pvu'].astype(object)  # allow comparison with np.nan
@@ -335,7 +343,7 @@ class Substance():
 
 def substance_df():
     """ Get dataframe containing all info about all substance variables """
-    with open('substances.csv', 'rb') as f:
+    with open(get_path() + 'substances.csv', 'rb') as f:
         substances = pd.read_csv(f)
     # update fct column with proper functions
     fctn_dict = {'h': fct.higher, 's': fct.simple, 'q': fct.quadratic}
@@ -385,14 +393,14 @@ def lookup_fit_function(short_name):
 
 def instrument_df() -> pd.DataFrame:
     """ Get dataframe containing all info about all substance variables """
-    with open('instruments.csv', 'rb') as f:
+    with open(get_path() + 'instruments.csv', 'rb') as f:
         instruments = pd.read_csv(f)
     return instruments
 
 def instr_vars_per_ID_df() -> pd.DataFrame:
     """ Import information on variables available per instrument per campaign. """
     # variable names as stored on databank
-    with open('instr_vars_per_ID.csv', 'rb') as f:
+    with open(get_path() + 'instr_vars_per_ID.csv', 'rb') as f:
         instr_vars_per_ID_df = pd.read_csv(f)
     return instr_vars_per_ID_df
 

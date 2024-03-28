@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 import toolpac.calc.binprocessor as bp
 
-import dataTools.tools
+from dataTools import tools
 import dataTools.dictionaries as dcts
 
 #%% Plotting Gradient by season

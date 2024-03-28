@@ -9,6 +9,7 @@ import numpy as np
 import datetime as dt
 import os
 import pandas as pd
+import pkgutil
 import geopandas
 from shapely.geometry import Point
 from metpy.units import units
@@ -19,6 +20,13 @@ from toolpac.conv.times import secofday_to_datetime
 
 import dataTools.dictionaries as dcts
 
+
+# %% 
+def get_path():
+    """ Get current package path to make accessing files etc easier. Probably a hack. """
+    loader = pkgutil.get_loader("dataTools")
+    path = os.path.dirname(loader.load_module("dataTools").__file__)
+    return path
 
 # %% Data extraction
 

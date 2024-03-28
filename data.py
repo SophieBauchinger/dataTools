@@ -44,7 +44,7 @@ from toolpac.conv.times import datetime_to_fractionalyear
 from toolpac.readwrite.sql_data_import import client_data_choice
 
 import dataTools.dictionaries as dcts
-import dataTools.tools
+from dataTools import tools
 
 #!! TODO: fix the underlying problem in toolpac rather than just suppressing stuff
 import warnings
@@ -1337,8 +1337,9 @@ class Caribic(GlobalData):
         self.data = {}  # easiest way of keeping info which file the data comes from
         parent_dir = r'E:\CARIBIC\Caribic2data'
 
-        if not recalculate and os.path.exists(r'misc_data\caribic_data_dict.pkl'):
-            with open(r'misc_data\caribic_data_dict.pkl', 'rb') as f:
+        resource = tools.get_path() + r"\misc_data\caribic_data_dict.pkl"
+        if not recalculate and os.path.exists(resource):
+            with open(resource, 'rb') as f:
                 self.data = dill.load(f)
             self.data = self.sel_year(*self.years).data
 
