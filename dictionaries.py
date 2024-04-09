@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import pkgutil
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap as lsc
 import cmasher as cmr
 import os
 
@@ -592,6 +593,18 @@ def dict_season():
             # 'color_3': 'green', 'color_4': 'red'}
 
 
+colors = [
+    '#E6E6E6', # 0.0 - 0.1
+    '#D5D4E8', # 0.1 - 0.2
+    '#A6BDDB', 
+    '#5EA4CC', 
+    '#FCC2AB', # 0.4 - 0.5
+    '#FC9272', 
+    '#F86144', 
+    '#E12D26', # 0.7 - 0.8
+    '#CB181D', # 0.8 - 0.9
+]
+
 def dict_colors():
     """ Get colorbars and colors for various variables. """
     return {
@@ -601,7 +614,9 @@ def dict_colors():
         'vstdv_strato': plt.cm.BuPu,
         'diff': plt.cm.PiYG,
         'vcount': cmr.get_sub_cmap('plasma_r', 0.1, 0.9),
+        # 'rvstd' : cmr.get_sub_cmap('hot_r', 0.1, 1),
         # 'vcount' : plt.cm.PuRd,
+        'rvstd' : lsc.from_list('RSTD_default', colors, N=9)
     }
 
 
