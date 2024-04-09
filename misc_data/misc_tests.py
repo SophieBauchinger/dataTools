@@ -29,6 +29,8 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 # print(c.df.shape, c.df.columns[:4])
 # =============================================================================
 
+fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
+
 #%%
 from data import GlobalData, Caribic
 import pandas as pd
@@ -40,8 +42,7 @@ import os
 import dill
 import xarray as xr
 """
-Hi, sorry, mir sind doch noch Ungereimtheiten in den WSM Daten aufgefallen. 
-Und zwar stimmen die Werte für p und alt nicht mit denen aus den GHG / INT / INTtpc files 
+
 """
 def process_caribic(ds): 
     # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
