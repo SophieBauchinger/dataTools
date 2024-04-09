@@ -21,16 +21,19 @@ from toolpac.conv.times import secofday_to_datetime
 import dataTools.dictionaries as dcts
 
 # %% 
-def get_path(subdir=None):
-    """ Get parent directory of current module, i.e. location of dataTools. """
+def get_path():
+    return dcts.get_path()
+
+# def get_path(subdir=None):
+    # """ Get parent directory of current module, i.e. location of dataTools. """
     # loader = pkgutil.get_loader("dataTools")
     # path = os.path.dirname(loader.load_module("dataTools").__file__)
     # print("cwd : ", os.getcwd()) # current working directory
     # loader = importlib.util.find_spec("dataTools")
     # path = loader.submodule_search_locations
-    path = os.path.dirname(os.path.abspath(__file__)) + "\\"
-    if subdir: path = path + subdir
-    return path
+    # path = os.path.dirname(os.path.abspath(__file__)) + "\\"
+    # if subdir: path = path + subdir
+    # return path
 
 # %% Data extraction
 
