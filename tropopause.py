@@ -18,8 +18,7 @@ from PIL import Image
 import glob
 import cmasher as cmr
 
-import toolpac.calc.dev_binprocessor as bp
-# from toolpac.calc.binprocessor import Bin_equi1d, Simple_bin_1d, Bin_equi2d, Simple_bin_2d
+import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
 
 import dataTools.dictionaries as dcts
