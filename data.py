@@ -1267,7 +1267,9 @@ class Caribic(GlobalData):
         df_yr = pd.DataFrame()
         col_dict = {}
         for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir):  # [1:]:
+
             flight_nr = int(str(current_dir)[-12:-9])
+            # flight_nr = int(str(current_dir).split('_')[0].removeprefix('Flight'))
 
             f = find.find_file(f'{pfx}_*', current_dir)
             if not f or len(f) == 0:  # no files found
@@ -1289,17 +1291,25 @@ class Caribic(GlobalData):
             df_yr = pd.concat([df_yr, df_flight])
 
         # Convert longitude and latitude into geometry objects
+        lat_col, lon_col = ('lat', 'lon') if pfx!='MS' else ('PosLat', 'PosLong')
+        
         geodata = [Point(lon, lat) for lon, lat in zip(
-            df_yr['lon'], df_yr['lat'])]
+            df_yr[lon_col], df_yr[lat_col])]
         gdf_yr = geopandas.GeoDataFrame(df_yr, geometry=geodata)
 
         # Drop cols which are saved within datetime, geometry
         if not gdf_yr['geometry'].empty:
+            
             filter_cols = ['TimeCRef', 'year', 'month', 'day',
-                           'hour', 'min', 'sec', 'lon', 'lat', 'type']
-            del_column_names = [gdf_yr.filter(
-                regex='^' + c).columns[0] for c in filter_cols]
-            gdf_yr.drop(del_column_names, axis=1, inplace=True)
+                           'hour', 'min', 'sec', lon_col, lat_col, 'type']
+            print(filter_cols)
+            
+            try: 
+                del_column_names = [gdf_yr.filter(
+                    regex='^' + c).columns[0] for c in filter_cols]
+                gdf_yr.drop(del_column_names, axis=1, inplace=True)
+            except: 
+                pass
 
         return gdf_yr, col_dict
 
@@ -1311,7 +1321,8 @@ class Caribic(GlobalData):
             gdf_yr, col_dict = self.get_year_data(pfx, yr, parent_dir, verbose)
 
             gdf_pfx = pd.concat([gdf_pfx, gdf_yr])
-            if pfx == 'GHG':  # rmv case-sensitive distinction in cols
+            # Remove case-sensitive distinction in Caribic data 
+            if pfx == 'GHG':
                 cols = ['SF6', 'CH4', 'CO2', 'N2O']
                 for col in cols + ['d_' + c for c in cols]:
                     if col.lower() in gdf_pfx.columns:
@@ -1319,12 +1330,16 @@ class Caribic(GlobalData):
                             gdf_pfx[col] = np.nan
                         gdf_pfx[col] = gdf_pfx[col].combine_first(gdf_pfx[col.lower()])
                         gdf_pfx.drop(columns=col.lower(), inplace=True)
+            # In Integrated data, drop Acetone and Acetonitrile columns
             if pfx == 'INT':
                 gdf_pfx.drop(columns=['int_acetone',
                                       'int_acetonitrile'], inplace=True)
             if pfx in ['INT2', 'INTtpc']:
                 gdf_pfx.drop(columns=['int_CARIBIC2_Ac',
                                       'int_CARIBIC2_AN'], inplace=True)
+            if pfx == 'MS': 
+                #!!! Lon / Lat is called PosLong and PosLat
+                print('Help')
         return gdf_pfx, col_dict
 
     def get_data(self, verbose=False, recalculate=False) -> dict:
@@ -1339,23 +1354,29 @@ class Caribic(GlobalData):
         resource = tools.get_path() + r"\misc_data\caribic_data_dict.pkl"
         if not recalculate and os.path.exists(resource):
             with open(resource, 'rb') as f:
-                self.data = dill.load(f)
-            self.data = self.sel_year(*self.years).data
+                data_dict = dill.load(f)
+            
+            # check if loaded data contains given pfxs
+            if all(pfx in data_dict.keys() for pfx in self.pfxs): 
+                self.data = data_dict
+                
+                self.data = self.sel_year(*self.years).data
+            
+                return self.data
 
-        else:
-            print('Importing Caribic Data from remote files.')
-            for pfx in self.pfxs:  # can include different prefixes here too
-                gdf_pfx, col_dict = self.get_pfx_data(pfx, parent_dir, verbose)
+        print('Importing Caribic Data from remote files.')
+        for pfx in self.pfxs:  # can include different prefixes here too
+            gdf_pfx, col_dict = self.get_pfx_data(pfx, parent_dir, verbose)
 
-                if gdf_pfx.empty: print("Data extraction unsuccessful. \
-                                        Please check your input data"); return
+            if gdf_pfx.empty: print("Data extraction unsuccessful. \
+                                    Please check your input data"); return
 
-                # Remove dropped columns from dictionary
-                pop_cols = [i for i in col_dict if i not in gdf_pfx.columns]
-                for key in pop_cols: col_dict.pop(key)
+            # Remove dropped columns from dictionary
+            pop_cols = [i for i in col_dict if i not in gdf_pfx.columns]
+            for key in pop_cols: col_dict.pop(key)
 
-                self.data[pfx] = gdf_pfx
-                self.data[f'{pfx}_dict'] = col_dict
+            self.data[pfx] = gdf_pfx
+            self.data[f'{pfx}_dict'] = col_dict
 
         # self.flights = list(set(pd.concat(
         #     [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
