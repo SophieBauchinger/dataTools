@@ -350,7 +350,7 @@ based on {self.glob_obj.__repr__()}'
 
     def bin_2d_seasonal(self, subs, xcoord, ycoord,
                      bin_equi2d = None,
-                     xbsize: float = None, ybsize: float = None) -> dict:
+                     xbsize: float = None, ybsize: float = None, **kwargs) -> dict:
         """ Bin the dataframe per season. """
         out_dict = {}
         if not xbsize:
@@ -1260,7 +1260,7 @@ class BinPlotter2D(BinPlotter):
 
         return tropo_weighted_average, strato_weighted_average
 
-    def yearly_maps(self, subs, bin_attr):
+    def yearly_maps(self, subs, bin_attr, **kwargs):
         # glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
         """ Create binned 2D plots for each available year on a grid. """
         
@@ -1292,7 +1292,8 @@ class BinPlotter2D(BinPlotter):
         bin_equi2d = bp.Bin_equi2d(-180, 180, xbsize, 
                                    -90, 90, ybsize)
         
-        vlims = self.get_vlimit(subs, bin_attr)
+        vlims = kwargs.get('vlims')
+        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
         norm = Normalize(*vlims)  # normalise color map to set limits
         
         for i, (ax, year) in enumerate(zip(grid, self.glob_obj.years)):
@@ -1342,14 +1343,15 @@ class BinPlotter2D(BinPlotter):
         try: 
             cmap = dcts.dict_colors()[bin_attr]
         except: 
-            cmap = plt.viridis
+            cmap = plt.cm.viridis
 
         binned_seasonal = self.bin_2d_seasonal(subs, xcoord, ycoord, **kwargs)
 
         if not any(bin_attr in bin2d_inst.__dict__ for bin2d_inst in binned_seasonal.values()):
             raise KeyError(f'\'{bin_attr}\' is not a valid attribute of Bin2D objects.')
 
-        vlims = self.get_vlimit(subs, bin_attr)
+        vlims = kwargs.get('vlims')
+        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
         xlims = self.get_coord_lims(xcoord, 'x')
         ylims = self.get_coord_lims(ycoord, 'y')
         
@@ -1360,7 +1362,7 @@ class BinPlotter2D(BinPlotter):
 
         fig.subplots_adjust(top = 1.1)
 
-        data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
+        data_title = 'Mixing ratio' if bin_attr=='vmean' else ('Varibility' + '(RSTD)' if bin_attr=='rvstd' else '')
         # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
 
         seasons = binned_seasonal.keys()
@@ -1379,13 +1381,15 @@ class BinPlotter2D(BinPlotter):
                             orientation='horizontal', 
                             # location='top', ticklocation='bottom'
                             )
-        cbar.ax.set_xlabel(data_title+' of '+subs.label(), 
+        cbar.ax.set_xlabel(data_title +' of '+ subs.label(name_only=True) \
+                           + f' [{subs.unit}]' if not bin_attr=='rvstd' else ' [\%]', 
                            # fontsize=13
                            )
 
         cbar_vals = cbar.get_ticks()
         cbar_vals = [vlims[0]] + cbar_vals[1:-1].tolist() + [vlims[1]]
-        cbar.set_ticks(cbar_vals, ticklocation='bottom')
+        cbar.ax.tick_params(bottom=True, top=False)
+        cbar.set_ticks(ticks = cbar_vals) #, labels=cbar_vals, ticklocation='bottom')
 
         plt.show()
 
@@ -1456,7 +1460,8 @@ class BinPlotter2D(BinPlotter):
         bin2d_inst = bp.Simple_bin_2d(np.array(df[subs.col_name]), x, y,
                                bin_equi2d, count_limit=self.count_limit)
         
-        vlims = self.get_vlimit(subs, bin_attr)
+        vlims = kwargs.get('vlims')
+        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
         xlims = self.get_coord_lims(xcoord, 'x')
         ylims = self.get_coord_lims(ycoord, 'y')
         
@@ -1624,7 +1629,7 @@ class BinPlotter3D(BinPlotter):
         stratosphere_map(subs, tp, bin_attr)
     """
 
-    def z_crossection(self, subs, tp, bin_attr, threshold = 3, zbsize=None): 
+    def z_crossection(self, subs, tp, bin_attr, threshold = 3, zbsize=None, **kwargs): 
         """ Create lat/lon gridded plots for all z-bins. """
         binned_data = self.bin_3d(subs, tp, zbsize=zbsize)
         
@@ -1646,7 +1651,8 @@ class BinPlotter3D(BinPlotter):
         
         # fig = plt.figure(dpi=150)
         
-        vlims = self.get_vlimit(subs, bin_attr)
+        vlims = kwargs.get('vlims')
+        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
         norm = Normalize(*vlims)
         cmap = dcts.dict_colors()[bin_attr]
 
@@ -1684,9 +1690,9 @@ class BinPlotter3D(BinPlotter):
                 plt.show()
     
         return binned_data
-        
 
-    def stratosphere_map(self, subs, tp, bin_attr): 
+
+    def stratosphere_map(self, subs, tp, bin_attr, **kwargs): 
         """ Plot (first two ?) stratospheric bins on a lon-lat binned map. """
         df = self.glob_obj.sel_strato(**tp.__dict__).df
         # df = self.glob_obj.sel_tropo(**tp.__dict__).df
@@ -1713,7 +1719,8 @@ class BinPlotter3D(BinPlotter):
                                    -90, 90, ybsize, 
                                    0, zbsize*2, zbsize)
         
-        vlims = self.get_vlimit(subs, bin_attr)
+        vlims = kwargs.get('vlims')
+        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
         
         # vlims,_,_ = self.get_limits(subs, bin_attr = bin_attr)
         norm = Normalize(*vlims)  # normalise color map to set limits
