@@ -93,3 +93,8 @@ panther_SF6,Sulfur hexafluoride ECD (SF6) - noaa,sf6,pptv,PANTHER,HIAPER,MSMT,q,
 SF6_MHD,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q,FALSE
 SF6catsMLOm,"Sulfur hexaflouride (SF6) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: WMO X2014",sf6,ppt,MLO,Mauna_Loa,MSMT,q,FALSE
 SF6_MZT,Annual mean SF6 dry air mole fraction,sf6,pmol mol-1,MZT,Mozart,MOZART,q,FALSE
+int_ERA5_O3,O3 (ERA5),o3,ppb,INTtpc,Caribic,ERA5,,FALSE
+Ozone,Ozone volume mixing ratio,o3,ppbV,MS,Caribic,MSMT,,FALSE
+MS_CO,Carbon monoxide mixing ratio [ppbV],co,ppbV,MS,Caribic,MSMT,,FALSE
+MS_CO2,Carbon dioxide dry air mole fraction [ppmV] # since container Mod.C: measured by Picarro instrument,co2,ppmV,MS,Caribic,MSMT,,FALSE
+MS_CH4,Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,ch4,ppbV,MS,Caribic,MSMT,,FALSE
