@@ -110,13 +110,17 @@ class GlobalData:
         self.source = self.ID = None
         self.data = {}
 
-    def pickle_data(self, fname: str, pdir=r'misc_data'):
+    def pickle_data(self, fname: str, pdir=None):
         """ Save data dictionary using dill. """
         if len(fname.split('.')) < 2:
             fname = fname + '.pkl'
-        with open(pdir + '/' + fname, 'wb') as f:
+        
+        if not pdir: 
+            pdir = tools.get_path() + '\\misc_data\\'
+        
+        with open(pdir + fname, 'wb') as f:
             dill.dump(self.data, f)
-            print(f'{self.ID} Data dictionary saved to {pdir}/{fname}')
+            print(f'{self.ID} Data dictionary saved to {pdir}\{fname}')
 
     def get_variables(self, category):
         """ Returns list of variables from chosen category with column in self.df """
@@ -241,38 +245,39 @@ class GlobalData:
         """ Creates dataframe for CLaMS data from netcdf files. """
 
         if self.ID in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
-            campaign_dir_dict = {
-                'CAR'  : 'CaribicTPChange',
-                'SHTR' : 'SouthtracTPChange',
-                'WISE' : 'WiseTPChange',
-                'ATOM' : 'AtomTPChange',
-                'HIPPO': 'HippoTPChange',
-                'PGS'  : 'PolstraccTPChange',
-                }
-
-            preprocess_fcts = {
-                'CAR' : tools.process_clams_v03, 
-                'ATOM' : tools.process_atom_clams
-                }
-
-            met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
-            fnames = met_pdir + "/*.nc"
             
-            if self.ID == 'CAR': 
-                fnames = met_pdir + "/2*/*.nc"
-            
-            if self.ID == 'ATOM': 
-                with xr.open_mfdataset(fnames, decode_times=False if self.ID in ('ATOM') else True,
-                                       preprocess = 
-                                       preprocess_fcts[self.ID] if self.ID in preprocess_fcts.keys() 
-                                       else tools.process_clams,
-                                       drop_variables = 'CARIBIC2_LocalTime' if self.ID =='CAR' else None,
-                                       ) as ds:
+            alldata_fname = {
+                'CAR' : 'caribic_clams_V03.nc'
+                }
+            all_data_path = tools.get_path()+'/misc_data/' + alldata_fname.get(self.ID)
+            if os.path.exists(all_data_path):
+                with xr.open_dataset(all_data_path) as ds: 
                     ds = ds
             
             else: 
+                print('Importing CLAMS data')
+                campaign_dir_dict = {
+                    'CAR'  : 'CaribicTPChange',
+                    'SHTR' : 'SouthtracTPChange',
+                    'WISE' : 'WiseTPChange',
+                    'ATOM' : 'AtomTPChange',
+                    'HIPPO': 'HippoTPChange',
+                    'PGS'  : 'PolstraccTPChange',
+                    }
+
+                preprocess_fcts = {
+                    'CAR' : tools.process_clams_v03, 
+                    'ATOM' : tools.process_atom_clams
+                    }
+
+                met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
+                fnames = met_pdir + "/*.nc"
+                
+                if self.ID == 'CAR': 
+                    fnames = met_pdir + "/2*/*.nc"
+                    
                 # extract data, each file goes through preprocess first to filter variables & convert units
-                with xr.open_mfdataset(fnames, decode_times = True,
+                with xr.open_mfdataset(fnames, decode_times=False if self.ID in ('ATOM') else True,
                                        preprocess = preprocess_fcts[self.ID] if self.ID in preprocess_fcts.keys() 
                                        else tools.process_clams,
                                        drop_variables = 'CARIBIC2_LocalTime' if self.ID =='CAR' else None,
@@ -284,7 +289,11 @@ class GlobalData:
 
             met_df = ds.to_dataframe()
 
-            self.data['met_data'] = met_df
+            if self.ID=='CAR': 
+                self.data['CLAMS'] = met_df
+            else: 
+                self.data['met_data'] = met_df
+
             return met_df
 
     # Calculate variables from within the data
@@ -386,7 +395,7 @@ class GlobalData:
         
         return indices
 
-    def binned_1d(self, subs, **kwargs) -> (list, list):
+    def binned_1d(self, subs, **kwargs) -> tuple[list, list]:
         """
         Returns 1D binned objects for each year as lists (lat / lon)
         Parameters:
@@ -404,7 +413,7 @@ class GlobalData:
     
     # Detrend substance mixing ratios
     def detrend_substance(self, subs, loc_obj=None, save=True, plot=False, note='', 
-                          **kwargs) -> (pd.DataFrame, np.ndarray):
+                          **kwargs) -> tuple[pd.DataFrame, np.ndarray]:
         """
         Remove multi-year linear trend from substance wrt. free troposphere measurements from main dataframe.
 
@@ -1253,7 +1262,7 @@ class Caribic(GlobalData):
     years: {self.years}
     status: {self.status}"""
 
-    def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> (pd.DataFrame, dict):
+    def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> tuple[pd.DataFrame, dict]:
         """ Data import for a single year """
         if not any(find.find_dir("*_{}*".format(yr), parent_dir)):
             # removes current year from class attribute if there's no data
@@ -1300,11 +1309,10 @@ class Caribic(GlobalData):
         # Drop cols which are saved within datetime, geometry
         if not gdf_yr['geometry'].empty:
             
-            filter_cols = ['TimeCRef', 'year', 'month', 'day',
-                           'hour', 'min', 'sec', lon_col, lat_col, 'type']
-            print(filter_cols)
-            
-            try: 
+            filter_cols = [c for c in gdf_yr.columns 
+                           if c in ['TimeCRef', 'year', 'month', 'day',
+                           'hour', 'min', 'sec', lon_col, lat_col, 'type']]
+            try: #TODO cannot remember what I wanted to achieve here
                 del_column_names = [gdf_yr.filter(
                     regex='^' + c).columns[0] for c in filter_cols]
                 gdf_yr.drop(del_column_names, axis=1, inplace=True)
@@ -1331,18 +1339,15 @@ class Caribic(GlobalData):
                         gdf_pfx[col] = gdf_pfx[col].combine_first(gdf_pfx[col.lower()])
                         gdf_pfx.drop(columns=col.lower(), inplace=True)
             # In Integrated data, drop Acetone and Acetonitrile columns
-            if pfx == 'INT':
-                gdf_pfx.drop(columns=['int_acetone',
-                                      'int_acetonitrile'], inplace=True)
-            if pfx in ['INT2', 'INTtpc']:
-                gdf_pfx.drop(columns=['int_CARIBIC2_Ac',
-                                      'int_CARIBIC2_AN'], inplace=True)
-            if pfx == 'MS': 
-                #!!! Lon / Lat is called PosLong and PosLat
-                print('Help')
+            columns_ac_an = ['int_acetone', 'int_acetonitrile',
+                            'int_CARIBIC2_Ac', 'int_CARIBIC2_AN', 
+                            'int_CARIBIC2_ACE', 'int_CARIBIC2_ACN']
+            
+            gdf_pfx.drop(columns=[c for c in gdf_pfx.columns if c in columns_ac_an], inplace=True)
+
         return gdf_pfx, col_dict
 
-    def get_data(self, verbose=False, recalculate=False) -> dict:
+    def get_data(self, verbose=False, recalculate=False, fname=None) -> dict:
         """ Imports Caribic data in the form of geopandas dataframes.
     
         Returns data dictionary containing dataframes for each file source and
@@ -1351,7 +1356,11 @@ class Caribic(GlobalData):
         self.data = {}  # easiest way of keeping info which file the data comes from
         parent_dir = r'E:\CARIBIC\Caribic2data'
 
-        resource = tools.get_path() + r"\misc_data\caribic_data_dict.pkl"
+        if not fname: 
+            resource = tools.get_path() + r"\misc_data\caribic_data_dict.pkl"
+        else: 
+            resource = tools.get_path() + "\\misc_data\\" + fname
+
         if not recalculate and os.path.exists(resource):
             with open(resource, 'rb') as f:
                 data_dict = dill.load(f)
@@ -1414,17 +1423,19 @@ class Caribic(GlobalData):
         """ Add calculated relative / absolute tropopause values to .met_data """
         df = self.met_data.copy()
         new_coords = dcts.get_coordinates(**{'ID': 'calc', 'source': 'Caribic'})
+        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'calc', 'source': 'CLAMS'})
 
         for coord in new_coords:
             # met = tp + rel -> MET - MINUS for either one
             met_col = coord.var1
+            met_coord = dcts.get_coord(col_name = met_col)
             minus_col = coord.var2
 
             if met_col in df.columns and minus_col in df.columns:
                 df[coord.col_name] = df[met_col] - df[minus_col]
 
-            elif coord.var == 'geopot':
-                met_data = df[met_col].values * units(dcts.get_coord(col_name=coord.var1).unit)
+            elif met_coord.var == 'geopot':
+                met_data = df[met_col].values * units(met_coord.unit)
                 df[coord.col_name] = calc.geopotential_to_height(met_data)
 
             else:
@@ -1441,7 +1452,7 @@ class Caribic(GlobalData):
                           left_index=True, right_index=True, suffixes=['', '_' + pfx])
             for c in df.columns:
                 if f'{c}_{pfx}' in df.columns:
-                    df[c] = df[c].combine_first(df[f'{c}_{pfx}'])
+                    df[c] = df[c].combine_first(df[f'{c}_{pfx}']) # Note: Future warning, watch but should be okay
                     df = df.drop(columns=f'{c}_{pfx}')
         self.data['df'] = df
         return df
@@ -2281,7 +2292,7 @@ class MaunaLoa(LocalData):
         self.ID = 'MLO'
         super().__init__(years=years, substances=substances)
         if data_D: self.data_D = {}
-        if not path_dir: path_dir = tools.get_path("misc_data")
+        if not path_dir: path_dir = tools.get_path() + "misc_data"
         self.get_data(path_dir, data_D)
 
     def __repr__(self):
