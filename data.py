@@ -291,6 +291,7 @@ class GlobalData:
 
             if self.ID=='CAR': 
                 self.data['CLAMS'] = met_df
+                self.pfxs = self.pfxs.append('CLAMS')
             else: 
                 self.data['met_data'] = met_df
 
@@ -944,64 +945,74 @@ class GlobalData:
             self.data['df_sorted'] = df_sorted
         return df_sorted
 
-    def calc_ratios(self, group_vc=False) -> pd.DataFrame:
-        """ Calculate ratio of tropospheric / stratospheric datapoints.
-        Returns a dataframe with counts and ratios for True / False values
-        NOTE!! No True / False rows if group==True
+    def calc_tropo_strato_ratios(self, tps = None, ratios = True, shared = True) -> pd.DataFrame:
+        """ Calculate ratio of tropospheric / stratospheric datapoints for given tropopause definitions.
+        
+        Parameters: 
+            tps (List[Coordinate]): Tropopause definitions to calculate ratios for
+            ratios (bool): Include ratio of tropo/strato counts in output 
+            shared (True, False, No): Use only shared or non-shared datapoints 
+        
+        Returns a dataframe with counts (and ratios) for True / False values for all available tps
         """
-        tr_cols = [c for c in self.df_sorted.columns if c.startswith('tropo_')]
-        tropo_counts = self.df_sorted[tr_cols].apply(pd.value_counts)
-        tropo_counts.dropna(axis=1, inplace=True)
-        tropo_counts.rename(columns={c: c[6:] for c in tropo_counts.columns}, inplace=True)
-
-        ratio_df = pd.DataFrame(columns=tropo_counts.columns, index=['ratios'])
-        ratios = [tropo_counts[c][True] / tropo_counts[c][False] for c in tropo_counts.columns]
-        ratio_df.loc['ratios'] = ratios  # set col
-
-        tropo_counts = pd.concat([tropo_counts, ratio_df])
-        return tropo_counts
-
-    def calc_shared_ratios(self, tps=None):
-        """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
-        if not tps:
+        
+        if not tps: 
             tps = self.tp_coords()
-        #     tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
+        
+        tr_cols = [c for c in self.df_sorted.columns if c.startswith('tropo_')]
+        # df = self.df_sorted[tr_cols]
 
-        shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
-        # shared_df = shared_df[shared_df != 0].dropna(subset=tropo_cols)
+        # TODO choose here the 'shared' value
+        
+        if shared: 
+            tropo_cols = ['tropo_'+tp.col_name for tp in tps 
+                        if 'tropo_'+tp.col_name in self.df_sorted]
+            df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+            
+        elif not shared: 
+            tropo_cols = [c for c in self.df_sorted.columns if c.startswith('tropo_')]
+            shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+            df = self.df_sorted[~ self.df_sorted.index.isin(shared_df.index)]
 
-        tropo_counts = shared_df[tropo_cols].apply(pd.value_counts)
-        tropo_counts.dropna(axis=1, inplace=True)
-        tropo_counts.rename(columns={c: c[6:] for c in tropo_counts.columns}, inplace=True)
+        elif shared == 'No': 
+            tropo_cols = ['tropo_' + tp.col_name for tp in tps 
+                          if 'tropo_' + tp.col_name in self.df_sorted]
+            shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
+            df = self.df_sorted[~ self.df_sorted.index.isin(shared_df.index)]
 
-        ratio_df = pd.DataFrame(columns=tropo_counts.columns, index=['ratios'])
-        ratios = [tropo_counts[c][True] / tropo_counts[c][False] for c in tropo_counts.columns]
+        else: 
+            raise KeyError(f'Invalid value for shared: {shared}')
+
+        tropo_counts = df[df==True].count(axis=0)
+        strato_counts = df[df==False].count(axis=0)
+        
+        count_df = pd.DataFrame({True : tropo_counts, False : strato_counts}).transpose()
+        count_df.dropna(axis=1, inplace=True)
+        count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
+        
+        if not ratios: 
+            return count_df
+
+        ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
+        ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
         ratio_df.loc['ratios'] = ratios  # set col
 
-        tropo_counts = pd.concat([tropo_counts, ratio_df])
+        return pd.concat([count_df, ratio_df])
 
-        return tropo_counts
+    def calc_ratios(self, tps=None, ratios=True) -> pd.DataFrame:
+        """ Calculate ratio of tropospheric / stratospheric datapoints for all TP definitions. """
+        return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared=False)
 
-    def calc_non_shared_ratios(self, tps=None):
+    def calc_shared_ratios(self, tps=None, ratios=True) -> pd.DataFrame:
         """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
-        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        tropo_cols = ['tropo_' + tp.col_name for tp in tps if 'tropo_' + tp.col_name in self.df_sorted]
+        return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared=True)
 
-        shared_df = self.df_sorted.dropna(subset=tropo_cols, how='any')
-        non_shared_df = self.df_sorted[~ self.df_sorted.index.isin(shared_df.index)]
-
-        tropo_counts = non_shared_df[tropo_cols].apply(pd.value_counts)
-        tropo_counts.dropna(axis=1, inplace=True)
-        tropo_counts.rename(columns={c: c[6:] for c in tropo_counts.columns}, inplace=True)
-
-        ratio_df = pd.DataFrame(columns=tropo_counts.columns, index=['ratios'])
-        ratios = [tropo_counts[c][True] / tropo_counts[c][False] for c in tropo_counts.columns]
-        ratio_df.loc['ratios'] = ratios  # set col
-
-        tropo_counts = pd.concat([tropo_counts, ratio_df])
-
-        return tropo_counts
+    def calc_non_shared_ratios(self, tps=None, ratios=True) -> pd.DataFrame:
+        """ 
+        Calculate ratios of tropo / strato data for given tps only for non-shared datapoints.
+        Can be useful to check results of only using shared vs. all datapoints. 
+        """
+        return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared='No')
 
     def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
         """ Calculate overall variability of stratospheric and tropospheric air. """
@@ -1031,14 +1042,14 @@ class GlobalData:
             t_mean = subs_data[shared_df['tropo_' + tp.col_name]].mean(skipna=True)
             s_mean = subs_data[shared_df['tropo_' + tp.col_name]].mean(skipna=True)
 
-            stdv_df['tropo_stdv'][tp.col_name] = t_stdv
-            stdv_df['strato_stdv'][tp.col_name] = s_stdv
+            stdv_df.loc[tp.col_name, 'tropo_stdv'] = t_stdv
+            stdv_df.loc[tp.col_name, 'strato_stdv'] = s_stdv
 
-            stdv_df['tropo_mean'][tp.col_name] = t_mean
-            stdv_df['strato_mean'][tp.col_name] = s_mean
+            stdv_df.loc[tp.col_name, 'tropo_mean'] = t_mean
+            stdv_df.loc[tp.col_name, 'strato_mean'] = s_mean
 
-            stdv_df['rel_tropo_stdv'][tp.col_name] = t_stdv / t_mean * 100
-            stdv_df['rel_strato_stdv'][tp.col_name] = s_stdv / s_mean * 100
+            stdv_df.loc[tp.col_name, 'rel_tropo_stdv'] = t_stdv / t_mean * 100
+            stdv_df.loc[tp.col_name, 'rel_strato_stdv'] = s_stdv / s_mean * 100
         
         if kwargs.get('seasonal'):
             for s in set(self.df.season): 
@@ -1224,7 +1235,7 @@ class Caribic(GlobalData):
     """
 
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INTtpc'),
-                 grid_size=5, verbose=False, recalculate=False, detrend_all=True):
+                 grid_size=5, verbose=False, recalculate=False, detrend_all=True, fname=None):
         """ Constructs attributes for Caribic object and creates data dictionary.
         
         Parameters:
@@ -1241,7 +1252,7 @@ class Caribic(GlobalData):
         self.ID = 'CAR'
         self.pfxs = pfxs
         # self.flights = ()
-        self.get_data(verbose=verbose, recalculate=recalculate)  # creates self.data dictionary
+        self.get_data(verbose=verbose, recalculate=recalculate, fname=fname)  # creates self.data dictionary
 
         if 'met_data' not in self.data:
             try:
@@ -1274,9 +1285,8 @@ class Caribic(GlobalData):
         print(f'Reading Caribic - {pfx} - {yr}')
         # Collect data from individual flights for current year
         df_yr = pd.DataFrame()
-        col_dict = {}
+        
         for current_dir in find.find_dir("Flight*_{}*".format(yr), parent_dir):  # [1:]:
-
             flight_nr = int(str(current_dir)[-12:-9])
             # flight_nr = int(str(current_dir).split('_')[0].removeprefix('Flight'))
 
@@ -1286,7 +1296,7 @@ class Caribic(GlobalData):
                                   Flight {flight_nr} in {yr}')
                 continue
             if len(f) > 1:
-                f.sort()  # sort to get most recent v
+                f.sort()  # sort to get most recent version with indexing from end
 
             f_data = FFI1001DataReader(f[-1], df=True, xtype='secofday',
                                        sep_variables=';')
@@ -1294,9 +1304,9 @@ class Caribic(GlobalData):
             df_flight.insert(0, 'Flight number',
                              [flight_nr] * df_flight.shape[0])
 
-            col_dict, rename_dict = tools.rename_columns(f_data.VNAME)
+            col_name_dict = tools.rename_columns(f_data.VNAME)
             # set names to their short version
-            df_flight.rename(columns=rename_dict, inplace=True)
+            df_flight.rename(columns=col_name_dict, inplace=True)
             df_yr = pd.concat([df_yr, df_flight])
 
         # Convert longitude and latitude into geometry objects
@@ -1319,14 +1329,13 @@ class Caribic(GlobalData):
             except: 
                 pass
 
-        return gdf_yr, col_dict
+        return gdf_yr
 
     def get_pfx_data(self, pfx, parent_dir, verbose) -> pd.DataFrame:
         """ Data import for chosen prefix. """
         gdf_pfx = geopandas.GeoDataFrame()
-        col_dict = {}
         for yr in self.years:
-            gdf_yr, col_dict = self.get_year_data(pfx, yr, parent_dir, verbose)
+            gdf_yr = self.get_year_data(pfx, yr, parent_dir, verbose)
 
             gdf_pfx = pd.concat([gdf_pfx, gdf_yr])
             # Remove case-sensitive distinction in Caribic data 
@@ -1345,51 +1354,62 @@ class Caribic(GlobalData):
             
             gdf_pfx.drop(columns=[c for c in gdf_pfx.columns if c in columns_ac_an], inplace=True)
 
-        return gdf_pfx, col_dict
+        return gdf_pfx
 
-    def get_data(self, verbose=False, recalculate=False, fname=None) -> dict:
+    def get_data(self, verbose=False, recalculate=False, fname=None, pdir=None) -> dict:
         """ Imports Caribic data in the form of geopandas dataframes.
     
         Returns data dictionary containing dataframes for each file source and
         dictionaries relating column names with Coordinate / Substance instances.
+
+        Parameters:
+            recalculate (bool): Data is imported from source instead of using pickled dictionary.
+            fname (str): specify File name of data dictionary if default should not be used.
+            pdir (str): specify Parent directory of source files if default should not be used.
+            verbose (bool): Makes function more talkative.
         """
         self.data = {}  # easiest way of keeping info which file the data comes from
-        parent_dir = r'E:\CARIBIC\Caribic2data'
+        if not recalculate:
+            if not fname:
+                resource = tools.get_path() + "\\misc_data\\caribic_data_dict.pkl"
+            else:
+                resource = tools.get_path() + "\\misc_data\\" + fname
 
-        if not fname: 
-            resource = tools.get_path() + r"\misc_data\caribic_data_dict.pkl"
-        else: 
-            resource = tools.get_path() + "\\misc_data\\" + fname
+            if os.path.exists(resource):
+                with open(resource, 'rb') as f:
+                    data_dict = dill.load(f)
 
-        if not recalculate and os.path.exists(resource):
-            with open(resource, 'rb') as f:
-                data_dict = dill.load(f)
-            
-            # check if loaded data contains given pfxs
-            if all(pfx in data_dict.keys() for pfx in self.pfxs): 
-                self.data = data_dict
+                if 'MS' in self.pfxs:
+                    with open(tools.get_path() + "\\misc_data\\caribic_MS_data.pkl", 'rb') as f:
+                        data_MS = dill.load(f)['MS']
+                    data_dict['MS'] = data_MS
                 
-                self.data = self.sel_year(*self.years).data
-            
-                return self.data
+                # check if loaded data contains given pfxs and vice versa
+                if all(pfx in data_dict.keys() for pfx in self.pfxs):
+                    self.data = {k:data_dict[k] for k in self.pfxs} # choose only pfxs as specified
+                    self.data = self.sel_year(*self.years).data
+                    
+                    for special_item, generator in [('df', '.create_df()'),
+                                                    ('met_data', '.get_met_data()'),
+                                                    ('df_sorted', '.get_df_sorted()'),
+                                                    ('CLAMS', '.get_clams_data')]:
+                        if special_item in data_dict: 
+                            self.data[special_item] = data_dict[special_item]
+                            if verbose: 
+                                print(f'Loaded \'{special_item}\' from saved data. Call {generator} to generate anew. ')
+                        
+                    return self.data
 
+            elif 'Y' != input(f'{resource} not found, complile data structure from source? [Y/N]').upper():
+                return {}
+
+        parent_dir = r'E:\CARIBIC\Caribic2data' if not pdir else pdir
         print('Importing Caribic Data from remote files.')
         for pfx in self.pfxs:  # can include different prefixes here too
-            gdf_pfx, col_dict = self.get_pfx_data(pfx, parent_dir, verbose)
-
+            gdf_pfx = self.get_pfx_data(pfx, parent_dir, verbose)
             if gdf_pfx.empty: print("Data extraction unsuccessful. \
                                     Please check your input data"); return
-
-            # Remove dropped columns from dictionary
-            pop_cols = [i for i in col_dict if i not in gdf_pfx.columns]
-            for key in pop_cols: col_dict.pop(key)
-
             self.data[pfx] = gdf_pfx
-            self.data[f'{pfx}_dict'] = col_dict
-
-        # self.flights = list(set(pd.concat(
-        #     [self.data[pfx]['Flight number'] for pfx in self.pfxs])))
-
         return self.data
 
     def coord_combo(self) -> pd.DataFrame:
@@ -1404,19 +1424,24 @@ class Caribic(GlobalData):
         for pfx in [pfx for pfx in self.pfxs if pfx != 'GHG']:
             df = df.combine_first(self.data[pfx].copy())
 
-        coords = ['Flight number', 'p', 'geometry'] + [
-            c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)
-            if c.col_name not in ['Flight number', 'p', 'geometry']]
-        # if 'GHG' not in self.pfxs:
-        #     coords = coords + ['p', 'geometry']
-        df.drop([col for col in df.columns if col not in coords],
-                axis=1, inplace=True)  # remove non-met / non-coord data
+        essentials = [c for c in df.columns if c in ['Flight number', 'p', 'geometry']]
+        coords = [c for c in df.columns if c in [i.col_name for i in dcts.get_coordinates()]] 
+        
+        # keep = essentials + [
+        #     c.col_name for ID in self.pfxs for c in dcts.get_coordinates(ID=ID)
+        #     if (c.col_name not in essentials and c in df.columns)]
+
+        drop_cols = [c for c in df.columns if c not in list(coords + essentials)] 
+        df.drop(drop_cols, axis=1, inplace=True)  # remove non-met / non-coord data
 
         # reorder columns
-        self.data['met_data'] = df[list(['Flight number', 'p']
-                                        + [col for col in df.columns
-                                           if col not in ['Flight number', 'p', 'geometry']]
-                                        + ['geometry'])]
+        columns = list(['Flight number'] 
+                        + (['p'] if 'p' in df.columns else [])
+                        + [col for col in df.columns
+                           if col not in ['Flight number', 'p', 'geometry']]
+                        + ['geometry'])
+
+        self.data['met_data'] = df[columns]
         return self.data['met_data']
 
     def create_tp_coords(self) -> pd.DataFrame:
@@ -1424,6 +1449,8 @@ class Caribic(GlobalData):
         df = self.met_data.copy()
         new_coords = dcts.get_coordinates(**{'ID': 'calc', 'source': 'Caribic'})
         new_coords = new_coords + dcts.get_coordinates(**{'ID': 'calc', 'source': 'CLAMS'})
+        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'CLAMS'})
+        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'Caribic'})
 
         for coord in new_coords:
             # met = tp + rel -> MET - MINUS for either one
@@ -1434,9 +1461,15 @@ class Caribic(GlobalData):
             if met_col in df.columns and minus_col in df.columns:
                 df[coord.col_name] = df[met_col] - df[minus_col]
 
-            elif met_coord.var == 'geopot':
+            elif met_coord.var == 'geopot' and met_col in df.columns:
                 met_data = df[met_col].values * units(met_coord.unit)
-                df[coord.col_name] = calc.geopotential_to_height(met_data)
+                height_m = calc.geopotential_to_height(met_data)
+                height_km = height_m * 1e-3
+
+                if coord.unit == 'm': 
+                    df[coord.col_name] = height_m
+                elif coord.unit == 'km': 
+                    df[coord.col_name] = height_km
 
             else:
                 print(f'Could not generate {coord.col_name} as precursors are not available')

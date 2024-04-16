@@ -25,7 +25,8 @@ import dataTools.dictionaries as dcts
 from dataTools.data import TropopauseData
 from dataTools import tools
 
-world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
+# geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}
 rel_vlims = {'p':(-100,100), 'pt':(-30, 40), 'z':(-1,2.5)}
 count_limit = 5
@@ -79,6 +80,7 @@ class TropopausePlotter(TropopauseData):
         self.tps = [tp for tp in coords if (
             str(tp.tp_def)!='nan' and 
             tp.col_name in [c.col_name for c in dcts.get_coordinates(**kwargs)])]
+        self.tps.sort(key=lambda x: x.tp_def)
         return self.tps
 
     def tp_height_global_scatter(self, rel=False):
@@ -333,19 +335,18 @@ class TropopausePlotter(TropopauseData):
             ax.legend()
             plt.show()
             
-    def tp_height_seasonal_laitude_binned(self, rel=False, note='', 
+    def tp_height_seasonal_latitude_binned(self, rel=False, note='', 
                                           seasonal_stdvs=False): 
         """ Plot average and seasonal tropopause heights, optionally with standard deviation. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
         
-        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel, source='Caribic'))
+        tps = self.tps # tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel, source='Caribic'))
 
         for tp in tps:
             fig, ax = plt.subplots(dpi=250, figsize=(7*0.8,4*0.8))
             ax.set_title(tp.label(True))
             # ax.set_title('Vertical extent of'+tp.label(True)+' Tropopause')
-            
             
             if tp.vcoord=='pt' and not rel: 
                 ax.set_ylim(290, 380)
@@ -503,37 +504,35 @@ class TropopausePlotter(TropopauseData):
                     plt.show()
         return self
 
-    def show_strato_tropo_vcounts(self, tps, shared=True, note='', **tp_kwargs): 
+    def show_strato_tropo_vcounts(self, tps=None, shared=True, note='', **tp_kwargs): 
         """ Bar plots of data point allocation for multiple tp definitions. """
+        if not tps: 
+            tps = self.tps
+        
         if shared is False: 
-            tropo_counts = self.calc_ratios() # dataframe
+            tropo_counts = self.calc_ratios(ratios=False) # dataframe
+            # tropo_counts = tropo_counts[[tp.col_name for tp in tps 
+            #                              if tp.col_name in tropo_counts.columns]]
             note += ' all'
         elif shared is True: 
-            tropo_counts = self.calc_shared_ratios()
+            tropo_counts = self.calc_shared_ratios(tps = tps, ratios=False)
             # note += ' shared'
         elif shared == 'No': 
-            tropo_counts = self.calc_non_shared_ratios()
+            tropo_counts = self.calc_non_shared_ratios(tps = tps, ratios=False)
             note += ' non-shared'
         else: 
             raise KeyError(f'Invalid value for shared: {shared}')
-            
+
+        tropo_counts = tropo_counts[[tp.col_name for tp in tps 
+                                     if tp.col_name in tropo_counts.columns]]
         tps = [tp for tp in tps if tp.col_name in tropo_counts.columns] # not all tps have ratios (chekkkk)
-
-        # if not tps: 
-        #     tps = [dcts.get_coord(col_name = c) for c in tropo_counts.columns 
-        #            if c in [c.col_name for c in dcts.get_coordinates() 
-        #                     if c.tp_def not in ['combo', 'cpt']]]
-        #     tps = tools.minimise_tps(tps)
-
-        tropo_counts.drop(index='ratios', inplace=True)
-        tropo_counts = tropo_counts[[tp.col_name for tp in tps if tp.col_name in tropo_counts.columns]]
+        tp_labels = [tp.label(filter_label=True) for tp in tps]
         
         tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
         strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
 
-        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
-                                        for tp in tps]))
-
+        # cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
+        #                                 for tp in tps]))
 
         fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=400, 
                                         figsize=(9,4), sharey=True)
@@ -548,8 +547,6 @@ class TropopausePlotter(TropopauseData):
         bar_params = dict(align='center', edgecolor='k',  rasterized=True,
                           alpha=0.65, zorder=10)
         nums = range(len(bar_labels))
-
-        print(nums, len(bar_labels), len(tp_labels), len(tropo_bar_vals))
 
         t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
         s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
@@ -654,26 +651,45 @@ class TropopausePlotter(TropopauseData):
     def strato_tropo_stdv_table(self, subs, tps=None, **kwargs):
         """ Creates a table with the """
         stdv_df = self.strato_tropo_stdv(subs, tps)
+        stdv_df = stdv_df[[c for c in stdv_df.columns if 'stdv' in c]]
         
         if kwargs.get('rel'): 
             stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' in c]]
         else: 
             stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' not in c]]
         
-        
-        stdv_df = stdv_df.astype(float).round(3 if kwargs.get('rel') else 3)
+        stdv_df = stdv_df.astype(float).round(1 if kwargs.get('rel') else 2)
         stdv_df.sort_index()
         
         fig, ax = plt.subplots(dpi=250)
 
         rowLabels = [dcts.get_coord(col_name=c).label(True) for c in stdv_df.index]
-        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
+        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'
+                     ] if not kwargs.get('rel') else [
+                         'Troposphere [%]', 'Stratosphere [%]']
+
+
+        norm_t = Normalize(np.min(stdv_df.values[:,0]) * 0.85, np.max(stdv_df.values[:,0]) * 1.15)
+        cmap_t = dcts.dict_colors()['vstdv_tropo']
+
+        norm_s = Normalize(np.min(stdv_df.values[:,1]) * 0.85, np.max(stdv_df.values[:,1]) * 1.15)
+        cmap_s = dcts.dict_colors()['vstdv_strato']
+
+        cellColors = pd.DataFrame([[cmap_t(norm_t(i)) for i in stdv_df.values[:,0]], 
+                                [cmap_s(norm_s(i)) for i in stdv_df.values[:,1]]]
+                                ).transpose().values
+
         table = ax.table(stdv_df.values, 
-                          rowLabels=rowLabels, 
-                          colLabels = colLabels,
-                         loc='center')
-        table.set_fontsize(14)
-        table.scale(1,4)
+                         rowLabels = rowLabels, 
+                         # rowColours = ['xkcd:light grey']*len(rowLabels),
+                         colLabels = colLabels,
+                         # colColours = ['xkcd:light grey']*len(colLabels),
+                         cellLoc = 'center',
+                         loc='center',
+                         cellColours = cellColors if kwargs.get('YayColors') else None,
+                         )
+        table.set_fontsize(15)
+        table.scale(1,3)
         ax.axis('off')
         
     def strato_tropo_stdv_mean_seasonal_table(self, subs, tps=None, **kwargs):
