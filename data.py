@@ -826,7 +826,7 @@ class GlobalData:
         # Calculate simple pre-flag
         ref_mxr = loc_obj.df.dropna(subset=[ref_subs.col_name])[ref_subs.col_name]
         df_flag = tools.pre_flag(mxr, ref_mxr, 'n2o', **kwargs)
-        flag = df_flag['flag_n2o'] if 'flag_n2o' in df_flag.columns else None
+        flag = df_flag['flag_n2o'].values if 'flag_n2o' in df_flag.columns else None
 
         strato = f'strato_{n2o_column}'
         tropo = f'tropo_{n2o_column}'
@@ -912,8 +912,8 @@ class GlobalData:
             tropo = 'tropo_' + tp.col_name
             strato = 'strato_' + tp.col_name
 
-            tp_sorted = pd.DataFrame({strato: pd.Series(np.nan),
-                                      tropo : pd.Series(np.nan)},
+            tp_sorted = pd.DataFrame({strato: pd.Series(np.nan, dtype=object),
+                                      tropo : pd.Series(np.nan, dtype=object)},
                                      index=tp_df.index)
 
             # tropo: high p (gt 0), low everything else (lt 0)
@@ -1070,7 +1070,6 @@ class GlobalData:
     
                     stdv_df['rel_tropo_stdv'][tp.col_name + f'_{s}'] = t_stdv / t_mean * 100
                     stdv_df['rel_strato_stdv'][tp.col_name + f'_{s}'] = s_stdv / s_mean * 100
-                
 
         return stdv_df
 
@@ -1478,15 +1477,27 @@ class Caribic(GlobalData):
         return df
 
     def create_df(self) -> pd.DataFrame:
-        df = self.met_data.copy()
+        df = self.met_data.copy() # CLAMS data should be included here already
+        
+        merge_kwargs = dict(
+            how='outer', 
+            sort=True,
+            left_index=True, 
+            right_index=True, 
+            )
+
         for pfx in self.pfxs:
             # df = df.sjoin(self.data[pfx])
-            df = pd.merge(self.data[pfx], df, how='outer', sort=True,
-                          left_index=True, right_index=True, suffixes=['', '_' + pfx])
+            df = pd.merge(self.data[pfx], df, 
+                          suffixes = [None, f'_{pfx}'],
+                          **merge_kwargs)
+            
             for c in df.columns:
                 if f'{c}_{pfx}' in df.columns:
                     df[c] = df[c].combine_first(df[f'{c}_{pfx}']) # Note: Future warning, watch but should be okay
                     df = df.drop(columns=f'{c}_{pfx}')
+        if 'geometry' in df.columns: 
+            df = df[df.index.isin(df.geometry.dropna().index)]
         self.data['df'] = df
         return df
 
