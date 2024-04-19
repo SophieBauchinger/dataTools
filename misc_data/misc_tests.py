@@ -161,7 +161,7 @@ class CaribicINTtpc(GlobalData):
             df_flight.insert(0, 'Flight number',
                              [flight_nr] * df_flight.shape[0])
 
-            col_dict, rename_dict = tools.rename_columns(f_data.VNAME)
+            rename_dict = tools.rename_columns(f_data.VNAME)
             # set names to their short version
             df_flight.rename(columns=rename_dict, inplace=True)
             df_yr = pd.concat([df_yr, df_flight])
