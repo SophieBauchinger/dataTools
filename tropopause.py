@@ -14,6 +14,7 @@ from matplotlib.colors import Normalize
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
 import matplotlib.patheffects as mpe
+import pandas as pd
 from PIL import Image
 import glob
 import cmasher as cmr
@@ -648,6 +649,58 @@ class TropopausePlotter(TropopauseData):
         fig.tight_layout()
         plt.show()
 
+    def make_stdv_table(self, ax, subs, stdv_df, **kwargs):
+        """ Create table for values of standard deviation in troposphere / stratosphere.
+
+        Parameters:
+            ax (matplotlib.axes.Axes): Axis to be plotted on
+            subs (Substance): Substance for which standard deviation was calculated
+            stdv_df (pd.DataFrame): Dataframe containing standard deviation data
+
+        Returns:
+            edited matplotlib.axes.Axes object, matplotlib.axes.table instance 
+        """
+        if 'prec' in kwargs:
+            prec = kwargs.get('prec')
+        else:  
+            prec = 1 if kwargs.get('rel') else 2
+
+        stdv_df = stdv_df.astype(float).round(prec)
+        stdv_df.sort_index()
+        
+        cellValues = [[ '{:.{prec}f}'.format(j, prec=prec) 
+                for j in i] for i in stdv_df.values]
+              
+        rowLabels = [dcts.get_coord(col_name=c).label(True) for c in stdv_df.index]
+        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'
+                     ] if not kwargs.get('rel') else [
+                         'Troposphere [%]', 'Stratosphere [%]']
+
+        norm_t = Normalize(np.min(stdv_df.values[:,0]) * 0.95, np.max(stdv_df.values[:,0]) * 1.15)
+        cmap_t = dcts.dict_colors()['vstdv_tropo']
+
+        norm_s = Normalize(np.min(stdv_df.values[:,1]) * 0.95, np.max(stdv_df.values[:,1]) * 1.15)
+        cmap_s = dcts.dict_colors()['vstdv_strato']
+
+        cellColors = pd.DataFrame([[cmap_t(norm_t(i)) for i in stdv_df.values[:,0]], 
+                                [cmap_s(norm_s(i)) for i in stdv_df.values[:,1]]]
+                                ).transpose().values
+
+        table = ax.table(cellValues, 
+                         rowLabels = rowLabels, 
+                         # rowColours = ['xkcd:light grey']*len(rowLabels),
+                         colLabels = colLabels,
+                         # colColours = ['xkcd:light grey']*len(colLabels),
+                         cellLoc = 'center',
+                         loc='center',
+                         cellColours = cellColors if not kwargs.get('NoColor') else None,
+                         )
+        table.set_fontsize(15)
+        table.scale(1,3)
+        ax.axis('off')
+
+        return ax, table
+
     def strato_tropo_stdv_table(self, subs, tps=None, **kwargs):
         """ Creates a table with the """
         stdv_df = self.strato_tropo_stdv(subs, tps)
@@ -657,101 +710,72 @@ class TropopausePlotter(TropopauseData):
             stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' in c]]
         else: 
             stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' not in c]]
-        
-        stdv_df = stdv_df.astype(float).round(1 if kwargs.get('rel') else 2)
-        stdv_df.sort_index()
-        
+              
         fig, ax = plt.subplots(dpi=250)
+        ax, table = self.make_stdv_table(ax, subs, stdv_df, **kwargs)
+        fig.show()
 
-        rowLabels = [dcts.get_coord(col_name=c).label(True) for c in stdv_df.index]
-        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'
-                     ] if not kwargs.get('rel') else [
-                         'Troposphere [%]', 'Stratosphere [%]']
-
-
-        norm_t = Normalize(np.min(stdv_df.values[:,0]) * 0.85, np.max(stdv_df.values[:,0]) * 1.15)
-        cmap_t = dcts.dict_colors()['vstdv_tropo']
-
-        norm_s = Normalize(np.min(stdv_df.values[:,1]) * 0.85, np.max(stdv_df.values[:,1]) * 1.15)
-        cmap_s = dcts.dict_colors()['vstdv_strato']
-
-        cellColors = pd.DataFrame([[cmap_t(norm_t(i)) for i in stdv_df.values[:,0]], 
-                                [cmap_s(norm_s(i)) for i in stdv_df.values[:,1]]]
-                                ).transpose().values
-
-        table = ax.table(stdv_df.values, 
-                         rowLabels = rowLabels, 
-                         # rowColours = ['xkcd:light grey']*len(rowLabels),
-                         colLabels = colLabels,
-                         # colColours = ['xkcd:light grey']*len(colLabels),
-                         cellLoc = 'center',
-                         loc='center',
-                         cellColours = cellColors if kwargs.get('YayColors') else None,
-                         )
-        table.set_fontsize(15)
-        table.scale(1,3)
-        ax.axis('off')
-        
     def strato_tropo_stdv_mean_seasonal_table(self, subs, tps=None, **kwargs):
-        """ Creates a table with the """
-        
+        """ Calculate and display table of variability per season and RMS.
+ 
+        Parameters: 
+            subs (Substance): Substance for which to calculate variability
+            tps (List[Coordinate]): Tropopause definitions to calculate hemispheric variability for
+        """
         self.df['season'] = tools.make_season(self.df.index.month)
-        
         stdv_df_dict = {}
-        
+
         for season in set(self.df.season):
-            
             stdv_df = self.sel_season(season).strato_tropo_stdv(subs, tps)
-            
+
             if kwargs.get('rel'): 
                 stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' in c]]
             else: 
                 stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' not in c]]
             
-            stdv_df = stdv_df.astype(float).round(3 if kwargs.get('rel') else 3)
-            stdv_df.sort_index()
-            
             stdv_df_dict[season] = stdv_df.rename(columns = {c:c +f'_{season}' for c in stdv_df.columns})
-            
+                
             fig, ax = plt.subplots(dpi=250)
-            # ax.set_title(f'Season : {season}')
+            ax, table = self.make_stdv_table(ax, subs, stdv_df, **kwargs)
             
-            ax.text(**dcts.note_dict(ax, s = f'season : {season}'))
-    
-            rowLabels = [dcts.get_coord(col_name=c).label(True) for c in stdv_df.index]
-            colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
-            table = ax.table(stdv_df.values, 
-                              rowLabels=rowLabels, 
-                              colLabels = colLabels,
-                             loc='center')
-            table.set_fontsize(14)
-            table.scale(1,4)
-            ax.axis('off')
+            ax.set_title('Variability of {} in {}'.format(
+                subs.label(),
+                dcts.dict_season()[f'name_{season}'] ))
+            fig.show()
         
-        # RMS of seasonal relative standard deviation
-        import pandas as pd
+        # Calculate average seasonal averages 
         df = pd.concat(stdv_df_dict.values(), axis=1)
-        df['rel_strato_av'] = (df['rel_strato_stdv_1'] + df['rel_strato_stdv_2'] + df['rel_strato_stdv_3'] + df['rel_strato_stdv_4']) / 4
-        df['rel_tropo_av'] = (df['rel_tropo_stdv_1'] + df['rel_tropo_stdv_2'] + df['rel_tropo_stdv_3'] + df['rel_tropo_stdv_4']) / 4
+        strato_cols = [c for c in df.columns if 'strato_stdv' in c]
+        tropo_cols = [c for c in df.columns if 'tropo_stdv' in c]
+
+        # Average of seasonal relative standard deviation
+        df['strato_stdv_av'] = df[strato_cols].sum(axis=1) / len(stdv_df_dict)
+        df['tropo_stdv_av'] = df[tropo_cols].sum(axis=1) / len(stdv_df_dict)
         
-        df = df[['rel_tropo_av', 'rel_strato_av']]
-        
-        df = df.astype(float).round(3 if kwargs.get('rel') else 3)
+        df_av = df[['tropo_stdv_av', 'strato_stdv_av']]
+        df_av = df_av.astype(float).round(3 if kwargs.get('rel') else 3)
         
         fig, ax = plt.subplots(dpi=250)
-        # ax.set_title(f'Season : {season}')
-        
-        # ax.text(**dcts.note_dict(ax, s = f'season : {season}'))
+        ax, table = self.make_stdv_table(ax, subs, df_av, **kwargs)
+        ax.set_title('Average {}seasonal variability of {}'.format(
+            'relative ' if kwargs.get('rel') else '',
+            subs.label()))
+        fig.show()
 
-        rowLabels = [dcts.get_coord(col_name=c).label(True) for c in df.index]
-        colLabels = [f'Troposphere [{subs.unit}]', f'Stratosphere [{subs.unit}]'] if not kwargs.get('rel') else ['Troposphere [%]', 'Stratosphere [%]']
-        table = ax.table(df.values, 
-                          rowLabels=rowLabels, 
-                          colLabels = colLabels,
-                         loc='center')
-        table.set_fontsize(14)
-        table.scale(1,4)
-        ax.axis('off')
+        # Root-mean-square of seasonal relative standard deviation
+        # RMS = ( 1/n * (x_1**2 + x_2**2 + ... + x_n**2) )**0.5
+        df['strato_stdv_RMS'] = ((df[strato_cols] **2 ).sum(axis=1) / len(stdv_df_dict) )**0.5
+        df['tropo_stdv_RMS'] = ((df[tropo_cols] **2 ).sum(axis=1) / len(stdv_df_dict) )**0.5
+        
+        df_RMS = df[['tropo_stdv_RMS', 'strato_stdv_RMS']]
+        df_RMS = df_RMS.astype(float).round(3)
+        
+        fig, ax = plt.subplots(dpi=250)
+        ax, table = self.make_stdv_table(ax, subs, df_RMS, **kwargs)
+        ax.set_title('RMS of {}seasonal variability of {}'.format(
+            'relative ' if kwargs.get('rel') else '',
+            subs.label()))
+        fig.show()
         
         return stdv_df_dict
         
