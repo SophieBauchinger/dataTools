@@ -98,29 +98,23 @@ def ds_to_gdf(ds) -> pd.DataFrame:
 
     return gdf
 
-def rename_columns(columns) -> tuple[dict, dict]:
+def rename_columns(columns) -> dict:
     """ Create dictionary relating column name with AMES_variable object
 
     Relate dataframe column name with all information in
 
     Get new column names and col_name_dict for AMES data structure.
-    Get only short name + unit; Save description in dict
+    Get only short name + unit; description found in coordinate instance for specific col_name
     Standardise names via case changes
     """
-    col_dict = {}
-    rename_dict = {}
+    col_name_dict = {}
     for x in columns:
         if len(x.split(';')) == 3:
             col_name, long_name, unit = [i.strip() for i in x.split(';')]
         else:
             col_name = x.split(";")[0].strip()
-
-        rename_dict.update({x: col_name})
-        if col_name in [i.col_name for i in dcts.get_coordinates()]:
-            coord = dcts.get_coord(col_name=col_name)  # store info
-            col_dict.update({col_name: coord})
-
-    return col_dict, rename_dict
+        col_name_dict.update({x: col_name})
+    return col_name_dict
 
 def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Choose which variables to keep when importing EMAC data .
@@ -152,7 +146,7 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
                           if v.startswith('tropop_') and not v.endswith('_f')
                           and not any([x in v for x in ['_clim', 'pblh']])])
     if incl_subs:
-        tracers = dcts.get_substances(**{'ID': 'EMAC'})
+        tracers = [s.col_name for s in dcts.get_substances(**{'ID': 'EMAC'})]
         tracers_at_fl = [t + '_at_fl' for t in tracers]
         variables.extend([v for v in ds.variables if
                           (v in tracers or v in tracers_at_fl)])
@@ -264,12 +258,14 @@ def process_clams_v03(ds):
     Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
     
     (for CARIBIC: 
-         function call needs to include 
-         drop_variables = 'CARIBIC2_LocalTime'
-         if decode_times = True )
-    
+        function call needs to include 
+        drop_variables = 'CARIBIC2_LocalTime'
+        if decode_times = True )
+        
     """
-    
+
+    #!!! Currently timestamps for V03 do NOT correspond to measurement timestamps !!!
+
     # ds = ds.drop_vars('CARIBIC2_LocalTime')
     
     TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
@@ -285,8 +281,6 @@ def process_clams_v03(ds):
         
         ds = ds.drop_vars(variable)
     
-    
-        
     return ds[[v for v in clams_variables_v03() if v in ds.variables]]
     
 
@@ -420,7 +414,7 @@ def pre_flag(data_arr, ref_arr, crit='n2o', limit=0.97, **kwargs) -> pd.DataFram
     data_arr.sort_index(inplace=True)
     df_flag = pd.DataFrame({f'strato_{data_arr.name}': np.nan,
                             f'tropo_{data_arr.name}': np.nan},
-                           index=data_arr.index)
+                           index=data_arr.index, dtype=object)
 
     fit = get_lin_fit(ref_arr)
     t_obs_tot = np.array(dt_to_fy(df_flag.index, method='exact'))
