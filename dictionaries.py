@@ -96,6 +96,7 @@ class Coordinate:
                 if filter_label:
                     tp = tp_defs[tp]
                     vc = self.vcoord if not self.vcoord == 'pt' else '$\Theta$'
+                    if self.rel_to_tp: vc = '$\Delta\,$' + vc
                     label = f'{tp + pv + crit} ({model}, {vc})'
             else:
                 label = f'{vcoord} [{self.unit}]'
@@ -582,7 +583,50 @@ def instruments_per_campaign(campaign: str) -> tuple:
         raise NotImplementedError(f'Campaign {campaign} does not have an instrument list.')
     return instr_dict[campaign]
 
-# %% Misc
+#%% MS Caribic data
+def MS_variables(*args): 
+    """ List of current variables of interest in the Caribic MS dataset """
+    measured_coords = [
+        # coordinates
+        'Altitude', 
+        'H_rel_TP', 
+        'Tpot',
+        ]
+    measured_subs = [
+        # substances
+        'Ozone', 
+        'CO', 
+        'CO2', 
+        'CH4', 
+        ]
+    modelled_ECMWF = [
+        # coordinates
+        'temp__k_', 
+        'pv__pvu_', 
+        'pot_temp__k_', 
+        'eq_pott_temp__k_', 
+        'z__0_1_g_m_', 
+        'eq_latitude_deg_n_', 
+        'p_strop__hpa_', 
+        'p_dtrop__hpa_', 
+        't_strop__k_', 
+        't_dtrop__k_', 
+        'pt_strop__k_', 
+        'pt_dtrop__k_', 
+        'pv_strop__pvu_', 
+        'z_strop__01grav_m_', 
+        'z_dtrop__01grav_m_', 
+        'dp_strop__hpa_',
+        'dp_dtrop__hpa_',
+        ]
+    variables = []
+    if 'measured' in args: 
+        [variables.append(i) for i in measured_coords + measured_subs]
+    if 'ECMWF' in args: 
+        [variables.append(i) for i in modelled_ECMWF]     
+    return variables
+
+# %% Misc for plotting
 def dict_season():
     """ Use to get name_s, color_s for season s"""
     return {'name_1': 'Spring (MAM)', 'color_1': '#228833',  # blue
