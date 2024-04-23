@@ -32,6 +32,7 @@ import os
 import pandas as pd
 from shapely.geometry import Point
 import traceback
+import warnings
 import xarray as xr
 
 # from toolpac.calc import bin_1d_2d
@@ -149,16 +150,34 @@ class GlobalData:
     def coordinates(self) -> list:
         """ Returns list of non-substance variables in self.df """
         return self.get_variables('coords')
-    
+
+    def get_coords(self, **coord_kwargs) -> list: 
+        """ Returns all coordinates that fit the specified parameters and exist in self.df """
+        try: 
+            coords = [tp for tp in self.coordinates 
+                  if tp.col_name in [c.col_name for 
+                                     c in dcts.get_coordinates(**coord_kwargs)]]
+        except KeyError: 
+            coords = []
+            warnings.warn('Warning. No coordinates found in data using the given specifications.')
+        return coords
+
     def tp_coords(self, **tp_kwargs) -> list: 
         """ Returns a list of vertical dynamic coordinates. """
+        # 1. filter coordinates for tropopause-relative coordinates only
         tp_coords = [c for c in self.coordinates if (
             str(c.tp_def) != 'nan' and 
             c.var != 'geopot' and 
             (c.vcoord =='mxr' or c.rel_to_tp) ) ]
-        # tp_coords = [c for c in self.coordinates if (str(c.tp_def)!='nan')]
-        for item in tp_kwargs: 
-            tp_coords = [tp for tp in tp_coords if str(getattr(tp, item)) == str(tp_kwargs.get(item))]
+
+        # 2. reduce list further using given keyword arguments
+        try: 
+            tp_coords = [tp for tp in tp_coords 
+                            if tp.col_name in [c.col_name for 
+                                            c in dcts.get_coordinates(**tp_kwargs)]]
+        except KeyError: 
+            tp_coords = []
+            warnings.warn('Warning. No TP coordinates found in data using the given specifications.')
         return tp_coords
 
     @property
