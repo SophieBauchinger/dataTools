@@ -351,7 +351,6 @@ def substance_df():
     substances['function'] = [fctn_dict.get(f) for f in substances['function']]
     return substances
 
-
 def get_substances(**kwargs) -> list['Substance']:
     """ Return list of Substance for all items conditions are met for. """
     df = substance_df()
@@ -367,7 +366,6 @@ def get_substances(**kwargs) -> list['Substance']:
     subs_dict = df.to_dict(orient='index')
     subs = [Substance(k, **v) for k, v in subs_dict.items()]
     return subs
-
 
 def get_subs(*args, **kwargs):
     """ Return single Substance object with the given specifications """
@@ -513,7 +511,7 @@ class Instrument:
         return f'Instrument : {self.original_name} - {self.variables}'
 
 
-#%%% SQL Database / HALO stuff
+#%% SQL Database / HALO stuff
 def campaign_definitions(campaign: str) -> dict:
     """  Returns parameters needed for client_data_choice per campaign.
 
@@ -626,7 +624,7 @@ def MS_variables(*args):
         [variables.append(i) for i in modelled_ECMWF]     
     return variables
 
-# %% Misc for plotting
+#%% Misc for plotting
 def dict_season():
     """ Use to get name_s, color_s for season s"""
     return {'name_1': 'Spring (MAM)', 'color_1': '#228833',  # blue
@@ -697,10 +695,13 @@ def note_dict(fig_or_ax, x=None, y=None, s=None, ha=None):
 
     x = x if x else 0.97
     y = y if y else 0.97
+    
+    if not ha: 
+        ha='right' if x > 0.5 else 'left'
 
     note_dict = dict(x=x,
                      y=y,
-                     horizontalalignment='right' if x > 0.5 else 'left',
+                     horizontalalignment = ha,
                      verticalalignment='center_baseline' if y > 0.5 else 'bottom',
                      transform=transform,
                      bbox=bbox_defaults)
