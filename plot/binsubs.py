@@ -414,11 +414,11 @@ based on {self.glob_obj.__repr__()}'
             
             s_std = df.loc[i][s_cols_vstd].values
             denom_std = np.nansum([( n[j]-1 ) * s_std[j]**2 for j in range(len(seasons))])
-            df['rms_vstdv'].loc[i] = np.sqrt(denom_std / nom) if not nom==0 else np.nan
+            df.loc[i, 'rms_vstdv'] = np.sqrt(denom_std / nom) if not nom==0 else np.nan
             
             s_rstd = df.loc[i][s_cols_rvstd].values
             denom_rstd = np.nansum([( n[j]-1 ) * s_rstd[j]**2 for j in range(len(seasons))])
-            df['rms_rvstd'].loc[i] = np.sqrt(denom_rstd / nom) if not nom==0 else np.nan
+            df.loc[i, 'rms_rvstd'] = np.sqrt(denom_rstd / nom) if not nom==0 else np.nan
         
         return df
 
@@ -479,13 +479,14 @@ class BinPlotter1D(BinPlotter):
                                                     seasons: list[int] = [1,3],
                                                     **kwargs): 
         """ Compare relative mixing ratio varibility between tropopause definitions. """
-        fig, ax = plt.subplots(dpi=500, figsize=(4,5))
+        fig, ax = plt.subplots(dpi=500, figsize=(5,6))
         outline = mpe.withStroke(linewidth=2, foreground='white')
         
         for i, tp in enumerate(tps):
             bin_dict = self.bin_1d_seasonal(subs, tp)
             
             ls = list(['--', '-.', ':', '-']*5)[i]
+            marker = list(['o', 'X', 'd', 'p', '*', '+', '1']*5)[i]
 
             for s in seasons: 
                 if s not in bin_dict.keys(): continue
@@ -493,14 +494,17 @@ class BinPlotter1D(BinPlotter):
                 if rel: vdata = vdata / bin_dict[s].vmean * 100
                 y = bin_dict[s].xintm
 
-                ax.plot(vdata, y, ls=ls,
+                ax.plot(vdata, y, 
+                        # ls=ls,
                         c=dcts.dict_season()[f'color_{s}'],
-                        label=tp.label(True) if s==1 else None,
-                        path_effects=[outline], zorder=2, lw=2.5)
+                        path_effects=[outline], 
+                        zorder=2, lw=1.5)
                 
-                ax.scatter(vdata, y,marker='.', 
-                        c=dcts.dict_season()[f'color_{s}'],
-                        zorder=3)
+                ax.scatter(vdata, y,
+                           marker=marker, 
+                           label=tp.label(True) if s==1 else None,
+                           c=dcts.dict_season()[f'color_{s}'],
+                           zorder=3)
 
                 if s==3:
                     yticks = [i for i in y if i<0] + [0] + [i for i in y if i > 0] + [-55, -65]
@@ -522,7 +526,8 @@ class BinPlotter1D(BinPlotter):
         ax.legend()
         ax.grid('both', ls='dashed', lw=0.5)
         ax.set_axisbelow(True)
-        ax.set_ylim(-70, 70)
+        if all(tp.vcoord=='pt' for tp in tps): 
+            ax.set_ylim(-70, 70)
 
     def plot_1d_seasonal_gradient(self, subs, coord, 
                                   bin_attr: str = 'vmean', 
@@ -532,83 +537,26 @@ class BinPlotter1D(BinPlotter):
         big = kwargs.pop('big') if 'big' in kwargs else False
         bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
         
-        # fig = plt.figure(dpi=500, figsize=(8,8/3))
-        # ax = fig.add_subplot(132)
-        
         fig, ax = plt.subplots(dpi=500, 
                                figsize= (6,4) if not big else (3,4))
-        outline = mpe.withStroke(linewidth=2, foreground='white')
+        
     
         if coord.vcoord=='pt' and coord.rel_to_tp: 
             ax.set_yticks(np.arange(-60, 75, 20) + [0])
 
-        # ax.set_xlim(5.1,6.2)
 
-        if add_stdv: 
-            ax_stdv = ax.twiny()
-            ax_stdv.set_xlim(0, (6.2-5.1))
 
         for s in bin_dict.keys():
-            color = dcts.dict_season()[f'color_{s}']
-            label = dcts.dict_season()[f'name_{s}']
-
-            vdata = getattr(bin_dict[s], bin_attr)
-            y = bin_dict[s].xintm
-
-            if bin_attr=='vmean': 
-                if add_stdv: 
-                    ax_stdv.plot(bin_dict[s].vstdv, y, 
-                            c = color, label = label,
-                            linewidth=1, ls='dashed',
-                            alpha=0.5,
-                            path_effects = [outline], zorder = 2)
-                    
-                    ax_stdv.tick_params(labelcolor='grey')
-                ax.errorbar(vdata, y, 
-                            xerr = bin_dict[s].vstdv, 
-                            c = color, lw = 1, alpha=0.7, 
-                            path_effects=[outline],
-                            capsize = 1.5, zorder = 1)
-            marker = 'd'
-            ax.plot(vdata, y, 
-                    marker=marker,
-                    c = color, label = label,
-                    linewidth=2,# if not kwargs.get('big') else 3,
-                    path_effects = [outline], zorder = 2)
-
-            ax.scatter(vdata, y, 
-                    marker=marker,
-                    c = color, zorder = 3)
+            self.plot_1d_gradient(ax, s, bin_dict[s], bin_attr, add_stdv)
             
-            # markers should be on top of all other information in the plot 
-            # ax.scatter(getattr(bin_dict[s], bin_attr), 
-            #             bin_dict[s].xintm, 
-            #             marker= marker,# '*', 
-            #             lw=1,
-            #             c=color, zorder=20)
-
-            # if s==3:
-            #     yticks = [i for i in y if i<0] + [0] + [i for i in y if i > 0]
-            #     ax.set_yticks(y if not coord.rel_to_tp else yticks)
-        
         ax.set_title(coord.label(filter_label=True))
         ax.set_ylabel(coord.label(coord_only = True))
-
-        # cl = f'{coord.vcoord} [{coord.unit}]'
-        # if coord.vcoord=='pt': 
-        #     cl = f'$\Theta$ [{coord.unit}]'
-        # if coord.rel_to_tp: 
-        #     cl = '$\Delta$' + cl
-        # ax.set_ylabel((f'{cl} - ' if coord.tp_def in ['dyn', 'therm'] else '') + f'{coord.label(True)}')
 
         if bin_attr=='vmean':
             ax.set_xlabel(subs.label())
         elif bin_attr=='vstdv': 
             ax.set_xlabel('Relative variability of '+subs.label(name_only=True))
 
-        # xmin = np.nanmin([np.nanmin(bin_inst.vmean) for bin_inst in bin_dict.values()])
-        # xmax = np.nanmax([np.nanmax(bin_inst.vmean) for bin_inst in bin_dict.values()])
-        
         if coord.vcoord in ['mxr', 'p'] and not coord.rel_to_tp: 
             ax.invert_yaxis()
         if coord.vcoord=='p': 
@@ -621,19 +569,59 @@ class BinPlotter1D(BinPlotter):
             # if coord.crit=='o3': 
             #     ax.set_ylim(-4, 5.1)
 
-        # if not big: 
-        #     ax.legend(loc='lower left')
+        if not big: 
+            ax.legend(loc='lower left')
         ax.grid('both', ls='dashed', lw=0.5)
         ax.set_axisbelow(True)
         
         if coord.rel_to_tp: 
             tools.add_zero_line(ax)
-            # zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks()!=0)
-            # for l in zero_lines: 
-            #     l.set_color('k')
-            #     l.set_linestyle('-.')
-        
+
         return bin_dict, fig 
+
+    def plot_1d_gradient(self, ax, s, bin_obj,
+                         bin_attr: str = 'vmean', 
+                         add_stdv: bool = False):
+        """ Create scatter/line plot for the given binned parameter for a single season. """
+        
+        outline = mpe.withStroke(linewidth=2, foreground='white')
+        
+        color = dcts.dict_season()[f'color_{s}']
+        label = dcts.dict_season()[f'name_{s}']
+
+        vdata = getattr(bin_obj, bin_attr)
+        y = bin_obj.xintm
+
+        if bin_attr=='vmean': 
+            if add_stdv: 
+                ax_stdv = ax.twiny()
+                ax_stdv.set_xlim(0, (6.2-5.1))
+                ax_stdv.plot(bin_obj.vstdv, y, 
+                            c = color, label = label,
+                            linewidth=1, ls='dashed',
+                            alpha=0.5,
+                            path_effects = [outline], zorder = 2)
+                    
+                ax_stdv.tick_params(labelcolor='grey')
+            (_, caps, _) = ax.errorbar(vdata, y, 
+                            xerr = bin_obj.vstdv, 
+                            c = color, lw = 0.8, alpha=0.7, 
+                            # path_effects=[outline],
+                            capsize = 2, zorder = 1)
+            for cap in caps: 
+                cap.set_markeredgewidth(1)
+                cap.set(alpha=1, zorder=20)
+
+        marker = 'd'
+        ax.plot(vdata, y, 
+                    marker=marker,
+                    c = color, label = label,
+                    linewidth=2,# if not kwargs.get('big') else 3,
+                    path_effects = [outline], zorder = 2)
+
+        ax.scatter(vdata, y, 
+                    marker=marker,
+                    c = color, zorder = 3)
 
     def plot_1d_seasonal_gradient_with_vstdv(self, subs, coord): 
         """ Add second axis to vertical gradient plots to indicate variability. """
@@ -654,17 +642,18 @@ class BinPlotter1D(BinPlotter):
 
         fig.set_size_inches(8,5)
 
-    def plot_vertical_profile_mean_vstdv(self, subs, tps: list = None, rstd=False, **kwargs): 
-        """ Scatter plot of mean seasnoal variability for troopause definitions """
+    def plot_vertical_profile_mean_vstdv(self, subs, 
+                                         tps: list = None, rstd=False, 
+                                         vcoord = 'pt',
+                                         **kwargs): 
+        """ Vertical THETA-profile of mean seasonal variability for diff. troopause definitions """
         if tps is None: 
-            tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True))
-            tps.sort(key=lambda x: x.col_name, reverse=True)
-            tps = [tp for tp in tps if tp.vcoord=='pt']
-            tps.append(dcts.get_coord(vcoord='pt', tp_def='nan', model='MSMT'))
+            tps = self.glob_obj.tp_coords(rel_to_tp=True, model='ERA5', vcoord=vcoord) \
+                + self.glob_obj.get_coords(vcoord=vcoord, model='ERA5', tp_def='nan') \
+                    + self.glob_obj.get_coords(tp_def='chem', vcoord = vcoord)
 
         pt_range = 70
-        # figsize = [6.4, 4.8] # default
-        figsize = [5.5, 4.5]
+        figsize = [5.5, 4.5] # default is [6.4, 4.8]
 
         if self.glob_obj.ID == 'PGS': 
             pt_range = 140
@@ -675,28 +664,24 @@ class BinPlotter1D(BinPlotter):
 
         for tp in tps:                              
             df = self.rms_seasonal_vstdv(subs, tp, **kwargs)
-            print(df)
-
-            if not rstd: 
-                x_data = df['rms_vstdv']
-            else: 
-                x_data = df['rms_rvstd'] * 100 # %
-            
-            
+            x_data = df['rms_vstdv'] if not rstd else df['rms_rvstd']*100
             y_data = df.index
             
-            if tp.model=='ERA5' and str(tp.tp_def) != 'nan': 
-            
+            if tp.rel_to_tp: 
                 ax.plot(x_data, y_data, 
                         '-', marker='d', 
-                        # c=dcts.dict_season()[f'color_{s}'],
+                        c = 'red',
                         label=tp.label(True),
-                        path_effects=[self.outline], zorder=10)
+                        path_effects=[self.outline], 
+                        zorder=10)
                 
                 ax.set_ylabel('$\Delta\Theta_{TP}$ [K]') 
-                
 
-            elif (tp.model=='MSMT' or not (tp.rel_to_tp is True)):
+            # elif (tp.model=='MSMT' or not (tp.rel_to_tp is True)): # chem tp coords
+            
+            elif tp.rel_to_tp and (tp.tp_def != 'nan'): # non-theta
+            
+            elif not tp.rel_to_tp is True: 
                 if tp.tp_def == 'chem':
                     color = 'yellow'
                     ax2 = ax.twinx()
@@ -708,13 +693,14 @@ class BinPlotter1D(BinPlotter):
                             # c=dcts.dict_season()[f'color_{s}'],
                             c = color,
                             label=tp.label(True),
-                            path_effects=[self.outline], zorder=10)
+                            path_effects=[self.outline], 
+                            zorder=10)
     
                     ax.set_ylabel('$\Theta$-Distance to TP [K]')
                     ax2.tick_params(axis ='y', labelcolor = color, color=color)
                     ax2.spines['right'].set_color(color)
 
-                else: # non-relative coords for reference
+                else: # 'worst' - non-relative coords for reference
                     color = 'xkcd:grey'
                     ax2 = ax.twinx()
                     ax2.set_ylabel(tp.label(),
@@ -748,6 +734,7 @@ class BinPlotter1D(BinPlotter):
         h,l = ax.get_legend_handles_labels()
         
         if 'ax2' in locals():
+            print('Ax2 exists')
             ax2.set_zorder(2)
             ax2.patch.set_visible(True)
             h2,l2 = ax2.get_legend_handles_labels()
@@ -1529,11 +1516,11 @@ class BinPlotter2D(BinPlotter):
             vmax_abs = max(abs(np.nanmin(vmean)), abs(np.nanmax(vmean)))
             norm = Normalize(-vmax_abs, vmax_abs)
 
-            bci = binned_seasonal_1[season].binclassinstance
+            bin_obj = binned_seasonal_1[season].binclassinstance
 
             img = ax.imshow(vmean.T, cmap = cmap, norm=norm,
                             aspect='auto', origin='lower',
-                            extent=[bci.xbmin, bci.xbmax, bci.ybmin, bci.ybmax])
+                            extent=[bin_obj.xbmin, bin_obj.xbmax, bin_obj.ybmin, bin_obj.ybmax])
             ax.set_xlim(xlims[0]*0.95, xlims[1]*1.05)
             ax.set_ylim(ylims[0]*0.95, ylims[1]*1.05)
 
@@ -1573,15 +1560,15 @@ class BinPlotter2D(BinPlotter):
                        cmap, norm, xlims, ylims, **kwargs):
         """ Plot binned data with imshow. """
 
-        bci = bin2d_inst.binclassinstance
+        bin_obj = bin2d_inst.binclassinstance
         data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
 
         img = ax.imshow(data.T,
                         cmap = cmap, norm=norm,
                         aspect='auto', origin='lower',
                         # if not ycoord.vcoord in ['p', 'mxr'] else 'upper',
-                        extent=[bci.xbmin, bci.xbmax, bci.ybmin, bci.ybmax] 
-                        # if not ycoord.vcoord in ['p', 'mxr'] else [bci.xbmin, bci.xbmax, bci.ybmax, bci.ybmin]
+                        extent=[bin_obj.xbmin, bin_obj.xbmax, bin_obj.ybmin, bin_obj.ybmax] 
+                        # if not ycoord.vcoord in ['p', 'mxr'] else [bin_obj.xbmin, bin_obj.xbmax, bin_obj.ybmax, bin_obj.ybmin]
                         )
 
         ax.set_xlabel(xcoord.label())
@@ -1589,17 +1576,17 @@ class BinPlotter2D(BinPlotter):
 
         ax.set_xlim(*xlims)
         #TODO with count_limit > 1, might not have data in all bins - get dynamic bins?
-        ax.set_ylim(ylims[0] - bci.ybsize*1.5, ylims[1] + bci.ybsize*1.5)
+        ax.set_ylim(ylims[0] - bin_obj.ybsize*1.5, ylims[1] + bin_obj.ybsize*1.5)
 
         ax.set_xticks(np.arange(-90, 90+30, 30)) # stop+30 to include stop
 
-        if bci.ybmin < 0:
+        if bin_obj.ybmin < 0:
             # make sure 0 is included in ticks, evenly spaced away from 0
-            ax.set_yticks(list(np.arange(0, abs(bci.ybmin) + bci.ybsize*3, bci.ybsize*3) * -1)
-                          + list(np.arange(0, bci.ybmax + bci.ybsize, bci.ybsize*3)))
+            ax.set_yticks(list(np.arange(0, abs(bin_obj.ybmin) + bin_obj.ybsize*3, bin_obj.ybsize*3) * -1)
+                          + list(np.arange(0, bin_obj.ybmax + bin_obj.ybsize, bin_obj.ybsize*3)))
         else:
-            ax.set_yticks(np.arange(bci.ybmin, bci.ybmax + bci.ybsize*3, bci.ybsize*3))
-        ax.set_yticks(np.arange(bci.ybmin, bci.ybmax+bci.ybsize, bci.ybsize), minor=True)
+            ax.set_yticks(np.arange(bin_obj.ybmin, bin_obj.ybmax + bin_obj.ybsize*3, bin_obj.ybsize*3))
+        ax.set_yticks(np.arange(bin_obj.ybmin, bin_obj.ybmax+bin_obj.ybsize, bin_obj.ybsize), minor=True)
 
         if ycoord.rel_to_tp:
             ax.hlines(0, *xlims, color='k', ls='dashed', zorder=1, lw=1)
