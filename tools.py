@@ -6,6 +6,7 @@
 
 """
 import datetime as dt
+import dill
 import geopandas
 import importlib
 from metpy.units import units
@@ -13,27 +14,17 @@ import numpy as np
 import pandas as pd
 import os
 from shapely.geometry import Point
+import warnings
 
 import toolpac.calc.binprocessor as bp
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
-from toolpac.conv.times import secofday_to_datetime
+from toolpac.conv.times import secofday_to_datetime, datetime_to_secofday
 
 import dataTools.dictionaries as dcts
 
 # %% 
 def get_path():
     return dcts.get_path()
-
-# def get_path(subdir=None):
-    # """ Get parent directory of current module, i.e. location of dataTools. """
-    # loader = pkgutil.get_loader("dataTools")
-    # path = os.path.dirname(loader.load_module("dataTools").__file__)
-    # print("cwd : ", os.getcwd()) # current working directory
-    # loader = importlib.util.find_spec("dataTools")
-    # path = loader.submodule_search_locations
-    # path = os.path.dirname(os.path.abspath(__file__)) + "\\"
-    # if subdir: path = path + subdir
-    # return path
 
 # %% Data extraction
 
@@ -165,7 +156,6 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     ds['time'] = ds.time.dt.round('S')  # rmvs floating pt errors
     return ds
 
-
 def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Keep only variables that depend only on time and are available in
     subsampled data """
@@ -252,6 +242,66 @@ def clams_variables_v03():
     
     return met_vars + dyn_tps + therm_tps
 
+def flight_nr_from_flight_info(flight_info) -> int: 
+    """ Get Flight number from flight_info attribute in .nc file 
+    Applicable for flight_info of the following format: 
+        'Campaign: CARIBIC2; Flightnumber: 544; Start: 11:09:55 22.03.2018; End: 21:20:55 22.03.2018'
+    """
+    flight_nr_string = flight_info.split(';')[1].replace('Flightnumber: ', '').strip()
+    return int(flight_nr_string)
+
+def start_time_from_flight_info(flight_info, as_datetime=False):
+    """ Get Timestamp from flight_info attribute in .nc file (time WRONG in V03 !!!) 
+    Applicable for flight_info of the following format: 
+        'Campaign: CARIBIC2; Flightnumber: 544; Start: 11:09:55 22.03.2018; End: 21:20:55 22.03.2018'
+    """
+    # tmp_str = ncfile.flight_info.split(';')[2]
+    starttime_string = flight_info.split(';')[2]
+    datetime_string = starttime_string.replace('Start: ', '').strip()
+    startdate = dt.datetime.strptime(datetime_string, '%H:%M:%S %d.%m.%Y')
+    
+    if as_datetime: 
+        return startdate
+    else: 
+        return [getattr(startdate, i) for i in 
+                ['year', 'month', 'day', 'hour', 'minute', 'second']]
+
+def start_datetime_by_flight_number(MS_df=None, load = True, save = False) -> pd.Series:
+    """  Get start time for each flight number from complete (!) MS dataframe with datetime index. """
+    if load or not MS_df: 
+        with open(get_path()+'misc_data\\start_dates_per_flight.pkl', 'rb') as f: 
+            start_dates = dill.load(f)
+    else: 
+        MS_df.sort_index()
+        flight_numbers = list(set(MS_df['Flight number'].values))
+
+        start_dates = pd.Series(index = flight_numbers, 
+                                dtype=object, 
+                                name='start_dates_per_flight_no') 
+
+        for flight_no in flight_numbers: 
+            start_dates[flight_no] = MS_df['Flight number'].ne(flight_no).idxmin()
+    
+    if save: 
+        with open(get_path()+'misc_data\\start_dates_per_flight.pkl', 'wb') as f: 
+            dill.dump(start_dates, f)
+            
+    return start_dates
+
+def get_start_datetime(flight_no, **kwargs) -> dt.datetime: 
+    """ Returns flight start as datetime if given CARIBIC-2 Flight number. """
+    info = start_datetime_by_flight_number(**kwargs)
+    if flight_no in info: 
+        return info[flight_no]
+    elif flight_no == 200: 
+        return dt.datetime(2007, 7, 18) + dt.timedelta(seconds = 49545)
+    elif flight_no == 201: 
+        return dt.datetime(2007, 7, 18) + dt.timedelta(seconds = 61095)
+    else:
+        raise KeyError(f'\
+Start time could not be evaluated using MS files, not in 200/201, \
+so dataset is incorrect for Flight {flight_no}]')
+
 def process_clams_v03(ds): 
     """ 
     Preprocess CLaMS datasets for e.g. CARIBIC-2 renalayis data version .03
@@ -263,11 +313,6 @@ def process_clams_v03(ds):
         if decode_times = True )
         
     """
-
-    #!!! Currently timestamps for V03 do NOT correspond to measurement timestamps !!!
-
-    # ds = ds.drop_vars('CARIBIC2_LocalTime')
-    
     TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
     TP_qualifier_dict = {0 : '_Main', 
                          1 : '_Second', 
@@ -281,8 +326,17 @@ def process_clams_v03(ds):
         
         ds = ds.drop_vars(variable)
     
-    return ds[[v for v in clams_variables_v03() if v in ds.variables]]
+    flight_nr = flight_nr_from_flight_info(ds.flight_info)
+    start_datetime = start_time_from_flight_info(ds.flight_info, as_datetime=True)
     
+    if start_datetime.hour == 0 and start_datetime.minute == 0 and start_datetime.second == 0:
+        # very likely that datetime is wrong in file (V03)
+        start_datetime = get_start_datetime(flight_nr)
+        start_secofday = int(datetime_to_secofday(start_datetime))
+        ds = ds.assign(Time = lambda x: x.Time + np.timedelta64(start_secofday, 's'))
+
+    
+    return ds[[v for v in clams_variables_v03() if v in ds.variables]]
 
 # %% Data selection
 def minimise_tps(tps, vcoord=None) -> list:
