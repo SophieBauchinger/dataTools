@@ -36,12 +36,12 @@ import warnings
 import xarray as xr
 
 # from toolpac.calc import bin_1d_2d
-from toolpac.readwrite import find
-from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
-from toolpac.conv.times import fractionalyear_to_datetime
-from toolpac.outliers import outliers
-from toolpac.conv.times import datetime_to_fractionalyear
-from toolpac.readwrite.sql_data_import import client_data_choice
+from toolpac.readwrite import find # type: ignore
+from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
+from toolpac.conv.times import fractionalyear_to_datetime # type: ignore
+from toolpac.outliers import outliers # type: ignore
+from toolpac.conv.times import datetime_to_fractionalyear # type: ignore
+from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools

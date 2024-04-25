@@ -19,8 +19,8 @@ from PIL import Image
 import glob
 import cmasher as cmr
 
-import toolpac.calc.binprocessor as bp
-from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
+import toolpac.calc.binprocessor as bp # type: ignore
+from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools.data import TropopauseData

@@ -28,7 +28,7 @@ import itertools
 from mpl_toolkits.axes_grid1 import AxesGrid
 import geopandas
 
-import toolpac.calc.binprocessor as bp
+import toolpac.calc.binprocessor as bp # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
