@@ -642,111 +642,111 @@ class BinPlotter1D(BinPlotter):
 
         fig.set_size_inches(8,5)
 
-    def plot_vertical_profile_mean_vstdv(self, subs, 
-                                         tps: list = None, rstd=False, 
-                                         vcoord = 'pt',
-                                         **kwargs): 
-        """ Vertical THETA-profile of mean seasonal variability for diff. troopause definitions """
-        if tps is None: 
-            tps = self.glob_obj.tp_coords(rel_to_tp=True, model='ERA5', vcoord=vcoord) \
-                + self.glob_obj.get_coords(vcoord=vcoord, model='ERA5', tp_def='nan') \
-                    + self.glob_obj.get_coords(tp_def='chem', vcoord = vcoord)
+    # def plot_vertical_profile_mean_vstdv(self, subs, 
+    #                                      tps: list = None, rstd=False, 
+    #                                      vcoord = 'pt',
+    #                                      **kwargs): 
+    #     """ Vertical THETA-profile of mean seasonal variability for diff. troopause definitions """
+    #     if tps is None: 
+    #         tps = self.glob_obj.tp_coords(rel_to_tp=True, model='ERA5', vcoord=vcoord) \
+    #             + self.glob_obj.get_coords(vcoord=vcoord, model='ERA5', tp_def='nan') \
+    #                 + self.glob_obj.get_coords(tp_def='chem', vcoord = vcoord)
 
-        pt_range = 70
-        figsize = [5.5, 4.5] # default is [6.4, 4.8]
+    #     pt_range = 70
+    #     figsize = [5.5, 4.5] # default is [6.4, 4.8]
 
-        if self.glob_obj.ID == 'PGS': 
-            pt_range = 140
-            figsize = [6.4, 4.8 * 1.5]
+    #     if self.glob_obj.ID == 'PGS': 
+    #         pt_range = 140
+    #         figsize = [6.4, 4.8 * 1.5]
 
-        fig, ax = plt.subplots(dpi=250, figsize = figsize)
-        ax.set_ylim(-pt_range, pt_range)
+    #     fig, ax = plt.subplots(dpi=250, figsize = figsize)
+    #     ax.set_ylim(-pt_range, pt_range)
 
-        for tp in tps:                              
-            df = self.rms_seasonal_vstdv(subs, tp, **kwargs)
-            x_data = df['rms_vstdv'] if not rstd else df['rms_rvstd']*100
-            y_data = df.index
+    #     for tp in tps:                              
+    #         df = self.rms_seasonal_vstdv(subs, tp, **kwargs)
+    #         x_data = df['rms_vstdv'] if not rstd else df['rms_rvstd']*100
+    #         y_data = df.index
             
-            if tp.rel_to_tp: 
-                ax.plot(x_data, y_data, 
-                        '-', marker='d', 
-                        c = 'red',
-                        label=tp.label(True),
-                        path_effects=[self.outline], 
-                        zorder=10)
+    #         if tp.rel_to_tp: 
+    #             ax.plot(x_data, y_data, 
+    #                     '-', marker='d', 
+    #                     c = 'red',
+    #                     label=tp.label(True),
+    #                     path_effects=[self.outline], 
+    #                     zorder=10)
                 
-                ax.set_ylabel('$\Delta\Theta_{TP}$ [K]') 
+    #             ax.set_ylabel('$\Delta\Theta_{TP}$ [K]') 
 
-            # elif (tp.model=='MSMT' or not (tp.rel_to_tp is True)): # chem tp coords
+    #         # elif (tp.model=='MSMT' or not (tp.rel_to_tp is True)): # chem tp coords
             
-            elif tp.rel_to_tp and (tp.tp_def != 'nan'): # non-theta
+    #         elif tp.rel_to_tp and (tp.tp_def != 'nan'): # non-theta
             
-            elif not tp.rel_to_tp is True: 
-                if tp.tp_def == 'chem':
-                    color = 'yellow'
-                    ax2 = ax.twinx()
-                    ax2.set_ylabel(tp.label(),
-                                   color = color) 
-                    # ax2.set_ylim(330-70, 330+70)
-                    ax.plot(x_data, y_data,
-                            '-', marker='d', 
-                            # c=dcts.dict_season()[f'color_{s}'],
-                            c = color,
-                            label=tp.label(True),
-                            path_effects=[self.outline], 
-                            zorder=10)
+    #         elif not tp.rel_to_tp is True: 
+    #             if tp.tp_def == 'chem':
+    #                 color = 'yellow'
+    #                 ax2 = ax.twinx()
+    #                 ax2.set_ylabel(tp.label(),
+    #                                color = color) 
+    #                 # ax2.set_ylim(330-70, 330+70)
+    #                 ax.plot(x_data, y_data,
+    #                         '-', marker='d', 
+    #                         # c=dcts.dict_season()[f'color_{s}'],
+    #                         c = color,
+    #                         label=tp.label(True),
+    #                         path_effects=[self.outline], 
+    #                         zorder=10)
     
-                    ax.set_ylabel('$\Theta$-Distance to TP [K]')
-                    ax2.tick_params(axis ='y', labelcolor = color, color=color)
-                    ax2.spines['right'].set_color(color)
+    #                 ax.set_ylabel('$\Theta$-Distance to TP [K]')
+    #                 ax2.tick_params(axis ='y', labelcolor = color, color=color)
+    #                 ax2.spines['right'].set_color(color)
 
-                else: # 'worst' - non-relative coords for reference
-                    color = 'xkcd:grey'
-                    ax2 = ax.twinx()
-                    ax2.set_ylabel(tp.label(),
-                                   color = color) 
-                    ax2.set_ylim(330-pt_range, 330+pt_range)
+    #             else: # 'worst' - non-relative coords for reference
+    #                 color = 'xkcd:grey'
+    #                 ax2 = ax.twinx()
+    #                 ax2.set_ylabel(tp.label(),
+    #                                color = color) 
+    #                 ax2.set_ylim(330-pt_range, 330+pt_range)
                     
-                    ax2.plot(x_data, y_data, 
-                             '--', marker='d', 
-                            c = color, 
-                            # label=tp.label(True),
-                            path_effects=[self.outline], zorder=0,
-                            label='Potential Temperature')
-                    ax2.tick_params(axis ='y', labelcolor = color, color=color)
-                    ax2.spines['right'].set_color(color)
+    #                 ax2.plot(x_data, y_data, 
+    #                          '--', marker='d', 
+    #                         c = color, 
+    #                         # label=tp.label(True),
+    #                         path_effects=[self.outline], zorder=0,
+    #                         label='Potential Temperature')
+    #                 ax2.tick_params(axis ='y', labelcolor = color, color=color)
+    #                 ax2.spines['right'].set_color(color)
                 
-            else: 
-                raise KeyError(f'No default plotting for {tp}')
+    #         else: 
+    #             raise KeyError(f'No default plotting for {tp}')
         
-        # ax.set_xlim(0, 0.25)
-        # ax.hlines(0, 0, 0.25, color='k', ls='dashed', zorder=0)
+    #     # ax.set_xlim(0, 0.25)
+    #     # ax.hlines(0, 0, 0.25, color='k', ls='dashed', zorder=0)
         
-        ax.grid('both', ls='dotted')
-        # ax.set_title(f'{self.glob_obj.ID}')
-        if not rstd: 
-            ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
-        else: 
-            ax.set_xlabel(f'Mean seasonal relative variability of {subs.label(name_only=True)} [%]')
-        ax.set_zorder(3)
-        ax.patch.set_visible(False)
+    #     ax.grid('both', ls='dotted')
+    #     # ax.set_title(f'{self.glob_obj.ID}')
+    #     if not rstd: 
+    #         ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
+    #     else: 
+    #         ax.set_xlabel(f'Mean seasonal relative variability of {subs.label(name_only=True)} [%]')
+    #     ax.set_zorder(3)
+    #     ax.patch.set_visible(False)
         
-        h,l = ax.get_legend_handles_labels()
+    #     h,l = ax.get_legend_handles_labels()
         
-        if 'ax2' in locals():
-            print('Ax2 exists')
-            ax2.set_zorder(2)
-            ax2.patch.set_visible(True)
-            h2,l2 = ax2.get_legend_handles_labels()
+    #     if 'ax2' in locals():
+    #         print('Ax2 exists')
+    #         ax2.set_zorder(2)
+    #         ax2.patch.set_visible(True)
+    #         h2,l2 = ax2.get_legend_handles_labels()
             
-            ax.legend(handles = h+h2, 
-                      labels=l+l2,
-                      loc='lower right')
+    #         ax.legend(handles = h+h2, 
+    #                   labels=l+l2,
+    #                   loc='lower right')
         
-        else: 
-            ax.legend(loc='lower right')
+    #     else: 
+    #         ax.legend(loc='lower right')
 
-        tools.add_zero_line(ax)
+    #     tools.add_zero_line(ax)
 
     def stdv_rms_non_pt(self, subs, tp): 
         """ Same as plot_vertical_profile_mean_vstdv but for other vcoords. """
@@ -765,17 +765,25 @@ class BinPlotter1D(BinPlotter):
             ax.set_xlabel(f'Mean variability of {subs.label(name_only=True)}')
             ax.legend(loc='lower right')
 
-    def make_bar_plot(self, subs, xcoord, tp, bin_attr: str, 
-                      percent_deviation: bool = False, **kwargs) -> tuple: 
-        """ Plot histograms showing differences between TPs. 
-        bin over xcoord
-        overall alpha plot for average value, split up into latitude bands ? 
+    def calc_bin_avs(self, data: pd.DataFrame, 
+                     subs, xcoord, bin_attr: str,
+                     **kwargs) -> float: 
+        """ Data is 1D-binned along xcoord and the average bin_atrr value is calculated for the dataset. 
+        
+        Parameters: 
+            data (pd.DataFrame): Data to be binned
+            subs (dcts.Substance): Substance instance to be binned
+            xcoord (dcts.Coordinate): Coordinate instance along which to bin
+            bin_attr (str): e.g. vmean/vstdv/rvstd, binned output to be averaged
+            
+            key xbsize (float): Bin-size along x-axis
+            key bin_equi1d (bp.Bin_equi1d, bp.Bin_notequi1d): Binning structure
+        
+        Returns the averaged value of bin_attr for the whole dataset. 
         """
-        # same bins for both tropo and strato
+
         if not isinstance(kwargs.get('xbsize'), float):
-            xbsize = self._get_bsize(xcoord, 'x')
-        else: 
-            xbsize = kwargs.get('xbsize')
+            xbsize = xcoord.get_bsize()
 
         if xcoord.col_name == 'geometry.y': # latitude
             x = self.df.geometry.y
@@ -793,53 +801,49 @@ class BinPlotter1D(BinPlotter):
         else: 
             bin_equi1d = kwargs.get('bin_equi1d')
 
-        s_data = self.glob_obj.sel_strato(**tp.__dict__).df
-        t_data = self.glob_obj.sel_tropo(**tp.__dict__).df
-
         if bin_attr=='vcount':
-            t_total = len(t_data[t_data[subs.col_name].notna()])
-            s_total = len(s_data[s_data[subs.col_name].notna()])
-            return t_total, s_total
+            total = len(data[data[subs.col_name].notna()])
+            return total
 
-        t_binned_1d = bp.Simple_bin_1d(np.array(t_data[subs.col_name]), x[x.index.isin(t_data.index)],
+        binned_1d = bp.Simple_bin_1d(np.array(data[subs.col_name]), x[x.index.isin(data.index)],
                                       bin_equi1d, count_limit=self.count_limit if not bin_attr=='vcount' else 1)
+        values = getattr(binned_1d, bin_attr)
+        nans = np.isnan(values)
+        av = np.average(values[~nans], weights = binned_1d.vcount[~nans])
 
-        s_binned_1d = bp.Simple_bin_1d(np.array(s_data[subs.col_name]), x[x.index.isin(s_data.index)],
-                                      bin_equi1d, count_limit=self.count_limit if not bin_attr=='vcount' else 1)
+        return av
 
-        t_values = getattr(t_binned_1d, bin_attr)
-        s_values = getattr(s_binned_1d, bin_attr)
+    def plot_bar_plots(self, subs, xcoord, bin_attr, **kwargs):
+        """ Plot a bar plot to compare average bin_attr values across tropopause definitions. 
+        1. Data is separated into stratospheric / tropospheric values for each TP definiton
+        2. Data is binned along the x-axis as defined by xcoord
+        3. The average value of bin_attr for the specified substance is calculated for each atm_layer
         
-        t_nans = np.isnan(t_values)
-        s_nans = np.isnan(s_values)
+        Parameters: 
+            subs (dcts.Substance): Substance instance indicating data to be binned
+            xcoord (dcts.Coordinate): Coordinate to use for 1D-binning
+            bin_attr (str): e.g. vmean/vstdv/rvstd, binned output to be averaged
+
+            key xbsize (float): Bin-size along x-axis
+            key bin_equi1d (bp.Bin_equi1d, bp.Bin_notequi1d): Binning structure
+            key tps ([dcts.Coordinate]): specify tropopause definitions to display 
+        """
+        tps = self.glob_obj.tp_coords() if not kwargs.get('tps') else kwargs.get('tps')
         
-        t_av = np.average(t_values[~t_nans], weights = t_binned_1d.vcount[~t_nans])
-        s_av = np.average(s_values[~s_nans], weights = s_binned_1d.vcount[~s_nans])
-
-        if bin_attr=='vstdv' and percent_deviation: 
-            t_av = t_av / np.average(t_binned_1d.vmean[~t_nans], weights = t_binned_1d.vcount[~t_nans]) * 100
-            s_av = s_av / np.average(s_binned_1d.vmean[~s_nans], weights = s_binned_1d.vcount[~s_nans]) * 100
-
-        return t_av, s_av
-
-    def plot_bar_plots(self, subs, xcoord, bin_attr, percent_deviation=False, **kwargs):
-        """ All tp defs. """
-        #TODO vstdv as percentage of the mean
+        #TODO shared_indices
         fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=200, 
                                          figsize=(9,4), sharey=True)
         
-        bin_description = f'{self.glob_obj.grid_size}°' + ('latitude' if xcoord.hcoord=='lat' else ('longitude' if xcoord.hcoord=='lon' else 'HUH')) + ' bins'
-        
-        if bin_attr=='vmean': 
-            description = f'Average mixing ratio in {bin_description}'
-        elif bin_attr=='vstdv': 
-            if not percent_deviation: 
-                description = f'Variability in {bin_description}'
-            else: 
-                description = f'Percent deviation in {bin_description}'
-        elif bin_attr == 'vcount': 
-            description = 'Total number of datapoints'
-        else: 
+        bin_description = f'{self.glob_obj.grid_size}°' \
+            + ('latitude' if xcoord.hcoord=='lat' else ('longitude' if xcoord.hcoord=='lon' else 'HUH')) \
+                + ' bins'
+        description_dict = dict(
+            vmean = f'Average mixing ratio in {bin_description}',
+            vstdv = f'Variability in {bin_description}',
+            vcount ='Total number of datapoints',
+            rvstd = 'Relative variability', )
+        description = description_dict.get(bin_attr)
+        if not description: 
             description = bin_attr
         
         fig.suptitle(f'{description} of {subs.label()}' if not bin_attr=='vcount' else description)
@@ -851,13 +855,24 @@ class BinPlotter1D(BinPlotter):
         strato_bar_vals = []
         bar_labels = []
         
-        for i, tp in enumerate(self.glob_obj.tp_coords()):
-            t_av, s_av = self.make_bar_plot(subs, xcoord, tp, bin_attr, 
-                                            percent_deviation, **kwargs)
+        self.glob_obj.create_df_sorted() # create df_sorted
+        shared_indices = self.glob_obj.get_shared_indices(tps)
+
+        for i, tp in enumerate(tps):
+            tropo_data = self.glob_obj.sel_tropo(**tp.__dict__).df
+            strato_data = self.glob_obj.sel_strato(**tp.__dict__).df
+            
+            if kwargs.get('shared_index'): 
+                tropo_data[tropo_data.index.isin(shared_indices)]
+                strato_data[strato_data.index.isin(shared_indices)]
+
+            t_av = self.calc_bin_avs(tropo_data,
+                                     subs, xcoord, bin_attr, **kwargs)
+            s_av = self.calc_bin_avs(strato_data,
+                                     subs, xcoord, bin_attr, **kwargs)
 
             tropo_bar_vals.append(t_av)
             strato_bar_vals.append(s_av)
-            
             bar_labels.append(tp.label(True))
             
         bar_params = dict(align='center', edgecolor='k',  rasterized=True,
@@ -873,27 +888,25 @@ class BinPlotter1D(BinPlotter):
         ax_label.axis('off')
 
         maximum = np.nanmax(tropo_bar_vals+strato_bar_vals)
-        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals) if not percent_deviation else 0
+        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals) if bin_attr != 'rvstd' else 0
         for decimal_place in [4,3,2,1,0]:
             if all(i>np.round(minimum, decimal_place) for i in tropo_bar_vals+strato_bar_vals): 
                 minimum = np.round(minimum, decimal_place)
             else: 
                 break
-        padding = (maximum-minimum)/3 * (2 if percent_deviation else 1)
+        padding = (maximum-minimum)/3 
 
         ax_t.set_xlim(maximum +padding , minimum-padding if not minimum-padding<0 else 0)
         ax_s.set_xlim(minimum-padding if not minimum-padding<0 else 0, maximum +padding)
         
         ax_t.grid('both', ls='dotted')
         ax_s.grid('both', ls='dotted')
-        # ax_t.axis('off')
-        # ax_s.axis('off')
         
         if not bin_attr=='vcount':
-            ax_t.bar_label(t_bars, ['{0:.3f}'.format(t_val)+('%' if percent_deviation else '')
+            ax_t.bar_label(t_bars, ['{0:.3f}'.format(t_val)
                                     for t_val in tropo_bar_vals], 
                            padding=2)
-            ax_s.bar_label(s_bars, ['{0:.3f}'.format(s_val)+('%' if percent_deviation else '')
+            ax_s.bar_label(s_bars, ['{0:.3f}'.format(s_val)
                                     for s_val in strato_bar_vals], 
                            padding=2)
 
@@ -908,7 +921,7 @@ class BinPlotter1D(BinPlotter):
         fig.subplots_adjust(wspace=0)
 
     def matrix_plot_stdev_subs(self, substance, note='', tps=None, minimise_tps=True,
-                               atm_layer='both', savefig=False) -> (np.array, np.array):
+                               atm_layer='both', savefig=False) -> tuple[np.array, np.array]:
         """
         Create matrix plot showing variability per latitude bin per tropopause definition
     
