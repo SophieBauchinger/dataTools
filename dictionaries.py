@@ -147,7 +147,6 @@ class Coordinate:
             print(f'No default bin size for {self.vcoord} / {self.hcoord}')
             return None
 
-
 def coordinate_df():
     """ Get dataframe containing all info about all coordinate variables """
     with open(get_path() + 'coordinates.csv', 'rb') as f:
@@ -155,7 +154,6 @@ def coordinate_df():
         if 'pvu' in coord_df.columns:
             coord_df['pvu'] = coord_df['pvu'].astype(object)  # allow comparison with np.nan
     return coord_df
-
 
 def get_coordinates(**kwargs):
     """Return dictionary of col_name:Coordinate for all items where conditions are met
@@ -186,13 +184,11 @@ def get_coordinates(**kwargs):
     coord = [Coordinate(**v) for k, v in coord_dict.items()]
     return coord
 
-
 def get_coord(**kwargs):
     coordinates = get_coordinates(**kwargs)  # dict i:Coordinate
     if len(coordinates) > 1:
         raise ValueError(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
     return coordinates[0]
-
 
 # %% Substances
 class Substance():
@@ -510,7 +506,6 @@ class Instrument:
     def __repr__(self):
         return f'Instrument : {self.original_name} - {self.variables}'
 
-
 #%% SQL Database / HALO stuff
 def campaign_definitions(campaign: str) -> dict:
     """  Returns parameters needed for client_data_choice per campaign.
@@ -634,7 +629,6 @@ def dict_season():
             # 'color_1': 'blue', 'color_2': 'orange',
             # 'color_3': 'green', 'color_4': 'red'}
 
-
 colors = [
     '#E6E6E6', # 0.0 - 0.1
     '#D5D4E8', # 0.1 - 0.2
@@ -661,7 +655,6 @@ def dict_colors():
         'rvstd' : lsc.from_list('RSTD_default', colors, N=9)
     }
 
-
 def axis_label(coord):
     """ Return axis label for vcoord / hcoord. """
     label_dict = {
@@ -674,13 +667,11 @@ def axis_label(coord):
     }
     return label_dict[coord]
 
-
 def dict_tps():
     """ Get color etc for tropopause definitions """
     return {'color_chem': '#1f77b4',
             'color_therm': '#ff7f0e',
             'color_dyn': '#2ca02c'}
-
 
 def note_dict(fig_or_ax, x=None, y=None, s=None, ha=None):
     """ Return default arguments & bbox dictionary for adding notes to plots. """
