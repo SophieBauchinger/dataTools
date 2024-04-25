@@ -47,7 +47,6 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 
 #!! TODO: fix the underlying problem in toolpac rather than just suppressing stuff
-import warnings
 from pandas.errors import SettingWithCopyWarning
 
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
@@ -162,6 +161,17 @@ class GlobalData:
             warnings.warn('Warning. No coordinates found in data using the given specifications.')
         return coords
 
+    def get_substs(self, **subs_kwargs) -> list: 
+        """ Returns all substances that fit the specified parameters and exist in self.df """
+        try: 
+            substs = [subs for subs in self.substances
+                      if subs.col_name in [s.col_name for
+                                           s in dcts.get_substances(**subs_kwargs)]]
+        except KeyError: 
+            substs = []
+            warnings.warn('Warning. No substances found in data using the given specifications.')
+        return substs
+
     def tp_coords(self, **tp_kwargs) -> list: 
         """ Returns a list of vertical dynamic coordinates. """
         # 1. filter coordinates for tropopause-relative coordinates only
@@ -173,8 +183,9 @@ class GlobalData:
         # 2. reduce list further using given keyword arguments
         try: 
             tp_coords = [tp for tp in tp_coords 
-                            if tp.col_name in [c.col_name for 
-                                            c in dcts.get_coordinates(**tp_kwargs)]]
+                            if tp.col_name in [c.col_name for c in 
+                                               dcts.get_coordinates(**tp_kwargs)]]
+
         except KeyError: 
             tp_coords = []
             warnings.warn('Warning. No TP coordinates found in data using the given specifications.')
@@ -256,11 +267,7 @@ class GlobalData:
         else: 
             raise NotImplementedError('Subclasses of GlobalData need to implement .get_met_data()')
 
-    #!!! TODO Caribic met_data dataset V03 - integration
-    # with xr.open_dataset(path+ '\caribic_clams_V03.nc') as ds_loaded: 
-    #     ds_loaded = ds_loaded
-
-    def get_clams_data(self, met_pdir=None, save_ds=False) -> pd.DataFrame:
+    def get_clams_data(self, met_pdir=None, save_ds=False, recalculate=False) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
 
         if self.ID in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
@@ -268,8 +275,8 @@ class GlobalData:
             alldata_fname = {
                 'CAR' : 'caribic_clams_V03.nc'
                 }
-            all_data_path = tools.get_path()+'/misc_data/' + alldata_fname.get(self.ID)
-            if os.path.exists(all_data_path):
+            all_data_path = tools.get_path()+'misc_data/' + alldata_fname.get(self.ID)
+            if os.path.exists(all_data_path) and not recalculate:
                 with xr.open_dataset(all_data_path) as ds: 
                     ds = ds
             
@@ -867,20 +874,26 @@ class GlobalData:
 
     def o3_filter_lt60(self, **kwargs) -> pd.DataFrame:
         """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
-        if self.source == 'Caribic':
-            subs = dcts.get_subs('o3', ID='INT')
+        o3_substs = self.get_substs(short_name = 'o3') 
+        
+        if len(o3_substs) == 1: 
+            [o3_subs] = [o3_substs]
+
+        elif self.source == 'Caribic':
+            if any(s.ID == 'INT' for s in o3_substs): 
+                [o3_subs] = [s for s in o3_substs if s.ID=='INT']
+            elif any(s.ID == 'MS' for s in o3_substs): 
+                [o3_subs] = [s for s in o3_substs if s.ID=='MS']
+            else: 
+                [o3_subs] = o3_substs
+                print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
         else:
-            o3_substances = [s for s in self.substances if s.short_name == 'o3']
-            if len(o3_substances) > 1:
-                raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
-            else:
-                subs = o3_substances[0]
-        if not subs.col_name in self.df.columns:
-            raise KeyError(f'Could not find Ozone measurements ({subs.col_name}) in the dataset.')
-        df_sorted = pd.DataFrame(index=self.df.index)
-        df_sorted.loc[self.df[subs.col_name].lt(60),
-        (f'strato_{subs.col_name}', f'tropo_{subs.col_name}')] = (False, True)
-        return df_sorted
+            raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
+        
+        o3_sorted = pd.DataFrame(index=self.df.index)
+        o3_sorted.loc[self.df[o3_subs.col_name].lt(60),
+        (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
+        return o3_sorted, o3_subs
 
     def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
         """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
@@ -951,12 +964,11 @@ class GlobalData:
 
         # Ozone: Flag O3 < 60 ppb as tropospheric
         if any(tp.crit == 'o3' for tp in tps) and not self.source == 'MULTI':
-            o3_sorted = self.o3_filter_lt60()
-            o3_tropo = o3_sorted[[c for c in o3_sorted if c.startswith('tropo')]]
-            o3_strato = o3_sorted[[c for c in o3_sorted if c.startswith('strato')]]
-            for tp in [tp for tp in tps if tp.crit == 'o3' and tp.vcoord == 'z']:
-                o3_sorted[f'tropo_{tp.col_name}'] = o3_tropo
-                o3_sorted[f'strato_{tp.col_name}'] = o3_strato
+            o3_sorted, o3_subs = self.o3_filter_lt60()
+            # rename O3_sorted columns to the corresponding O3 tropopause coord to update
+            for tp in [tp for tp in tps if tp.crit == 'o3']:
+                o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
+                o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
                 df_sorted.update(o3_sorted, overwrite=False)
 
         df_sorted = df_sorted.convert_dtypes()
@@ -1389,16 +1401,16 @@ class Caribic(GlobalData):
         self.data = {}  # easiest way of keeping info which file the data comes from
         if not recalculate:
             if not fname:
-                resource = tools.get_path() + "\\misc_data\\caribic_data_dict.pkl"
+                resource = tools.get_path() + "misc_data\\caribic_data_dict.pkl"
             else:
-                resource = tools.get_path() + "\\misc_data\\" + fname
+                resource = tools.get_path() + "misc_data\\" + fname
 
             if os.path.exists(resource):
                 with open(resource, 'rb') as f:
                     data_dict = dill.load(f)
 
-                if 'MS' in self.pfxs:
-                    with open(tools.get_path() + "\\misc_data\\caribic_MS_data.pkl", 'rb') as f:
+                if 'MS' in self.pfxs and 'MS' not in data_dict:
+                    with open(tools.get_path() + "\\misc_data\\caribic_10s_data.pkl", 'rb') as f:
                         data_MS = dill.load(f)['MS']
                     data_dict['MS'] = data_MS
                 
@@ -1410,7 +1422,7 @@ class Caribic(GlobalData):
                     for special_item, generator in [('df', '.create_df()'),
                                                     ('met_data', '.get_met_data()'),
                                                     ('df_sorted', '.get_df_sorted()'),
-                                                    ('CLAMS', '.get_clams_data')]:
+                                                    ('CLAMS', '.get_clams_data(recalculate=True)')]:
                         if special_item in data_dict: 
                             self.data[special_item] = data_dict[special_item]
                             if verbose: 
@@ -1554,6 +1566,13 @@ class Caribic(GlobalData):
             return self.data['INT']
         raise Warning('No INT data available')
 
+
+    @property
+    def INTtpc(self) -> pd.DataFrame:
+        if 'INTtpc' in self.data:
+            return self.data['INTtpc']
+        raise Warning('No INTtpc data available')
+
     @property
     def INT2(self) -> pd.DataFrame:
         if 'INT2' in self.data:
@@ -1561,10 +1580,10 @@ class Caribic(GlobalData):
         raise Warning('No INT2 data available')
 
     @property
-    def INTtpc(self) -> pd.DataFrame:
-        if 'INTtpc' in self.data:
-            return self.data['INTtpc']
-        raise Warning('No INTtpc data available')
+    def MS(self) -> pd.DataFrame: 
+        if 'MS' in self.data: 
+            return self.data['MS']
+        raise Warning('No MS data available')
 
     @property
     def met_data(self) -> pd.DataFrame:

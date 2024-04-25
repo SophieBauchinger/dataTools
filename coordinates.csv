@@ -53,7 +53,6 @@ int_ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA
 int_ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,TRUE,ERA5,3.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_3_5
 int_h_rel_TP,Geopotential height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,
 int_h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_h_rel_TP
-int_O3,Pseudo coord: Ozone integrated over flask sampling time from high resolution measurements,ppb,INT,Caribic,mxr,,,chem,FALSE,MSMT,,o3,,
 int_p_dtrop_hpa,Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p,int_dp_dtrop_hpa
 int_p_strop_hpa,Pressure of thermal tropopause (ECMWF),hPa,calc,Caribic,p,,,therm,FALSE,ECMWF,,,p,int_dp_strop_hpa
 int_pt_dTP_K,Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMWF) ,K,calc,Caribic,pt,,,dyn,FALSE,ECMWF,3.5,,int_Tpot,int_pt_rel_dTP_K
