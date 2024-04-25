@@ -138,3 +138,7 @@ misc_data/emac_ds.nc
 .idea/other.xml
 misc_data/all_data_dict.pkl
 misc_data/caribic_MS_data.pkl
+misc_data/caribic_10s_data.pkl
+misc_data/caribic_clams_V03.nc
+misc_data/caribic_MS_data.nc
+misc_data/caribic_clams_V03.nc
