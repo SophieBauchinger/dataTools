@@ -28,7 +28,7 @@ from matplotlib.colors import LinearSegmentedColormap as lsc
 import cmasher as cmr
 import os
 
-from toolpac.outliers import ol_fit_functions as fct
+from toolpac.outliers import ol_fit_functions as fct # type: ignore
 
 def get_path():
     """ Get parent directory of current module, i.e. location of dataTools. """

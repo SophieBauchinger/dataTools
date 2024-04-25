@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 """ Auxiliary functions for data extraction and handling.
 
 @Author: Sophie Bauchinger, IAU
@@ -16,9 +17,9 @@ import os
 from shapely.geometry import Point
 import warnings
 
-import toolpac.calc.binprocessor as bp
-from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy
-from toolpac.conv.times import secofday_to_datetime, datetime_to_secofday
+import toolpac.calc.binprocessor as bp # type: ignore
+from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
+from toolpac.conv.times import secofday_to_datetime, datetime_to_secofday # type: ignore
 
 import dataTools.dictionaries as dcts
 
