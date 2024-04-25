@@ -338,6 +338,36 @@ def process_clams_v03(ds):
     
     return ds[[v for v in clams_variables_v03() if v in ds.variables]]
 
+def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
+    """ Interpolate met data onto given measurement timestamps. 
+    
+    Parameters: 
+        dataframe (pd.DataFrame): data to be interpolated
+        times (array, list): Timestamps to be used for interpolating onto
+    """
+    if isinstance(dataframe, geopandas.GeoDataFrame):
+        dataframe = pd.DataFrame(dataframe[[c for c in dataframe.columns if c != 'geometry']])
+
+    # add measurement timestamps to met_data
+    new_indices = [i for i in times if i not in dataframe.index]
+
+    expanded_df = pd.concat([dataframe, pd.Series(index=new_indices, dtype='object')])
+    expanded_df.drop(columns=[0], inplace=True)
+    expanded_df.sort_index(inplace=True)
+
+    try:
+        expanded_df.interpolate(method='time', inplace=True, limit=2)  # , limit=500)
+    except TypeError:
+        print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
+
+    regridded_data = expanded_df.loc[times]  # return only measurement timestamps
+    
+    # Rename columns using prefix
+    regridded_data.rename(columns = {col:prefix+col for col in regridded_data.columns}, 
+                          inplace=True)
+    
+    return regridded_data
+
 # %% Data selection
 def minimise_tps(tps, vcoord=None) -> list:
     """ Returns a reduced list of tropopause coordinates.
@@ -402,7 +432,6 @@ def minimise_tps(tps, vcoord=None) -> list:
     tps.sort(key=lambda x: x.tp_def)
     return tps
 
-
 # %% Data Handling
 def make_season(month) -> np.array:
     """ If given array of months, return integer representation of seasons
@@ -418,7 +447,6 @@ def make_season(month) -> np.array:
         elif m in [12, 1, 2]:
             season[i] = 4  # winter
     return season
-
 
 def assign_t_s(df, TS, coordinate, tp_val=0) -> pd.Series:
     """ Returns the bool series of t / s after applying appropriate comparison for a chosen vcoord.
@@ -441,7 +469,6 @@ def assign_t_s(df, TS, coordinate, tp_val=0) -> pd.Series:
     else:
         raise KeyError(f'Strat/Trop assignment undefined for {coordinate}')
 
-
 def get_lin_fit(series, degree=2) -> np.array:  # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
     the substance (col name) """
@@ -451,7 +478,6 @@ def get_lin_fit(series, degree=2) -> np.array:  # previously get_mlo_fit
     fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
     print(f'Fit parameters obtained: {fit}')
     return fit
-
 
 def pre_flag(data_arr, ref_arr, crit='n2o', limit=0.97, **kwargs) -> pd.DataFrame:
     """ Sort data into strato / tropo based on difference to ground obs.
@@ -483,7 +509,6 @@ def pre_flag(data_arr, ref_arr, crit='n2o', limit=0.97, **kwargs) -> pd.DataFram
               df_flag[f'flag_{crit}'].value_counts())
     return df_flag
 
-
 def conv_molarity_PartsPer(x, unit):
     """ Convert molarity (mol/mol) to given unit (eg. ppb). """
     factor = {'ppm': 1e6,  # per million
@@ -494,7 +519,6 @@ def conv_molarity_PartsPer(x, unit):
     # e.g. n2o: 300 ppb, 3e-7 mol/mol
     return x * factor[unit]
 
-
 def conv_PartsPer_molarity(x, unit):
     """ Convert x from [unit] to molarity (mol/mol) """
     factor = {'ppm': 1e-6,  # per million
@@ -503,7 +527,6 @@ def conv_PartsPer_molarity(x, unit):
               'ppq': 1e-15,  # per quadrillion
               }
     return x * factor[unit]
-
 
 # %% Plotting tools
 def add_zero_line(ax, axis='y'):
@@ -570,7 +593,6 @@ def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
             print(f'everything is nan for {yr}')
 
     return out_lat_list, out_lon_list
-
 
 def bin_2d(glob_obj, subs, **kwargs) -> list:
     """

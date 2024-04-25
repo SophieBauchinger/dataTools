@@ -1566,7 +1566,6 @@ class Caribic(GlobalData):
             return self.data['INT']
         raise Warning('No INT data available')
 
-
     @property
     def INTtpc(self) -> pd.DataFrame:
         if 'INTtpc' in self.data:
@@ -1612,7 +1611,7 @@ class Caribic(GlobalData):
             self.get_emac_data()
 
         # Interpolate and return EMAC data on Caribic timestamps
-        int_emac = interpolate_onto_timestamps(self.data['EMAC'], self.df.index.values)
+        int_emac = tools.interpolate_onto_timestamps(self.data['EMAC'], self.df.index.values)
         self.data['int_EMAC'] = int_emac
 
         if merge_df:
@@ -1862,7 +1861,7 @@ class CampaignData(GlobalData):
         times = self.data['time'].values
 
         try:
-            interpolated_met_data = interpolate_onto_timestamps(met_data, times, 'int_')
+            interpolated_met_data = tools.interpolate_onto_timestamps(met_data, times, 'int_')
         except:
             print('Interpolation unsuccessful. ')
             interpolated_met_data = met_data
@@ -1892,38 +1891,6 @@ class CampaignData(GlobalData):
         if 'met_data' in self.data:
             return self.data['met_data']
         return self.get_met_data()
-
-
-def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
-    """ Interpolate met data onto given measurement timestamps. 
-    
-    Parameters: 
-        dataframe (pd.DataFrame): data to be interpolated
-        times (array, list): Timestamps to be used for interpolating onto
-    """
-    if isinstance(dataframe, geopandas.GeoDataFrame):
-        dataframe = pd.DataFrame(dataframe[[c for c in dataframe.columns if c != 'geometry']])
-
-    # add measurement timestamps to met_data
-    new_indices = [i for i in times if i not in dataframe.index]
-
-    expanded_df = pd.concat([dataframe, pd.Series(index=new_indices, dtype='object')])
-    expanded_df.drop(columns=[0], inplace=True)
-    expanded_df.sort_index(inplace=True)
-
-    try:
-        expanded_df.interpolate(method='time', inplace=True, limit=2)  # , limit=500)
-    except TypeError:
-        print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
-
-    regridded_data = expanded_df.loc[times]  # return only measurement timestamps
-    
-    # Rename columns using prefix
-    regridded_data.rename(columns = {col:prefix+col for col in regridded_data.columns}, 
-                          inplace=True)
-    
-    return regridded_data
-
 
 # EMAC
 class EMAC(GlobalData):
