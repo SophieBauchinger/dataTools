@@ -23,7 +23,7 @@ import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
 
 import dataTools.dictionaries as dcts
-from dataTools.data import TropopauseData
+from dataTools.data import TropopauseData, Caribic, GlobalData
 from dataTools import tools
 
 world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
@@ -60,21 +60,10 @@ def substance_strato_tropo(DataObj, tp, subs):
     
     # ax1.legend(); ax2.legend()
     plt.show()
-    
 
 #%% Define TropopausePlotter
-class TropopausePlotter(TropopauseData):
-    """ Add plotting functionality to tropopause data objects """
-    def __init__(self, tp_data = None, years=range(2005, 2020), 
-                 interp=True, method='n', df_sorted=True):
-        if not tp_data is None: #isinstance(tp_data, TropopauseData):
-            self.__dict__ = tp_data.__dict__.copy()
-        else: 
-            super().__init__(years, interp, method, df_sorted)
-        self.detrend_all()
-
-        self.tps = self.set_tps()
-
+class TropopausePlotter(GlobalData): 
+    """ Define plotting functionality for GlobalData object. """
     def set_tps(self, **kwargs): 
         """ Set default tropopause definitions to plot. """
         coords = self.coordinates
@@ -503,7 +492,6 @@ class TropopausePlotter(TropopauseData):
                     fig.legend(lines, labels, loc='upper center', ncol=2,
                                bbox_to_anchor=[0.5, 0.94])
                     plt.show()
-        return self
 
     def show_strato_tropo_vcounts(self, tps=None, shared=True, note='', **tp_kwargs): 
         """ Bar plots of data point allocation for multiple tp definitions. """
@@ -720,13 +708,14 @@ class TropopausePlotter(TropopauseData):
  
         Parameters: 
             subs (Substance): Substance for which to calculate variability
-            tps (List[Coordinate]): Tropopause definitions to calculate hemispheric variability for
+            tps (List[Coordinate]): Tropopause definitions to calculate atmos.layer variability for
         """
         self.df['season'] = tools.make_season(self.df.index.month)
         stdv_df_dict = {}
 
         for season in set(self.df.season):
             stdv_df = self.sel_season(season).strato_tropo_stdv(subs, tps)
+            stdv_df = stdv_df[[c for c in stdv_df.columns if 'stdv' in c]]
 
             if kwargs.get('rel'): 
                 stdv_df = stdv_df[[c for c in stdv_df.columns if 'rel' in c]]
@@ -778,7 +767,6 @@ class TropopausePlotter(TropopauseData):
         fig.show()
         
         return stdv_df_dict
-        
 
 #%% N2O filter
 def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
@@ -823,24 +811,7 @@ def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
     plt.show()
 
 #%% Variability
-
-# variability_tropo = {
-#     'detr_sf6' : (0.05, 0.17),
-#     'detr_n2o' : (0.8, 1.8),
-#     'detr_co'  : (16, 30),
-#     'detr_co2' : (2.0, 3.0),
-#     'detr_ch4' : (16, 26),
-#     }
-
-# variability_strato = {
-#     'detr_sf6' : (0.05, 0.3),
-#     'detr_n2o' : (5.1, 13),
-#     'detr_co'  : (10, 26),
-#     'detr_co2' : (1.2, 1.8),
-#     'detr_ch4' : (30, 60),
-#     }
-
-def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
+def matrix_plot_stdev_subs(glob_obj, substance,  note='', tps=None,
                            atm_layer='both', savefig=False):
     """
     Create matrix plot showing variability per latitude bin per tropopause definition
@@ -853,13 +824,8 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     Returns:
         tropospheric, stratospheric standard deviations within each bin as list for each tp coordinate
     """
-    # tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
-    #        if 'tropo_'+tp.col_name in glob_obj.df_sorted.columns]
-    
-    # if minimise_tps:
-    #     tps = tools.minimise_tps(tps)
-
-    tps = glob_obj.tp_coords()
+    if not tps: 
+        tps = glob_obj.tp_coords()
 
     lat_bmin, lat_bmax = 30, 90 # np.nanmin(lat), np.nanmax(lat)
     lat_bci = bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size)
@@ -942,13 +908,7 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
     except KeyError: 
         vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
         
-    # if substance.short_name in variability_strato: 
-    #     vmin = variability_strato[substance.short_name][0]
-    #     vmax = variability_strato[substance.short_name][1]
-    # else: 
-    #     vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
-
-    norm = Normalize(vmin, vmax)  # normalise color map to set limits
+    norm = Normalize(vmin, vmax) 
     strato_cmap = plt.cm.BuPu  # create colormap
     ax_strato1.set_title(f'Stratospheric variability of {substance.label()}{note}', fontsize=14)
 
@@ -1003,11 +963,6 @@ def matrix_plot_stdev_subs(glob_obj, substance,  note='', minimise_tps=True,
         vmin, vmax = substance.vlims('vstdv', 'tropo')
     except KeyError: 
         vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
-    # if substance.short_name in variability_tropo: 
-    #     vmin = variability_tropo[substance.short_name][0]
-    #     vmax = variability_tropo[substance.short_name][1]
-    # else: 
-    #     vmin, vmax = np.nanmin(tropo_stdevs), np.nanmax(tropo_stdevs)
     norm = Normalize(vmin, vmax)  # normalise color map to set limits
     tropo_cmap = cmr.get_sub_cmap('YlOrBr', 0, 0.75) # create colormap
     ax_tropo1.set_title(f'Tropospheric variability of {substance.label()}{note}', fontsize=14)
@@ -1082,295 +1037,20 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
                                    atm_layer=atm_layer, savefig=savefig)
 
 
-# =============================================================================
-#     def tp_height_seasonal(self, rel=True, note=''): 
-#         """ Plot seasonal tropopause height for 4 tropopause definitions. 
-#         
-#         pt: average - MAM - JJA - SON - DJF
-#         z:  average - MAM - JJA - SON - DJF
-#         
-#         """
-#         tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel))
-#         vcoords = set(tp.vcoord for tp in tps)
-# 
-#         nrows = 4 # len(vcoords)
-#         ncols = 5 # 4 seasons & average --- # max([len([tp for tp in tps if tp.vcoord==vc]) for vc in vcoords]) + 1
-# 
-#         # tp_array = np.zeros((nrows, ncols), dtype=object)
-#         # for i, vc in enumerate(vcoords): 
-#         #     vc_tps = [tp for tp in tps if tp.vcoord==vc]
-#         #     for j, tp in enumerate(vc_tps): 
-#         #         tp_array[i,j] = tp
-# 
-#         data_array = np.empty((nrows,ncols), dtype=object)
-#         
-#         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
-# 
-#         fig, ax = plt.subplots(figsize=(10, 5), dpi=250, sharex='row')
-#         grid = gridspec.GridSpec(nrows, ncols, figure=fig)
-#         axs = grid.subplots()
-# 
-#         for i in range(nrows): 
-#             for j in range(ncols): 
-#                 data = self.df if j==0 else self.sel_season(j).df
-# 
-#                 tp = tps[i]
-#                 bin1d = bp.Simple_bin_1d(data[tp.col_name],
-#                                       np.array(data.geometry.y), bci,
-#                                       count_limit = self.count_limit)
-#                 data_array[i,j] = bin1d
-#                 ax = axs[i,j]
-#                 color = 'k' if j==0 else dcts.dict_season()[f'color_{j}']
-#                 ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, 
-#                             lw=4, elinewidth=2, color=color, capsize=1,
-#                             label='Average' if j==0 else dcts.dict_season()[f'name_{j}'])
-# 
-#                 ax.text(0.05, 0.05,
-#                         tp.label(True),
-#                         # '{}_{}{}'.format(tp.model, tp.tp_def,
-#                         #                  '_'+str(tp.pvu) if tp.tp_def=='dyn' else ''),
-#                         transform=ax.transAxes, verticalalignment='bottom',
-#                         bbox = dict(boxstyle='round', facecolor='white',
-#                                     edgecolor='grey', alpha=0.5, pad=0.25))
-#         # for row in axs: 
-#         #     row[1].set_ylabel()
-# 
-# 
-#     def tp_height_seasonal_trace(self, ax, tp, season=None): 
-#         """ Plot seasonal tropopause height trace onto given axis. """
-#         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
-#         for s in [season] if season else [1,2,3,4]: 
-#             data = self.sel_season(s).df
-#         
-#         return ax
-# 
-#     def tp_height_trace(self, ax, tp, stdv=True): 
-#         """ Plot tropopause height trace with standard deviation (optional) onto given axis. """
-#         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
-#         data = self.df.copy()
-#         
-#         return ax
-# 
-#     def plot_tp_heights(self, tps=None, seasonal=False, rel=True, note=''): 
-#         """ Plot tropopause height over latitude for different definitions. """
-#         if not tps: 
-#             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-#         
-#         vcoords = set(tp.vcoord for tp in tps)
-#         nrows = len(vcoords)
-#         ncols = max([len([tp for tp in tps if tp.vcoord==vc]) for vc in vcoords]) + 1
-# 
-#         fig, axs = plt.subplots(nrows, ncols, dpi=250,
-#                                 figsize=(ncols*4,nrows*4), 
-#                                 sharey='row', sharex=True, squeeze=False)
-# 
-# 
-#     
-#         # bin using same binclassinstance as all other tropopauses
-#         bin1d = bp.Simple_bin_1d(data[tp.col_name],
-#                               np.array(data.geometry.y), bci,
-#                               count_limit = self.count_limit)
-#         
-# 
-#         for vc, row in zip(vcoords, axs): 
-#             vc_tps = [tp for tp in tps if tp.vcoord==vc]
-#             
-#             for tp, ax in zip(vc_tps, row):
-#                 if seasonal: 
-#                     self.tp_height_seaonal_trace(ax, tp)
-#                 else: 
-#                     self.tp_height_trace(ax, tp)
-#                 ax.set_xticks(np.arange(-90, 100, 10))
-# 
-#     def tp_height_1d(self, tps=None, seasonal=False, rel=True,  note=''): 
-#         """ Plots tropopause height over latitude. 
-# 
-#         Parameters:
-#             vcoord (str): vertical coordinate indicating tropopause extent
-#             rel (bool): vertical coordinate relative to CARIBIC flight track
-#             seasonal (bool): separate data into seasons
-#         """
-#         if not tps: 
-#             tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=True))
-#         vcoords = set(tp.vcoord for tp in tps)
-#         
-#         nrows = len(vcoords)
-#         ncols = max([len([tp for tp in tps if tp.vcoord==vc]) for vc in vcoords]) + 1
-# 
-#         fig, axs = plt.subplots(nrows, ncols, dpi=250,
-#                                 figsize=(ncols*4,nrows*4), 
-#                                 sharey='row', sharex=True, squeeze=False)
-# 
-#         tp_array = np.zeros((nrows, ncols), dtype=object)
-#         for i, vc in enumerate(vcoords): 
-#             vc_tps = [tp for tp in tps if tp.vcoord==vc]
-#             for j, tp in enumerate(vc_tps): 
-#                 tp_array[i,j] = tp
-# 
-#         fig.suptitle('{}'.format(
-#             'Vertical extent of troposphere' if not rel
-#             else 'Distance between flight track and troposphere'))
-#         
-#         if note: 
-#             fig.subplots_adjust(top=0.85)
-#             fig.text(s=note, **dcts.note_dict(fig, x=0.98, y=0.94))
-# 
-#         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
-#         vmeans = pd.DataFrame(index = bci.xintm) # overall average
-#         vmeans_std = pd.DataFrame(index = bci.xintm) # overall average
-# 
-#         for ax, tp in zip(axs.flatten(), tp_array.flatten()):
-#             if tp==0: 
-#                 ax.axis('off')
-#             else: 
-#                 for s in ([None] if not seasonal else [1,2,3,4]):
-#                     # get data
-#                     data = self.df.copy()
-#                     if seasonal:
-#                         data = self.sel_season(s).df
-#                     # prep data: only take tps in ranges they make sense in
-#                     if not tp.col_name in data.columns: pass
-#                     if tp.tp_def == 'dyn': # dynamic TP only outside the tropics
-#                         data = data[np.array([(i>30 or i<-30) for i in np.array(data.geometry.y) ])]
-#                     if tp.tp_def == 'cpt': # cold point TP only in the tropics
-#                         data = data[np.array([(i<30 and i>-30) for i in np.array(data.geometry.y) ])]
-# 
-#                     ax.set_xticks(np.arange(30, 100, 10))
-# 
-#                     # bin using same binclassinstance as all other tropopauses
-#                     bin1d = bp.Simple_bin_1d(data[tp.col_name],
-#                                           np.array(data.geometry.y), bci,
-#                                           count_limit = self.count_limit)
-#                     if not seasonal:
-#                         vmeans[tp.col_name] = bin1d.vmean
-#                         vmeans_std[tp.col_name+'_std'] = bin1d.vstdv
-#                         label = tp.label(True) # '{}_{}{}'.format(tp.model, tp.tp_def, '_'+str(tp.pvu) if tp.tp_def=='dyn' else '')
-#                         ax.plot(bin1d.xmean, bin1d.vmean, color='#1f77b4', label=label)
-#                         ax.fill_between(bin1d.xmean, bin1d.vmean-bin1d.vstdv, bin1d.vmean+bin1d.vstdv,
-#                                         alpha=0.3, color='#1f77b4')
-#                         # ax.legend(loc='lower left')
-#                         ax.set_title(label)
-# 
-#                     else: # seasonal. separate vmeans by season to calc av later
-#                         vmeans[tp.col_name+f'_{s}'] = bin1d.vmean
-#                         color = dcts.dict_season()[f'color_{s}']
-#                         # ax.plot(bin1d.xmean, bin1d.vmean, color=color, label=dcts.dict_season()[f'name_{s}'])
-#                         
-#                         ax.errorbar(bin1d.xmean, bin1d.vmean, bin1d.vstdv, 
-#                                     lw=4, elinewidth=2, 
-#                                     color=color, label=dcts.dict_season()[f'name_{s}'])
-#                         
-#                         ax.text(0.05, 0.05,
-#                                 tp.label(True),
-#                                 # '{}_{}{}'.format(tp.model, tp.tp_def,
-#                                 #                  '_'+str(tp.pvu) if tp.tp_def=='dyn' else ''),
-#                                 transform=ax.transAxes, verticalalignment='bottom',
-#                                 bbox = dict(boxstyle='round', facecolor='white',
-#                                             edgecolor='grey', alpha=0.5, pad=0.25))
-#         
-# 
-#         # for i, ax in enumerate(axs.flatten()): # hide extra plots
-#         #     if i > len(tps): ax.axis('off')
-# 
-# 
-#         for vc, row in zip(vcoords, axs): 
-#             if vc == 'p': 
-#                 row[0].invert_yaxis()
-#                 row[0].set_yscale('{}'.format('symlog' if rel else 'log'))
-#             row[0].set_ylabel(vc)
-# 
-#         if not seasonal:
-#             # indicate average tropopause height on all plots & add xaxis label to extra plot
-#             average = vmeans.mean(axis=1).values
-#             vmeans['av_std'] = np.nan
-#             for i in range(len(vmeans.index)):
-#                 sqrt_of_sum_of_squares = np.sqrt(np.nansum([unc**2 for unc in vmeans_std.iloc[i]])) / 2
-#                 vmeans['av_std'].iloc[i] = sqrt_of_sum_of_squares
-# 
-#             axAv = axs.flatten()[len(tps)]
-#             axAv.plot(bci.xintm, average, ls='dashed', c='k', alpha=0.5,
-#                     zorder=1, label='Average')
-#             axAv.fill_between(bci.xintm,
-#                               average-vmeans['av_std'], average+vmeans['av_std'],
-#                               alpha=0.3, color='k')
-#             axAv.legend(loc='lower left')
-# 
-#         else:
-#             for s in [1,2,3,4]:
-#                 vmeans_s = vmeans[[c for c in vmeans.columns if c.endswith(f'_{s}')]]
-#                 average = vmeans_s.mean(axis=1).values
-#                 axAv = axs.flatten()[len(tps)]
-#                 axAv.plot(bci.xintm, average, ls='dashed',
-#                           c = dcts.dict_season()[f'color_{s}'], # alpha=0.5,
-#                           zorder=1, label=dcts.dict_season()[f'name_{s}'])
-# 
-#         # go through axes, (add average), set label
-#         for ax in axs.flatten()[:len(tps)+1]:
-#             if not seasonal:
-#                 ax.plot(bci.xintm, average, ls='dashed', c='k', alpha=0.3, zorder=1)
-#             if rel: ax.hlines(0, min(bci.xintm), max(bci.xintm),
-#                               color='grey', zorder=2, lw=0.5, ls='dotted')
-#             ax.set_xlabel('Latitude [°N]')
-#             ax.set_xlim(30, 90) #!!!
-# 
-#         # if vcoord == 'p': # because sharey=True, applied for all axes
-#         #     axAv.invert_yaxis()
-#         #     axAv.set_yscale('{}'.format('symlog' if rel else 'log'))
-# 
-#         
-#         # if nrows>1: 
-#         #     for ax in [axs[0,0], axs[0,1]]: # left most
-#         #         ax.set_ylabel(tp.label())
-#         # else: 
-#         #     axs.flatten()[0].set_ylabel(tp.label())
-# 
-#         fig.tight_layout()
-#         if seasonal: # add horizontal figure legend for seasons at the top
-#             fig.subplots_adjust(top=0.85) # add space for fig legend
-#             lines, labels = axs.flatten()[0].get_legend_handles_labels()
-#             fig.legend(lines, labels, loc='upper center', ncol=4,
-#                 bbox_to_anchor=[0.5, 0.94])
-#         plt.show()
-#         return
-#     
-# =============================================================================
+#%% Combine functionality of TropopausePlotter with specific GlobalData sub-classes 
+class CaribicTropopause(Caribic, TropopausePlotter): 
+    """ Add functionality of TropopausePlotter to Caribic objects. """
+    def __init__(self, **kwargs): 
+        super().__init__(**kwargs) # Caribic
 
-#%% Plotting function calls
-# if __name__=='__main__':
-#     tpause = TropopauseData()
-#     tpp_extratropics = TropopausePlotter(tp_inst=tpause).sel_latitude(30, 90)
-#     tpp_extratropics.show_ratios()
-
-    # # Global 2D scatter of tropopause heights for all definitions
-    # for year in tp.years:
-    #     tp.scatter_2d(save=False, year=year)
-
-    # #  Binned versus latitude
-    # for vc in ['p', 'pt', 'z']:
-    #     tp.tropopause_vs_latitude(vc, rel=False)
-    #     # tropopause_vs_latitude(vc, rel=True)
-    #     tp.tropopause_vs_latitude(vc, rel=False, seasonal=True)
-
-    # # Substances in tropopsphere / stratosphere
-    # substances = get_substances(source='EMAC') + get_substances(source='Caribic')
-    # substances = [s for s in substances if not s.col_name.startswith('d_')]
-    # df_sorted = tp.sort_tropo_strato(substances)
-    # tp.trop_strat_ratios()
-
-#%% Animate changes over years
-def make_gif():
-    pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
-    for vc in ['p', 'pt', 'z']:
-        tps = dcts.get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)
-        for tp in tps:
-            # fn = pdir+.format(, '_'+str(year) if year else ''))
-            frames = [Image.open(image) for image in glob.glob(f'{pdir}/{tp.col_name}*_*.png')]
-            if len(frames)==0: frames = [Image.open(image) for image in glob.glob(f'{pdir}/{tp.col_name[:-1]}*_*.png')]
-
-            # frames = [Image.open(image) for image in glob.glob(f"{pdir}/*.JPG")]
-            frame_one = frames[0]
-            frame_one.save(f'C:/Users/sophie_bauchinger/sophie_bauchinger/Figures/tp_scatter_2d_GIFs/{tp.col_name}.gif',
-                           format="GIF", append_images=frames,
-                           save_all=True, duration=200, loop=0)
-# if __name__ == "__main__":
-#     make_gif()
+#%% Deprecated
+# class TropopausePlotter(TropopauseData):
+#     """ Add plotting functionality to tropopause data objects """
+#     def __init__(self, tp_data = None, years=range(2005, 2020), 
+#                  interp=True, method='n', df_sorted=True):
+#         if not tp_data is None: #isinstance(tp_data, TropopauseData):
+#             self.__dict__ = tp_data.__dict__.copy()
+#         else: 
+#             super().__init__(years, interp, method, df_sorted)
+#         self.detrend_all()
+#         self.tps = self.set_tps()
