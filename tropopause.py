@@ -23,7 +23,7 @@ import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
 
 import dataTools.dictionaries as dcts
-from dataTools.data import TropopauseData, Caribic, GlobalData
+from dataTools.data import Caribic, GlobalData
 from dataTools import tools
 
 world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
