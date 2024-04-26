@@ -877,7 +877,7 @@ class GlobalData:
         o3_substs = self.get_substs(short_name = 'o3') 
         
         if len(o3_substs) == 1: 
-            [o3_subs] = [o3_substs]
+            [o3_subs] = o3_substs
 
         elif self.source == 'Caribic':
             if any(s.ID == 'INT' for s in o3_substs): 
@@ -885,7 +885,7 @@ class GlobalData:
             elif any(s.ID == 'MS' for s in o3_substs): 
                 [o3_subs] = [s for s in o3_substs if s.ID=='MS']
             else: 
-                [o3_subs] = o3_substs
+                [o3_subs] = o3_substs[0]
                 print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
         else:
             raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
@@ -1519,7 +1519,7 @@ class Caribic(GlobalData):
 
         for pfx in self.pfxs:
             # df = df.sjoin(self.data[pfx])
-            df = pd.merge(self.data[pfx], df, 
+            df = pd.merge(df, self.data[pfx],
                           suffixes = [None, f'_{pfx}'],
                           **merge_kwargs)
             
@@ -1529,6 +1529,7 @@ class Caribic(GlobalData):
                     df = df.drop(columns=f'{c}_{pfx}')
         if 'geometry' in df.columns: 
             df = df[df.index.isin(df.geometry.dropna().index)]
+            
         self.data['df'] = df
         return df
 
@@ -1619,6 +1620,29 @@ class Caribic(GlobalData):
                           left_index=True, right_index=True)
             self.data['df'] = df
         return int_emac
+    
+        # data = self.df.copy()
+        # tps_emac = [i.col_name for i in dcts.get_coordinates(source='EMAC') if i.col_name in self.df.columns] + [
+        #     i for i in ['ECHAM5_tm1_at_fl', 'ECHAM5_tpoteq_at_fl', 'ECHAM5_press_at_fl'] if i in self.df.columns]
+        # subs_emac = [i.col_name for i in dcts.get_substances(source='EMAC') if i.col_name in self.df.columns]
+
+        # nan_count_i = data[tps_emac[0]].isna().value_counts().loc[True]
+        # for c in tps_emac + subs_emac:
+        #     if method == 'b':
+        #         data[c].interpolate(method='linear', inplace=True, limit=2)
+        #     elif method == 'n':
+        #         data[c].interpolate(method='nearest', inplace=True, limit=2)
+        #     else:
+        #         raise KeyError('Please choose either b-linear or n-nearest neighbour interpolation.')
+        #     data[c] = data[c].astype(float)
+        # nan_count_f = data[tps_emac[0]].isna().value_counts().loc[True]
+
+        # if verbose: print('{} NaNs in EMAC data filled using {} interpolation'.format(
+        #     nan_count_i - nan_count_f, 'nearest neighbour' if method == 'n' else 'linear'))
+
+        # self.data['df'] = data
+        # self.status['interp_emac'] = True
+        # return data
 
 # HALO and ATOM campaigns from SQL Database
 class CampaignData(GlobalData):
