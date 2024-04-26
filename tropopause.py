@@ -1042,15 +1042,3 @@ class CaribicTropopause(Caribic, TropopausePlotter):
     """ Add functionality of TropopausePlotter to Caribic objects. """
     def __init__(self, **kwargs): 
         super().__init__(**kwargs) # Caribic
-
-#%% Deprecated
-# class TropopausePlotter(TropopauseData):
-#     """ Add plotting functionality to tropopause data objects """
-#     def __init__(self, tp_data = None, years=range(2005, 2020), 
-#                  interp=True, method='n', df_sorted=True):
-#         if not tp_data is None: #isinstance(tp_data, TropopauseData):
-#             self.__dict__ = tp_data.__dict__.copy()
-#         else: 
-#             super().__init__(years, interp, method, df_sorted)
-#         self.detrend_all()
-#         self.tps = self.set_tps()
