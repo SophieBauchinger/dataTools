@@ -634,3 +634,22 @@ def bin_2d(glob_obj, subs, **kwargs) -> list:
 
         out_list.append(out)
     return out_list
+
+#%% Animate changes over years
+def make_gif(pdir=None, fnames=None):
+    if not pdir: 
+        pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
+    for vc in ['p', 'pt', 'z']:
+        tps = dcts.get_coordinates(vcoord=vc, tp_def='not_nan', rel_to_tp=False)
+        for tp in tps:
+            # fn = pdir+.format(, '_'+str(year) if year else ''))
+            frames = [Image.open(image) for image in glob.glob(f'{pdir}/{tp.col_name}*_*.png')]
+            if len(frames)==0: frames = [Image.open(image) for image in glob.glob(f'{pdir}/{tp.col_name[:-1]}*_*.png')]
+
+            # frames = [Image.open(image) for image in glob.glob(f"{pdir}/*.JPG")]
+            frame_one = frames[0]
+            frame_one.save(f'C:/Users/sophie_bauchinger/sophie_bauchinger/Figures/tp_scatter_2d_GIFs/{tp.col_name}.gif',
+                           format="GIF", append_images=frames,
+                           save_all=True, duration=200, loop=0)
+# if __name__ == "__main__":
+#     make_gif()
