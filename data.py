@@ -97,7 +97,7 @@ class GlobalData:
             Filter for tropospheric data, then remove extreme events
     """
 
-    def __init__(self, years, grid_size=5, count_limit=5):
+    def __init__(self, years, grid_size=5, count_limit=5, **kwargs):
         """
         years: array or list of integers
         grid_size: int
@@ -172,24 +172,27 @@ class GlobalData:
             warnings.warn('Warning. No substances found in data using the given specifications.')
         return substs
 
-    def tp_coords(self, **tp_kwargs) -> list: 
-        """ Returns a list of vertical dynamic coordinates. """
+    def get_tps(self, **tp_kwargs) -> list: 
+        """ Returns a list of vertical dynamic coordinates that fulfill conditions in tp_kwargs. """
         # 1. filter coordinates for tropopause-relative coordinates only
-        tp_coords = [c for c in self.coordinates if (
+        tps = [c for c in self.coordinates if (
             str(c.tp_def) != 'nan' and 
             c.var != 'geopot' and 
             (c.vcoord =='mxr' or c.rel_to_tp) ) ]
 
         # 2. reduce list further using given keyword arguments
         try: 
-            tp_coords = [tp for tp in tp_coords 
-                            if tp.col_name in [c.col_name for c in 
-                                               dcts.get_coordinates(**tp_kwargs)]]
+            filtered_coord_columns = [c.col_name for c in dcts.get_coordinates(**tp_kwargs)]
+            tps = [tp for tp in tps if tp.col_name in filtered_coord_columns]
 
         except KeyError: 
-            tp_coords = []
+            tps = []
             warnings.warn('Warning. No TP coordinates found in data using the given specifications.')
-        return tp_coords
+        return tps
+    
+    def set_tps(self, **tp_kwargs): 
+        """ Set .tps (shorthand for tropopause coordinates) in accordance with tp_kwargs. """
+        self.tps = self.get_tps(**tp_kwargs)
 
     @property
     def flights(self):
@@ -394,7 +397,7 @@ class GlobalData:
         prefix = 'tropo_' if not df else ''
         
         if not tps:
-            tps = self.tp_coords() #tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
+            tps = self.tps #tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
         
         if self.source != 'MULTI': 
             tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
@@ -915,7 +918,7 @@ class GlobalData:
                                  index=data.index)
 
         # Get tropopause coordinates
-        tps = self.tp_coords()
+        tps = self.get_tps()
         
         # N2O filter
         for tp in [tp for tp in tps if tp.crit == 'n2o']:
@@ -976,6 +979,13 @@ class GlobalData:
             self.data['df_sorted'] = df_sorted
         return df_sorted
 
+    @property
+    def df_sorted(self) -> pd.DataFrame:
+        """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
+        if 'df_sorted' not in self.data:
+            self.create_df_sorted(save=True)
+        return self.data['df_sorted']
+
     def calc_tropo_strato_ratios(self, tps = None, ratios = True, shared = True) -> pd.DataFrame:
         """ Calculate ratio of tropospheric / stratospheric datapoints for given tropopause definitions.
         
@@ -988,7 +998,7 @@ class GlobalData:
         """
         
         if not tps: 
-            tps = self.tp_coords()
+            tps = self.tps
         
         tr_cols = [c for c in self.df_sorted.columns if c.startswith('tropo_')]
         # df = self.df_sorted[tr_cols]
@@ -1103,13 +1113,6 @@ class GlobalData:
                     stdv_df['rel_strato_stdv'][tp.col_name + f'_{s}'] = s_stdv / s_mean * 100
 
         return stdv_df
-
-    @property
-    def df_sorted(self) -> pd.DataFrame:
-        """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
-        if 'df_sorted' not in self.data:
-            self.create_df_sorted(save=True)
-        return self.data['df_sorted']
 
     def sel_atm_layer(self, atm_layer: str, tp=None, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
@@ -1247,8 +1250,7 @@ class GlobalData:
         out.status.update({'EE_filter': True})
         return out
 
-
-## # Caribic
+# Caribic
 class Caribic(GlobalData):
     """ Stores all available information from Caribic datafiles and allows further analsis. 
     
@@ -1265,7 +1267,7 @@ class Caribic(GlobalData):
     """
 
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INTtpc'),
-                 grid_size=5, verbose=False, recalculate=False, detrend_all=True, fname=None):
+                 grid_size=5, verbose=False, recalculate=False, fname=None, tps_dict = {}, **kwargs):
         """ Constructs attributes for Caribic object and creates data dictionary.
         
         Parameters:
@@ -1283,6 +1285,7 @@ class Caribic(GlobalData):
         self.pfxs = pfxs
         # self.flights = ()
         self.get_data(verbose=verbose, recalculate=recalculate, fname=fname)  # creates self.data dictionary
+        self.set_tps(**tps_dict)
 
         if 'met_data' not in self.data:
             try:
@@ -1290,12 +1293,6 @@ class Caribic(GlobalData):
                 self.create_tp_coords()
             except Exception:
                 traceback.print_exc()
-
-        # if detrend_all:
-        #     try:
-        #         self.detrend_all()
-        #     except Exception:
-        #         traceback.print_exc()
 
     def __repr__(self):
         return f"""{self.__class__}
@@ -1656,7 +1653,7 @@ class CampaignData(GlobalData):
         df: Pandas GeoDataFrame
     """
 
-    def __init__(self, campaign, grid_size=5, v_limits=None, **kwargs):
+    def __init__(self, campaign, grid_size=5, v_limits=None, tps_dict={}, **kwargs):
         """ Initialise HALO_campaign object. """
         years = dcts.years_per_campaign(campaign)
         super().__init__(years, grid_size)
@@ -1686,6 +1683,7 @@ class CampaignData(GlobalData):
         #     self.flights = set(self.data['df']['Flight number'].values)
 
         self.years = list(set(self.data['df'].index.year))
+        self.set_tps(**tps_dict)
 
     def __repr__(self):
         """ Show instance details representing dataset. """
@@ -1927,13 +1925,14 @@ class EMAC(GlobalData):
             Create pandas dataframe from time-dependent data
     """
 
-    def __init__(self, years=range(2005, 2020), s4d=True, s4d_s=True, tp=True, df=True, pdir=None):
+    def __init__(self, years=range(2005, 2020), s4d=True, s4d_s=True, tp=True, df=True, pdir=None, tps_dict={}):
         if isinstance(years, int): years = [years]
         super().__init__([yr for yr in years if 2000 <= yr <= 2019])
         self.source = 'EMAC'
         self.ID = 'EMAC'
         self.pdir = '{}'.format(r'E:/MODELL/EMAC/TPChange/' if pdir is None else pdir)
         self.get_data(years, s4d, s4d_s, tp, df)
+        self.set_tps(**tps_dict)
 
     def __repr__(self):
         self.years.sort()
@@ -2255,7 +2254,6 @@ class LocalData():
             return self.data['df']  #
         return self.create_df()
 
-
 class MaunaLoa(LocalData):
     """ Stores data for all substances measured at Mauna Loa. """
 
@@ -2378,7 +2376,6 @@ class MaunaLoa(LocalData):
         self.data['dict'].update({k: dcts.get_subs(col_name=k) for k in df.columns
                                   if k in [s.col_name for s in dcts.get_substances()]})
         return df
-
 
 class MaceHead(LocalData):
     """ Stores data for SF6 measurements at Mace Head. """

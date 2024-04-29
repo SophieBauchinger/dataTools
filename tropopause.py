@@ -34,51 +34,15 @@ count_limit = 5
 
 #TODO Add disclaimer to dyn and cpt to show reduced latitude ranges 
 
-def substance_strato_tropo(DataObj, tp, subs):
-    fig, (ax1, ax2) = plt.subplots(2, dpi=250, figsize=(15, 9), sharex=True)
-    # tp = dcts.get_coord(col_name='int_ERA5_D_TROP1_PRESS')
-    fig.suptitle(tp.label(filter_label=True) + ' tropopause', fontsize=15, y=0.95)
-    
-    subs_data = DataObj.df[subs.col_name]
-    df_sorted = DataObj.df_sorted
-    
-    if 'tropo_'+tp.col_name not in df_sorted.columns: 
-        raise KeyError(f'{tp} not found in df_sorted')
-    
-    t_subs = subs_data[df_sorted['tropo_' + tp.col_name]].dropna()
-    s_subs = subs_data[df_sorted['strato_' + tp.col_name]].dropna()
-    
-    ax1.set_title('Stratospheric')
-    ax1.scatter(subs_data.index, subs_data, color='grey', label='background')
-    ax1.scatter(s_subs.index, s_subs, color='blue', label='strato')
-    ax1.set_ylabel(subs.label())
-    
-    ax2.set_title('Tropospheric')
-    ax2.scatter(subs_data.index, subs_data, color='grey', label='background')
-    ax2.scatter(t_subs.index, t_subs, color='orange', label='tropo')
-    ax2.set_ylabel(subs.label())
-    
-    # ax1.legend(); ax2.legend()
-    plt.show()
-
 #%% Define TropopausePlotter
 class TropopausePlotter(GlobalData): 
     """ Define plotting functionality for GlobalData object. """
-    def set_tps(self, **kwargs): 
-        """ Set default tropopause definitions to plot. """
-        coords = self.coordinates
-        self.tps = [tp for tp in coords if (
-            str(tp.tp_def)!='nan' and 
-            tp.col_name in [c.col_name for c in dcts.get_coordinates(**kwargs)])]
-        self.tps.sort(key=lambda x: x.tp_def)
-        return self.tps
-
-    def tp_height_global_scatter(self, rel=False):
-        """ """
+    # def __init__(self, **kwargs): 
+    #     raise tools.InitialisationError('Inheritance error, this class is not meant to be initialised.')
         
-        tps = tools.minimise_tps(self.coordinates)
-
-        for tp in tps: 
+    def tp_height_global_2D_overview(self, rel=False, tps=None):
+        """ Show 2D-binned latitude-longitude maps of tropopause height for various definitions. """
+        for tp in (self.tps if not tps else tps): 
             fig, ax = plt.subplots(dpi=150, figsize=(10,5))
             ax.set_title(tp.label(True))
 
@@ -111,22 +75,17 @@ class TropopausePlotter(GlobalData):
             ax.set_xlabel('Latitude [°N]')
             plt.show()
 
-    def tp_height_seasonal_global_scatter(self, savefig=False, year=None, rel = False, 
-                   minimise_tps = True):
-        """ 2D global scatter of tropopause height.
+    def tp_height_seasonal__2D_overview(self, savefig=False, year=None, tps=None):
+        """ Plot 2D-binned latitude-longitude map of tropopause heights for all seasons.
+
         Parameters:
-            save (bool): save plot to pdir instead of plotting
+            savefig (bool): save plot to pdir instead of plotting
             year (float): select single specific year to plot / save
+            tps (list): tropopause definitions, use if specified 
         """
         pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
-
-        tps = dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel)
-        if minimise_tps: 
-            tps = tools.minimise_tps(tps)
         
-        for tp in tps:
-            if tp.tp_def=='cpt' or tp.vcoord not in ['pt', 'p', 'z']: 
-                continue
+        for tp in (self.tps if not tps else tps): 
             fig, axs = plt.subplots(2,2,dpi=150, figsize=(10,5))
             # fig.suptitle(f'{tp.col_name} - {tp.long_name}')
             fig.suptitle(tp.label(True))
@@ -166,20 +125,17 @@ class TropopausePlotter(GlobalData):
             plt.show()
             plt.close()
 
-    def tp_height_latitude_multiple_definitions(self, tps=None, rel=False): 
-        """ """
+    def tp_height_latitude_multiple_definitions(self, tps=None): 
+        """ Plot 1D binned TP height over latitude comparison for multiple TP definitions. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
-        
-        if tps is None: 
-            tps = tools.minimise_tps(self.coordinates, rel=rel) # CANNOT ask for this 
 
         fig, ax = plt.subplots(dpi=250, figsize=(7,4))
 
         data = self.df
         data = data[data.index.isin(self.get_shared_indices(tps, df=True))]
 
-        for tp in tps:
+        for tp in (self.tps if not tps else tps): 
             label = tp.label(True)
 
             bin1d = bp.Simple_bin_1d(data[tp.col_name],
@@ -200,7 +156,6 @@ class TropopausePlotter(GlobalData):
                 ax.invert_yaxis()
                 if tp.vcoord=='p': 
                     ax.set_yscale('log' if not tp.rel_to_tp else 'symlog')
-
 
             # ax.set_ylabel(tp.label())# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
             ax.set_ylabel(tp.label(coord_only=True))
@@ -223,12 +178,12 @@ class TropopausePlotter(GlobalData):
                     l.set_color('xkcd:dark grey')
                     l.set_linestyle('-.')
 
-    def tp_height_latitude_binned_hlines(self, rel=False, note=''): 
-        """ Plot latitude-binned tropoause heights with horizontal lines over bin. """
+    def tp_height_latitude_binned_hlines(self, tps=None): 
+        """ Plot 1D-binned TP height over latitude with horizontal lines across bin. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
 
-        for tp in tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel)):
+        for tp in (self.tps if not tps else tps): 
             fig, ax = plt.subplots(dpi=250)
             # ax.set_title('Vertical extent of'+tp.label(True)+' Tropopause')
             ax.set_xlim(30, 90)
@@ -267,12 +222,6 @@ class TropopausePlotter(GlobalData):
                     if tp.vcoord=='p': 
                         ax.set_yscale('log' if not tp.rel_to_tp else 'symlog')
 
-                # ax.text(0.05, 0.05,
-                #         tp.label(True),
-                #         transform=ax.transAxes, verticalalignment='bottom',
-                #         bbox = dict(boxstyle='round', facecolor='white',
-                #                     edgecolor='grey', alpha=0.5, pad=0.25))
-            
                 # get last hline and set label for the legend
                 trace.set_label(dcts.dict_season()[f'name_{s}'] if not s=='av' else 'Average')
 
@@ -283,7 +232,7 @@ class TropopausePlotter(GlobalData):
 
             plt.show()
 
-    def tp_height_latitude_binned_yearly(self, rel=False, note=''): 
+    def tp_height_latitude_binned_yearly(self, tps = None): 
         """ Plot average tropopause height over available years. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=2, foreground='white')
@@ -294,7 +243,7 @@ class TropopausePlotter(GlobalData):
         cmap = plt.cm.cool
         norm = Normalize(min(self.years), max(self.years))
         
-        for tp in tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel)):
+        for tp in (self.tps if not tps else tps): 
             fig, ax = plt.subplots(dpi=250)#nrows, ncols)
 
             ax.set_xlim(30, 90)
@@ -325,15 +274,13 @@ class TropopausePlotter(GlobalData):
             ax.legend()
             plt.show()
             
-    def tp_height_seasonal_latitude_binned(self, rel=False, note='', 
+    def tp_height_seasonal_latitude_binned(self, rel=False, note='', tps = None,
                                           seasonal_stdvs=False): 
         """ Plot average and seasonal tropopause heights, optionally with standard deviation. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
         
-        tps = self.tps # tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', rel_to_tp=rel, source='Caribic'))
-
-        for tp in tps:
+        for tp in (self.tps if not tps else tps): 
             fig, ax = plt.subplots(dpi=250, figsize=(7*0.8,4*0.8))
             ax.set_title(tp.label(True))
             # ax.set_title('Vertical extent of'+tp.label(True)+' Tropopause')
@@ -410,88 +357,90 @@ class TropopausePlotter(GlobalData):
                     l.set_color('xkcd:dark grey')
                     l.set_linestyle('-.')
 
-    def plot_subs_sorted(self, substances, vcoords=['p', 'pt', 'z', 'mxr'],
-                         detr = False, minimise_tps = True):
-        """ Plot timeseries of subs mixing ratios with strato / tropo colours. """
-        if not substances:
-            substances = dcts.get_substances(source='EMAC') + dcts.get_substances(source='Caribic')
-            substances = [s for s in substances if not s.col_name.startswith('d_')]
-        elif isinstance(substances, dcts.Substance): substances = [substances]
-        if not isinstance(substances, list): 
-            raise Warning('Cannot work like this. Pls supply substances as list.')
+    def make_figures_per_vcoord(self, plotting_function, **kwargs): 
+        """ Create suitable canvas to plot various plots per tp def and vcoord onto. 
+        Parameters: 
+            plotting function (): Function to pass ax and kwargs to
+                must be given in the form of {ClassInstance.method} if class method, else as {method}
+            key subs (dcts.Substance): substance to sort and plot
+        """
+        tps = (self.tps if not kwargs.get('tps') else kwargs.get('tps'))
+        vcoords = set(tp.vcoord for tp in tps) if not kwargs.get('vcoords') else kwargs.get('vcoords') # ['p', 'pt', 'z', 'mxr']
 
-        if not 'df_sorted' in self.data: self.create_df_sorted(save=True)
-        df_sorted = self.df_sorted.copy()
+        for vcoord in vcoords: 
+            tps_vc = [tp for tp in tps if tp.vcoord == vcoord]
 
-        cols = [c[6:] for c in df_sorted.columns if c.startswith('tropo_')]
-        tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan') if tp.col_name in cols]
-        if minimise_tps: tps = tools.minimise_tps(tps)
+            fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200,
+                                    figsize=(7, math.ceil(len(tps)/2)*2),
+                                    sharey=True, sharex=True)
+            if len(tps_vc)==0: continue
 
-        if detr: 
-            for subs_short in set([s.short_name for s in substances if not s.startswith(('d', 'detr'))]):
-                self.detrend_substance(subs_short)
-        else: 
-            substances = [s for s in substances if not s.short_name.startswith('detr_')]
+            if len(tps_vc)%2: axs.flatten()[-1].axis('off')
+            fig.suptitle(f'{kwargs.get("subs").col_name}')
 
-        for subs in substances: # new plot for each substance 
-            if not subs.col_name in self.df.columns:
-                print(f'{subs.col_name} not found in data')
-                continue
-
-            if minimise_tps: 
-                if len(tps)==0: continue
-                fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200,
-                                        figsize=(7, math.ceil(len(tps)/2)*2),
-                                        sharey=True, sharex=True)
-                if len(tps)%2: axs.flatten()[-1].axis('off')
-                fig.suptitle(f'{subs.col_name}')
-
-                for tp, ax in zip(tps, axs.flatten()):
-                    tp_tropo = self.df[df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
-                    tp_strato = self.df[df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
-
-                    ax.set_title(tp.label(filter_label=True), fontsize=8)
-                    ax.scatter(tp_strato.index, tp_strato[subs.col_name],
-                                c='grey',  marker='.', zorder=0, label='strato')
-                    ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
-                                c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
-
-                fig.autofmt_xdate()
-                fig.tight_layout()
-                fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
-                lines, labels = axs.flatten()[0].get_legend_handles_labels()
-                fig.legend(lines, labels, loc='upper center', ncol=2,
-                           bbox_to_anchor=[0.5, 0.94])
-                plt.show()
+            for tp, ax in zip(tps_vc, axs.flatten()):
+                plotting_function(ax=ax, tp=tp, **kwargs) 
             
-            # new figure for each vcoord, otherwise overloading the plots
-            if not minimise_tps: 
-                for vcoord in vcoords:
-                    tps_vc = [tp for tp in tps if tp.vcoord==vcoord]
-                    if len(tps_vc)==0: continue
-                    fig, axs = plt.subplots(math.ceil(len(tps_vc)/2), 2, dpi=200,
-                                            figsize=(7, math.ceil(len(tps_vc)/2)*2),
-                                            sharey=True, sharex=True)
-                    if len(tps_vc)%2: axs.flatten()[-1].axis('off')
-                    fig.suptitle(f'{subs.col_name}')
+            if vcoord=='p': 
+                ax.invert_yaxis()
+
+            fig.autofmt_xdate()
+            fig.tight_layout()
+            fig.subplots_adjust(top = 0.8 + math.ceil(len(tps_vc))/150)
+            lines, labels = axs.flatten()[0].get_legend_handles_labels()
+            fig.legend(lines, labels, loc='upper center', ncol=2,
+                        bbox_to_anchor=[0.5, 0.94])
+            plt.show()
+    
+    def AX_timeseries_subs_STsorted(self, ax, subs, tp, **kwargs): 
+        """ Plot timeseries of subs mixing ratios with strato / tropo colours. 
+        Parameters: 
+            subs(dcts.Substance)
+            vcoords (list[str]): vertical coordinates to plot
+            tps (list[dcts.Coordinate]): tropopause definitions to use for sorting 
+        """
+        tp_tropo = self.df[self.df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
+        tp_strato = self.df[self.df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
+
+        ax.set_title(tp.label(filter_label=True), fontsize=8)
+        ax.scatter(tp_strato.index, tp_strato[subs.col_name],
+                    c='grey',  marker='.', zorder=0, label='Stratosphere')
+        ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
+                    c='xkcd:kelly green',  marker='.', zorder=1, label='Troposphere')
+    
+    def AX_subs_vs_ycoord_STsorted(self, ax, subs, ycoord, tp, popt0=None, popt1=None, **kwargs):
+        """ Plot strat / trop sorted data """
+        # only take data with index that is available in df_sorted
+        data = self.df[self.df.index.isin(self.df_sorted.index)]
+        data.sort_index(inplace=True)
         
-                    for tp, ax in zip(tps_vc, axs.flatten()):
-                        tp_tropo = self.df[df_sorted['tropo_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
-                        tp_strato = self.df[df_sorted['strato_'+tp.col_name] == True] #.dropna(axis=0, subset=[tp.col_name])
-    
-                        ax.set_title(tp.label(filter_label=True), fontsize=8)
-                        ax.scatter(tp_strato.index, tp_strato[subs.col_name],
-                                    c='grey',  marker='.', zorder=0, label='strato')
-                        ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
-                                    c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
-    
-                    fig.autofmt_xdate()
-                    fig.tight_layout()
-                    fig.subplots_adjust(top = 0.8 + math.ceil(len(tps_vc))/150)
-                    lines, labels = axs.flatten()[0].get_legend_handles_labels()
-                    fig.legend(lines, labels, loc='upper center', ncol=2,
-                               bbox_to_anchor=[0.5, 0.94])
-                    plt.show()
+        tropo_col = 'tropo_'+tp.col_name
+        strato_col = 'strato_'+tp.col_name
+
+        # take 'data' here because substances may not be available in df_sorted
+        df_tropo = data[self.df_sorted[tropo_col] == True]
+        df_strato = data[self.df_sorted[strato_col] == True]
+
+        ax.set_title(tp.label(True))#' filter on {subs.label()} data')
+
+        ax.scatter(df_strato[subs.col_name], df_strato[ycoord.col_name], 
+                    c='grey',  marker='.', zorder=0, label='Stratosphere')
+        ax.scatter(df_tropo[subs.col_name], df_tropo[ycoord.col_name], 
+                    c='xkcd:kelly green',  marker='.', zorder=1, label='Troposphere')
+
+        if popt0 is not None and popt1 is not None and subs.short_name == tp.crit:
+            # only plot baseline for chemical tropopause def and where crit is being plotted
+            t_obs_tot = np.array(dt_to_fy(self.df_sorted.index, method='exact'))
+            ls = 'solid' if tp.ID == subs.ID else 'dashed'
+
+            func = dcts.get_subs(col_name=tp.col_name).function
+            ax.plot(self.df_sorted.index, func(t_obs_tot-2005, *popt0),
+                    c='r', lw=1, ls=ls, label='initial')
+            ax.plot(self.df_sorted.index, func(t_obs_tot-2005, *popt1),
+                    c='k', lw=1, ls=ls, label='filtered')
+
+        ax.set_ylabel(ycoord.label())
+        ax.set_xlabel(subs.label())
 
     def show_strato_tropo_vcounts(self, tps=None, shared=True, note='', **tp_kwargs): 
         """ Bar plots of data point allocation for multiple tp definitions. """
@@ -769,46 +718,7 @@ class TropopausePlotter(GlobalData):
         return stdv_df_dict
 
 #%% N2O filter
-def plot_sorted(glob_obj, tp, subs, popt0=None, popt1=None, **kwargs):
-    """ Plot strat / trop sorted data """
-    # only take data with index that is available in df_sorted
-    data = glob_obj.df[glob_obj.df.index.isin(glob_obj.df_sorted.index)]
-    data.sort_index(inplace=True)
-    
-    tropo_col = 'tropo_'+tp.col_name
-    strato_col = 'strato_'+tp.col_name
 
-    # take 'data' here because substances may not be available in df_sorted
-    df_tropo = data[glob_obj.df_sorted[tropo_col] == True]
-    df_strato = data[glob_obj.df_sorted[strato_col] == True]
-
-    fig, ax = plt.subplots(dpi=200)
-    plt.title(f'{tp.label(True)}')#' filter on {subs.label()} data')
-    # ax.scatter(df_strato.index, df_strato[subs.col_name],
-    #             c='grey',  marker='.', zorder=0, label='strato')
-    # ax.scatter(df_tropo.index, df_tropo[subs.col_name],
-    #             c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
-
-    ax.scatter(df_strato[subs.col_name], df_strato['p'], 
-                c='grey',  marker='.', zorder=0, label='strato')
-    ax.scatter(df_tropo[subs.col_name], df_tropo['p'], 
-                c='xkcd:kelly green',  marker='.', zorder=1, label='tropo')
-
-
-    if popt0 is not None and popt1 is not None and subs.short_name == tp.crit:
-        # only plot baseline for chemical tropopause def and where crit is being plotted
-        t_obs_tot = np.array(dt_to_fy(glob_obj.df_sorted.index, method='exact'))
-        ls = 'solid' if tp.ID == subs.ID else 'dashed'
-
-        func = dcts.get_subs(col_name=tp.col_name).function
-        ax.plot(glob_obj.df_sorted.index, func(t_obs_tot-2005, *popt0),
-                c='r', lw=1, ls=ls, label='initial')
-        ax.plot(glob_obj.df_sorted.index, func(t_obs_tot-2005, *popt1),
-                c='k', lw=1, ls=ls, label='filtered')
-
-    plt.ylabel(subs.label())
-    plt.legend()
-    plt.show()
 
 #%% Variability
 def matrix_plot_stdev_subs(glob_obj, substance,  note='', tps=None,
@@ -1036,9 +946,9 @@ def matrix_plot_stdev(glob_obj, note='', atm_layer='both', savefig=False,
         matrix_plot_stdev_subs(glob_obj, subs,  note=note, minimise_tps=minimise_tps,
                                    atm_layer=atm_layer, savefig=savefig)
 
-
 #%% Combine functionality of TropopausePlotter with specific GlobalData sub-classes 
 class CaribicTropopause(Caribic, TropopausePlotter): 
     """ Add functionality of TropopausePlotter to Caribic objects. """
     def __init__(self, **kwargs): 
+        """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic

@@ -9,13 +9,13 @@
 import datetime as dt
 import dill
 import geopandas
-import importlib
+import glob
 from metpy.units import units
 import numpy as np
 import pandas as pd
+from PIL import Image
 import os
 from shapely.geometry import Point
-import warnings
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -635,7 +635,9 @@ def bin_2d(glob_obj, subs, **kwargs) -> list:
         out_list.append(out)
     return out_list
 
-#%% Animate changes over years
+#%% Miscellaneous
+
+# Animate changes over years
 def make_gif(pdir=None, fnames=None):
     if not pdir: 
         pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
@@ -651,5 +653,7 @@ def make_gif(pdir=None, fnames=None):
             frame_one.save(f'C:/Users/sophie_bauchinger/sophie_bauchinger/Figures/tp_scatter_2d_GIFs/{tp.col_name}.gif',
                            format="GIF", append_images=frames,
                            save_all=True, duration=200, loop=0)
-# if __name__ == "__main__":
-#     make_gif()
+
+class InitialisationError(Exception): 
+    """ Raised when initialisation of a class is not intended. """
+    pass
