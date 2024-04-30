@@ -5,6 +5,46 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Fri Apr 28 09:51:49 2023
 
+Functions: 
+    # --- Data extraction ---
+    time_mean(df, f, first_of_month, minmax)
+    ds_to_gdf(ds)
+    rename_columns(columns)
+    process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
+    process_emac_s4d_s(ds, incl_model, incl_tropop, incl_subs)
+    process_caribic(ds)
+    clams_variables
+    process_clams(ds)
+    process_atom_clams(ds)
+    clams_variables_v03
+    flight_nr_from_flight_info(flight_info)
+    start_time_from_flight_info(flight_info, as_datetime)
+    start_datetime_by_flight_number(MS_df, load, save)
+    get_start_datetime(flight_no, **kwargs)
+    process_clams_v03(ds)
+    interpolate_onto_timestamps(dataframe, times, prefix)
+
+    # --- Data selection ---
+    minimise_tps(tps, vcoord)
+    
+    # --- Data handling ---
+    make_season(month)
+    assign_t_s(df, TS, coordinate, tp_val)
+    get_lin_fit(series, degree)
+    pre_flag(data_arr, ref_arr, crit, limit, **kwargs)
+    conv_molarity_PartsPer(x, unit)
+    conv_PartsPer_molarity(x, unit)
+    
+    # --- Plotting helpers ---
+    add_zero_line(ax, axis)
+    
+    # --- Binning of geodataframes ---
+    bin_1d(glob_obj, subs, **kwargs)
+    bin_2d(glob_obj, subs, **kwargs)
+    
+    # --- Create animations ---
+    make_gif(pdir, fnames)
+      
 """
 import datetime as dt
 import dill
@@ -28,7 +68,6 @@ def get_path():
     return dcts.get_path()
 
 # %% Data extraction
-
 def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
     """ Group values by time and return the respective averages.
     Parameters:

@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
+""" Visualisation of binned aircraft campaign data primarily in regards to the local tropopause. 
+
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun  6 13:59:31 2023
 
 Showing mixing ratios per season on a plot of coordinate relative to the
 tropopause (in km or K) versus equivalent latitude (in deg N)
 
-BinPlotter1D: 
-    - Histograms of nr of datapoints over distance to tropopause bins
-    - Vertical profiles: 
-        seasonal or not
-        variability or mean mixing ratios
-    - Bar plots for Troposphere | Stratosphere: vmean, vstdv, vcount
-    - Matrices of variability per latitude bin
+class BinPlotter
+
+class BinPlotter1D(BinPlotter)
+class BinPlotter2D(BinPlotter)
+class BinPlotter3D(BinPlotter)
+
+fctn n2o_tp_stdv_rms
 
 """
 
@@ -115,8 +116,6 @@ class BinPlotter():
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         self.outline = mpe.withStroke(linewidth=2, foreground='white')
-
-        self.kwargs = kwargs
 
     def __repr__(self):
         return f'<class eqlat.BinPlotter> with minimum points per bin: {self.glob_obj.count_limit} \n\

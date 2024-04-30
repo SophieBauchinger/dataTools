@@ -4,25 +4,53 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Tue May  9 15:39:11 2023
 
-substance_list: Get all available substances for different datasets
-get_fct_substance: Fitting function for specific substance trends
-get_col_name: Long column name from abbreviated substance
-get_tp_params: Get all available parameters for TP filtering dep. on conditions
-get_v_coord: Long column name acc. to vertical coordinate parameters
-get_h_coord: Long column name acc. to horizontal coordinate parameters
-get_coord_name: Long column name from abbreviated coordinate name
+class Coordinate
+    .label: filter_label, coord_only
+    .get_bsize
 
-dict_season: dictionary linking name and color to Nrs. 1-4
-get_vlims: default limits for colormap representation per substance
-get_default_units: default unit per substance
+class Substance
+    .label: name_only, delta
+    .vlims: bin_attr, atm_layer
 
-validated_input: let user try again if input was not in choices
-choose_column: let user choose from available columns per specification
+class Instrument
+
+Functions:
+    # ---- Coordinates ---- 
+    coordinate_df
+    get_coordinates(**kwargs)
+    get_coord(**kwargs)
+
+     # ---- Substances ---- 
+    vlim_dict_per_substance(short_name)
+    substance_df
+    get_substances(**kwargs)
+    get_subs(**kwargs)
+    lookup_fit_function(short_name)
+    
+    # ---- Instruments ----
+    instrument_df
+    instr_vars_per_ID_df
+    get_instruments(ID)
+    get_variables(ID, instr)
+    variables_per_instruments(instr)
+    harmonise_instruments(old_name)
+    harmonise_variables(instr, var_name)
+    
+    # --- Aircraft campaigns ---
+    campaign_definitions(campaign)
+    years_per_campaign(campaign)
+    instruments_per_campaign(campaign)
+    MS_variables(*args)
+    
+    # --- Plotting / Colors ---
+    dict_season
+    dict_colors
+    dict_tps
+    note_dict(fig_or_ax, x, y, s, ha)
 
 """
 import numpy as np
 import pandas as pd
-import pkgutil
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap as lsc
 import cmasher as cmr
@@ -258,85 +286,140 @@ class Substance():
             raise KeyError('Could not generate a label')
 
     def vlims(self, bin_attr='vmean', atm_layer=None) -> tuple:
-        """ Default colormap normalisation limits for substance mixing ratio or variabiliy. """
+        """ Default colormap normalisation limits for substance mixing ratio or variabiliy. 
+        
+        Args: 
+            bin_attr (str): vmean / vstdv / rvstd / ... + _tropo/_strato
+            atm_layer (str): Atmospheric layer, if not in bin_attr will be added as bin_attr + _  + atm_layer
+        """
+        # special cases for vcount 
+        if self.short_name.startswith('d_'): 
+            vlims = (0,1)
+        
+        vlim_dict = vlim_dict_per_substance(self.short_name)
 
-        def get_vlims(subs_short, bin_attr='vmean', atm_layer=None) -> tuple:
-            """ Default colormap normalisation limits for substance mixing ratio or variability. """
-            vlims_mxr = {  # optimised for Caribic measurements from 2005 to 2020
-                'sf6': (5.5, 10),
-                'co2': (370, 420),
-                'ch4': (1650, 1970),
-                'n2o': (290, 330),
+        if atm_layer is not None and atm_layer not in bin_attr: # set bin_attr to reflect atm_layer
+            bin_attr = f'{bin_attr}_{atm_layer}' 
 
-                'co': (15, 250),
-                'o3': (0.0, 1000),
-                'h2o': (0.0, 1000),
-                'no': (0.0, 0.6),
-                'noy': (0.0, 6),
-                'f11': (130, 250),
-                'f12': (400, 540),
+        if bin_attr not in vlim_dict: # invalid bin_attr
+            raise KeyError(f'Unrecognised bin_attr {bin_attr}, please check your input. ')
 
-                'detr_sf6': (0.95, 1.05), # (5.5, 6.5),
-                'detr_co2': (370, 395),
-                'detr_ch4': (1650, 1970),
-                'detr_n2o': (290, 330),
-                'detr_co': (50, 150)
-            }
+        if str(vlim_dict[bin_attr]) == '(nan, nan)': # values not set for substance 
+            raise KeyError(f'No default vlims set for {bin_attr} in {self.short_name} data')
+        
+         # values and bin_attr set and valid
+        vlims = vlim_dict[bin_attr] if not atm_layer else vlim_dict[f'{bin_attr}_{atm_layer}']
 
-            if bin_attr == 'vmean':
-                try:
-                    return vlims_mxr[subs_short]
-                except:
-                    raise KeyError(f'No default vlims for {subs_short}. ')
+        return vlims 
 
-            vlims_stdv_total = {
-                'detr_sf6': (0, 0.05),
-                'sf6': (0, 2),
-                'detr_n2o': (0, 13),
-                'detr_co': (10, 30),
-                'detr_co2': (0.8, 3.0),
-                'detr_ch4': (16, 60),
-                'o3' : (0, 200),
-            }
+def vlim_dict_per_substance(short_name) -> dict[tuple]: 
+    """ Returns dictionary for colormap normalisation limits for the given substance (str). 
+    
+    Dictionary keys: vmean / vstdv / vstdv_tropo / vstdv_strato / rvstd / rvstd_tropo / rvstd_strato
+    If values are not specifically set for a substance, their dict entry will be (nan, nan). 
+    """
+    
+    vlim_dict = {
+        'vmean' : (np.nan, np.nan),
+        'vstdv': (np.nan, np.nan),
+        'vstdv_tropo' : (np.nan, np.nan),
+        'vstdv_strato' : (np.nan, np.nan),
+        'rvstd' : (0, 10),
+        'rvstd_tropo' : (np.nan, np.nan),
+        'rvstd_strato' : (np.nan, np.nan),
+        'vcount' :  (1, np.nan),
+        }
+    
+    if   short_name == 'sf6': 
+        vlim_dict.update(
+            dict(vmean = (5.5, 10),
+                 vstdv = (0, 2),
+                 vstdv_tropo = (0.05, 0.3),
+                 vstdv_strato = (0, 2),
+                 ))
+    elif short_name == 'detr_sf6': 
+        vlim_dict.update(
+            dict(vmean = (0.95, 1.05),
+                 vstdv = (0, 0.05),
+                 vstdv_tropo = (0.05, 0.15),
+                 vstdv_strato = (0.05, 0.3),
+                 ))
+    elif short_name == 'detr_co2': 
+        vlim_dict.update(
+            dict(vmean = (370, 395),
+                 vstdv = (0.8, 3.0),
+                 vstdv_tropo = (2.0, 3.0),
+                 vstdv_strato = (1.2, 1.8),
+                 ))
+    elif short_name == 'detr_ch4': 
+        vlim_dict.update(
+            dict(vmean = (1650, 1970),
+                 vstdv = (16, 60),
+                 vstdv_tropo = (16, 26),
+                 vstdv_strato = (30, 60),
+                 ))
+    elif short_name == 'detr_n2o': 
+        vlim_dict.update(
+            dict(vmean = (290, 330),
+                 vstdv = (0, 13),
+                 vstdv_tropo =  (0.8, 1.8),
+                 vstdv_strato = (5.1, 13),
+                 ))
+    elif short_name == 'detr_co': 
+        vlim_dict.update(
+            dict(vmean = (50, 150),
+                 vstdv = (10, 30),
+                 vstdv_tropo = (16, 30),
+                 vstdv_strato = (10, 26),
+                 ))
+    elif short_name == 'ch4': 
+        vlim_dict.update(
+            dict(vmean = (1650, 1970),
+                 ))
+    elif short_name == 'co2': 
+        vlim_dict.update(
+            dict(vmean =  (370, 420),
+                 ))
+    elif short_name == 'n2o': 
+        vlim_dict.update(
+            dict(vmean = (290, 330),
+                 ))
+    elif short_name == 'co': 
+        vlim_dict.update(
+            dict(vmean = (15, 250),
+                 ))
+    elif short_name == 'o3': 
+        vlim_dict.update(
+            dict(vmean = (0.0, 1000),
+                 vstdv = (0, 200),
+                 vstdv_tropo = (15, 60),
+                 vstdv_strato = (90, 200), 
+                 rvstd = (0,10),
+                 ))
+    elif short_name == 'h2o': 
+        vlim_dict.update(
+            dict(vmean = (0.0, 1000),
+                 ))
+    elif short_name == 'no': 
+        vlim_dict.update(
+            dict(vmean = (0.0, 0.6),
+                 ))
+    elif short_name == 'noy': 
+        vlim_dict.update(
+            dict(vmean = (0.0, 6),
+                 ))      
+    elif short_name == 'f11': 
+        vlim_dict.update(
+            dict(vmean = (130, 250),
+                 ))
+    elif short_name == 'f12': 
+        vlim_dict.update(
+            dict(vmean = (400, 540),
+                 ))
+    else: 
+        raise KeyError(f'There are no default vlims for {short_name}')
 
-            vlims_stdv_tropo = {
-                'detr_sf6': (0.05, 0.15),
-                'sf6': (0.05, 0.3),
-                'detr_n2o': (0.8, 1.8),
-                'detr_co': (16, 30),
-                'detr_co2': (2.0, 3.0),
-                'detr_ch4': (16, 26),
-            }
-
-            vlims_stdv_strato = {
-                'detr_sf6': (0.05, 0.3),
-                'sf6': (0, 2),
-                'detr_n2o': (5.1, 13),
-                'detr_co': (10, 26),
-                'detr_co2': (1.2, 1.8),
-                'detr_ch4': (30, 60),
-            }
-
-            if bin_attr == 'vstdv':
-                if not atm_layer:
-                    return vlims_stdv_total[subs_short]
-                elif atm_layer == 'tropo':
-                    return vlims_stdv_tropo[subs_short]
-                elif atm_layer == 'strato':
-                    return vlims_stdv_strato[subs_short]
-                else:
-                    raise KeyError(f'No default vlims for {subs_short} STDV in {atm_layer}')
-
-            if bin_attr == 'vcount':
-                return (1, np.nan)
-            
-            else: 
-                raise KeyError(f'Unrecognised bin attribute: {bin_attr}')
-
-        if not self.short_name.startswith('d_'):
-            return get_vlims(self.short_name, bin_attr, atm_layer)
-        else:
-            return (0, 1)
+    return vlim_dict
 
 def substance_df():
     """ Get dataframe containing all info about all substance variables """
@@ -385,7 +468,6 @@ def lookup_fit_function(short_name):
     return function_per_f[f_per_subs[short_name]]
 
 #%% Aircraft campaigns
-
 def instrument_df() -> pd.DataFrame:
     """ Get dataframe containing all info about all substance variables """
     with open(get_path() + 'instruments.csv', 'rb') as f:
@@ -506,7 +588,7 @@ class Instrument:
     def __repr__(self):
         return f'Instrument : {self.original_name} - {self.variables}'
 
-#%% SQL Database / HALO stuff
+#%% Data: Campaigns / Instruments / Variables
 def campaign_definitions(campaign: str) -> dict:
     """  Returns parameters needed for client_data_choice per campaign.
 
@@ -576,7 +658,6 @@ def instruments_per_campaign(campaign: str) -> tuple:
         raise NotImplementedError(f'Campaign {campaign} does not have an instrument list.')
     return instr_dict[campaign]
 
-#%% MS Caribic data
 def MS_variables(*args): 
     """ List of current variables of interest in the Caribic MS dataset """
     measured_coords = [
@@ -652,20 +733,8 @@ def dict_colors():
         'vcount': cmr.get_sub_cmap('plasma_r', 0.1, 0.9),
         # 'rvstd' : cmr.get_sub_cmap('hot_r', 0.1, 1),
         # 'vcount' : plt.cm.PuRd,
-        'rvstd' : lsc.from_list('RSTD_default', colors, N=9)
+        'rvstd' : lsc.from_list('RSTD_default', colors, N=9),
     }
-
-def axis_label(coord):
-    """ Return axis label for vcoord / hcoord. """
-    label_dict = {
-        'pt': '$\Theta$',
-        'z': 'z',
-        'p': 'p',
-        'lat': 'Latitude [°N]',
-        'lon': 'Longitude [°E]',
-        'mxr': 'N$_2$O mixing ratio'
-    }
-    return label_dict[coord]
 
 def dict_tps():
     """ Get color etc for tropopause definitions """
@@ -688,7 +757,7 @@ def note_dict(fig_or_ax, x=None, y=None, s=None, ha=None):
     y = y if y else 0.97
     
     if not ha: 
-        ha='right' if x > 0.5 else 'left'
+        ha = 'right' if x > 0.5 else 'left'
 
     note_dict = dict(x=x,
                      y=y,
