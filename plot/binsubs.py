@@ -71,7 +71,6 @@ class SimpleBinPlotter():
         fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
         plt.show()
 
-
 class BinPlotter():
     """ Plotting class to facilitate creating binned 2D plots for any choice of x and y.
 
@@ -89,37 +88,31 @@ class BinPlotter():
         bin_1d_seasonal(subs, coord, bin_equi1d, xbsize)
         bin_2d_seasonal(subs, xcoord, ycoord, bin_equi2d, xbsize, ybsize)
     """
-    def __init__(self, glob_obj: GlobalData, filter_tps = None, **kwargs):
+    def __init__(self, filter_tps = None, **kwargs):
         """ Initialise class instances. 
         Paramters: 
-            glob_obj (GlobalData)
+            (GlobalData)
             detr (bool): Use data with linear trend wrt MLO05 removed
             
             key xbsize / ybsize (float)
             key ybsize (float)
             key vlims / xlims / ylims (Tuple[float])
             """
-        self.glob_obj = glob_obj
-        
         # if not kwargs.get('all_latitudes'): 
-        #     self.glob_obj = self.glob_obj.sel_latitude(30, 90)
-
-        self.data = {'df' : glob_obj.df} # dataframe
+        #     self.= self.sel_latitude(30, 90)
 
         # filter_tps = kwargs.pop('filter_tps') if 'filter_tps' in kwargs else False
         if filter_tps: 
             # tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
             self.filter_non_shared_indices(filter_tps)
-            glob_obj.data['df'] = self.df.copy()
-
-        self.count_limit = glob_obj.count_limit
+            self.data['df'] = self.df.copy()
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         self.outline = mpe.withStroke(linewidth=2, foreground='white')
 
     def __repr__(self):
-        return f'<class eqlat.BinPlotter> with minimum points per bin: {self.glob_obj.count_limit} \n\
-based on {self.glob_obj.__repr__()}'
+        return f'<class eqlat.BinPlotter> with minimum points per bin: {self.count_limit} \n\
+based on {self.__repr__()}'
 
     @property
     def df(self) -> pd.DataFrame:
@@ -257,9 +250,9 @@ based on {self.glob_obj.__repr__()}'
                df: pd.DataFrame = None): 
         """ Bin substance data onto longitude-latitude-z grid. """
         if not xbsize:
-            xbsize = self.glob_obj.grid_size
+            xbsize = self.grid_size
         if not ybsize:
-            ybsize = self.glob_obj.grid_size
+            ybsize = self.grid_size
         if not zbsize: 
             zbsize = self._get_bsize(zcoord)
         
@@ -290,12 +283,12 @@ based on {self.glob_obj.__repr__()}'
         if not tp.rel_to_tp: 
             raise Exception('tp has to be relative to tropopause')
         
-        xbsize = ybsize = self.glob_obj.grid_size
+        xbsize = ybsize = self.grid_size
         zbsize = self._get_bsize(tp)
 
         # calculate binned output per season
         if not isinstance(df, pd.DataFrame): 
-            df = self.glob_obj.sel_strato(**tp.__dict__).df
+            df = self.sel_strato(**tp.__dict__).df
         
 
         x = df.geometry.x
@@ -431,8 +424,8 @@ class BinPlotter1D(BinPlotter):
         matrix_plot_stdv_subs()
         matrix_plot_stdv()
     """
-    def __init__(self, glob_obj, **kwargs):
-        super().__init__(glob_obj, **kwargs)
+    def __init__(self,  **kwargs):
+        super().__init__( **kwargs)
 
     def flight_height_histogram(self, tp, alpha: float = 0.7, ax=None, **kwargs): 
         """ Make a histogram of the number of datapoints for each tp bin. """
@@ -440,9 +433,9 @@ class BinPlotter1D(BinPlotter):
             fig, ax = plt.subplots(dpi=250, figsize=(6,4))
             ax.set_ylabel(tp.label())
         
-        data = self.glob_obj.df[tp.col_name].dropna()
+        data = self.df[tp.col_name].dropna()
 
-        ax.set_title(f'Distribution of {self.glob_obj.source} measurements')
+        ax.set_title(f'Distribution of {self.source} measurements')
         rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (data.min(), 
                                                                       data.max())
         hist = ax.hist(data.values, 
@@ -647,14 +640,14 @@ class BinPlotter1D(BinPlotter):
     #                                      **kwargs): 
     #     """ Vertical THETA-profile of mean seasonal variability for diff. troopause definitions """
     #     if tps is None: 
-    #         tps = self.glob_obj.tp_coords(rel_to_tp=True, model='ERA5', vcoord=vcoord) \
-    #             + self.glob_obj.get_coords(vcoord=vcoord, model='ERA5', tp_def='nan') \
-    #                 + self.glob_obj.get_coords(tp_def='chem', vcoord = vcoord)
+    #         tps = self.tp_coords(rel_to_tp=True, model='ERA5', vcoord=vcoord) \
+    #             + self.get_coords(vcoord=vcoord, model='ERA5', tp_def='nan') \
+    #                 + self.get_coords(tp_def='chem', vcoord = vcoord)
 
     #     pt_range = 70
     #     figsize = [5.5, 4.5] # default is [6.4, 4.8]
 
-    #     if self.glob_obj.ID == 'PGS': 
+    #     if self.ID == 'PGS': 
     #         pt_range = 140
     #         figsize = [6.4, 4.8 * 1.5]
 
@@ -722,7 +715,7 @@ class BinPlotter1D(BinPlotter):
     #     # ax.hlines(0, 0, 0.25, color='k', ls='dashed', zorder=0)
         
     #     ax.grid('both', ls='dotted')
-    #     # ax.set_title(f'{self.glob_obj.ID}')
+    #     # ax.set_title(f'{self.ID}')
     #     if not rstd: 
     #         ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
     #     else: 
@@ -827,13 +820,13 @@ class BinPlotter1D(BinPlotter):
             key bin_equi1d (bp.Bin_equi1d, bp.Bin_notequi1d): Binning structure
             key tps ([dcts.Coordinate]): specify tropopause definitions to display 
         """
-        tps = self.glob_obj.tp_coords() if not kwargs.get('tps') else kwargs.get('tps')
+        tps = self.tp_coords() if not kwargs.get('tps') else kwargs.get('tps')
         
         #TODO shared_indices
         fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=200, 
                                          figsize=(9,4), sharey=True)
         
-        bin_description = f'{self.glob_obj.grid_size}°' \
+        bin_description = f'{self.grid_size}°' \
             + ('latitude' if xcoord.hcoord=='lat' else ('longitude' if xcoord.hcoord=='lon' else 'HUH')) \
                 + ' bins'
         description_dict = dict(
@@ -854,12 +847,12 @@ class BinPlotter1D(BinPlotter):
         strato_bar_vals = []
         bar_labels = []
         
-        self.glob_obj.create_df_sorted() # create df_sorted
-        shared_indices = self.glob_obj.get_shared_indices(tps)
+        self.create_df_sorted() # create df_sorted
+        shared_indices = self.get_shared_indices(tps)
 
         for i, tp in enumerate(tps):
-            tropo_data = self.glob_obj.sel_tropo(**tp.__dict__).df
-            strato_data = self.glob_obj.sel_strato(**tp.__dict__).df
+            tropo_data = self.sel_tropo(**tp.__dict__).df
+            strato_data = self.sel_strato(**tp.__dict__).df
             
             if kwargs.get('shared_index'): 
                 tropo_data[tropo_data.index.isin(shared_indices)]
@@ -925,7 +918,7 @@ class BinPlotter1D(BinPlotter):
         Create matrix plot showing variability per latitude bin per tropopause definition
     
         Parameters:
-            glob_obj (GlobalObject): Contains the data in self.df
+            (GlobalObject): Contains the data in self.df
             key short_name (str): Substance short name to show, e.g. 'n2o'
 
         Returns:
@@ -933,13 +926,13 @@ class BinPlotter1D(BinPlotter):
         """
         if not tps: 
             tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
-                   if 'tropo_'+tp.col_name in self.glob_obj.df_sorted.columns]
+                   if 'tropo_'+tp.col_name in self.df_sorted.columns]
     
         if minimise_tps:
             tps = tools.minimise_tps(tps)
     
         lat_bmin, lat_bmax = -90, 90 # np.nanmin(lat), np.nanmax(lat)
-        lat_bci = bp.Bin_equi1d(lat_bmin, lat_bmax, self.glob_obj.grid_size)
+        lat_bci = bp.Bin_equi1d(lat_bmin, lat_bmax, self.grid_size)
     
         tropo_stdevs = np.full((len(tps), lat_bci.nx), np.nan)
         tropo_av_stdevs = np.full(len(tps), np.nan)
@@ -951,10 +944,10 @@ class BinPlotter1D(BinPlotter):
     
         for i, tp in enumerate(tps):
             # troposphere
-            tropo_data = self.glob_obj.sel_tropo(**tp.__dict__).df
+            tropo_data = self.sel_tropo(**tp.__dict__).df
             tropo_lat = np.array([tropo_data.geometry[i].y for i in range(len(tropo_data.index))]) # lat
             tropo_out_lat = bp.Simple_bin_1d(tropo_data[substance.col_name], tropo_lat, 
-                                             lat_bci, count_limit = self.glob_obj.count_limit)
+                                             lat_bci, count_limit = self.count_limit)
             tropo_out_list.append(tropo_out_lat)
             tropo_stdevs[i] = tropo_out_lat.vstdv if not all(np.isnan(tropo_out_lat.vstdv)) else tropo_stdevs[i]
             
@@ -965,10 +958,10 @@ class BinPlotter1D(BinPlotter):
             tropo_av_stdevs[i] = tropo_weighted_average 
             
             # stratosphere
-            strato_data = self.glob_obj.sel_strato(**tp.__dict__).df
+            strato_data = self.sel_strato(**tp.__dict__).df
             strato_lat = np.array([strato_data.geometry[i].y for i in range(len(strato_data.index))]) # lat
             strato_out_lat = bp.Simple_bin_1d(strato_data[substance.col_name], strato_lat, 
-                                              lat_bci, count_limit = self.glob_obj.count_limit)
+                                              lat_bci, count_limit = self.count_limit)
             strato_out_list.append(strato_out_lat)
             strato_stdevs[i] = strato_out_lat.vstdv if not all(np.isnan(strato_out_lat.vstdv)) else strato_stdevs[i]
             
@@ -980,10 +973,10 @@ class BinPlotter1D(BinPlotter):
     
         # Plotting
         # -------------------------------------------------------------------------
-        pixels = self.glob_obj.grid_size # how many pixels per imshow square
+        pixels = self.grid_size # how many pixels per imshow square
         yticks = np.linspace(0, (len(tps)-1)*pixels, num=len(tps))[::-1] # order was reversed for some reason
         tp_labels = [tp.label(True)+'\n' for tp in tps]
-        xticks = np.arange(lat_bmin, lat_bmax+self.glob_obj.grid_size, self.glob_obj.grid_size)
+        xticks = np.arange(lat_bmin, lat_bmax+self.grid_size, self.grid_size)
     
         fig = plt.figure(dpi=200, figsize=(lat_bci.nx*0.825, 10))#len(tps)*2))
     
@@ -1036,7 +1029,7 @@ class BinPlotter1D(BinPlotter):
             for i,y in enumerate(yticks):
                 value = strato_stdevs[i,j]
                 if str(value) != 'nan':
-                    ax_strato1.text(x+0.5*self.glob_obj.grid_size,
+                    ax_strato1.text(x+0.5*self.grid_size,
                             y+0.5*pixels,
                             '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
                             va='center', ha='center')
@@ -1049,13 +1042,13 @@ class BinPlotter1D(BinPlotter):
     
         # Stratosphere average variability
         img = ax_strato2.matshow(np.array([strato_av_stdevs]).T, alpha=0.75,
-                         extent = [0, self.glob_obj.grid_size,
+                         extent = [0, self.grid_size,
                                    0, len(tps)*pixels],
                          cmap = strato_cmap, norm=norm)
         for i,y in enumerate(yticks): 
             value = strato_av_stdevs[i]
             if str(value) != 'nan':
-                ax_strato2.text(0.5*self.glob_obj.grid_size,
+                ax_strato2.text(0.5*self.grid_size,
                         y+0.5*pixels,
                         '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
                         va='center', ha='center')
@@ -1092,7 +1085,7 @@ class BinPlotter1D(BinPlotter):
             for i,y in enumerate(yticks):
                 value = tropo_stdevs[i,j]
                 if str(value) != 'nan':
-                    ax_tropo1.text(x+0.5*self.glob_obj.grid_size,
+                    ax_tropo1.text(x+0.5*self.grid_size,
                             y+0.5*pixels,
                             '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
                             va='center', ha='center')
@@ -1105,14 +1098,14 @@ class BinPlotter1D(BinPlotter):
         
         # Tropopsphere average variability
         img = ax_tropo2.matshow(np.array([tropo_av_stdevs]).T, alpha=0.75,
-                         extent = [0, self.glob_obj.grid_size,
+                         extent = [0, self.grid_size,
                                    0, len(tps)*pixels],
                          cmap = tropo_cmap, norm=norm)
     
         for i,y in enumerate(yticks): 
             value = tropo_av_stdevs[i]
             if str(value) != 'nan':
-                ax_tropo2.text(0.5*self.glob_obj.grid_size,
+                ax_tropo2.text(0.5*self.grid_size,
                         y+0.5*pixels,
                         '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
                         va='center', ha='center')
@@ -1133,7 +1126,7 @@ class BinPlotter1D(BinPlotter):
     
     def matrix_plot_stdev(self, note='', atm_layer='both', savefig=False,
                           minimise_tps=True, **subs_kwargs):
-        substances = [s for s in self.glob_obj.substances
+        substances = [s for s in self.substances
                       if not s.col_name.startswith('d_')]
     
         for subs in substances:
@@ -1141,19 +1134,19 @@ class BinPlotter1D(BinPlotter):
                                        atm_layer=atm_layer, savefig=savefig)
 
 
-def plot_seasonal_vstdv_n2o_filter(glob_obj, subs, theta, rstd=False, 
+def plot_seasonal_vstdv_n2o_filter( subs, theta, rstd=False, 
                                    tp_kwargs = dict(vcoord='mxr', ID='GHG')): 
     """ Scatter plot of mean seasnoal variability for troopause definitions """
     
-    bp1 = BinPlotter1D(glob_obj)
-    bp_tropo = BinPlotter1D(glob_obj.sel_tropo(**tp_kwargs))
-    bp_strato = BinPlotter1D(glob_obj.sel_strato(**tp_kwargs))
+    bp1 = BinPlotter1D()
+    bp_tropo = BinPlotter1D().sel_tropo(**tp_kwargs)
+    bp_strato = BinPlotter1D().sel_strato(**tp_kwargs)
     
     pt_range = 70
     # figsize = [6.4, 4.8] # default
     figsize = [5, 3]
 
-    # if glob_obj.ID == 'PGS': 
+    # if ID == 'PGS': 
     #     pt_range = 140
     #     figsize = [6.4, 4.8 * 1.5]
 
@@ -1185,7 +1178,7 @@ def plot_seasonal_vstdv_n2o_filter(glob_obj, subs, theta, rstd=False,
         ax.set_ylabel('$\Theta$ [K]') 
         
         ax.grid('both', ls='dotted')
-        # ax.set_title(f'{self.glob_obj.ID}')
+        # ax.set_title(f'{self.ID}')
         if not rstd: 
             ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
         else: 
@@ -1216,9 +1209,9 @@ class BinPlotter2D(BinPlotter):
         plot_mxr_diff(params_1, params2)
         plot_differences()
     """
-    def __init__(self, glob_obj, **kwargs): 
+    def __init__(self,  **kwargs): 
         """ Initialise bin plotter. """
-        super().__init__(glob_obj, **kwargs)
+        super().__init__( **kwargs)
 
     def calc_average(self, bin2d_inst, bin_attr='vstdv'):
         """ Calculate weighted overall average. """
@@ -1260,10 +1253,10 @@ class BinPlotter2D(BinPlotter):
         return tropo_weighted_average, strato_weighted_average
 
     def yearly_maps(self, subs, bin_attr, **kwargs):
-        # glob_obj, subs, single_yr=None, c_pfx=None, years=None, detr=False):
+        #  subs, single_yr=None, c_pfx=None, years=None, detr=False):
         """ Create binned 2D plots for each available year on a grid. """
         
-        nplots = len(self.glob_obj.years)
+        nplots = len(self.years)
         nrows = nplots if nplots <= 4 else math.ceil(nplots / 3)
         ncols = 1 if nplots <= 4 else 3
 
@@ -1295,7 +1288,7 @@ class BinPlotter2D(BinPlotter):
         if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
         norm = Normalize(*vlims)  # normalise color map to set limits
         
-        for i, (ax, year) in enumerate(zip(grid, self.glob_obj.years)):
+        for i, (ax, year) in enumerate(zip(grid, self.years)):
             ax.text(**dcts.note_dict(ax, 0.13, 0.1, f'{year}'), weight='bold')
             world.boundary.plot(ax=ax, color='grey', linewidth=0.3)
 
@@ -1309,7 +1302,7 @@ class BinPlotter2D(BinPlotter):
             ax.set_ylim(-60, 100)
 
             # plot data
-            df_year = self.glob_obj.sel_year(year).df
+            df_year = self.sel_year(year).df
             if df_year.empty: 
                 continue
             out = self.bin_2d(subs, xcoord, ycoord, bin_equi2d, df=df_year)         
@@ -1404,7 +1397,7 @@ class BinPlotter2D(BinPlotter):
 
     def plot_mixing_ratios(self, **kwargs):
         """ Plot all possible permutations of subs, xcoord, ycoord. """
-        permutations = list(itertools.product(self.glob_obj.substances,
+        permutations = list(itertools.product(self.substances,
                                               # self.x_coordinates,
                                               [dcts.get_coord(col_name='int_ERA5_EQLAT')],
                                               # self.y_coordinates
@@ -1690,11 +1683,10 @@ class BinPlotter3D(BinPlotter):
     
         return binned_data
 
-
     def stratosphere_map(self, subs, tp, bin_attr, **kwargs): 
         """ Plot (first two ?) stratospheric bins on a lon-lat binned map. """
-        df = self.glob_obj.sel_strato(**tp.__dict__).df
-        # df = self.glob_obj.sel_tropo(**tp.__dict__).df
+        df = self.sel_strato(**tp.__dict__).df
+        # df = self.sel_tropo(**tp.__dict__).df
 
         fig, ax = plt.subplots(figsize=(9,9))
         ax.set_title(tp.label(True))
@@ -1737,7 +1729,7 @@ class BinPlotter3D(BinPlotter):
         plt.colorbar(img, ax=ax, pad=0.1, orientation='horizontal') # colorbar
         plt.show()
 
-def n2o_tp_stdv_rms(glob_obj, subs, rstd=False): 
+def n2o_tp_stdv_rms( subs, rstd=False): 
     n2o = dcts.get_coord(col_name='N2O')
     vcoord = dcts.get_coord(col_name='int_ERA5_THETA')
     
@@ -1745,14 +1737,14 @@ def n2o_tp_stdv_rms(glob_obj, subs, rstd=False):
     
     # bin_equi1d = bp.Bin_equi1d(4, 13, 0.75)
     
-    bp = BinPlotter1D(glob_obj)
+    bp = BinPlotter1D()
     var_df = bp.rms_seasonal_vstdv(subs, vcoord)
     
-    strato = BinPlotter1D(glob_obj.sel_strato(**n2o.__dict__))
+    strato = BinPlotter1D(sel_strato(**n2o.__dict__))
     s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) #, 
                                          # bin_equi1d=bin_equi1d)
     
-    tropo = BinPlotter1D(glob_obj.sel_tropo(**n2o.__dict__))
+    tropo = BinPlotter1D(sel_tropo(**n2o.__dict__))
     t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord) #,
                                         # bin_equi1d=bin_equi1d)
     
@@ -1784,3 +1776,10 @@ def n2o_tp_stdv_rms(glob_obj, subs, rstd=False):
     ax.legend(loc='lower right')
     
     
+#%% Define global-data specific subclasses using multiple inheritance
+from dataTools.data import Caribic
+class CaribicBin1D(Caribic, BinPlotter1D): 
+    """ Class holding data and binned plotting functionality for Caribic. """
+    def __init__(self, **kwargs): 
+        """ Initialise object according to Caribic.__init__() """
+        super().__init__(**kwargs) # Caribic
