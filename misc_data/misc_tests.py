@@ -28,8 +28,12 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 # print(ac_flat.df.shape, ac_flat.df.columns[:4])
 # print(c.df.shape, c.df.columns[:4])
 # =============================================================================
-
-fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
+pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\\'
+# fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
+fnameV02 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V02.txt'
+fnameV03 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V03.txt'
+c2 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
+c3 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
 
 #%%
 from data import GlobalData, Caribic
