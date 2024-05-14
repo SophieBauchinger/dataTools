@@ -448,13 +448,7 @@ class GlobalData:
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
 
-
-
-
-
-# --- TRANSFER FROM BinPlotter
-    # self.kwargs = kwargs
-
+# --- 1D and 2D Binning according to selected coordinates transferred from ..plot.binsubs.BinPlotter --- 
     @property
     def outline(self): 
         """ Helper function to add outline to lines in plots. """
@@ -553,8 +547,8 @@ class GlobalData:
         
         Returns bp.Simple_bin_3d object
         """
-        xbsize = self.glob_obj.grid_size if not xbsize else xbsize 
-        ybsize = self.glob_obj.grid_size if not ybsize else ybsize 
+        xbsize = self.grid_size if not xbsize else xbsize 
+        ybsize = self.grid_size if not ybsize else ybsize 
         zbsize = zcoord.get_bsize() if not zbsize else zbsize
         
         x = self.df.geometry.x
@@ -576,15 +570,19 @@ class GlobalData:
         
         return out
 
-    def bin_LMS(self, subs, tp, df=None, bci_3d=None, zbsize=None, nr_of_bins = 5) -> bp.Simple_bin_3d: 
+    def bin_LMS(self, subs, tp, df=None, bci_3d=None, zbsize=None, nr_of_bins = 3) -> bp.Simple_bin_3d: 
         """ Bin data onto lon-lat-tp grid, then return only the lowermost stratospheric bins. 
         
         Args: 
-            subs (dcts.Substance)
+            subs (dcts.Substance): Substance data to bin
             tp (dcts.Coordinate): Tropopause Definition used to select LMS data
             
+        Optional:
             df (pd.DataFrame): Stratospheric dataset (filtered using TP)
-        
+            bci_3d(bp.Bin_equi3d, bp.Bin_notequi3d): Binned data
+            zbsize (float): Size of vertical bins
+            nr_of_bins (int): Max nr. of bins over the tropopause that sshould be returned 
+
         Returns bp.Simple_bin_3d object
         """
         
@@ -594,7 +592,6 @@ class GlobalData:
         xbsize = ybsize = self.grid_size
         zbsize = tp.get_bsize() if not zbsize else zbsize
 
-        # calculate binned output per season
         if not isinstance(df, pd.DataFrame): 
             df = self.sel_strato(**tp.__dict__).df
 
@@ -604,7 +601,10 @@ class GlobalData:
         ybmin, ybmax = -90, 90
 
         z = df[tp.col_name]
+
+        # nr_of_bins = min(out.nz, nr_of_bins)
         zbmax = ((np.nanmax(z) // zbsize) + 1) * zbsize
+        zbmax = min(zbsize * nr_of_bins, zbmax)
         zbmin = (np.nanmin(z) // zbsize) * zbsize
 
         if not isinstance(bci_3d, (bp.Bin_equi3d, bp.Bin_notequi3d)):
@@ -614,10 +614,6 @@ class GlobalData:
 
         out = bp.Simple_bin_3d(np.array(df[subs.col_name]), 
                                x, y, z, bci_3d)
-        
-        # TODO select only the lowermost nr_of_bins
-        
-        
         return out
 
     def bin_1d_seasonal(self, subs, coord, bci_1d=None, xbsize=None, df=None) -> dict[bp.Simple_bin_1d]:
@@ -1401,12 +1397,15 @@ class GlobalData:
         """ Returns GlobalData object containing only tropospheric data points. """
         return self.sel_atm_layer('strato', tp, **kwargs)
 
-    def sel_LMS(self, tp=None, **kwargs): #!!!
+    def sel_LMS(self, tp=None, nr_of_bins = 3, **kwargs): #!!!
         """ Returns GlobalData object containing only lowermost stratospheric data points. """
         strato_data = self.sel_strato(self, tp, **kwargs)
-        self.bin_LMS
-        raise NotImplementedError('Pure lies. ')
-        return strato_data
+        
+        zbsize = tp.get_bsize() if not kwargs.get('zbsize') else kwargs.get('zbsize')
+        
+        LMS_data = strato_data[strato_data[tp.col_name] <= zbsize * nr_of_bins]
+        
+        return LMS_data
 
     def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
         """ Flag each datapoint according to its distance to specific tropopause definitions. """
@@ -1518,105 +1517,6 @@ class GlobalData:
         
         return df
 
-    '''
-    def latitude_binned_1d_strato_tropo_stdv(self, subs, tps=None, **kwargs): # binned and toggled seasonal
-        """ Calculate latitudial-binned stratospheric and tropospheric variability for substances sorted using TP definitions. 
-        
-        Parameters: 
-            subs (dcts.Substance)
-            tps (list[dcts.Coordinate])
-            
-            key seasonal (bool): additionally calculate seasonal variables 
-        
-        # Returns a dataframe with 
-        #     columns:  tropo/strato + stdv/mean/rstv 
-        #     index: tropopause definitions (+ _season if seasonal)
-        """
-        
-        # 0. define necessary variables
-        
-
-        lat_coord = dcts.get_coord(col_name = 'geometry.y')
-        
-        tps = self.tps if not tps else tps
-        shared_indices = self.get_shared_indices(tps=tps)
-        
-        xbsize = lat_coord.get_bsize if not 'xbsize' in kwargs else kwargs.get('xbsize')
-        
-        if not isinstance(bci_1d, (bp.Bin_equi1d, bp.Bin_notequi1d)): 
-            bci_1d = bp.Bin_equi1d(-90, 90, xbsize)
-            
-        if not 'df_sorted' in self.data: 
-            self.df_sorted
-        
-        if kwargs.get('seasonal') and not 'season' in self.df.columns: 
-            self.df['season'] = tools.make_season(self.df.index.month)
-        
-        if kwargs.get('seasonal'):
-            strato_lat_bin_data_dict = tropo_lat_bin_data_dict = {} 
-        else: 
-            strato_lat_bin_data_df = tropo_lat_bin_data_df = pd.DataFrame(index = [tp.col_name for tp in tps])
-        
-        for i, tp in enumerate(tps):
-                
-            strato_df = self.sel_strato(**tp.__dict__).df
-            strato_df = strato_df[strato_df.index.isin(shared_indices)]
-            
-            tropo_df = self.sel_tropo(**tp.__dict__).df
-            tropo_df = tropo_df[tropo_df.index.isin(shared_indices)]
-
-            if kwargs.get('seasonal'):
-                strato_lat_bin_data_dict[tp.col_name] = self.bin_1d_seasonal(subs, lat_coord, bci_1d, xbsize, strato_df)
-                tropo_lat_bin_data_dict[tp.col_name] = self.bin_1d_seasonal(subs, lat_coord, bci_1d, xbsize, tropo_df)
-        
-            else: 
-                strato_lat_bin_data_df[tp.col_name] = self.bin_1d(subs, lat_coord, bci_1d, xbsize, strato_df)
-                tropo_lat_bin_data_df[tp.col_name] = self.bin_1d(subs, lat_coord, bci_1d, xbsize, tropo_df)          
-
-
-        # --- # --- #
-
-        tropo_stdevs = np.full((len(tps), bci_1d.nx), np.nan)
-        tropo_av_stdevs = np.full(len(tps), np.nan)
-        strato_stdevs = np.full((len(tps), bci_1d.nx), np.nan)
-        strato_av_stdevs = np.full(len(tps), np.nan)
-
-        tropo_out_list = []
-        strato_out_list = []
-
-        for i, tp in enumerate(tps):
-            # troposphere
-            tropo_data = self.sel_tropo(**tp.__dict__).df
-            tropo_data = tropo_data[tropo_data.index.isin(shared_indices)]
-            
-            tropo_lat = np.array([tropo_data.geometry.iloc[i].y for i in range(len(tropo_data.index))]) # lat
-            tropo_out_lat = bp.Simple_bin_1d(tropo_data[subs.col_name], tropo_lat, 
-                                            lat_bci, count_limit = self.count_limit)
-            tropo_out_list.append(tropo_out_lat)
-            tropo_stdevs[i] = tropo_out_lat.vstdv if not all(np.isnan(tropo_out_lat.vstdv)) else tropo_stdevs[i]
-            
-            # weighted average stdv
-            tropo_nonan_stdv = tropo_out_lat.vstdv[~ np.isnan(tropo_out_lat.vstdv)]
-            tropo_nonan_vcount = tropo_out_lat.vcount[~ np.isnan(tropo_out_lat.vstdv)]
-            tropo_weighted_average = np.average(tropo_nonan_stdv, weights = tropo_nonan_vcount)
-            tropo_av_stdevs[i] = tropo_weighted_average 
-            
-            # stratosphere
-            strato_data = self.sel_strato(**tp.__dict__).df
-            strato_data = strato_data[strato_data.index.isin(shared_indices)]
-            
-            strato_lat = np.array([strato_data.geometry.iloc[i].y for i in range(len(strato_data.index))]) # lat
-            strato_out_lat = bp.Simple_bin_1d(strato_data[subs.col_name], strato_lat, 
-                                            lat_bci, count_limit = self.count_limit)
-            strato_out_list.append(strato_out_lat)
-            strato_stdevs[i] = strato_out_lat.vstdv if not all(np.isnan(strato_out_lat.vstdv)) else strato_stdevs[i]
-            
-            # weighted average stdv
-            strato_nonan_stdv = strato_out_lat.vstdv[~ np.isnan(strato_out_lat.vstdv)]
-            strato_nonan_vcount = strato_out_lat.vcount[~ np.isnan(strato_out_lat.vstdv)]
-            strato_weighted_average = np.average(strato_nonan_stdv, weights = strato_nonan_vcount)
-            strato_av_stdevs[i] = strato_weighted_average 
-    '''
 # --- Filter for extreme events in tropospheric air ---
     def filter_extreme_events(self, plot_ol=False, **tp_kwargs):
         """ Returns only tropospheric background data (filter out tropospheric extreme events)

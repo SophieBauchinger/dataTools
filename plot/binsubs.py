@@ -33,7 +33,7 @@ import toolpac.calc.binprocessor as bp # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-from dataTools.data import GlobalData
+from dataTools.data import Caribic
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
@@ -43,7 +43,7 @@ warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed 
 #TODO map of distance to tropopause (stratosphere only?)
 #TODO might want to implement a logarithmic scale for pressure at some point
 
-class SimpleBinPlotter(): 
+class SimpleBinPlotter: 
     def plot_1d(self, simple_bin_1d, bin_attr='vmean'): 
         """ scatter plot of binned data. """
         data = getattr(simple_bin_1d, bin_attr)
@@ -71,7 +71,7 @@ class SimpleBinPlotter():
         fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
         plt.show()
 
-class BinPlotter():
+class BinPlotter:
     """ Plotting class to facilitate creating binned 2D plots for any choice of x and y.
 
     Attributes:
@@ -90,17 +90,13 @@ class BinPlotter():
     """
     def __init__(self, filter_tps = None, **kwargs):
         """ Initialise class instances. 
-        Paramters: 
-            (GlobalData)
-            detr (bool): Use data with linear trend wrt MLO05 removed
-            
+        Paramters:
+            filter_tps (List[Coordinate]): Reduce dataset to only points that all TP coords share
+         
             key xbsize / ybsize (float)
             key ybsize (float)
             key vlims / xlims / ylims (Tuple[float])
             """
-        # if not kwargs.get('all_latitudes'): 
-        #     self.= self.sel_latitude(30, 90)
-
         # filter_tps = kwargs.pop('filter_tps') if 'filter_tps' in kwargs else False
         if filter_tps: 
             # tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
@@ -119,10 +115,11 @@ based on {self.__repr__()}'
         return self.data['df']
 
     def get_vlimit(self, subs: dcts.Substance, 
-                   bin_attr: str) -> tuple: 
+                   bin_attr: str, **kwargs) -> tuple: 
         """ Get colormap limits for given substance and bin attribute. """
-        if 'vlims' in self.kwargs:
-            vlims = self.kwargs.get('vlims')
+        if hasattr(self, 'kwargs'):
+            if 'vlims' in self.kwargs: 
+                vlims = self.kwargs.get('vlims')
         else:
             try:
                 vlims = subs.vlims(bin_attr=bin_attr)
@@ -155,22 +152,26 @@ based on {self.__repr__()}'
 
     def _get_bsize(self, coord, xyz: str = None) -> float: 
         """ Get bin size for given coordinate. """
-        if xyz=='x' and 'xbsize' in self.kwargs: 
-            bsize = self.kwargs.get('xbsize')
-        elif xyz=='y' and 'ybsize' in self.kwargs: 
-            bsize = self.kwargs.get('ybsize')
-        elif xyz=='z' and 'zbsize' in self.kwargs: 
-            bsize = self.kwargs.get('zbsize')
+        bsize = None
 
-        else: 
-            bsize = coord.get_bsize()# dcts.get_default_bsize(coord.hcoord)
-            if not bsize and xyz=='x': 
-                bsize = 10
-            if not bsize:    
-                lims = self.get_coord_lims(coord, xyz)
-                bsize = 5 * ( np.ceil((lims[1]-lims[0])/10) / 5 )
-                if (lims[1]-lims[0])/10<1: 
-                    bsize=0.5
+        if hasattr(self, 'kwargs'):
+            if xyz=='x' and 'xbsize' in self.kwargs: 
+                bsize = self.kwargs.get('xbsize')
+            elif xyz=='y' and 'ybsize' in self.kwargs: 
+                bsize = self.kwargs.get('ybsize')
+            elif xyz=='z' and 'zbsize' in self.kwargs: 
+                bsize = self.kwargs.get('zbsize')
+            if bsize: 
+                return bsize 
+
+        bsize = coord.get_bsize()# dcts.get_default_bsize(coord.hcoord)
+        if not bsize and xyz=='x': 
+            bsize = 10
+        if not bsize:    
+            lims = self.get_coord_lims(coord, xyz)
+            bsize = 5 * ( np.ceil((lims[1]-lims[0])/10) / 5 )
+            if (lims[1]-lims[0])/10<1: 
+                bsize=0.5
         return bsize
 
     def filter_non_shared_indices(self, tps: list):
@@ -181,6 +182,7 @@ based on {self.__repr__()}'
         self.data['df'] = self.data['df'][self.data['df'] != 0].dropna(subset=cols)
         return self.data['df']
 
+    '''    
     def bin_1d(self, subs, coord, bin_equi1d=None, xbsize: float = None): 
         """ Bin substance data onto bins of coord. """
         if not xbsize:
@@ -380,6 +382,7 @@ based on {self.__repr__()}'
             out_dict[s] = out
 
         return out_dict
+    '''
 
     def rms_seasonal_vstdv(self, subs, coord, **kwargs) -> pd.DataFrame:
         """ Root mean squared of seasonal variability for given substance and tp. """
@@ -633,112 +636,6 @@ class BinPlotter1D(BinPlotter):
         ax1.tick_params(labelleft=False)
 
         fig.set_size_inches(8,5)
-
-    # def plot_vertical_profile_mean_vstdv(self, subs, 
-    #                                      tps: list = None, rstd=False, 
-    #                                      vcoord = 'pt',
-    #                                      **kwargs): 
-    #     """ Vertical THETA-profile of mean seasonal variability for diff. troopause definitions """
-    #     if tps is None: 
-    #         tps = self.tp_coords(rel_to_tp=True, model='ERA5', vcoord=vcoord) \
-    #             + self.get_coords(vcoord=vcoord, model='ERA5', tp_def='nan') \
-    #                 + self.get_coords(tp_def='chem', vcoord = vcoord)
-
-    #     pt_range = 70
-    #     figsize = [5.5, 4.5] # default is [6.4, 4.8]
-
-    #     if self.ID == 'PGS': 
-    #         pt_range = 140
-    #         figsize = [6.4, 4.8 * 1.5]
-
-    #     fig, ax = plt.subplots(dpi=250, figsize = figsize)
-    #     ax.set_ylim(-pt_range, pt_range)
-
-    #     for tp in tps:                              
-    #         df = self.rms_seasonal_vstdv(subs, tp, **kwargs)
-    #         x_data = df['rms_vstdv'] if not rstd else df['rms_rvstd']*100
-    #         y_data = df.index
-            
-    #         if tp.rel_to_tp: 
-    #             ax.plot(x_data, y_data, 
-    #                     '-', marker='d', 
-    #                     c = 'red',
-    #                     label=tp.label(True),
-    #                     path_effects=[self.outline], 
-    #                     zorder=10)
-                
-    #             ax.set_ylabel('$\Delta\Theta_{TP}$ [K]') 
-
-    #         # elif (tp.model=='MSMT' or not (tp.rel_to_tp is True)): # chem tp coords
-            
-    #         elif tp.rel_to_tp and (tp.tp_def != 'nan'): # non-theta
-            
-    #         elif not tp.rel_to_tp is True: 
-    #             if tp.tp_def == 'chem':
-    #                 color = 'yellow'
-    #                 ax2 = ax.twinx()
-    #                 ax2.set_ylabel(tp.label(),
-    #                                color = color) 
-    #                 # ax2.set_ylim(330-70, 330+70)
-    #                 ax.plot(x_data, y_data,
-    #                         '-', marker='d', 
-    #                         # c=dcts.dict_season()[f'color_{s}'],
-    #                         c = color,
-    #                         label=tp.label(True),
-    #                         path_effects=[self.outline], 
-    #                         zorder=10)
-    
-    #                 ax.set_ylabel('$\Theta$-Distance to TP [K]')
-    #                 ax2.tick_params(axis ='y', labelcolor = color, color=color)
-    #                 ax2.spines['right'].set_color(color)
-
-    #             else: # 'worst' - non-relative coords for reference
-    #                 color = 'xkcd:grey'
-    #                 ax2 = ax.twinx()
-    #                 ax2.set_ylabel(tp.label(),
-    #                                color = color) 
-    #                 ax2.set_ylim(330-pt_range, 330+pt_range)
-                    
-    #                 ax2.plot(x_data, y_data, 
-    #                          '--', marker='d', 
-    #                         c = color, 
-    #                         # label=tp.label(True),
-    #                         path_effects=[self.outline], zorder=0,
-    #                         label='Potential Temperature')
-    #                 ax2.tick_params(axis ='y', labelcolor = color, color=color)
-    #                 ax2.spines['right'].set_color(color)
-                
-    #         else: 
-    #             raise KeyError(f'No default plotting for {tp}')
-        
-    #     # ax.set_xlim(0, 0.25)
-    #     # ax.hlines(0, 0, 0.25, color='k', ls='dashed', zorder=0)
-        
-    #     ax.grid('both', ls='dotted')
-    #     # ax.set_title(f'{self.ID}')
-    #     if not rstd: 
-    #         ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
-    #     else: 
-    #         ax.set_xlabel(f'Mean seasonal relative variability of {subs.label(name_only=True)} [%]')
-    #     ax.set_zorder(3)
-    #     ax.patch.set_visible(False)
-        
-    #     h,l = ax.get_legend_handles_labels()
-        
-    #     if 'ax2' in locals():
-    #         print('Ax2 exists')
-    #         ax2.set_zorder(2)
-    #         ax2.patch.set_visible(True)
-    #         h2,l2 = ax2.get_legend_handles_labels()
-            
-    #         ax.legend(handles = h+h2, 
-    #                   labels=l+l2,
-    #                   loc='lower right')
-        
-    #     else: 
-    #         ax.legend(loc='lower right')
-
-    #     tools.add_zero_line(ax)
 
     def stdv_rms_non_pt(self, subs, tp): 
         """ Same as plot_vertical_profile_mean_vstdv but for other vcoords. """
@@ -1729,6 +1626,226 @@ class BinPlotter3D(BinPlotter):
         plt.colorbar(img, ax=ax, pad=0.1, orientation='horizontal') # colorbar
         plt.show()
 
+    def matrix_plot_3d_stdev_subs(self, substance, note='', tps=None,
+                                  atm_layer='both', savefig=False) -> tuple[np.array, np.array]:
+        """
+        Create matrix plot showing variability per latitude bin per tropopause definition
+    
+        Parameters:
+            (GlobalObject): Contains the data in self.df
+            key short_name (str): Substance short name to show, e.g. 'n2o'
+
+        Returns:
+            tropospheric, stratospheric standard deviations within each bin as list for each tp coordinate
+        """
+        if not tps: 
+            tps = [tp for tp in dcts.get_coordinates(tp_def='not_nan')
+                   if 'tropo_'+tp.col_name in self.df_sorted.columns]
+    
+        lat_bmin, lat_bmax = -90, 90 # np.nanmin(lat), np.nanmax(lat)
+        lat_bci = bp.Bin_equi1d(lat_bmin, lat_bmax, self.grid_size)
+    
+        tropo_stdevs = np.full((len(tps), lat_bci.nx), np.nan)
+        tropo_av_stdevs = np.full(len(tps), np.nan)
+        strato_stdevs = np.full((len(tps), lat_bci.nx), np.nan)
+        strato_av_stdevs = np.full(len(tps), np.nan)
+    
+        tropo_out_list = []
+        strato_out_list = []
+    
+        for i, tp in enumerate(tps):
+            # troposphere
+            tropo_data = self.sel_tropo(**tp.__dict__).df
+            tropo_lat = np.array([tropo_data.geometry[i].y for i in range(len(tropo_data.index))]) # lat
+            tropo_out_lat = bp.Simple_bin_1d(tropo_data[substance.col_name], tropo_lat, 
+                                             lat_bci, count_limit = self.count_limit)
+            tropo_out_list.append(tropo_out_lat)
+            tropo_stdevs[i] = tropo_out_lat.vstdv if not all(np.isnan(tropo_out_lat.vstdv)) else tropo_stdevs[i]
+            
+            # weighted average stdv
+            tropo_nonan_stdv = tropo_out_lat.vstdv[~ np.isnan(tropo_out_lat.vstdv)]
+            tropo_nonan_vcount = tropo_out_lat.vcount[~ np.isnan(tropo_out_lat.vstdv)]
+            tropo_weighted_average = np.average(tropo_nonan_stdv, weights = tropo_nonan_vcount)
+            tropo_av_stdevs[i] = tropo_weighted_average 
+            
+            # stratosphere
+            strato_data = self.sel_strato(**tp.__dict__).df
+            strato_lat = np.array([strato_data.geometry[i].y for i in range(len(strato_data.index))]) # lat
+            strato_out_lat = bp.Simple_bin_1d(strato_data[substance.col_name], strato_lat, 
+                                              lat_bci, count_limit = self.count_limit)
+            strato_out_list.append(strato_out_lat)
+            strato_stdevs[i] = strato_out_lat.vstdv if not all(np.isnan(strato_out_lat.vstdv)) else strato_stdevs[i]
+            
+            # weighted average stdv
+            strato_nonan_stdv = strato_out_lat.vstdv[~ np.isnan(strato_out_lat.vstdv)]
+            strato_nonan_vcount = strato_out_lat.vcount[~ np.isnan(strato_out_lat.vstdv)]
+            strato_weighted_average = np.average(strato_nonan_stdv, weights = strato_nonan_vcount)
+            strato_av_stdevs[i] = strato_weighted_average 
+    
+        # Plotting
+        # -------------------------------------------------------------------------
+        pixels = self.grid_size # how many pixels per imshow square
+        yticks = np.linspace(0, (len(tps)-1)*pixels, num=len(tps))[::-1] # order was reversed for some reason
+        tp_labels = [tp.label(True)+'\n' for tp in tps]
+        xticks = np.arange(lat_bmin, lat_bmax+self.grid_size, self.grid_size)
+    
+        fig = plt.figure(dpi=200, figsize=(lat_bci.nx*0.825, 10))#len(tps)*2))
+    
+        gs = gridspec.GridSpec(5, 2, figure=fig,
+                               height_ratios = [1, 0.1, 0.02, 1, 0.1],
+                               width_ratios = [1, 0.09])
+        axs = gs.subplots()
+    
+        [ax.remove() for ax in axs[2, 0:]]
+        middle_ax = plt.subplot(gs[2, 0:])
+        middle_ax.axis('off')
+    
+        ax_strato1 = axs[0,0]
+        ax_strato2 = axs[0,1]
+        [ax.remove() for ax in  axs[1, 0:]]
+        cax_s = plt.subplot(gs[1, 0:])
+        
+        ax_tropo1 = axs[3,0]
+        ax_tropo2 = axs[3,1]
+        [ax.remove() for ax in axs[4, 0:]]
+        cax_t = plt.subplot(gs[4, 0:])
+    
+        # Plot STRATOSPHERE
+        # -------------------------------------------------------------------------
+        try: 
+            vmin, vmax = substance.vlims('vstdv', 'strato')
+        except KeyError: 
+            vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
+            
+        norm = Normalize(vmin, vmax)  # normalise color map to set limits
+        strato_cmap = dcts.dict_colors()['vstdv_strato'] # plt.cm.BuPu  # create colormap
+        ax_strato1.set_title(f'Stratospheric variability of {substance.label()}{note}', fontsize=14)
+    
+        img = ax_strato1.matshow(strato_stdevs, alpha=0.75,
+                         extent = [lat_bmin, lat_bmax,
+                                   0, len(tps)*pixels],
+                         cmap = strato_cmap, norm=norm)
+        ax_strato1.set_yticks(yticks, labels=tp_labels)
+        ax_strato1.set_xticks(xticks, loc='bottom')
+        ax_strato1.tick_params(axis='x', top=False, labeltop=False, labelbottom=True)
+    
+        for label in ax_strato1.get_yticklabels():
+            label.set_verticalalignment('bottom')
+    
+        ax_strato1.grid('both')
+        ax_strato1.set_xlabel('Latitude [°N]')
+    
+        # add numeric values
+        for j,x in enumerate(xticks[:-1]):
+            for i,y in enumerate(yticks):
+                value = strato_stdevs[i,j]
+                if str(value) != 'nan':
+                    ax_strato1.text(x+0.5*self.grid_size,
+                            y+0.5*pixels,
+                            '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
+                            va='center', ha='center')
+        cbar = plt.colorbar(img, cax=cax_s, orientation='horizontal')
+        cbar.set_label(f'Standard deviation of {substance.label(name_only=True)} within bin [{substance.unit}]')
+        # make sure vmin and vmax are shown as colorbar ticks
+        cbar_vals = cbar.get_ticks()
+        cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
+        cbar.set_ticks(cbar_vals)
+    
+        # Stratosphere average variability
+        img = ax_strato2.matshow(np.array([strato_av_stdevs]).T, alpha=0.75,
+                         extent = [0, self.grid_size,
+                                   0, len(tps)*pixels],
+                         cmap = strato_cmap, norm=norm)
+        for i,y in enumerate(yticks): 
+            value = strato_av_stdevs[i]
+            if str(value) != 'nan':
+                ax_strato2.text(0.5*self.grid_size,
+                        y+0.5*pixels,
+                        '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(vmax/100),
+                        va='center', ha='center')
+        ax_strato2.tick_params(axis='both', bottom=False, top=False, labeltop=False, left=False, labelleft=False)
+        ax_strato2.set_xlabel('Average')
+    
+        # Plot TROPOSPHERE
+        # -------------------------------------------------------------------------
+        try: 
+            vmin, vmax = substance.vlims('vstdv', 'tropo')
+        except KeyError: 
+            vmin, vmax = np.nanmin(strato_stdevs), np.nanmax(strato_stdevs)
+        norm = Normalize(vmin, vmax)  # normalise color map to set limits
+        tropo_cmap = dcts.dict_colors()['vstdv_tropo'] # cmr.get_sub_cmap('YlOrBr', 0, 0.75) # create colormap
+        ax_tropo1.set_title(f'Tropospheric variability of {substance.label()}{note}', fontsize=14)
+    
+        img = ax_tropo1.matshow(tropo_stdevs, alpha=0.75,
+                         extent = [lat_bmin, lat_bmax,
+                                   0, len(tps)*pixels],
+                         cmap = tropo_cmap, norm=norm)
+        ax_tropo1.set_yticks(yticks, labels=tp_labels)
+        ax_tropo1.set_xticks(xticks, loc='bottom')
+        ax_tropo1.tick_params(axis='x', top=False, labeltop=False, labelbottom=True)
+        ax_tropo1.set_xlabel('Latitude [°N]')
+    
+        for label in ax_tropo1.get_yticklabels():
+            label.set_verticalalignment('bottom')
+    
+        ax_tropo1.grid('both')
+        # ax1.set_xlim(-40, 90)
+    
+        # add numeric values
+        for j,x in enumerate(xticks[:-1]):
+            for i,y in enumerate(yticks):
+                value = tropo_stdevs[i,j]
+                if str(value) != 'nan':
+                    ax_tropo1.text(x+0.5*self.grid_size,
+                            y+0.5*pixels,
+                            '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
+                            va='center', ha='center')
+        cbar = plt.colorbar(img, cax=cax_t, orientation='horizontal')
+        cbar.set_label(f'Standard deviation of {substance.label(name_only=True)} within bin [{substance.unit}]')
+        # make sure vmin and vmax are shown as colorbar ticks
+        cbar_vals = cbar.get_ticks()
+        cbar_vals = [vmin] + cbar_vals[1:-1].tolist() + [vmax]
+        cbar.set_ticks(cbar_vals)
+        
+        # Tropopsphere average variability
+        img = ax_tropo2.matshow(np.array([tropo_av_stdevs]).T, alpha=0.75,
+                         extent = [0, self.grid_size,
+                                   0, len(tps)*pixels],
+                         cmap = tropo_cmap, norm=norm)
+    
+        for i,y in enumerate(yticks): 
+            value = tropo_av_stdevs[i]
+            if str(value) != 'nan':
+                ax_tropo2.text(0.5*self.grid_size,
+                        y+0.5*pixels,
+                        '{0:.2f}'.format(value) if value>vmax/100 else '<{0:.2f}'.format(np.ceil(vmax/100)),
+                        va='center', ha='center')
+    
+    
+        ax_tropo2.set_xlabel('Average')
+        ax_tropo2.tick_params(axis='both', bottom=False, top=False, labeltop=False, left=False, labelleft=False)
+    
+        # -------------------------------------------------------------------------
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.8)
+    
+        if savefig:
+            plt.savefig(f'E:/CARIBIC/Plots/variability_lat_binned/variability_{substance.col_name}.png', format='png')
+        fig.show()
+    
+        return tropo_out_list, strato_out_list
+    
+    def matrix_plot_stdev(self, note='', atm_layer='both', savefig=False,
+                          minimise_tps=True, **subs_kwargs):
+        substances = [s for s in self.substances
+                      if not s.col_name.startswith('d_')]
+    
+        for subs in substances:
+            self.matrix_plot_stdev_subs(subs, note=note, minimise_tps=minimise_tps,
+                                       atm_layer=atm_layer, savefig=savefig)
+
+
+
 def n2o_tp_stdv_rms( subs, rstd=False): 
     n2o = dcts.get_coord(col_name='N2O')
     vcoord = dcts.get_coord(col_name='int_ERA5_THETA')
@@ -1777,9 +1894,21 @@ def n2o_tp_stdv_rms( subs, rstd=False):
     
     
 #%% Define global-data specific subclasses using multiple inheritance
-from dataTools.data import Caribic
 class CaribicBin1D(Caribic, BinPlotter1D): 
     """ Class holding data and binned plotting functionality for Caribic. """
     def __init__(self, **kwargs): 
         """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic
+
+class CaribicBin2D(Caribic, BinPlotter2D): 
+    """ Class holding data and binned plotting functionality for Caribic. """
+    def __init__(self, **kwargs): 
+        """ Initialise object according to Caribic.__init__() """
+        super().__init__(**kwargs) # Caribic
+
+class CaribicBin3D(Caribic, BinPlotter3D): 
+    """ Class holding data and binned plotting functionality for Caribic. """
+    def __init__(self, **kwargs): 
+        """ Initialise object according to Caribic.__init__() """
+        super().__init__(**kwargs) # Caribic
+
