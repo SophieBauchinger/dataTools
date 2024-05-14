@@ -35,38 +35,38 @@ int_ERA5_dynTP_PHI_1_5,Geopotential of local 1.5 PVU surface (ERA5),m2s-2,INTtpc
 int_ERA5_dynTP_PHI_2_0,Geopotential of local 2.0 PVU surface (ERA5),m2s-2,INTtpc,CLAMS,z,,geopot,dyn,FALSE,ERA5,2,,,
 int_ERA5_dynTP_PHI_3_5,Geopotential of local 3.5 PVU surface (ERA5),m2s-2,INTtpc,CLAMS,z,,geopot,dyn,FALSE,ERA5,3.5,,,
 int_ERA5_thermTP_Z,Height of main lapse rate tropopause (ERA5),km,INTtpc,CLAMS,z,,,therm,FALSE,ERA5,,,,
-int_ERA5_HEIGHT,Geopotential height (ERA5),km,int_calc,CLAMS,z,,,,,ERA5,,,int_ERA5_PHI,
-int_ERA5_HEIGHT_1_5,Geopotential height of local 1.5 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,FALSE,ERA5,1.5,,int_ERA5_dynTP_PHI_1_5,
-int_ERA5_HEIGHT_2_0,Geopotential height of local 2.0 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,FALSE,ERA5,2,,int_ERA5_dynTP_PHI_2_0,
-int_ERA5_HEIGHT_3_5,Geopotential height of local 3.5 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,FALSE,ERA5,3.5,,int_ERA5_dynTP_PHI_3_5,
-int_ERA5_D_PRESS_thermTP,Pressure-Distance to local lapse rate tropopause (ERA5),hPa,int_calc,CLAMS,p,,,therm,TRUE,ERA5,,,int_ERA5_PRESS,int_ERA5_thermTP_PRESS
-int_ERA5_D_PRESS_1_5,Pressure-Distance to local 1.5 PVU surface (ERA5),hPa,int_calc,CLAMS,p,,,dyn,TRUE,ERA5,1.5,,int_ERA5_PRESS,int_ERA5_dynTP_PRESS_1_5
-int_ERA5_D_PRESS_2_0,Pressure-Distance to local 2.0 PVU surface (ERA5),hPa,int_calc,CLAMS,p,,,dyn,TRUE,ERA5,2,,int_ERA5_PRESS,int_ERA5_dynTP_PRESS_2_0
-int_ERA5_D_PRESS_3_5,Pressure-Distance to local 3.5 PVU surface (ERA5),hPa,int_calc,CLAMS,p,,,dyn,TRUE,ERA5,3.5,,int_ERA5_PRESS,int_ERA5_dynTP_PRESS_3_5
-int_ERA5_D_THETA_thermTP,THETA-Distance to local lapse rate tropopause (ERA5),K,int_calc,CLAMS,pt,,,therm,TRUE,ERA5,,,int_ERA5_THETA,int_ERA5_thermTP_THETA
-int_ERA5_D_THETA_1_5,THETA-Distance to local 1.5 PVU surface (ERA5),K,int_calc,CLAMS,pt,,,dyn,TRUE,ERA5,1.5,,int_ERA5_THETA,int_ERA5_dynTP_THETA_1_5
-int_ERA5_D_THETA_2_0,THETA-Distance to local 2.0 PVU surface (ERA5),K,int_calc,CLAMS,pt,,,dyn,TRUE,ERA5,2,,int_ERA5_THETA,int_ERA5_dynTP_THETA_2_0
-int_ERA5_D_THETA_3_5,THETA-Distance to local 3.5 PVU surface (ERA5),K,int_calc,CLAMS,pt,,,dyn,TRUE,ERA5,3.5,,int_ERA5_THETA,int_ERA5_dynTP_THETA_3_5
-int_ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),km,int_calc,CLAMS,z,,,therm,TRUE,ERA5,,,int_ERA5_HEIGHT,int_ERA5_thermTP_Z
-int_ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,TRUE,ERA5,1.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_1_5
-int_ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,TRUE,ERA5,2,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_2_0
-int_ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,TRUE,ERA5,3.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_3_5
+int_ERA5_HEIGHT,Geopotential height (ERA5),km,calc,CLAMS,z,,,,,ERA5,,,int_ERA5_PHI,
+int_ERA5_HEIGHT_1_5,Geopotential height of local 1.5 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,FALSE,ERA5,1.5,,int_ERA5_dynTP_PHI_1_5,
+int_ERA5_HEIGHT_2_0,Geopotential height of local 2.0 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,FALSE,ERA5,2,,int_ERA5_dynTP_PHI_2_0,
+int_ERA5_HEIGHT_3_5,Geopotential height of local 3.5 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,FALSE,ERA5,3.5,,int_ERA5_dynTP_PHI_3_5,
+int_ERA5_D_PRESS_thermTP,Pressure-Distance to local lapse rate tropopause (ERA5),hPa,calc,CLAMS,p,,,therm,TRUE,ERA5,,,int_ERA5_PRESS,int_ERA5_thermTP_PRESS
+int_ERA5_D_PRESS_1_5,Pressure-Distance to local 1.5 PVU surface (ERA5),hPa,calc,CLAMS,p,,,dyn,TRUE,ERA5,1.5,,int_ERA5_PRESS,int_ERA5_dynTP_PRESS_1_5
+int_ERA5_D_PRESS_2_0,Pressure-Distance to local 2.0 PVU surface (ERA5),hPa,calc,CLAMS,p,,,dyn,TRUE,ERA5,2,,int_ERA5_PRESS,int_ERA5_dynTP_PRESS_2_0
+int_ERA5_D_PRESS_3_5,Pressure-Distance to local 3.5 PVU surface (ERA5),hPa,calc,CLAMS,p,,,dyn,TRUE,ERA5,3.5,,int_ERA5_PRESS,int_ERA5_dynTP_PRESS_3_5
+int_ERA5_D_THETA_thermTP,THETA-Distance to local lapse rate tropopause (ERA5),K,calc,CLAMS,pt,,,therm,TRUE,ERA5,,,int_ERA5_THETA,int_ERA5_thermTP_THETA
+int_ERA5_D_THETA_1_5,THETA-Distance to local 1.5 PVU surface (ERA5),K,calc,CLAMS,pt,,,dyn,TRUE,ERA5,1.5,,int_ERA5_THETA,int_ERA5_dynTP_THETA_1_5
+int_ERA5_D_THETA_2_0,THETA-Distance to local 2.0 PVU surface (ERA5),K,calc,CLAMS,pt,,,dyn,TRUE,ERA5,2,,int_ERA5_THETA,int_ERA5_dynTP_THETA_2_0
+int_ERA5_D_THETA_3_5,THETA-Distance to local 3.5 PVU surface (ERA5),K,calc,CLAMS,pt,,,dyn,TRUE,ERA5,3.5,,int_ERA5_THETA,int_ERA5_dynTP_THETA_3_5
+int_ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),km,calc,CLAMS,z,,,therm,TRUE,ERA5,,,int_ERA5_HEIGHT,int_ERA5_thermTP_Z
+int_ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,TRUE,ERA5,1.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_1_5
+int_ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,TRUE,ERA5,2,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_2_0
+int_ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,calc,CLAMS,z,,,dyn,TRUE,ERA5,3.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_3_5
 int_h_rel_TP,Geopotential height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,
-int_h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,int_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_h_rel_TP
-int_p_dtrop_hpa,Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,int_calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p,int_dp_dtrop_hpa
-int_p_strop_hpa,Pressure of thermal tropopause (ECMWF),hPa,int_calc,Caribic,p,,,therm,FALSE,ECMWF,,,p,int_dp_strop_hpa
-int_pt_dTP_K,Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMWF) ,K,int_calc,Caribic,pt,,,dyn,FALSE,ECMWF,3.5,,int_Tpot,int_pt_rel_dTP_K
+int_h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_h_rel_TP
+int_p_dtrop_hpa,Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p,int_dp_dtrop_hpa
+int_p_strop_hpa,Pressure of thermal tropopause (ECMWF),hPa,calc,Caribic,p,,,therm,FALSE,ECMWF,,,p,int_dp_strop_hpa
+int_pt_dTP_K,Potential temperature of dynamical (PV=3.5PVU) tropopause (ECMWF) ,K,calc,Caribic,pt,,,dyn,FALSE,ECMWF,3.5,,int_Tpot,int_pt_rel_dTP_K
 int_pt_rel_dTP_K,Potential temperature difference relative to dynamical (PV=3.5PVU) tropopause from ECMWF,K,INT,Caribic,pt,,,dyn,TRUE,ECMWF,3.5,,,
 int_pt_rel_sTP_K,Potential temperature difference relative to thermal tropopause from ECMWF,K,INT,Caribic,pt,,,therm,TRUE,ECMWF,,,,
-int_pt_sTP_K,Potential temperature of thermal tropopause (ECMWF) ,K,int_calc,Caribic,pt,,,therm,FALSE,ECMWF,,,int_Tpot,int_pt_rel_sTP_K
+int_pt_sTP_K,Potential temperature of thermal tropopause (ECMWF) ,K,calc,Caribic,pt,,,therm,FALSE,ECMWF,,,int_Tpot,int_pt_rel_sTP_K
 int_PV,PV from ECMWF (integral),PVU,INT,Caribic,pv,,,,,ECMWF,,,,
 int_ToAirTmp,Total Air Temperature # Celsius-temperature-scale,degC,INT,Caribic,,,t,,,ECMWF,,,,
 int_Tpot,potential temperature derived from measured pressure and temperature,K,INT,Caribic,pt,,,,,MSMT,,,,
-int_z_dTP_km,Geopotential height of dynamical (PV=3.5PVU) tropopause (ECMWF),km,int_calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km,int_z_rel_dTP_km
+int_z_dTP_km,Geopotential height of dynamical (PV=3.5PVU) tropopause (ECMWF),km,calc,Caribic,z,,,dyn,FALSE,ECMWF,3.5,,int_z_km,int_z_rel_dTP_km
 int_z_km,Geopotential height of sample from ECMWF (with g=9.81 m/s^2),km,INT,Caribic,z,,,,,ECMWF,,,,
 int_z_rel_dTP_km,Geopotential height relative to dynamical (PV=3.5PVU) tropopause from ECMWF,km,INT,Caribic,z,,,dyn,TRUE,ECMWF,3.5,,,
 int_z_rel_sTP_km,Geopotential height relative to thermal tropopause from ECMWF,km,INT,Caribic,z,,,therm,TRUE,ECMWF,,,,
-int_z_sTP_km,Geopotential height of thermal tropopause from ECMWF,km,int_calc,Caribic,z,,,therm,FALSE,ECMWF,,,int_z_km,int_z_rel_sTP_km
+int_z_sTP_km,Geopotential height of thermal tropopause from ECMWF,km,calc,Caribic,z,,,therm,FALSE,ECMWF,,,int_z_km,int_z_rel_sTP_km
 N2O,Pseudo coord: N2O mixing ratio,ppb,GHG,Caribic,mxr,,,chem,FALSE,MSMT,,n2o,,
 p,pressure (mean value),mbar,GHG,Caribic,p,,,,FALSE,MSMT,,,,
 ERAInt_PV,Potential Vorticity (ERAInt),PVU,CLAMS,CLAMS,pv,,,,,ERAInt,,,,
@@ -117,21 +117,21 @@ ilev,hybrid level at layer interfaces,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
 latitude,track latitude,degrees_north,EMAC,EMAC,,lat,,,,EMAC,,,,
 lev,hybrid level at layer midpoints,level,EMAC,EMAC,lev,,,,FALSE,EMAC,,,,
 longitude,track longitude,degrees_east,EMAC,EMAC,,lon,,,,EMAC,,,,
-tp_cpt_p_D,Pressure difference relative to cold point tropopause from EMAC,hPa,EMAC_calc,EMAC,p,,,cpt,TRUE,EMAC,,,tpress,tropop_cpt
-tp_cpt_pt,Potential temperature of cold point tropopause from EMAC,K,EMAC_calc,EMAC,pt,,,cpt,FALSE,EMAC,,,e5vdiff_tpot,tropop_cpt_i
-tp_cpt_pt_D,Potential temperature relative to cold point tropopause from EMAC,K,EMAC_calc,EMAC,pt,,,cpt,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_cpt_pt
-tp_cpt_z,Geopotential height of cold point tropopause from EMAC,km,EMAC_calc,EMAC,z,,,cpt,FALSE,EMAC,,,ECHAM5_height,tropop_cpt_i
-tp_cpt_z_D,Geopoential height relative to cold point tropopause from EMAC,km,EMAC_calc,EMAC,z,,,cpt,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_cpt_z
-tp_PV_p_D,Pressure difference relative to PV (3.5PVU) tropopause from EMAC,hPa,EMAC_calc,EMAC,p,,,dyn,TRUE,EMAC,3.5,,tpress,tropop_tp_PV
-tp_PV_pt,Potential temperature of PV (3.5PVU) tropopause from EMAC,K,EMAC_calc,EMAC,pt,,,dyn,FALSE,EMAC,3.5,,e5vdiff_tpot,tropop_tp_PV_i
-tp_PV_pt_D,Potential temperature relative to PV (3.5PVU) tropopause from EMAC,K,EMAC_calc,EMAC,pt,,,dyn,TRUE,EMAC,3.5,,e5vdiff_tpot_at_fl,tp_PV_pt
-tp_PV_z,Geopotential height of PV (3.5PVU) tropopause from EMAC,km,EMAC_calc,EMAC,z,,,dyn,FALSE,EMAC,3.5,,ECHAM5_height,tropop_tp_PV_i
-tp_PV_z_D,Geopoential height relative to PV (3.5PVU) tropopause from EMAC,km,EMAC_calc,EMAC,z,,,dyn,TRUE,EMAC,3.5,,ECHAM5_height_at_fl,tp_PV_z
-tp_WMO_p_D,Pressure difference relative to thermal (WMO) tropopause from EMAC,hPa,EMAC_calc,EMAC,p,,,therm,TRUE,EMAC,,,tpress,tropop_tp_WMO
-tp_WMO_pt,Potential temperature of thermal (WMO) tropopause from EMAC,K,EMAC_calc,EMAC,pt,,,therm,FALSE,EMAC,,,e5vdiff_tpot,tropop_tp_WMO_i
-tp_WMO_pt_D,Potential temperature relative to thermal (WMO) tropopause from EMAC,K,EMAC_calc,EMAC,pt,,,therm,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_WMO_pt
-tp_WMO_z,Geopotential height of thermal (WMO) tropopause from EMAC,km,EMAC_calc,EMAC,z,,,therm,FALSE,EMAC,,,ECHAM5_height,tropop_tp_WMO_i
-tp_WMO_z_D,Geopoential height relative to thermal (WMO) tropopause from EMAC,km,EMAC_calc,EMAC,z,,,therm,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_WMO_z
+tp_cpt_p_D,Pressure difference relative to cold point tropopause from EMAC,hPa,calc,EMAC,p,,,cpt,TRUE,EMAC,,,tpress,tropop_cpt
+tp_cpt_pt,Potential temperature of cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,FALSE,EMAC,,,e5vdiff_tpot,tropop_cpt_i
+tp_cpt_pt_D,Potential temperature relative to cold point tropopause from EMAC,K,calc,EMAC,pt,,,cpt,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_cpt_pt
+tp_cpt_z,Geopotential height of cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,FALSE,EMAC,,,ECHAM5_height,tropop_cpt_i
+tp_cpt_z_D,Geopoential height relative to cold point tropopause from EMAC,km,calc,EMAC,z,,,cpt,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_cpt_z
+tp_PV_p_D,Pressure difference relative to PV (3.5PVU) tropopause from EMAC,hPa,calc,EMAC,p,,,dyn,TRUE,EMAC,3.5,,tpress,tropop_tp_PV
+tp_PV_pt,Potential temperature of PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,FALSE,EMAC,3.5,,e5vdiff_tpot,tropop_tp_PV_i
+tp_PV_pt_D,Potential temperature relative to PV (3.5PVU) tropopause from EMAC,K,calc,EMAC,pt,,,dyn,TRUE,EMAC,3.5,,e5vdiff_tpot_at_fl,tp_PV_pt
+tp_PV_z,Geopotential height of PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,FALSE,EMAC,3.5,,ECHAM5_height,tropop_tp_PV_i
+tp_PV_z_D,Geopoential height relative to PV (3.5PVU) tropopause from EMAC,km,calc,EMAC,z,,,dyn,TRUE,EMAC,3.5,,ECHAM5_height_at_fl,tp_PV_z
+tp_WMO_p_D,Pressure difference relative to thermal (WMO) tropopause from EMAC,hPa,calc,EMAC,p,,,therm,TRUE,EMAC,,,tpress,tropop_tp_WMO
+tp_WMO_pt,Potential temperature of thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,FALSE,EMAC,,,e5vdiff_tpot,tropop_tp_WMO_i
+tp_WMO_pt_D,Potential temperature relative to thermal (WMO) tropopause from EMAC,K,calc,EMAC,pt,,,therm,TRUE,EMAC,,,e5vdiff_tpot_at_fl,tp_WMO_pt
+tp_WMO_z,Geopotential height of thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,FALSE,EMAC,,,ECHAM5_height,tropop_tp_WMO_i
+tp_WMO_z_D,Geopoential height relative to thermal (WMO) tropopause from EMAC,km,calc,EMAC,z,,,therm,TRUE,EMAC,,,ECHAM5_height_at_fl,tp_WMO_z
 tpress,track pressure,hPa,EMAC,EMAC,p,,,,FALSE,EMAC,,,,
 tps,track surface pressure,hPa,EMAC,EMAC,,,p0,,,EMAC,,,,
 tracer_gp_N2O_at_fl,Pseudo coord: tracer GP N2O,mol mol-1,EMAC,EMAC,mxr,,,chem,FALSE,EMAC,,n2o,,
@@ -216,4 +216,4 @@ ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),km,C
 ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,1.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_1_5
 ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,2,,ERA5_HEIGHT_km,ERA5_HEIGHT_2_0
 ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_3_5
-H_TP,"Ozone-based representative height of tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn, JGR, 2010]",km,MS_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,Altitude ,H_rel_TP
+H_TP,"Ozone-based representative height of tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn, JGR, 2010]",km,Caribic_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,Altitude ,H_rel_TP
