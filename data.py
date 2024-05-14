@@ -985,10 +985,10 @@ class GlobalData:
 
         if self.source not in ['Caribic', 'TP']:
             raise NotImplementedError('Action not yet supported for non-Caribic data')
-        eql_col = dcts.get_coord(model=model, hcoord='eql').col_name
+        [eql] = self.get_coords(model=model, hcoord='eql')
         df = self.data['df'].copy()
-        df = df[df[eql_col] > eql_min]
-        df = df[df[eql_col] < eql_max]
+        df = df[df[eql.col_name] > eql_min]
+        df = df[df[eql.col_name] < eql_max]
         out.data['df'] = df
 
         df_list = [k for k in self.data
@@ -1358,10 +1358,10 @@ class GlobalData:
                 kwargs.update({'source': self.source})
     
             if 'rel_to_tp' not in kwargs and any(
-                    c.rel_to_tp for c in dcts.get_coordinates(**kwargs)):
+                    c.rel_to_tp for c in self.get_coords(**kwargs)):
                 kwargs.update({'rel_to_tp': True})
     
-            tp = dcts.get_coord(**kwargs)
+            [tp] = self.get_coords(**kwargs)
 
         if 'df_sorted' not in self.data:
             df_sorted = self.create_df_sorted(save=False, **kwargs)
@@ -1618,8 +1618,12 @@ class GlobalData:
             strato_av_stdevs[i] = strato_weighted_average 
     '''
 # --- Filter for extreme events in tropospheric air ---
-    def filter_extreme_events(self, **kwargs):
-        """ Filter out all tropospheric extreme events.
+    def filter_extreme_events(self, plot_ol=False, **tp_kwargs):
+        """ Returns only tropospheric background data (filter out tropospheric extreme events)
+        1. tp_kwargs are used to select tropospheric data only (if object is not already purely tropospheric)
+        2. For each substance in the dataset, extreme 
+         
+        Filter out all tropospheric extreme events.
 
         Returns new Caribic object where tropospheric extreme events have been removed.
         Result depends on tropopause definition for tropo / strato sorting.
@@ -1641,7 +1645,7 @@ class GlobalData:
         elif self.status.get('strato'):
             raise Warning('Cannot filter extreme events in purely stratospheric dataset')
         else:
-            out = self.sel_tropo(**kwargs)
+            out = self.sel_tropo(**tp_kwargs)
         out.data = {k: v for k, v in self.data.items() if k not in ['sf6', 'n2o', 'ch4', 'co2']}
 
         for k in out.data:
@@ -1665,11 +1669,10 @@ class GlobalData:
                         d_mxr = None  # integrated values of high resolution data
 
                     # Find extreme events
-                    plot = False if 'plot' not in kwargs else kwargs.get('plot')
                     tmp = outliers.find_ol(dcts.get_subs(col_name=substance).function,
                                            time, mxr, d_mxr, flag=None,  # here
                                            direction='p', verbose=False,
-                                           plot=plot, limit=0.1, ctrl_plots=False)
+                                           plot=plot_ol, limit=0.1, ctrl_plots=False)
 
                     # Set rows that were flagged as extreme events to 9999, then nan
                     for c in [c for c in data.columns if substance in c]:  # all related columns
