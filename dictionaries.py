@@ -308,7 +308,7 @@ class Substance():
             raise KeyError(f'No default vlims set for {bin_attr} in {self.short_name} data')
         
          # values and bin_attr set and valid
-        vlims = vlim_dict[bin_attr] if not atm_layer else vlim_dict[f'{bin_attr}_{atm_layer}']
+        vlims = vlim_dict[bin_attr] # if not atm_layer else vlim_dict[f'{bin_attr}_{atm_layer}']
 
         return vlims 
 
@@ -341,8 +341,10 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
         vlim_dict.update(
             dict(vmean = (0.95, 1.05),
                  vstdv = (0, 0.05),
-                 vstdv_tropo = (0.05, 0.15),
-                 vstdv_strato = (0.05, 0.3),
+                 vstdv_tropo = (0.005, 0.015),
+                 vstdv_strato = (0.005, 0.03),
+                 rvstd_tropo = (0.005, 0.015),
+                 rvstd_strato = (0.015, 0.035),
                  ))
     elif short_name == 'detr_co2': 
         vlim_dict.update(
@@ -350,6 +352,8 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
                  vstdv = (0.8, 3.0),
                  vstdv_tropo = (2.0, 3.0),
                  vstdv_strato = (1.2, 1.8),
+                 rvstd_tropo = (0.5, 0.8),
+                 rvstd_strato = (0.25, 0.5),
                  ))
     elif short_name == 'detr_ch4': 
         vlim_dict.update(
@@ -395,6 +399,8 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
                  vstdv_tropo = (15, 60),
                  vstdv_strato = (90, 200), 
                  rvstd = (0,10),
+                 rvstd_tropo = (0,10),
+                 rvstd_strato = (0,10),
                  ))
     elif short_name == 'h2o': 
         vlim_dict.update(
@@ -729,6 +735,8 @@ def dict_colors():
         'vstdv': cmr.get_sub_cmap('hot_r', 0.1, 1),
         'vstdv_tropo': cmr.get_sub_cmap('YlOrBr', 0, 0.75),
         'vstdv_strato': plt.cm.BuPu,
+        'rvstd_tropo': cmr.get_sub_cmap('YlOrBr', 0, 0.75),
+        'rvstd_strato': plt.cm.BuPu,
         'diff': plt.cm.PiYG,
         'vcount': cmr.get_sub_cmap('plasma_r', 0.1, 0.9),
         # 'rvstd' : cmr.get_sub_cmap('hot_r', 0.1, 1),
