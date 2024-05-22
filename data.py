@@ -140,7 +140,7 @@ class GlobalData:
                 variables.append(var)
             except KeyError:
                 continue
-        if 'geometry' in self.data['df'].columns: 
+        if 'geometry' in self.data['df'].columns and category == 'coords': 
             variables.append(dcts.get_coord(col_name = 'geometry.y'))
             variables.append(dcts.get_coord(col_name = 'geometry.x'))
         return variables
@@ -430,6 +430,28 @@ class GlobalData:
             # indices = [i for i in indices_non_chem if i in n2o_indices]
         
         return indices
+
+    def remove_non_shared_indices(self, inplace = True, **kwargs): # filter_non_shared_indices
+        """ Returns a class instances with all non-shared indices of the given tps filtered out. """
+        tps = (self.tps if not kwargs.get('tps') else kwargs.get('tps'))
+        shared_indices = self.get_shared_indices(tps)
+
+        out = type(self).__new__(self.__class__)  # new class instance
+        for attribute_key in self.__dict__:  # copy attributes
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+
+        out.data = {}
+        df_list = [k for k in self.data
+                   if isinstance(self.data[k], pd.DataFrame)]  # includes geodataframes
+        for k in df_list:  # only take data from chosen years
+            out.data[k] = self.data[k][self.data[k].index.isin(shared_indices)]
+
+        out.status['shared_i_coords'] = tps
+        
+        if inplace: 
+            self.data = out.data
+        
+        return out
 
 # --- 1D and 2D Binning according to selected coordinates --- 
     def binned_1d(self, subs, **kwargs) -> tuple[list, list]:
@@ -1332,6 +1354,16 @@ class GlobalData:
         """
         return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared='No')
 
+    def shared_tropo_strato_indices(self, tps) -> tuple[pd.Index, pd.Index]:
+        """ Get indices of datapoints that are identified consistently as tropospheric / stratospheric. """
+        shared_tropo = shared_strato = self.get_shared_indices(tps)
+
+        for tp in tps: # iteratively remove non-shared indices 
+            shared_tropo = shared_tropo[self.df_sorted.loc[shared_tropo, 'tropo_'+tp.col_name]] 
+            shared_strato = shared_strato[self.df_sorted.loc[shared_strato, 'strato_'+tp.col_name]] 
+
+        return shared_tropo, shared_strato
+
 # --- Make selections based on strato / tropo characteristics --- 
     def sel_atm_layer(self, atm_layer: str, tp=None, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
@@ -1399,7 +1431,7 @@ class GlobalData:
 
     def sel_LMS(self, tp=None, nr_of_bins = 3, **kwargs): #!!!
         """ Returns GlobalData object containing only lowermost stratospheric data points. """
-        strato_data = self.sel_strato(self, tp, **kwargs)
+        strato_data = self.sel_strato(tp, **kwargs).df
         
         zbsize = tp.get_bsize() if not kwargs.get('zbsize') else kwargs.get('zbsize')
         
