@@ -32,8 +32,10 @@ pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_da
 # fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
 fnameV02 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V02.txt'
 fnameV03 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V03.txt'
+fnameV04 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V04(1).txt'
 c2 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
 c3 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
+c4 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
 
 #%%
 from data import GlobalData, Caribic
