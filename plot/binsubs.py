@@ -16,6 +16,7 @@ class BinPlotter3D(BinPlotter)
 fctn n2o_tp_stdv_rms
 
 """
+#%% Imports
 
 import numpy as np
 import math
@@ -42,6 +43,8 @@ warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed 
 
 #TODO map of distance to tropopause (stratosphere only?)
 #TODO might want to implement a logarithmic scale for pressure at some point
+
+#%%% BinPlotter classes for multiple dimensionalities
 
 class SimpleBinPlotter: 
     def plot_1d(self, simple_bin_1d, bin_attr='vmean'): 
@@ -72,21 +75,13 @@ class SimpleBinPlotter:
         plt.show()
 
 class BinPlotter:
-    """ Plotting class to facilitate creating binned 2D plots for any choice of x and y.
-
-    Attributes:
-        data (pd.DataFrame): Input data
+    """ Structure for binning & plotting classes for any choice of x/y/z.
 
     Methods:
+        set_kwargs(**kwargs)
         get_vlimit(subs, bin_attr)
         get_coord_lims(coord, xyz)
         _get_bsize(coord, xyz)
-        filter_non_shared_indices(tps)
-        bin_1d(subs, coord)
-        bin_2d(subs, xcoord, ycoord)
-        bin_3d(subs, zcoord)
-        bin_1d_seasonal(subs, coord, bin_equi1d, xbsize)
-        bin_2d_seasonal(subs, xcoord, ycoord, bin_equi2d, xbsize, ybsize)
     """
     def __init__(self, filter_tps = None, **kwargs):
         """ Initialise class instances. 
@@ -97,11 +92,8 @@ class BinPlotter:
             key ybsize (float)
             key vlims / xlims / ylims (Tuple[float])
             """
-        # filter_tps = kwargs.pop('filter_tps') if 'filter_tps' in kwargs else False
         if filter_tps: 
-            # tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-            self.filter_non_shared_indices(filter_tps)
-            self.data['df'] = self.df.copy()
+            self.remove_non_shared_indices(filter_tps, inplace=True)
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         self.outline = mpe.withStroke(linewidth=2, foreground='white')
@@ -110,38 +102,43 @@ class BinPlotter:
         return f'<class eqlat.BinPlotter> with minimum points per bin: {self.count_limit} \n\
 based on {self.__repr__()}'
 
+    def set_kwargs(self, **kwargs): 
+        """ Set shared kwargs used by various class methods. """
+        self._kwargs = kwargs
+        return self
+
     @property
     def df(self) -> pd.DataFrame:
         return self.data['df']
 
-    def get_vlimit(self, subs: dcts.Substance, 
-                   bin_attr: str, **kwargs) -> tuple: 
+    def get_vlimit(self, subs: dcts.Substance, bin_attr: str) -> tuple: 
         """ Get colormap limits for given substance and bin attribute. """
-        if hasattr(self, 'kwargs'):
-            if 'vlims' in self.kwargs: 
-                vlims = self.kwargs.get('vlims')
-        else:
-            try:
-                vlims = subs.vlims(bin_attr=bin_attr)
-            except KeyError:
-                if bin_attr=='vmean':
-                    vlims = (np.nanmin(self.df[subs.col_name]), np.nanmax(self.df[subs.col_name]))
-                else:
-                    raise KeyError('Could not generate colormap limits.')
-            except: 
+        if hasattr(self, '_kwargs'): 
+            if 'vlims' in self._kwargs:
+                return self._kwargs.get('vlims')
+
+        try:
+            vlims = subs.vlims(bin_attr=bin_attr)
+        except KeyError:
+            if bin_attr=='vmean':
+                vlims = (np.nanmin(self.df[subs.col_name]), np.nanmax(self.df[subs.col_name]))
+            else:
                 raise KeyError('Could not generate colormap limits.')
+        except: 
+            raise KeyError('Could not generate colormap limits.')
         return vlims
 
     def get_coord_lims(self, coord, xyz: str = None) -> tuple: 
-        """ Get coordinate limits for plotting. """
+        """ Returns default maximum / minimum boundary of the coordinate for plotting. """
+
         if xyz=='x': 
-            if 'xlims' in self.kwargs: 
-                lims = self.kwargs.get('xlims')
+            if 'xlims' in self._kwargs: 
+                lims = self._kwargs.get('xlims')
             else: 
                 lims = (-90, 90)
         elif xyz=='y': 
-            if 'ylims' in self.kwargs: 
-                lims = self.kwargs.get('ylims')
+            if 'ylims' in self._kwargs: 
+                lims = self._kwargs.get('ylims')
             else: 
                 lims = (np.floor(np.nanmin(self.df[coord.col_name])),
                          np.ceil(np.nanmax(self.df[coord.col_name])))
@@ -154,13 +151,13 @@ based on {self.__repr__()}'
         """ Get bin size for given coordinate. """
         bsize = None
 
-        if hasattr(self, 'kwargs'):
-            if xyz=='x' and 'xbsize' in self.kwargs: 
-                bsize = self.kwargs.get('xbsize')
-            elif xyz=='y' and 'ybsize' in self.kwargs: 
-                bsize = self.kwargs.get('ybsize')
-            elif xyz=='z' and 'zbsize' in self.kwargs: 
-                bsize = self.kwargs.get('zbsize')
+        if hasattr(self, '_kwargs'):
+            if xyz=='x' and 'xbsize' in self._kwargs: 
+                bsize = self._kwargs.get('xbsize')
+            elif xyz=='y' and 'ybsize' in self._kwargs: 
+                bsize = self._kwargs.get('ybsize')
+            elif xyz=='z' and 'zbsize' in self._kwargs: 
+                bsize = self._kwargs.get('zbsize')
             if bsize: 
                 return bsize 
 
@@ -173,249 +170,6 @@ based on {self.__repr__()}'
             if (lims[1]-lims[0])/10<1: 
                 bsize=0.5
         return bsize
-
-    def filter_non_shared_indices(self, tps: list):
-        """ Filter dataframe for datapoints that don't exist for all tps or are zero. """
-        print('Filtering out non-shared indices. ')
-        cols = [tp.col_name for tp in tps]
-        self.data['df'].dropna(subset=cols, how='any', inplace=True)
-        self.data['df'] = self.data['df'][self.data['df'] != 0].dropna(subset=cols)
-        return self.data['df']
-
-    '''    
-    def bin_1d(self, subs, coord, bin_equi1d=None, xbsize: float = None): 
-        """ Bin substance data onto bins of coord. """
-        if not xbsize:
-            xbsize = self._get_bsize(coord)
-
-        df = self.df
-
-        if coord.col_name == 'geometry.y': # latitude
-            x = df.geometry.y
-        elif coord.col_name == 'geometry.x':
-            x = df.geometry.x
-        else:
-            x = np.array(df[coord.col_name])
-
-        # get bins as multiples of the bin size
-        xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-        xbmin = (np.nanmin(x) // xbsize) * xbsize
-        
-        if not bin_equi1d:
-            bin_equi1d = bp.Bin_equi1d(xbmin, xbmax, xbsize)
-
-        out = bp.Simple_bin_1d(np.array(df[subs.col_name]), x,
-                               bin_equi1d, count_limit=self.count_limit)
-
-        return out
-
-    def bin_2d(self, subs, xcoord, ycoord, bin_equi2d=None, 
-               xbsize: float = None, ybsize: float = None, 
-               df: pd.DataFrame = None): 
-        """ Bin substance data onto x-y grid. """
-        if not xbsize:
-            xbsize = self._get_bsize(xcoord, 'x')
-        if not ybsize:
-            ybsize = self._get_bsize(ycoord, 'y')
-
-        # calculate binned output per season
-        if not isinstance(df, pd.DataFrame): 
-            df = self.df
-
-        if xcoord.col_name.startswith('geometry.'):
-            x = df.geometry.y if xcoord.col_name == 'geometry.y' else df.geometry.x
-        else:
-            x = np.array(df[xcoord.col_name])
-
-        if ycoord.col_name.startswith('geometry.'):
-            y = df.geometry.y if ycoord.col_name == 'geometry.y' else df.geometry.x
-        else: 
-            y = np.array(df[ycoord.col_name])
-
-        # get bins as multiples of the bin size
-        xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-        xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-        ybmax = ((np.nanmax(y) // ybsize) + 1) * ybsize
-        ybmin = (np.nanmin(y) // ybsize) * ybsize
-
-        if not bin_equi2d:
-            bin_equi2d = bp.Bin_equi2d(xbmin, xbmax, xbsize,
-                                       ybmin, ybmax, ybsize)
-
-        out = bp.Simple_bin_2d(np.array(df[subs.col_name]), x, y,
-                               bin_equi2d, count_limit=self.count_limit)
-        return out
-
-    def bin_3d(self, subs, zcoord, bin_equi3d=None, 
-               xbsize: float = None, ybsize: float = None, zbsize: float = None, 
-               df: pd.DataFrame = None): 
-        """ Bin substance data onto longitude-latitude-z grid. """
-        if not xbsize:
-            xbsize = self.grid_size
-        if not ybsize:
-            ybsize = self.grid_size
-        if not zbsize: 
-            zbsize = self._get_bsize(zcoord)
-        
-        # calculate binned output per season
-        if not isinstance(df, pd.DataFrame): 
-            df = self.df
-        
-        x = df.geometry.x
-        y = df.geometry.y
-        xbmin, xbmax = -180, 180
-        ybmin, ybmax = -90, 90
-
-        z = df[zcoord.col_name]
-        zbmax = ((np.nanmax(z) // zbsize) + 1) * zbsize
-        zbmin = (np.nanmin(z) // zbsize) * zbsize
-        
-        if not bin_equi3d:
-            bin_equi3d = bp.Bin_equi3d(xbmin, xbmax, xbsize,
-                                       ybmin, ybmax, ybsize,
-                                       zbmin, zbmax, zbsize)
-        
-        out = bp.Simple_bin_3d(np.array(df[subs.col_name]), x, y, z, bin_equi3d)
-        
-        return out
-
-    def bin_LMS(self, subs, tp, df=None): 
-        """ Bin data onto lon-lat-z grid without count limit, then take lowest stratospheric bins. """
-        if not tp.rel_to_tp: 
-            raise Exception('tp has to be relative to tropopause')
-        
-        xbsize = ybsize = self.grid_size
-        zbsize = self._get_bsize(tp)
-
-        # calculate binned output per season
-        if not isinstance(df, pd.DataFrame): 
-            df = self.sel_strato(**tp.__dict__).df
-        
-
-        x = df.geometry.x
-        y = df.geometry.y
-        xbmin, xbmax = -180, 180
-        ybmin, ybmax = -90, 90
-
-        z = df[tp.col_name]
-        zbmax = ((np.nanmax(z) // zbsize) + 1) * zbsize
-        zbmin = (np.nanmin(z) // zbsize) * zbsize
-
-        bin_equi3d = bp.Bin_equi3d(xbmin, xbmax, xbsize,
-                                   ybmin, ybmax, ybsize,
-                                   zbmin, zbmax, zbsize)
-
-        out = bp.Simple_bin_3d(np.array(df[subs.col_name]), x, y, z, bin_equi3d)
-        
-        return out
-
-    def bin_1d_seasonal(self, subs, coord, bin_equi1d=None, xbsize: float = None) -> dict:
-        """ Bin the data onto coord for each season. """
-        out_dict = {}
-        if not xbsize:
-            xbsize = self._get_bsize(coord, 'x')
-
-        for s in set(self.df['season'].tolist()):
-            df = self.df[self.df['season'] == s]
-
-            if coord.col_name == 'geometry.y': # latitude
-                x = df.geometry.y
-            elif coord.col_name == 'geometry.x':
-                x = df.geometry.x
-            else:
-                x = np.array(df[coord.col_name])
-            
-            # skip seasons that have no data
-            if all(str(xi) == 'nan' for xi in x): continue
-            
-            # get bins as multiples of the bin size
-            xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-            xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-            if not bin_equi1d:
-                bin_equi1d = bp.Bin_equi1d(xbmin, xbmax, xbsize)
-
-            out = bp.Simple_bin_1d(np.array(df[subs.col_name]), x,
-                                   bin_equi1d, count_limit=self.count_limit)
-            out_dict[s] = out
-
-        return out_dict
-
-    def bin_2d_seasonal(self, subs, xcoord, ycoord,
-                     bin_equi2d = None,
-                     xbsize: float = None, ybsize: float = None, **kwargs) -> dict:
-        """ Bin the dataframe per season. """
-        out_dict = {}
-        if not xbsize:
-            xbsize = self._get_bsize(xcoord, 'x')
-        if not ybsize:
-            ybsize = self._get_bsize(ycoord, 'y')
-
-        # calculate binned output per season
-        for s in set(self.df['season'].tolist()):
-            df = self.df[self.df['season'] == s]
-
-            if xcoord.col_name == 'geometry.y': # latitude
-                x = df.geometry.y
-            else:
-                x = np.array(df[xcoord.col_name])
-            
-            # skip seasons that have no data
-            if all(str(xi) == 'nan' for xi in x): continue
-
-            y = np.array(df[ycoord.col_name])
-
-            # get bins as multiples of the bin size
-            xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-            xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-            ybmax = ((np.nanmax(y) // ybsize) + 1) * ybsize
-            ybmin = (np.nanmin(y) // ybsize) * ybsize
-
-            if not bin_equi2d:
-                bin_equi2d = bp.Bin_equi2d(xbmin, xbmax, xbsize,
-                                           ybmin, ybmax, ybsize)
-
-            out = bp.Simple_bin_2d(np.array(df[subs.col_name]), x, y,
-                                   bin_equi2d, count_limit=self.count_limit)
-            out_dict[s] = out
-
-        return out_dict
-    '''
-
-    def rms_seasonal_vstdv(self, subs, coord, **kwargs) -> pd.DataFrame:
-        """ Root mean squared of seasonal variability for given substance and tp. """
-        data_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
-        seasons = list(data_dict.keys())
-
-        df = pd.DataFrame(index = data_dict[seasons[0]].xintm)
-        df['rms_vstdv'] = np.nan
-        df['rms_rvstd'] = np.nan
-        
-        for s in data_dict: 
-            df[f'vstdv_{s}'] = data_dict[s].vstdv
-            df[f'rvstd_{s}'] = data_dict[s].rvstd
-            df[f'vcount_{s}'] = data_dict[s].vcount
-
-        s_cols_vstd = [c for c in df.columns if c.startswith('vstdv')]
-        s_cols_rvstd = [c for c in df.columns if c.startswith('rvstd')]
-        n_cols = [c for c in df.columns if c.startswith('vcount')]
-        
-        # for each bin, calculate the root mean square of the season's standard deviations
-        for i in df.index: 
-            n = df.loc[i][n_cols].values
-            nom = sum(n) - len([i for i in n if i])
-            
-            s_std = df.loc[i][s_cols_vstd].values
-            denom_std = np.nansum([( n[j]-1 ) * s_std[j]**2 for j in range(len(seasons))])
-            df.loc[i, 'rms_vstdv'] = np.sqrt(denom_std / nom) if not nom==0 else np.nan
-            
-            s_rstd = df.loc[i][s_cols_rvstd].values
-            denom_rstd = np.nansum([( n[j]-1 ) * s_rstd[j]**2 for j in range(len(seasons))])
-            df.loc[i, 'rms_rvstd'] = np.sqrt(denom_rstd / nom) if not nom==0 else np.nan
-        
-        return df
 
 class BinPlotter1D(BinPlotter):
     """ Single dimensional binning & plotting. 
@@ -1029,65 +783,6 @@ class BinPlotter1D(BinPlotter):
         for subs in substances:
             self.matrix_plot_stdev_subs(subs, note=note, minimise_tps=minimise_tps,
                                        atm_layer=atm_layer, savefig=savefig)
-
-
-def plot_seasonal_vstdv_n2o_filter( subs, theta, rstd=False, 
-                                   tp_kwargs = dict(vcoord='mxr', ID='GHG')): 
-    """ Scatter plot of mean seasnoal variability for troopause definitions """
-    
-    bp1 = BinPlotter1D()
-    bp_tropo = BinPlotter1D().sel_tropo(**tp_kwargs)
-    bp_strato = BinPlotter1D().sel_strato(**tp_kwargs)
-    
-    pt_range = 70
-    # figsize = [6.4, 4.8] # default
-    figsize = [5, 3]
-
-    # if ID == 'PGS': 
-    #     pt_range = 140
-    #     figsize = [6.4, 4.8 * 1.5]
-
-    fig, ax = plt.subplots(dpi=250, figsize = figsize)
-    # ax.set_ylim(280, 400)
-    ax.set_ylim(280, 370)
-    
-    for instance, c, label in zip([bp1, bp_tropo, bp_strato],
-                           ['grey', 'teal', 'orange'], 
-                           ['Unfiltered', 'Tropo ', 'Strato ']):
-        # label = theta.label(True)
-        
-        df = instance.rms_seasonal_vstdv(subs, theta)
-        
-        if not rstd: 
-            x_data = df['rms_vstdv']
-        else: 
-            x_data = df['rms_rvstd'] * 100 # %
-        
-        y_data = df.index
-        
-        ax.plot(x_data, y_data, 
-                '-', marker='d', 
-                c=c,
-                # c=dcts.dict_season()[f'color_{s}'],
-                label=label,
-                path_effects=[instance.outline], zorder=10)
-        
-        ax.set_ylabel('$\Theta$ [K]') 
-        
-        ax.grid('both', ls='dotted')
-        # ax.set_title(f'{self.ID}')
-        if not rstd: 
-            ax.set_xlabel(f'Mean seasonal variability of {subs.label(name_only=True)} [{subs.unit}]')
-        else: 
-            ax.set_xlabel(f'Relative seasonal variability of {subs.label(name_only=True)} [%]')
-        ax.set_zorder(3)
-        ax.patch.set_visible(False)
-        
-        h,l = ax.get_legend_handles_labels()
-        ax.legend(loc='lower right')
-
-        tools.add_zero_line(ax)
-
 
 class BinPlotter2D(BinPlotter): 
     """ Two-dimensional binning & plotting. 
@@ -1845,54 +1540,6 @@ class BinPlotter3D(BinPlotter):
                                        atm_layer=atm_layer, savefig=savefig)
 
 
-
-def n2o_tp_stdv_rms( subs, rstd=False): 
-    n2o = dcts.get_coord(col_name='N2O')
-    vcoord = dcts.get_coord(col_name='int_ERA5_THETA')
-    
-    attr = 'rms_rvstd' if rstd else 'rms_vstdv'
-    
-    # bin_equi1d = bp.Bin_equi1d(4, 13, 0.75)
-    
-    bp = BinPlotter1D()
-    var_df = bp.rms_seasonal_vstdv(subs, vcoord)
-    
-    strato = BinPlotter1D(sel_strato(**n2o.__dict__))
-    s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) #, 
-                                         # bin_equi1d=bin_equi1d)
-    
-    tropo = BinPlotter1D(sel_tropo(**n2o.__dict__))
-    t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord) #,
-                                        # bin_equi1d=bin_equi1d)
-    
-    fig, ax = plt.subplots(dpi=250, figsize=(4, 6))
-    
-    ax.plot(var_df[attr]*(100 if rstd else 1), var_df.index, 
-            '-', marker='d', 
-            c='grey', ls='dashed',
-            label='Unfiltered',
-            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
-
-    ax.plot(t_var_df[attr]*(100 if rstd else 1), t_var_df.index, 
-            '-', marker='d', 
-            c='red',
-            label='Tropospheric',
-            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
-    
-    ax.plot(s_var_df[attr]*(100 if rstd else 1), s_var_df.index, 
-            '-', marker='d', 
-            c='purple',
-            label='Stratospheric',
-            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
-
-    ax.set_ylabel(vcoord.label()) 
-
-    ax.grid('both', ls='dotted')
-    rel = 'relative ' if rstd else ''
-    ax.set_xlabel(f'Mean {rel}variability of {subs.label(name_only=True)} [%]')
-    ax.legend(loc='lower right')
-    
-    
 #%% Define global-data specific subclasses using multiple inheritance
 class CaribicBin1D(Caribic, BinPlotter1D): 
     """ Class holding data and binned plotting functionality for Caribic. """
@@ -1912,3 +1559,45 @@ class CaribicBin3D(Caribic, BinPlotter3D):
         """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic
 
+#%% Show RMS improvements when using N2O Filtering 
+def n2o_tp_stdv_rms( subs, rel=False, lat_bounds = (-90, 90)): 
+    """ Plot seasonal RMS variability for given substance. """
+    n2o = dcts.get_coord(col_name='N2O')
+    vcoord = dcts.get_coord(col_name='int_ERA5_THETA')
+    
+    bin_attr = 'rms_rvstd' if rel else 'rms_vstdv'
+    
+    bp1d = CaribicBin1D().sel_latitude(*lat_bounds)
+    var_df = bp1d.rms_seasonal_vstdv(subs, vcoord)
+    
+    strato = bp1d.sel_strato(**n2o.__dict__)
+    s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) 
+
+    tropo = bp1d.sel_tropo(**n2o.__dict__)
+    t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord)
+    
+    fig, ax = plt.subplots(dpi=250, figsize=(5,3))
+    
+    ax.plot(var_df[bin_attr]*(100 if rel else 1), var_df.index, 
+            ls='dashed', marker='d', c='grey', 
+            label='Unfiltered',
+            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
+
+    ax.plot(t_var_df[bin_attr]*(100 if rel else 1), t_var_df.index, 
+            '-', marker='d', c='orange',
+            label='Tropospheric',
+            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
+    
+    ax.plot(s_var_df[bin_attr]*(100 if rel else 1), s_var_df.index, 
+            '-', marker='d', c='teal',
+            label='Stratospheric',
+            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
+
+    ax.set_ylabel(vcoord.label())
+
+    ax.grid('both', ls='dotted')
+    label_rel = 'relative ' if rel else ''
+    unit = '%' if rel else subs.unit
+    ax.set_xlabel(f'Mean {label_rel}variability of {subs.label(name_only=True)} [{unit}]')
+    ax.legend(loc='lower right')
+    
