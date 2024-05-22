@@ -35,6 +35,8 @@ from dataTools import tools
 import dataTools.dictionaries as dcts
 from dataTools.data import GlobalData
 
+world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
+
 """
 # set up orthographic map projection with perspective of satellite looking 
 # down at 50N, 100W. use low resolution coastlines.
@@ -59,8 +61,11 @@ transform = ccrs.PlateCarree()
 
 class GlobalDataPlotter(GlobalData): 
     """ Simple plotting capabilities for GlobalData objects. """
-    def __init__(self): 
-        super().__init__()
+    def __init__(self, glob_obj): 
+        super().__init__(glob_obj.years)
+        # self = type(glob_obj).__new__(glob_obj.__class__)
+        self.__dict__ = glob_obj.__dict__
+        self.__dict__['data'] = glob_obj.__dict__['data']
 
     def timeseries_global(self, substances=None, colorful=True, note=''):
         """ Scatter plots of timeseries data incl. monthly averages of chosen substances. """
@@ -68,14 +73,14 @@ class GlobalDataPlotter(GlobalData):
         df_mm = tools.time_mean(data, 'M')
 
         for subs in self.substances if substances is None else substances:
-            col = subs.col_name
-            if detr:
-                try:
-                    subs = dcts.get_subs(col_name = f'detr_{subs.col_name}')
-                except KeyError:
-                    print(f'Could not detrend {subs.short_name}')
-                else:
-                    self.detrend_substance(subs.short_name)
+            # col = subs.col_name
+            # if detr:
+            #     try:
+            #         subs = dcts.get_subs(col_name = f'detr_{subs.col_name}')
+            #     except KeyError:
+            #         print(f'Could not detrend {subs.short_name}')
+            #     else:
+            #         self.detrend_substance(subs.short_name)
 
             fig, ax = plt.subplots(dpi=250, figsize=(8, 4))
             if note:
@@ -118,13 +123,13 @@ class GlobalDataPlotter(GlobalData):
             # Plot monthly means on top of the data
             outline = mpe.withStroke(linewidth=2, foreground='white')
             ax.plot(df_mm.index, 
-                    df_mm[col],
+                    df_mm[subs.col_name],
                     path_effects=[outline],
                     label='Monthly mean',
                     color='k' if colorful else 'g',
                     lw=0.7, zorder=2)
 
-            for i, mean in enumerate(df_mm[col]):
+            for i, mean in enumerate(df_mm[subs.col_name]):
                 year, month = df_mm.index[i].year, df_mm.index[i].month
                 xmin = dt.datetime(year, month, 1)
                 xmax = dt.datetime(year, month, monthrange(year, month)[1])
@@ -213,18 +218,20 @@ class GlobalDataPlotter(GlobalData):
 
             break
 
-    def plot_binned_2d(self, bin_attr='vmean', hide_lats=False, 
-                    projection='moll', **subs_kwargs): 
+    def plot_binned_2d(self, bin_attr='vmean', hide_lats=False, substances=None,
+                       
+                    projection='moll'): 
         """ 2D plot of binned substance data for all years at once. """
         data = self.df
-        # substances = [dcts.get_subs(col_name=c) for c in data.columns
-        #               if c in [s.col_name for s in dcts.get_substances(**subs_kwargs)]
-        #               and not (c.startswith('d_') or '_d_' in c)]
-        substances = self.substances
+        substances = self.substances if substances is None else substances
 
         for subs in (substances if not bin_attr=='vcount' else [dcts.get_subs(col_name='N2O')]): 
             fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
-            # ax = fig.add_subplot(projection="aitoff")
+            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+            
+            ax.set_title(subs.label() if bin_attr != 'vcount' \
+                         else 'Distribution of greenhouse gas flask measurements')
+            
             cmap = dcts.dict_colors()[bin_attr]
             vmin, vmax = subs.vlims(bin_attr=bin_attr)
             if 'mol' in subs.unit:
@@ -244,32 +251,7 @@ class GlobalDataPlotter(GlobalData):
             lat = data.geometry.y 
             lon = data.geometry.x
             out = bp.Simple_bin_2d(data[subs.col_name], lat, lon, bci)
-
             img_data = getattr(out, bin_attr)
-            
-            #!!! projections not yet implemented
-            # if projection is not None: 
-            #     lat0 = 0
-            #     lon0 = 0
-            #     map = Basemap(projection=projection, lat_0=lat0,lon_0=lon0,resolution='l')
-            #     # # draw coastlines, country boundaries, fill continents.
-            #     # map.drawcoastlines(linewidth=0.25, zorder=10)
-            #     # map.drawcountries(linewidth=0.25, zorder=10)
-
-            #     xpt,ypt = map(out.xintm, out.yintm)
-            #     print(out.yintm, xpt)
-
-            #     # img = map.pcolormesh(ypt, xpt,
-            #     #     #bci.yintm, bci.xintm,
-            #     #                      img_data.T, 
-            #     #                      cmap=cmap, 
-            #     #                      norm=norm,
-            #     #                      # origin='lower',
-            #     #                     # extent=[out.ybmin-lat0, out.ybmax-lat0, out.xbmin-lon0, out.xbmax-lon0],
-            #     #                     zorder=30)
-            # else: 
-            world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
             img = ax.imshow(img_data, cmap=cmap, norm=norm, origin='lower',
                             extent=[out.ybmin, out.ybmax, out.xbmin, out.xbmax])
             
@@ -277,22 +259,13 @@ class GlobalDataPlotter(GlobalData):
                 ax.hlines(30, -180, 180, color='k', lw=1, ls='dashed')
                 ax.add_patch(Rectangle((-180, -90), 180*2, 90+30, facecolor="grey", alpha=0.25))
 
-            # ax.set_title(f'{yr}')#, weight='bold')
-            # ax.text(**dcts.note_dict(ax, 0.13, 0.1, f'{year}'), weight='bold')
-            # ax.set_xlim(-180, 180)
-            # ax.set_ylim(-90, 90)
-
             # label outer plot axes
             ax.set_ylabel('Latitude [°N]')
             ax.set_xlabel('Longitude [°E]')
             
             cbar = plt.colorbar(img, ax=ax, extend='neither' if not bin_attr=='vcount' else 'max')
             cbar.ax.set_xlabel(f'[{subs.unit}]' if bin_attr!='vcount' else '[# Points]')
-            # cbar.ax.tick_params(labelsize=15, which='both')
-            # cbar.ax.minorticks_on()
 
-            ax.set_title((subs.label() + ('' if not self.source=='HALO' else ' - ' + self.ID))
-                        if bin_attr != 'vcount' else 'Distribution of greenhouse gas flask measurements')
 
     def yearly_plot_binned_2d(self, detr=False, bin_attr='vmean', **subs_kwargs):
         # self, subs, single_yr=None, c_pfx=None, years=None, detr=False):
