@@ -16,7 +16,8 @@ import copy
 import geopandas
 import math
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize
+from matplotlib import cm
+from matplotlib.colors import Normalize, LogNorm
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
 import matplotlib.patheffects as mpe
@@ -46,6 +47,20 @@ class TropopausePlotter(GlobalData):
         class GlobalSubclassTropopause(GlobalSubclass, TropopausePlotter)
     """
 # --- Plot differences in tropopause heights for TP definitions / seasons / years ---       
+    def _make_two_column_axs(self, tps, extra_axes=0): 
+        no_of_axs = len(tps) + extra_axes
+
+        fig, axs = plt.subplots(math.ceil(no_of_axs/2), 2, 
+                                dpi=100,
+                                figsize=(7, math.ceil(no_of_axs/2)*2),
+                                sharey=True, sharex=True)
+
+        if no_of_axs%2: 
+            axs.flatten()[len(tps)].axis('off')
+            axs.flatten()[-1].axis('off')
+        
+        return fig, axs
+
     def tp_height_global_2D_overview(self, rel=False, tps=None):
         """ Show 2D-binned latitude-longitude maps of tropopause height for various definitions. """
         for tp in (self.tps if not tps else tps): 
@@ -281,16 +296,15 @@ class TropopausePlotter(GlobalData):
             plt.show()
             
     def tp_height_seasonal_latitude_binned(self, rel=False, note='', tps = None,
-                                          seasonal_stdvs=False): 
+                                          seasonal_stdvs=False, **kwargs): 
         """ Plot average and seasonal tropopause heights, optionally with standard deviation. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
         
-        for tp in (self.tps if not tps else tps): 
-            fig, ax = plt.subplots(dpi=250, figsize=(7*0.8,4*0.8))
+        tps = (self.tps if tps is None else tps)
+        
+        def plot_tp_heights(ax, tp):
             ax.set_title(tp.label(True))
-            # ax.set_title('Vertical extent of'+tp.label(True)+' Tropopause')
-            
             if tp.vcoord=='pt' and not rel: 
                 ax.set_ylim(290, 380)
             elif tp.vcoord=='z' and not rel: 
@@ -354,14 +368,40 @@ class TropopausePlotter(GlobalData):
             if tp.vcoord=='z' and tp.rel_to_tp: 
                 ax.set_ylim(-2.5,4.1)
             ax.grid(True, ls='dotted')
-            ax.legend(loc='upper left' if tp.rel_to_tp else 'upper right', 
-                      fontsize=9)
             
             if tp.rel_to_tp: 
                 zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks()!=0)
                 for l in zero_lines: 
                     l.set_color('xkcd:dark grey')
                     l.set_linestyle('-.')
+            return ax
+
+        if not kwargs.get('separate_plots'):
+            fig, axs = self._make_two_column_axs(tps)
+            fig.suptitle('Vertical extent of tropopauses')
+            size = fig.get_size_inches()
+            scaling_factor = (1.25, 1.5)
+            fig.set_size_inches(size * scaling_factor)
+            
+            for tp, ax in zip(tps, axs.flatten()): 
+                plot_tp_heights(ax, tp)
+            fig.tight_layout()
+
+            top = 0.8 + math.ceil(len(tps))/150
+            lines, labels = axs.flatten()[0].get_legend_handles_labels()
+            lines = [lines[i] for i in range(1, len(lines))] + [lines[0]]
+            labels = [labels[i] for i in range(1, len(labels))] + [labels[0]]
+
+            fig.subplots_adjust(top = top)
+            leg = fig.legend(lines, labels, loc='upper center', ncol=3,
+                        bbox_to_anchor=[0.5, 0.94],
+                        markerscale=2)
+        else: 
+            for tp in tps: 
+                fig, ax = plt.subplots()
+                plot_tp_heights(ax, tp)
+                ax.legend(loc='upper left' if tp.rel_to_tp else 'upper right',
+                          fontsize=9)
 
 # --- Plot substance values sorted into stratosphere / troposphere
     def make_figures_per_vcoord(self, plotting_function, **kwargs): 
@@ -455,85 +495,180 @@ class TropopausePlotter(GlobalData):
         ax.scatter(tp_strato.index, tp_strato[subs.col_name],
                     c='grey',  marker='.', zorder=0, label='Stratosphere')
         ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
-                    c='xkcd:kelly green',  marker='.', zorder=1, label='Troposphere')      
+                    c='xkcd:kelly green',  marker='.', zorder=1, label='Troposphere')
 
     def subs_vs_ycoord_STsorted(self, subs, ycoord, tps, **kwargs): 
-        """ 
+        """ Show distribution of tropospheric and stratospheric substance measurements. 
+        
+        Args: 
+            subs (dcts.Substance): Substance to plot data fpor 
+            ycoord (dcts.Coordinate): (Vertical) coordinate to plot on the y-axis
+            tps (List[dcts.Coordinate]): Tropoause definitions to use for sorting 
+            
+            key joint (bool): Show datapoints that are always sorted into troposphere / stratosphere
+            key heatmap (bool): Show distribution of always-tropo / always-strato points as heatmap
+            key alpha (float): Marker transparency
+            key marker (str): Marker type
+            key s (int): Marker size
+            key facecolors (str): Marker inner colour 
         """
-        
-        #TODO: shared indices !!!!!!
-        
         tps = (self.tps if not kwargs.get('tps') else kwargs.get('tps'))
         if not ycoord: [ycoord] = self.get_coords(vcoord='pt', tp_def='nan', model='ERA5') # backup solution 
 
         no_of_axs = len(tps)
         if kwargs.get('joint'): no_of_axs += 1
+        # if kwargs.get('heatmap'): no_of_axs += 2 # tropo / strato / colorbar
 
         fig, axs = plt.subplots(math.ceil(no_of_axs/2), 2, 
-                                dpi=200,
+                                dpi=100,
                                 figsize=(7, math.ceil(no_of_axs/2)*2),
                                 sharey=True, sharex=True)
 
-        if no_of_axs%2: axs.flatten()[-1].axis('off')
+        if no_of_axs%2: 
+            axs.flatten()[len(tps)].axis('off')
+            axs.flatten()[-1].axis('off')
+            
         fig.suptitle(subs.label())
         
-        purely_tropospheric_indices = self.df.index
-        purely_stratospheric_indices = self.df.index
-
         for tp, ax in zip(tps, axs.flatten()):
             df_tropo, df_strato = self.AX_subs_vs_ycoord_STsorted(
                 ax=ax, subs=subs, ycoord=ycoord, tp=tp, **kwargs) 
-            purely_tropospheric_indices = purely_tropospheric_indices[purely_tropospheric_indices.isin(df_tropo.index)]
-            purely_stratospheric_indices = purely_stratospheric_indices[purely_stratospheric_indices.isin(df_strato.index)]
+        
+        if kwargs.get('heatmap') or kwargs.get('joint'): 
+            # indicate points that are always tropospheric no matter the TP definition 
+            print('Joint tropospheric points : {}\nJoint stratospheric points: {}'.format(
+                *[len(i) for i in self.shared_tropo_strato_indices(tps)] ) )
         
         if kwargs.get('joint'): 
-            # indicate points that are always tropospheric no matter the TP definition 
-            print('Joint tropospheric points: ', len(purely_tropospheric_indices))
-            print('Joint stratospheric points:', len(purely_stratospheric_indices))
-            marker_params = dict(
-                marker = '+',
-                facecolors = 'none', 
-                s = 2,
-                alpha = 0.05
-                )
-            
-            joint_ax = axs.flatten()[no_of_axs-1]
-            # joint_ax.axis('on')
-            # joint_ax.set_title('sorted')
-            joint_ax.scatter(self.df.loc[purely_tropospheric_indices][subs.col_name], 
-                        self.df.loc[purely_tropospheric_indices][ycoord.col_name], 
-                        c='xkcd:pink', # red
-                        zorder=2, 
-                        label='always tropos',
-                        **marker_params)
-            joint_ax.scatter(self.df.loc[purely_stratospheric_indices][subs.col_name], 
-                        self.df.loc[purely_stratospheric_indices][ycoord.col_name], 
-                        c='c', # cyan
-                        zorder=1, 
-                        label='always stratos',
-                        **marker_params)
-            joint_ax.set_ylabel(ycoord.label())
-            joint_ax.set_xlabel(subs.label())
-            joint_leg = joint_ax.legend(markerscale=4)
-            for lh in joint_leg.legendHandles: 
-                lh.set_alpha(1)
-                # lh.set_marker('o')
+            joint_ax = axs.flatten()[no_of_axs-1] # if not kwargs.get('heatmap') else no_of_axs-3]
+            self.add_consistently_sorted(subs, ycoord, tps, joint_ax, **kwargs)
         
         if tp.vcoord=='p': 
             ax.invert_yaxis()
         if kwargs.get('xdate'): 
             fig.autofmt_xdate()
+
         fig.tight_layout()
-        fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
+        top = 0.8 + math.ceil(len(tps))/150
         lines, labels = axs.flatten()[0].get_legend_handles_labels()
+        if kwargs.get('joint'): 
+            joint_lines, joint_labels = joint_ax.get_legend_handles_labels()
+            lines = lines + joint_lines
+            labels = labels + joint_labels
+            top = 0.75 + math.ceil(len(tps))/150
+        fig.subplots_adjust(top = top)
         leg = fig.legend(lines, labels, loc='upper center', ncol=2,
                     bbox_to_anchor=[0.5, 0.94],
-                    markerscale=4)
-        for lh in leg.legendHandles: 
+                    markerscale=2)
+        for lh in leg.legend_handles: 
             lh.set_alpha(1)
-            # lh.set_marker('o')
         plt.show()
         
+        if kwargs.get('heatmap'): 
+            self.consistently_sorted_heatmap(subs, ycoord, tps,
+                                             #axs.flatten()[-2:], 
+                                             **kwargs)
+
+    def add_consistently_sorted(self, subs, ycoord, tps, joint_ax, **kwargs): 
+        """ Plot datapoints which are consistently sorted into tropo / strato onto given axis. """
+        shared_tropo, shared_strato = self.shared_tropo_strato_indices(tps)
+        joint_ax.axis('on')
+
+        marker_params = dict(
+            marker = '+',
+            facecolors = 'none', 
+            s = 2, alpha = 0.05)
+        for key in marker_params: 
+            if key in kwargs: 
+                marker_params.update({key: kwargs[key]})
+        
+        joint_ax.scatter(self.df.loc[shared_tropo][subs.col_name], 
+                    self.df.loc[shared_tropo][ycoord.col_name], 
+                    c='xkcd:pink', # red
+                    zorder=2, 
+                    label='always Troposphere',
+                    **marker_params)
+
+        joint_ax.scatter(self.df.loc[shared_strato][subs.col_name], 
+                    self.df.loc[shared_strato][ycoord.col_name], 
+                    c='c', # cyan
+                    zorder=1, 
+                    label='always Stratosphere',
+                    **marker_params)
+
+        joint_ax.set_ylabel(ycoord.label())
+        joint_ax.set_xlabel(subs.label())
+
+        # Legend
+        # joint_leg = joint_ax.legend(markerscale=4)
+        # for lh in joint_leg.legend_handles: 
+        #     lh.set_alpha(1)
+        
+        return joint_ax
+
+    def consistently_sorted_heatmap(self, subs, ycoord, tps, axs = None, **kwargs):
+        """ Create and add heatmap for distribution in given dataframe. 
+        
+        Args: 
+            subs (dcts.Substance)
+            ycoord (dcts.Coordinate)
+            tps (List[dcts.Coordinate])
+            axs (plt.Axes, plt.Axes): List of two axes for tropospheric and stratospheric plot
+            
+            key LogNorm (bool)
+            key xbsize (float)
+            key xbins (int)
+            key ybsize (float)
+            key ybins (int)
+            key bins ( int or array_like or [int, int] or [array, array] )
+        """
+        if axs is None: 
+            _, axs = plt.subplots(2, figsize = (8,5), sharex=True, sharey=True)
+        
+        H_tropo_ax, H_strato_ax = axs
+        
+        H_tropo_ax.set_title('Tropospheric')
+        H_strato_ax.set_title('Stratospheric')
+
+        cmap = dcts.dict_colors()['vcount'] # ['heatmap']
+        cmap.set_bad('k', 0)
+        
+        
+        data = self.df.dropna(subset = [subs.col_name])
+        shared_tropo, shared_strato = self.shared_tropo_strato_indices(tps)
+        
+        shared_tropo = shared_tropo[shared_tropo.isin(data.index)]
+        shared_strato = shared_strato[shared_strato.isin(data.index)]
+        
+        # define default bins
+        xmin, xmax = data[subs.col_name].min(), data[subs.col_name].max()
+        xbsize = 5 * ( np.ceil((xmax-xmin)/10) / 5 ) if 'xbsize' not in kwargs else kwargs.get('xbsize')
+        xlims = (xmin - xbsize/2, xmax + xbsize/2)
+        xbin_edges = np.linspace(*xlims, 100 if not 'xbins' in kwargs else kwargs.get('xbins'))
+        
+        ybsize = ycoord.get_bsize() if 'ybsize' not in kwargs else kwargs.get('ybsize')
+        ylims = (data[ycoord.col_name].dropna().min() - ybsize, 
+                data[ycoord.col_name].dropna().max() + 2*ybsize)
+        ybin_edges = np.linspace(*ylims, 
+                                 20 if not 'ybins' in kwargs else kwargs.get('ybins'))
+
+        for ax, idx in zip([H_tropo_ax, H_strato_ax], 
+                           [shared_tropo, shared_strato]): 
+            heatmap, xedges, yedges = np.histogram2d(data[subs.col_name].loc[idx],
+                                                     data[ycoord.col_name].loc[idx], 
+                                                     bins=(xbin_edges, ybin_edges) if not 'bins' in kwargs else kwargs.get('bins'))
+            heatmap[heatmap == 0] = np.nan # filter out bins without data
+            img = ax.pcolormesh(xedges, yedges, 
+                                heatmap.T, 
+                                norm = None if not kwargs.get('LogNorm') else LogNorm(), 
+                                cmap=cmap)
+            
+            ax.set_ylabel(ycoord.label())
+        ax.set_xlabel(subs.label())
+
+        cbar = plt.colorbar(img, ax = axs, orientation='vertical')
+        cbar.set_label(f'Distribution of {subs.label(True)} msmts [#]')
+
     def AX_subs_vs_ycoord_STsorted(self, ax, subs, ycoord, tp, popt0=None, popt1=None, **kwargs):
         """ Plot strat / trop sorted data """
         # only take data with index that is available in df_sorted
@@ -551,24 +686,30 @@ class TropopausePlotter(GlobalData):
 
         marker_params = dict(
             marker = '+',
-            facecolors = 'none', 
+            # facecolors = 'none', 
             s = 2,
-            alpha = 0.05, 
+            alpha = 0.05,
             )
+        for key in marker_params: 
+            if key in kwargs: 
+                marker_params.update({key: kwargs[key]})
+
+        tropos_c = dict(c = 'm')
+        stratos_c = dict(c = 'b')
 
         ax.scatter(df_tropo[subs.col_name], 
-                   df_tropo[ycoord.col_name], 
-                   label='Troposphere',
-                   c='m', # magenta
-                   zorder=1, 
-                   **marker_params)
+                df_tropo[ycoord.col_name], 
+                label='Troposphere',
+                zorder=1, 
+                **tropos_c, 
+                **marker_params)
         
         ax.scatter(df_strato[subs.col_name], 
-                   df_strato[ycoord.col_name], 
-                   label='Stratosphere',
-                   c='b', # blue
-                   zorder=0, 
-                   **marker_params)
+                df_strato[ycoord.col_name], 
+                label='Stratosphere',
+                zorder=0,
+                **stratos_c,
+                **marker_params)
 
         if popt0 is not None and popt1 is not None and subs.short_name == tp.crit:
             # only plot baseline for chemical tropopause def and where crit is being plotted
@@ -1114,28 +1255,5 @@ class CaribicTropopause(Caribic, TropopausePlotter):
     def __init__(self, **kwargs): 
         """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic
-        
-    def filter_nonshared_indices(self, inplace = True, **kwargs): 
-        """ Returns a class instances with all non-shared indices of the given tps filtered out. """
-        tps = (self.tps if not kwargs.get('tps') else kwargs.get('tps'))
-        shared_indices = self.get_shared_indices(tps)
 
-        out = type(self).__new__(self.__class__)  # new class instance
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
-        out.data = {}
-        # Dataframes
-        df_list = [k for k in self.data
-                   if isinstance(self.data[k], pd.DataFrame)]  # or Geodf
-        for k in df_list:  # only take data from chosen years
-            out.data[k] = self.data[k][self.data[k].index.isin(shared_indices)]
-
-        out.status['shared_indices'] = True
-        
-        if inplace: 
-            self.data = out.data
-        
-        return out
-
-
+# %%
