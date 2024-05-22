@@ -154,7 +154,7 @@ class Coordinate:
 
         return label
 
-    def get_bsize(self):
+    def get_bsize(self) -> float:
         """ Returns default bin size of the coordinate. """
         bsizes_dict = {
             'pt': 10,
@@ -172,8 +172,7 @@ class Coordinate:
         elif self.hcoord in bsizes_dict:
             return bsizes_dict[self.hcoord]
         else:
-            print(f'No default bin size for {self.vcoord} / {self.hcoord}')
-            return None
+            raise KeyError(f'No default bin size for v: {self.vcoord} / h: {self.hcoord} / var: {self.var}')
 
 def coordinate_df():
     """ Get dataframe containing all info about all coordinate variables """
@@ -212,7 +211,10 @@ def get_coordinates(**kwargs):
     coord = [Coordinate(**v) for k, v in coord_dict.items()]
     return coord
 
-def get_coord(**kwargs):
+def get_coord(*args, **kwargs):
+    for i, arg in enumerate(args):  # col_name, ID
+        pot_args = ['col_name', 'ID']
+        kwargs.update({pot_args[i]: arg})
     coordinates = get_coordinates(**kwargs)  # dict i:Coordinate
     if len(coordinates) > 1:
         raise ValueError(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
@@ -318,6 +320,10 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
     Dictionary keys: vmean / vstdv / vstdv_tropo / vstdv_strato / rvstd / rvstd_tropo / rvstd_strato
     If values are not specifically set for a substance, their dict entry will be (nan, nan). 
     """
+    d_ = False
+    if short_name.startswith('d_'): 
+        short_name = short_name[2:]
+        d_ = True
     
     vlim_dict = {
         'vmean' : (np.nan, np.nan),
@@ -330,7 +336,7 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
         'vcount' :  (1, np.nan),
         }
     
-    if   short_name == 'sf6': 
+    if short_name == 'sf6': 
         vlim_dict.update(
             dict(vmean = (5.5, 10),
                  vstdv = (0, 2),
@@ -421,9 +427,15 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
     elif short_name == 'f12': 
         vlim_dict.update(
             dict(vmean = (400, 540),
-                 ))
+                 ))   
     else: 
         raise KeyError(f'There are no default vlims for {short_name}')
+
+    if d_: 
+        vlim_dict.update(
+            {k : (v[0]/100, v[1]/100) for k, v in vlim_dict.items()
+             if 'vmean' in k}
+        )
 
     return vlim_dict
 
@@ -453,9 +465,15 @@ def get_substances(**kwargs) -> list['Substance']:
     return subs
 
 def get_subs(*args, **kwargs):
-    """ Return single Substance object with the given specifications """
+    """ Returns the unique Substance object with the given specifications. 
+    
+    Args (Optional): 
+        1. col_name (str)
+        2. ID (str)
+        3. clams (bool)
+    """
     for i, arg in enumerate(args):  # substance, ID, clams
-        pot_args = ['short_name', 'ID', 'clams']
+        pot_args = ['col_name', 'ID', 'clams']
         kwargs.update({pot_args[i]: arg})
     if 'short_name' not in kwargs and 'substance' in kwargs:
         kwargs.update({'short_name': kwargs.pop('substance')})
@@ -739,9 +757,17 @@ def dict_colors():
         'rvstd_strato': plt.cm.BuPu,
         'diff': plt.cm.PiYG,
         'vcount': cmr.get_sub_cmap('plasma_r', 0.1, 0.9),
+        'heatmap' : plt.cm.rainbow,
+        'tropo' : 'm', # magenta 
+        'always_tropo' : 'pink',
+        'strato' : 'b', # blue
+        'always_stato' : 'c', # cyan
         # 'rvstd' : cmr.get_sub_cmap('hot_r', 0.1, 1),
         # 'vcount' : plt.cm.PuRd,
         'rvstd' : lsc.from_list('RSTD_default', colors, N=9),
+        'chem' : '#1f77b4',
+        'therm' : '#ff7f0e',
+        'dyn' : '#2ca02c',
     }
 
 def dict_tps():
