@@ -81,15 +81,29 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
     df = df[cols]
 
     df_mean = df.groupby(pd.PeriodIndex(df.index, freq=f)).mean(numeric_only=True)
-    df_mean['Date_Time'] = np.nan
-    for i, (y, m, d) in enumerate(zip(
-            df_mean.index.year,
-            df_mean.index.month if f != 'Y' else None,
-            df_mean.index.day if f == 'D' else (
-                [1] * len(df_mean.index) if first_of_month else None))):
-        df_mean['Date_Time'][i] = dt.datetime(y, m, d)
-
+    df_mean.reset_index(inplace=True)
+    
+    if f == 'D': 
+        df_mean['Date_Time'] = df_mean['Date_Time'].apply(lambda x: dt.datetime(x.year, x.month, x.day))
+    elif f == 'M' and first_of_month: 
+        df_mean['Date_Time'] = df_mean['Date_Time'].apply(lambda x: dt.datetime(x.year, x.month, 1))
+    else: 
+        df_mean['Date_Time'] = df_mean['Date_Time'].apply(lambda x: dt.datetime(x.year, x.month, 15))
+        
     df_mean.set_index('Date_Time', inplace=True)
+    
+    # df_mean['Date_Time', i] = dt.datetime(y, m, d)
+    
+    # df_mean['Date_Time'] = np.nan
+    # for i, (y, m, d) in enumerate(zip(
+    #         df_mean.index.year,
+    #         df_mean.index.month if f != 'Y' else None,
+    #         df_mean.index.day if f == 'D' else (
+    #             [1] * len(df_mean.index) if first_of_month else None))):
+    #     df_mean['Date_Time', i] = dt.datetime(y, m, d)
+
+    # df_mean.set_index('Date_Time', inplace=True)
+    
     if minmax:
         df_min = df.groupby(pd.PeriodIndex(df.index, freq=f)).min(numeric_only=True)
         df_max = df.groupby(pd.PeriodIndex(df.index, freq=f)).max(numeric_only=True)
@@ -608,7 +622,7 @@ def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
     for yr in glob_obj.years:  # loop through available years
         df_yr = glob_obj.df[glob_obj.df.index.year == yr]
 
-        lat = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))])  # lat
+        lat = np.array([df_yr.geometry.iloc[i].y for i in range(len(df_yr.index))])  # lat
         if kwargs.get('lat_binlimits'):
             lat_binclassinstance = bp.Bin_notequi1d(kwargs.get('lat_binlimits'))
         else:
@@ -617,7 +631,7 @@ def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
         out_lat = bp.Simple_bin_1d(df_yr[substance], lat, lat_binclassinstance)
         out_lat.__dict__.update(lat_binclassinstance.__dict__)
 
-        lon = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))])  # lon
+        lon = np.array([df_yr.geometry.iloc[i].x for i in range(len(df_yr.index))])  # lon
         if kwargs.get('lon_binlimits'):
             lon_binclassinstance = bp.Bin_notequi1d(kwargs.get('lon_binlimits'))
         else:
@@ -653,14 +667,14 @@ def bin_2d(glob_obj, subs, **kwargs) -> list:
     for yr in glob_obj.years:  # loop through available years if possible
         df_yr = glob_obj.df[glob_obj.df.index.year == yr]
 
-        lat = np.array([df_yr.geometry[i].y for i in range(len(df_yr.index))])  # lat
+        lat = np.array([df_yr.geometry.iloc[i].y for i in range(len(df_yr.index))])  # lat
         lat_binlimits = kwargs.get('lat_binlimits')
         if lat_binlimits is None:
             # use equidistant binning if not specified else
             lat_bmin, lat_bmax = np.nanmin(lat), np.nanmax(lat)
             lat_binlimits = list(bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size).xbinlimits)
 
-        lon = np.array([df_yr.geometry[i].x for i in range(len(df_yr.index))])  # lon
+        lon = np.array([df_yr.geometry.iloc[i].x for i in range(len(df_yr.index))])  # lon
         lon_binlimits = kwargs.get('lon_binlimits')
         if lon_binlimits is None:
             lon_bmin, lon_bmax = np.nanmin(lon), np.nanmax(lon)
