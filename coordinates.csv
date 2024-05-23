@@ -6,7 +6,7 @@ MMS_LON,GPS Longitude,deg E,MMS,ATOM,,lon,,,,MSMT,,,,
 MMS_PRESS,Static pressure,hPa,MMS,ATOM,p,,,,,MSMT,,,,
 MMS_TEMP,Static temperature,K,MMS,ATOM,,,t,,,MSMT,,,,
 MMS_THETA,Potential temperature ,K,MMS,ATOM,pt,,,,,MSMT,,,,
-alt,"Pressure Altitude = StdAltitu*0.3048, barometric altitude",m,INTtpc,CLAMS,z,,,,,MSMT,,,,
+alt,Pressure Altitude = StdAltitu*0.3048 - barometric altitude,m,INTtpc,CLAMS,z,,,,,MSMT,,,,
 geometry,geometry,degrees,GHG,Caribic,,geometry,,,,MSMT,,,,
 geometry.x,longitude,degrees_east,GHG,Caribic,,lon,,,,MSMT,,,,
 geometry.y,latitude,degrees_north,GHG,Caribic,,lat,,,,MSMT,,,,
@@ -162,13 +162,13 @@ GLORIA_altitude,measured altitude ,km,GLORIA,HALO,alt,,,,,MSMT,,,,
 GLORIA_lapse_rate,measured lapse rate,K km-1,GLORIA,HALO,,,lapse_rate,,,MSMT,,,,
 TRIHOP_N2O,Pseudo coord: Nitrous oxide from TRIHOP [ppb - inferred],ppb,TRIHOP,HALO,mxr,,,chem,FALSE,MSMT,,n2o,,
 UMAQS_N2O,Pseudo coord: Nitrous oxide from UMAQS [ppb - inferred],ppb,UMAQS,HALO,mxr,,,chem,FALSE,MSMT,,n2o,,
-AWAS_N2O,"Nitrous oxide from flask (N2O, awas )",ppbv,AWAS ,HIAPER,mxr,,,chem,FALSE,MSMT,,n2o,,
-hiaper_MET_LAT,"GGLAT - Latitude from GPS, datum WGS84 [decimal degree]",dec deg,MET,HIAPER,,lat,,,,MSMT,,,,
-hiaper_MET_LON,"GGLON - Longitude from GPS, datum WGS84 [decimal degree]",dec deg,MET,HIAPER,,lon,,,,MSMT,,,,
+AWAS_N2O,Nitrous oxide from flask (N2O - awas),ppbv,AWAS ,HIAPER,mxr,,,chem,FALSE,MSMT,,n2o,,
+hiaper_MET_LAT,GGLAT - Latitude from GPS. datum WGS84 [decimal degree],dec deg,MET,HIAPER,,lat,,,,MSMT,,,,
+hiaper_MET_LON,GGLON - Longitude from GPS. datum WGS84 [decimal degree],dec deg,MET,HIAPER,,lon,,,,MSMT,,,,
 hiaper_MET_PALT,PALT - Pressure altitude [m],m,MET,HIAPER,p,,,,,MSMT,,,,
 hiaper_MET_PRESS,PSXC - Reference static pressure: research static pressure corrected for airflow effects [hPa],hPa,MET,HIAPER,p,,,,,MSMT,,,,
 hiaper_MET_THETA,THETA - Potential temperature [K],K,MET,HIAPER,pt,,,,,MSMT,,,,
-NWAS_N2O,"Nitrous oxide from flask (N2O, NWAS)",ppb,NWAS,HIAPER,mxr,,,chem,FALSE,MSMT,,n2o,,
+NWAS_N2O,Nitrous oxide from flask (N2O - NWAS),ppb,NWAS,HIAPER,mxr,,,chem,FALSE,MSMT,,n2o,,
 ERA5_D_PRESS_1_5_Main,Pressure distance to 1.5 PVU surface from ERA5,hPa,CLAMS_calc,CLAMS,p,,,dyn,TRUE,ERA5,1.5,,ERA5_PRESS,ERA5_PRESS_1_5_Main
 ERA5_D_PRESS_2_0_Main,Pressure distance to 2.0 PVU surface from ERA5,hPa,CLAMS_calc,CLAMS,p,,,dyn,TRUE,ERA5,2,,ERA5_PRESS,ERA5_PRESS_2_0_Main
 ERA5_D_PRESS_3_5_Main,Pressure distance to 3.5 PVU surface from ERA5,hPa,CLAMS_calc,CLAMS,p,,,dyn,TRUE,ERA5,3.5,,ERA5_PRESS,ERA5_PRESS_3_5_Main
@@ -186,7 +186,7 @@ ERA5_D_Z_1_5_Main,Height difference to main 1.5 PVU surface,km,CLAMS_calc,CLAMS,
 ERA5_D_Z_2_0_Main,Height difference to main 2.0 PVU surface,km,CLAMS_calc,CLAMS,z,,,dyn,TRUE,ERA5,2,,ERA5_HEIGHT,ERA5_HEIGHT_2_0_Main
 ERA5_D_Z_3_5_Main,Height difference to main 3.5 PVU surface,km,CLAMS_calc,CLAMS,z,,,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT,ERA5_HEIGHT_3_5_Main
 Altitude ,Pressure Altitude [m] # Altitude=StdAltitu*0.3048,m,MS,Caribic,z,,,,,,,,,
-H_rel_TP,"Ozone-based representative height above the tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn, JGR, 2010]",km,MS,Caribic,z,,,chem,TRUE,MSMT,,o3,,
+H_rel_TP,Ozone-based representative height above the tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn JGR 2010],km,MS,Caribic,z,,,chem,TRUE,MSMT,,o3,,
 ERA5_thermTP_PRESS_Main,Pressure of main lapse rate tropopause (ERA5),hPa,CLAMS,Caribic,p,,,therm,FALSE,ERA5,,,,
 ERA5_dynTP_PRESS_1_5_Main,Pressure of local 1.5 PVU surface (ERA5),hPa,CLAMS,Caribic,p,,,dyn,FALSE,ERA5,1.5,,,
 ERA5_dynTP_PRESS_2_0_Main,Pressure of local 2.0 PVU surface (ERA5),hPa,CLAMS,Caribic,p,,,dyn,FALSE,ERA5,2,,,
@@ -216,4 +216,4 @@ ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),km,C
 ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,1.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_1_5
 ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,2,,ERA5_HEIGHT_km,ERA5_HEIGHT_2_0
 ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_3_5
-H_TP,"Ozone-based representative height of tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn, JGR, 2010]",km,MS_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,Altitude ,H_rel_TP
+H_TP,Ozone-based representative height of tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn JGR 2010],km,MS_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,Altitude  ,H_rel_TP
