@@ -340,14 +340,19 @@ class GlobalData:
         if kwargs.get('recalculate'): 
             data.drop(columns = [c.col_name for c in self.coordinates if c.ID=='calc'], 
                       inplace=True)
+        
+        all_calc_coords = dcts.get_coordinates(ID='calc') \
+                        + dcts.get_coordinates(ID='CLAMS_calc') \
+                        + dcts.get_coordinates(ID='MS_calc') \
+                        + dcts.get_coordinates(ID='EMAC_calc')
 
         # Firstly calculate geopotential height from geopotential
-        geopot_coords = [c for c in dcts.get_coordinates(ID='calc') if (
+        geopot_coords = [c for c in all_calc_coords if (
             c.var1 in data.columns and str(c.var2) == 'nan' )]
         
         for coord in geopot_coords: 
             
-            met_data = data[coord.var1].values * units(dcts.get_coord(col_name=coord.var1).unit)
+            met_data = data[coord.var1].values * units(dcts.get_coord(coord.var1).unit)
             
             # geopot_values = data[coord.var1].values
             # geopot = units.Quantity(geopot_values, 'm^2/s^2')
@@ -361,7 +366,7 @@ class GlobalData:
                 data[coord.col_name] = height_km
 
         # Now calculate TP / distances to TP coordinates 
-        calc_coords = [c for c in dcts.get_coordinates(ID='calc') if 
+        calc_coords = [c for c in all_calc_coords if 
             all(col in data.columns for col in [c.var1, c.var2])]
         
         for coord in calc_coords: 
@@ -373,16 +378,28 @@ class GlobalData:
             met_coord = dcts.get_coord(col_name = coord.var1)
             tp_coord = dcts.get_coord(col_name = coord.var2)
             
-            met_data = data[coord.var1]
-            tp_data = data[coord.var2]
+            met_data = copy.deepcopy(data[coord.var1]) # prevents .df to be overwritten 
+            tp_data = copy.deepcopy(data[coord.var2])
             
-            if tp_coord.unit != met_coord.unit: 
-                if all(unit in ['hPa', 'mbar'] for unit in [tp_coord.unit, met_coord.unit]):
+            if tp_coord.unit != met_coord.unit != coord.unit: 
+                if all(unit in ['hPa', 'mbar'] for unit in [tp_coord.unit, met_coord.unit, coord.unit]):
                     pass
-                elif all(unit in ['km', 'm'] for unit in [tp_coord.unit, met_coord.unit]): 
-                    print('UNIT MISMATCH when calculating ', coord.long_name, 'from \n', 
-                      dcts.get_coord(col_name=coord.var1), '\n', # met
-                      dcts.get_coord(col_name=coord.var2)) # tp
+                elif all(unit in ['km', 'm'] for unit in [tp_coord.unit, met_coord.unit, coord.unit]): 
+                    if coord.unit == 'm': 
+                        if tp_coord.unit == 'km': tp_data *= 1e3
+                        if met_coord.unit == 'km': met_data *= 1e3
+                    elif coord.unit == 'km': 
+                        if tp_coord.unit == 'm': tp_data *= 1e-3
+                        if met_coord.unit == 'm': met_data *= 1e-3
+                
+                    if kwargs.get('verbose'): 
+                        print('UNIT MISMATCH when calculating ', coord.long_name, 'from \n', 
+                        dcts.get_coord(col_name=coord.var1), '\n', # met
+                        dcts.get_coord(col_name=coord.var2)) # tp
+                        
+                        print('Fixed by readjusting: \n',
+                              data[coord.var2].dropna().iloc[0], f' [{tp_coord.unit}] -> ', tp_data.dropna().iloc[0], f' [{coord.unit}]\n', 
+                              data[coord.var1].dropna().iloc[0], f' [{met_coord.unit}] -> ', met_data.dropna().iloc[0], f' [{coord.unit}]')
                 else: 
                     print(f'HALT STOPP: units do not match on {met_coord} and {tp_coord}.')
                     continue
@@ -555,26 +572,34 @@ class GlobalData:
         return out
 
     def bin_3d(self, subs, zcoord, bci_3d=None, 
-               xbsize = None, ybsize = None, zbsize = None) -> bp.Simple_bin_3d: 
-        """ Bin substance data in self.df onto a 3D-grid given by z-coordinate / latitude / longitude. 
+               xbsize = None, ybsize = None, zbsize = None,
+               eql=False) -> bp.Simple_bin_3d: 
+        """ Bin substance data onto a 3D-grid given by z-coordinate / (equivalent) latitude / longitude. 
         
         Args: 
             subs (dcts.Substance)
-            zcoord (dcts.Coordinate)
+            zcoord (dcts.Coordinate) - vertical coordinate
             
             bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
             xbsize (float)
             ybsize (float)
             zbsize (float)
+            
+            eql (bool): Use equivalalent latitude instead of latitude as y-coordinate 
         
-        Returns bp.Simple_bin_3d object
+        Returns a bp.Simple_bin_3d object. 
         """
         xbsize = self.grid_size if not xbsize else xbsize 
         ybsize = self.grid_size if not ybsize else ybsize 
         zbsize = zcoord.get_bsize() if not zbsize else zbsize
         
-        x = self.df.geometry.x
-        y = self.df.geometry.y
+        x = self.df.geometry.x # longitude
+        y = self.df.geometry.y # latitude
+        
+        if eql:
+            [ycoord] = self.get_coords(hcoord='eql', model='ERA5')
+            y = self.df[ycoord.col_name]
+        
         xbmin, xbmax = -180, 180
         ybmin, ybmax = -90, 90
 
