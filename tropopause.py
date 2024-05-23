@@ -288,15 +288,15 @@ class TropopausePlotter(GlobalData):
 
             ylabel = tp.label(True) 
             vc_label = {'pt': '$\Theta$', 'z':'z', 'mxr':'mxr'}
-            ax.set_ylabel(ylabel if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
+            ax.set_ylabel(ylabel)# if not tp.rel_to_tp else f'$\Delta\,${vc_label[tp.vcoord]} [{tp.unit}] - ' + ylabel)
             ax.set_xlabel('Latitude [°N]')
 
             ax.grid(True, ls='dotted')
             ax.legend()
             plt.show()
             
-    def tp_height_seasonal_latitude_binned(self, rel=False, note='', tps = None,
-                                          seasonal_stdvs=False, **kwargs): 
+    def tp_height_seasonal_latitude_binned(self, tps = None, note='', 
+                                           seasonal_stdvs=False, **kwargs): 
         """ Plot average and seasonal tropopause heights, optionally with standard deviation. """
         bci = bp.Bin_equi1d(-90, 90, self.grid_size)
         outline = mpe.withStroke(linewidth=4, foreground='white')
@@ -305,9 +305,9 @@ class TropopausePlotter(GlobalData):
         
         def plot_tp_heights(ax, tp):
             ax.set_title(tp.label(True))
-            if tp.vcoord=='pt' and not rel: 
+            if tp.vcoord=='pt' and not all(tp.rel_to_tp is False for tp in tps): 
                 ax.set_ylim(290, 380)
-            elif tp.vcoord=='z' and not rel: 
+            elif tp.vcoord=='z' and not all(tp.rel_to_tp is False for tp in tps): 
                 ax.set_ylim(6, 14)
 
             for s in ['av', 1,2,3,4]:
@@ -379,6 +379,7 @@ class TropopausePlotter(GlobalData):
         if not kwargs.get('separate_plots'):
             fig, axs = self._make_two_column_axs(tps)
             fig.suptitle('Vertical extent of tropopauses')
+            # tools.resize_figure(fig, scaling factor)
             size = fig.get_size_inches()
             scaling_factor = (1.25, 1.5)
             fig.set_size_inches(size * scaling_factor)
@@ -879,14 +880,11 @@ class TropopausePlotter(GlobalData):
             
             key rel (bool): Calculate relative instead of absolute standard deviation
         """
-        shared_indices = self.get_shared_indices(tps=tps)
-        
         self.df['season'] = tools.make_season(self.df.index.month)
         stdv_df_dict = {}
 
         for season in set(self.df.season):
             stdv_df = self.sel_season(season).strato_tropo_stdv(subs, tps)
-            stdv_df = stdv_df[stdv_df.index.isin(shared_indices)]
             stdv_df = stdv_df[[c for c in stdv_df.columns if 'stdv' in c]]
 
             if kwargs.get('rel'): 
@@ -998,13 +996,10 @@ class TropopausePlotter(GlobalData):
             ax.set_title('Variability of {} in {}'.format(
                 subs.label(),
                 dcts.dict_season()[f'name_{season}'] ))
-            fig.show()
         
         # Show average and RMS seasonal averages 
         self.average_seasonal_stdv_table(subs, stdv_df_dict, **kwargs)
         self.rms_seasonal_stdv_table(subs, stdv_df_dict, **kwargs)
-
-        return stdv_df_dict
 
     def average_seasonal_stdv_table(self, subs, stdv_df_dict, **kwargs):
         """ Create table showing average seasonal standard deviation 
