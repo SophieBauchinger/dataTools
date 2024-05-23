@@ -9,7 +9,7 @@ class Coordinate
     .get_bsize
 
 class Substance
-    .label: name_only, delta
+    .label: name_only
     .vlims: bin_attr, atm_layer
 
 class Instrument
@@ -18,13 +18,13 @@ Functions:
     # ---- Coordinates ---- 
     coordinate_df
     get_coordinates(**kwargs)
-    get_coord(**kwargs)
+    get_coord(*args, **kwargs)
 
      # ---- Substances ---- 
     vlim_dict_per_substance(short_name)
     substance_df
     get_substances(**kwargs)
-    get_subs(**kwargs)
+    get_subs(*args, **kwargs)
     lookup_fit_function(short_name)
     
     # ---- Instruments ----
@@ -177,7 +177,7 @@ class Coordinate:
 def coordinate_df():
     """ Get dataframe containing all info about all coordinate variables """
     with open(get_path() + 'coordinates.csv', 'rb') as f:
-        coord_df = pd.read_csv(f)
+        coord_df = pd.read_csv(f, sep="\s*,\s*", engine='python')
         if 'pvu' in coord_df.columns:
             coord_df['pvu'] = coord_df['pvu'].astype(object)  # allow comparison with np.nan
     return coord_df
@@ -242,7 +242,7 @@ class Substance():
     def __repr__(self):
         return f'Substance : {self.short_name} [{self.unit}] - \'{self.col_name}\' from {self.ID}'
 
-    def label(self, name_only=False, delta=False):
+    def label(self, name_only=False):
         """ Returns string to be used as axis label. """
 
         special_names = {'ch2cl2': 'CH$_2$Cl$_2$',
@@ -278,11 +278,8 @@ class Substance():
         if not self.detr:
             return f'{code} [{unit}] ({identifier})'
 
-        elif self.detr:# and not delta:
+        elif self.detr:
             return f'{code} rel. to BGD [{unit}]'
-
-        # elif self.detr and delta:
-        #     return f'{code} ' + r'(-$\Delta_{2005}$)' + f' [{unit}]'
 
         else:
             raise KeyError('Could not generate a label')
