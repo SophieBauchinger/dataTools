@@ -266,7 +266,6 @@ class GlobalDataPlotter(GlobalData):
             cbar = plt.colorbar(img, ax=ax, extend='neither' if not bin_attr=='vcount' else 'max')
             cbar.ax.set_xlabel(f'[{subs.unit}]' if bin_attr!='vcount' else '[# Points]')
 
-
     def yearly_plot_binned_2d(self, detr=False, bin_attr='vmean', **subs_kwargs):
         # self, subs, single_yr=None, c_pfx=None, years=None, detr=False):
         """ Create a 2D plot of binned mixing ratios for each available year on a grid.
@@ -348,12 +347,11 @@ class GlobalDataPlotter(GlobalData):
             # fig.tight_layout()
             plt.show()
 
-
-    def mxr_vs_vcoord(self, subs, vcoord, tick_params, ax=None, note=None): 
+    def mxr_vs_vcoord(self, subs, vcoord, tick_params = {}, ax=None, note=None): 
+        """ Plot datapoints on a simple vcoord vs. substance mixing ratio plot. """
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
-
-        if not ax:
-            fig, ax = plt.subplots(dpi=200)
+        if ax is None:
+            _, ax = plt.subplots(dpi=200)
         for s in set(self.df['season'].tolist()):
             df = self.df[self.df['season'] == s].dropna(subset=[vcoord.col_name, subs.col_name], how='any')
             if len(df) == 0: 
@@ -362,51 +360,45 @@ class GlobalDataPlotter(GlobalData):
             x = df[subs.col_name]
             y = df[vcoord.col_name]
 
-            # if vcoord.rel_to_tp: 
-            #     ax.set_ylim(-70, 90)
-            # if subs.col_name=='detr_SF6': 
-            #     ax.set_xlim(5,7)
-
             ax.scatter(x, y, 
                         marker='.',
                         label = dcts.dict_season()[f'name_{s}'],
                         c=dcts.dict_season()[f'color_{s}'], 
                         zorder=2, 
                         lw=0.1)
-            # ax.legend()
 
         ax.set_ylabel(vcoord.label())
-        if tick_params.get('bottom'): 
+        if not tick_params.get('bottom') is False: 
             ax.set_xlabel(subs.label())
         
         ax.tick_params(**tick_params)
         if note: 
             ax.text(**dcts.note_dict(ax, y = 0.05, s= note))
             
-        ax.grid(True, zorder=0, ls='dashed', alpha=0.5)
+        ax.grid(True, zorder=0, ls='dashed', alpha=0.5)    
         
+    def plot_sf6_detrend_reltp_progression(self):    
+        _, ((ax11, ax12), (ax21, ax22)) = plt.subplots(2, 2, dpi=300, figsize=(9,6))
         
-    def plot_sf6_detrend_reltp_progression(self, bp1=None):    
-        fig, ((ax11, ax12), (ax21, ax22)) = plt.subplots(2, 2, dpi=300, figsize=(9,6))
+        [s11] = self.get_substs(short_name='sf6', detr=False) # dcts.get_subs(col_name='SF6')
+        [c11] = self.get_coords(vcoord='pt', tp_def='nan', model='ERA5')
         
-        s11 = dcts.get_subs(col_name='SF6')
-        c11 = dcts.get_coord(col_name='int_ERA5_THETA')
-        
-        s12 = dcts.get_subs(col_name='detr_SF6')
+        [s12] = self.get_substs(short_name='detr_sf6', detr=True)
         c12 = c11
         
         s22 = s12
-        c22 = dcts.get_coord(col_name='int_ERA5_D_TROP1_THETA')
+        [c22] = self.get_coords(vcoord='pt', rel_to_tp = True, tp_def = 'therm', model='ERA5') 
+        # dcts.get_coord(col_name='int_ERA5_D_TROP1_THETA')
         
-        mxr_vs_vcoord(self, s11, c11, 
-                    ax = ax11, 
-                    tick_params  = dict(top=True, labeltop=True, bottom=True, labelbottom=True),
-                    )
+        self.mxr_vs_vcoord(s11, c11, 
+                           ax = ax11, 
+                           tick_params = dict(top=True, labeltop=True, bottom=True, labelbottom=True),
+                           )
         ax11.set_xlabel(s11.label(), loc='center')
         ax11.set_ylabel(c11.label(), loc='center')
         ax11.set_xlim(5,11.6)
         
-        mxr_vs_vcoord(self, s12, c12, 
+        self.mxr_vs_vcoord(s12, c12, 
                     ax=ax12,
                     tick_params  = dict(top=True, labeltop=True, bottom=False, labelbottom=False), 
                     )
@@ -414,7 +406,7 @@ class GlobalDataPlotter(GlobalData):
         ax12.set_ylabel(c12.label(), loc='center')
         
         
-        mxr_vs_vcoord(self, s22, c22, 
+        self.mxr_vs_vcoord(s22, c22, 
                     ax=ax22,
                     tick_params  = dict(top=False, labeltop=False, bottom=True, labelbottom=True),
                     )
@@ -429,13 +421,6 @@ class GlobalDataPlotter(GlobalData):
         ax22.yaxis.set_label_position("right")
         
         ax21.set_visible(False)
-        
-        # if bp1:
-        #     df12 = bp1.rms_seasonal_vstdv(s12, c12)
-        #     ax12_twin = ax12.twinx()
-            
-        #     ax12_twin.plot(df12['rms_vstdv'], df12.index)
-        #     ax12_twin.set_xlim(0,0.5)
         
         plt.show()
 
