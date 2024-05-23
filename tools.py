@@ -523,14 +523,15 @@ def assign_t_s(df, TS, coordinate, tp_val=0) -> pd.Series:
     else:
         raise KeyError(f'Strat/Trop assignment undefined for {coordinate}')
 
-def get_lin_fit(series, degree=2) -> np.array:  # previously get_mlo_fit
+def get_lin_fit(series, degree=2, verbose=False) -> np.array:  # previously get_mlo_fit
     """ Given one year of reference data, find the fit parameters for
     the substance (col name) """
     year, month = series.index.year, series.index.month
     t_ref = year + (month - 0.5) / 12  # obtain frac year for middle of the month
     mxr_ref = series.values
     fit = np.poly1d(np.polyfit(t_ref, mxr_ref, degree))
-    print(f'Fit parameters obtained: {fit}')
+    if verbose: 
+        print(f'Fit parameters obtained: {fit}')
     return fit
 
 def pre_flag(data_arr, ref_arr, crit='n2o', limit=0.97, **kwargs) -> pd.DataFrame:
@@ -599,7 +600,6 @@ def add_zero_line(ax, axis='y'):
         ax.set_xlim(*xlims)
 
 # %% Binning of global data sets
-
 def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
     """
     Returns 1D binned objects for each year as lists (lat / lon)
@@ -669,6 +669,7 @@ def bin_2d(glob_obj, subs, **kwargs) -> list:
 
         lat = np.array([df_yr.geometry.iloc[i].y for i in range(len(df_yr.index))])  # lat
         lat_binlimits = kwargs.get('lat_binlimits')
+        
         if lat_binlimits is None:
             # use equidistant binning if not specified else
             lat_bmin, lat_bmax = np.nanmin(lat), np.nanmax(lat)
@@ -689,9 +690,7 @@ def bin_2d(glob_obj, subs, **kwargs) -> list:
     return out_list
 
 #%% Miscellaneous
-
-# Animate changes over years
-def make_gif(pdir=None, fnames=None):
+def make_gif(pdir=None, fnames=None): # Animate changes over years
     if not pdir: 
         pdir = r'C:\Users\sophie_bauchinger\sophie_bauchinger\Figures\tp_scatter_2d'
     for vc in ['p', 'pt', 'z']:
