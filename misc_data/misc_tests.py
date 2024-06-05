@@ -6,9 +6,13 @@
 Test functions on miscellaneous data 
 """
 import numpy as np
+import xarray as xr
 
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
+
+from dataTools import tools
+import dataTools.dictionaries as dcts
 
 #%% Test changes to FFI1001ReadHeader, FFI1001DataReader
 # =============================================================================
@@ -28,14 +32,28 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
 # print(ac_flat.df.shape, ac_flat.df.columns[:4])
 # print(c.df.shape, c.df.columns[:4])
 # =============================================================================
-pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\\'
+pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data'
+
 # fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
-fnameV02 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V02.txt'
-fnameV03 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V03.txt'
-fnameV04 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V04(1).txt'
-c2 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
-c3 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
-c4 = FFI1001DataReader(fnameV02, sep_variables=';', df=True)
+# fnameV02 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V02.txt'
+# fnameV03 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V03.txt'
+# fnameV04 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V04(1).txt'
+
+# c2 = FFI1001DataReader(fnameV02, sep_variables=';', df=True, xtype='secofday')
+# c3 = FFI1001DataReader(fnameV02, sep_variables=';', df=True, xtype='secofday')
+# c4 = FFI1001DataReader(fnameV02, sep_variables=';', df=True, xtype='secofday')
+
+fl547_nc = dcts.get_path() + 'misc_data\\CARIBIC2_20180516_547_TPC_V04.nc'
+fl547_V05 = dcts.get_path() + 'misc_data\\INTtpc_20180516_547_MEX_MUC_10s_V05.txt'
+
+
+with xr.open_dataset(fl547_nc, drop_variables = ['CARIBIC2_LocalTime']) as ds: 
+    ds = tools.process_TPC_v04(ds)
+    df_547 = ds.to_dataframe()
+
+c5 = FFI1001DataReader(fl547_V05, sep_variables=';', df=True, xtype='secofday')
+
+
 
 #%%
 from data import GlobalData, Caribic

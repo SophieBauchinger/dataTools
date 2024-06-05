@@ -1,0 +1,106 @@
+92 1001
+T. Schuck (schuck@iau.uni-frankfurt.de)
+Goethe University Frankfurt, Institute for Atmospheric and Environmental Sciences
+Whole air sample data from CARIBIC II (onboard Airbus A340 600 HE of Lufthansa), integrals of Whole Air Sampling intervals
+IAGOS-CARIBIC (CARIBIC-2), http://www.caribic-atmospheric.com/
+1 1
+2018 05 16 2024 06 03
+0
+TimeCRef; CARIBIC_reference_time_since_0_hours_UTC_on_first_date_in_line_7; [s]
+58
+1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999 999999
+year; date of sampling: year; [yyyy]
+month; date of sampling: month; [mm]
+day; date of sampling: day; [dd]
+hour; time of sampling (mean value): hour; [HH]
+min; time of sampling (mean value): minutes; [MM]
+sec; time of sampling (mean value): seconds; [SS]
+lon; longitude (mean value) integrated over flask sampling time from high resolution measurementslongitude (mean value); [deg]
+lat; latitude (mean value) integrated over flask sampling time from high resolution measurements; [deg]
+p; pressure (mean value) integrated over flask sampling time from high resolution measurements; [mbar]
+alt; Pressure Altitude = StdAltitu*0.3048 integrated over flask sampling time from high resolution measurements; [m]
+type; type of sample collector: 0 glass flask from TRAC, 1 metal flask from HIRES; [0-1]
+int_CARIBIC2_CO; Carbon monoxide mixing ratio integrated over flask sampling interval from 10s averages; [ppb]
+int_CARIBIC2_Ozone; Ozone mixing ratio integrated over flask sampling interval from 10s averages; [ppb]
+int_CARIBIC2_H2Ogas; water vapour mixing ratio integrated over flask sampling interval from 10s averages; [ppm]
+int_CARIBIC2_NO; NO volume mixing ratio integrated over flask sampling interval from 10s averages; [ppb]
+int_CARIBIC2_NOy; NOy volume mixing ratio integrated over flask sampling interval from 10s averages; [ppb]
+int_CARIBIC2_ACE; Acetone volume mixing ratio; [ppt]
+int_CARIBIC2_ACN; Acetonitrile volume mixing ratio; [ppt]
+int_CARIBIC2_CO2; Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval integrated over flask sampling interval from 10s averages; [ppm]
+int_CARIBIC2_CH4; integrated over flask sampling interval from 10s averagesMethane dry air mole fraction from Picarro instrument integrated over sampling interval; [ppb]
+int_CARIBIC2_H_rel_TP; height above O3 tropopause according to Zahn et al. (2003), Atmospheric Environment, 37, 439-440 integrated over flask sampling interval from 10s averages; [km]
+int_ERA5_PV; Potential vorticity (ERA5) integrated over flask sampling interval from 10s averages; [PVU]
+int_Theta; potential temperature derived from measured pressure and temperature: Tpot:=(StcAirTmp+273.15)*exp(0.2857*ln(1000/pstatic) integrated over flask sampling interval from 10s averages; [K]
+int_ERA5_PRESS; Pressure (ERA5) integrated over flask sampling interval from 10s averages; [hPa]
+int_ERA5_TEMP; Temperature (ERA5) integrated over flask sampling interval from 10s averages; [K]
+int_ERA5_THETA; Potential temperature (ERA5) integrated over flask sampling interval from 10s averages; [K]
+int_ERA5_EQLAT; Equivalent latitude (ERA5) integrated over flask sampling interval from 10s averages; [deg]
+int_ERA5_PHI; Geopotential (ERA5) integrated over flask sampling interval from 10s averages; [m2 s-2]
+int_ERA5_thermTP_PRESS; Pressure of local first lapse rate tropopause (ERA5) integrated over flask sampling interval from 10s averages; [hPa]
+int_ERA5_thermTP_THETA; Pot. temperature of first local lapse rate tropopause (ERA5) integrated over flask sampling interval from 10s averages; thermal_tropopause_potential_temperature
+int_ERA5_thermTP_Z; Height of first local lapse rate tropopause (ERA5) integrated over flask sampling interval from 10s averages; [km]
+int_ERA5_dynTP_PRESS_1_5; Pressure at main 1.5 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [hPa]
+int_ERA5_dynTP_PRESS_2_0; Pressure at main 2.0 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [hPa]
+int_ERA5_dynTP_PRESS_3_5; Pressure at main 3.5 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [hPa]
+int_ERA5_dynTP_PHI_1_5; Geopotential at main 1.5 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [m2 s-2]
+int_ERA5_dynTP_PHI_2_0; Geopotential at main 2.0 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [m2 s-2]
+int_ERA5_dynTP_PHI_3_5; Geopotential at main 3.5 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [m2 s-2]
+int_ERA5_dynTP_PHI_4_0; Geopotential at main [0], second [1] and third [2] 4.0 PVU/380 K surface; [m**2/s**2]
+int_ERA5_dynTP_PRESS_4_0; Pressure at main [0], second [1] and third [2] 4.0 PVU/380 K surface; [hPa]
+int_ERA5_dynTP_THETA_4_0; Potential temperature at main [0], second [1] and third [2] 4.0 PVU/380 K surface; [K]
+int_ERA5_dynTP_THETA_1_5; Potential temperature at main 1.5 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [K]
+int_ERA5_dynTP_THETA_2_0; Potential temperature at main 2.0 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [K]
+int_ERA5_dynTP_THETA_3_5; Potential temperature at main 3.5 PVU surface (ERA5) integrated over flask sampling interval from 10s averages; [K]
+int_CLaMS_CH4; methane mole fraction from CLaMS model integrated over flask sampling interval from 10s averages; [ppb]
+int_CLaMS_CO; carbon monoxide mole fraction from CLaMS model integrated over flask sampling interval from 10s averages; [ppb]
+int_CLaMS_CO2; carbon dioxide mole fraction from CLaMS model integrated over flask sampling interval from 10s averages; [ppm]
+int_CLaMS_F11; CFC-11 mixing ratio from CLaMS model integrated over flask sampling interval from 10s averages; [ppt]
+int_CLaMS_F12; CFC-12 mole fraction from CLaMS model integrated over flask sampling interval from 10s averages; [ppt]
+int_CLaMS_H2O; water vapour mole fraction from CLaMS model integrated over flask sampling interval from 10s averages; [ppm]
+int_CLaMS_N2O; nitrous oxide mole fraction from CLaMS model integrated over flask sampling interval from 10s averages; [ppb]
+int_CLaMS_O3; Ozone mixing ratio from CLaMS model integrated over flask sampling interval from 10s averages; [ppb]
+int_ERA5_O3; Ozone mixing ratio from ERA5 integrated over flask sampling interval from 10s averages; [ppb]
+int_AgeSpec_AGE; Mean age from age-spectrum (10 yr) from CLaMS model integrated over flask sampling interval from 10s averages; [year]
+int_AgeSpec_MODE; Modal age from age-spectrum (10 yr) from CLaMS model integrated over flask sampling interval from 10s averages; [year]
+int_AgeSpec_MEDIAN_AGE; Median age from age-spectrum from CLaMS model integrated over flask sampling interval from 10s averages; [year]
+int_AgeSpec_NF_01; NH surface mass fraction tracer; [m^3/m^3]
+int_AgeSpec_SF_01; SH surface mass fraction tracer; [m^3/m^3]
+int_AgeSpec_TF_01; Tropical surface mass fraction tracer; [m^3/m^3]
+8
+creation_date: 25.04.24
+author: H.-C. Lachnitt (hlachnit@uni-mainz.de); PI: Peter Hoor, Felix Plöger, Daniel Kunkel
+institute: Institute for Atmospheric Physics, Johannes Gutenberg-University Mainz
+description: Parameters along flight path interpolated in space and time.
+Project: The Tropopause Region in a Changing Atmosphere (TPChange) – DFG Transregional Collaborative Research Center TR 301 (https://tpchange.de)
+FileName: INTtpc_20180516_547_MEX_MUC_10s_V05.txt
+ExceptionToConsider: no
+ChangeLog: 0
+12
+WAS_data_source_file: TRAC_Zeiten.csv
+all values are mean values for the sampling interval
+sampling takes up to 45 seconds
+#
+The following two lines contain names and units according to the 'NetCDF Climate and Forecast (CF) Metadata Convention', see http://cfconventions.org/. Each entry (name or unit) corresponds to a certain column; the entry before the first tab belongs to the independent column.
+CF_StandardNames: time	time	time	time	time	time	time	longitude	latitude	air_pressure	barometric_altitude	sample_type	mole_fraction_of_carbon_monoxide_in_air	mole_fraction_of_ozone_in_air	mole_fraction_of_water_vapor_in_air	mole_fraction_of_nitrogen_monoxide_in_air	mole_fraction_of_total_reactive_nitrogen_in_air	mole_fraction_of_acetone_in_air	mole_fraction_of_aceto_nitrile_in_air	mole_fraction_of_carbon_dioxide_in_air	mole_fraction_of_methane_in_air	altitude_wrt_tropopause	potential_vorticity	air_potential_temperature	air_pressure	air_temperature	air_potential_temperature	equivalent_latitude	geopotential	tropopause_air_pressure	[K]	tropopause_altitude	tropopause_air_pressure	tropopause_air_pressure	tropopause_air_pressure	dynamic_tropopause_geopotential	dynamic_tropopause_geopotential	dynamic_tropopause_geopotential	geopotential_at_4pvu_380k	pressure_at_4pvu_380k	potential_temperature_at_4pvu_380k	dynamic_tropopause_potential_temperature	dynamic_tropopause_potential_temperature	dynamic_tropopause_potential_temperature	mole_fraction_of_methane_in_air	mole_fraction_of_carbon_monoxide_in_air	mole_fraction_of_carbon_dioxide_in_air	mole_fraction_of_cfc_11_in_air	mole_fraction_of_cfc_12_in_air	mole_fraction_of_water_vapor_in_air	mole_fraction_of_nitrous_oxide_in_air	mole_fraction_of_ozone_in_air	mole_fraction_of_ozone_in_air				NH_surface_mass_fraction_tracer	SH_surface_mass_fraction_tracer	Tropical_surface_mass_fraction_tracer
+CF_Units: [s]	[year]	[month]	[day]	[hour]	[min]	[s]	[degree_east]	[degree_north]	[100 Pa]	 [m]	[1]	[1e-9]	[1e-9]	[1e-6]	[1e-9]	[1e-9]	[1e-12]	[1e-12]	[1e-6]	[1e-9]	[1e3 m]	[1e-6 K m2 kg-1 s-1]	[K]	[100 Pa]	 [K]	[K]	[degree]	[m2 s-2]	[Pa]		[m]	[Pa]	[Pa]	[Pa]	[m2 s-2]	[m2 s-2]	[m2 s-2]	[m2 s-2]	[100 Pa]	[K]	[K]	[K]	[K]	[1e-9]	[1e-9]	[1e-6]	[1e-12]	[1e-12]	[1e-6]	[1e-9]	[1e-9]	[1e-9]				[1]	[1]	[1]
+The following four lines contain: Start date like in line 7 (formatted as YYYYMMDD), followed by the scaling factors like in line 11; Line number containing the KeyLabel 'ExceptionToConsider' (0 if no such exception is mentioned), followed by the VMISS-values like in line 12; Units like in lines 13ff; Column headers.
+20180516	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1	1
+0	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999	999999
+[s]	[yyyy]	[mm]	[dd]	[HH]	[MM]	[SS]	[deg]	[deg]	[mbar]	 [m]	[0-1]	 [ppb]	 [ppb]	[ppm]	 [ppb]	 [ppb]	[ppt]	[ppt]	[ppm]	[ppb]	[km]	 [PVU]	[K]	 [hPa]	 [K]	[K]	 [deg]	[m2 s-2]	[hPa]	thermal_tropopause_potential_temperature	[km]	[hPa]	[hPa]	[hPa]	[m2 s-2]	[m2 s-2]	[m2 s-2]	[m**2/s**2]	[hPa]	[K]	[K]	[K]	[K]	 [ppb]	 [ppb]	 [ppm]	 [ppt]	 [ppt]	 [ppm]	 [ppb]	 [ppb]	 [ppb]	 [year]	 [year]	 [year]	[m^3/m^3]	[m^3/m^3]	[m^3/m^3]
+TimeCRef	year	month	day	hour	min	sec	lon	lat	p	alt	type	int_CARIBIC2_CO	int_CARIBIC2_Ozone	int_CARIBIC2_H2Ogas	int_CARIBIC2_NO	int_CARIBIC2_NOy	int_CARIBIC2_ACE	int_CARIBIC2_ACN	int_CARIBIC2_CO2	int_CARIBIC2_CH4	int_CARIBIC2_H_rel_TP	int_ERA5_PV	int_Theta	int_ERA5_PRESS	int_ERA5_TEMP	int_ERA5_THETA	int_ERA5_EQLAT	int_ERA5_PHI	int_ERA5_thermTP_PRESS	int_ERA5_thermTP_THETA	int_ERA5_thermTP_Z	int_ERA5_dynTP_PRESS_1_5	int_ERA5_dynTP_PRESS_2_0	int_ERA5_dynTP_PRESS_3_5	int_ERA5_dynTP_PHI_1_5	int_ERA5_dynTP_PHI_2_0	int_ERA5_dynTP_PHI_3_5	int_ERA5_dynTP_PHI_4_0	int_ERA5_dynTP_PRESS_4_0	int_ERA5_dynTP_THETA_4_0	int_ERA5_dynTP_THETA_1_5	int_ERA5_dynTP_THETA_2_0	int_ERA5_dynTP_THETA_3_5	int_CLaMS_CH4	int_CLaMS_CO	int_CLaMS_CO2	int_CLaMS_F11	int_CLaMS_F12	int_CLaMS_H2O	int_CLaMS_N2O	int_CLaMS_O3	int_ERA5_O3	int_AgeSpec_AGE	int_AgeSpec_MODE	int_AgeSpec_MEDIAN_AGE	int_AgeSpec_NF_01	int_AgeSpec_SF_01	int_AgeSpec_TF_01
+60186	2018	5	16	16	43	5	-97.90	20.88	298.66	9194.90	0	87.36	26.03	183.65	999999	999999	999999	999999	999999	999999	999999	0.11	341.56	298.66	240.75	340.16	10.94	95447.39	99.60	374.85	16.62	117.68	111.40	99.19	153635.05	156752.66	163258.44	164747.42	96.59	377.84	365.36	367.89	375.19	1784.04	64.98	407.52	225.82	502.98	121.57	328.10	18.34	43.69	0.42	0.04	0.22	0.96	0.95	1.00
+62820	2018	5	16	17	27	0	-95.24	25.84	237.40	10697.45	0	74.60	27.00	69.05	999999	999999	999999	999999	999999	999999	999999	0.28	344.80	237.40	227.54	343.30	19.23	110265.62	98.29	382.98	16.68	168.98	141.66	102.14	131726.14	142379.02	161437.67	161443.36	102.13	380.00	353.04	362.48	379.99	1776.26	56.04	407.00	224.09	500.78	65.44	326.72	41.63	53.36	0.51	0.20	0.28	0.96	0.95	1.00
+65460	2018	5	16	18	11	0	-91.21	30.32	237.35	10697.63	0	105.00	94.84	133.09	999999	999999	1358.00	194.50	999999	999999	999999	1.65	337.97	237.35	223.99	337.96	34.79	109250.44	93.43	395.93	17.00	245.46	225.45	204.62	107087.29	112558.19	118688.84	120910.04	197.47	345.09	337.50	339.02	342.84	1762.03	46.67	406.37	220.57	495.87	38.64	323.78	79.60	142.13	0.72	0.20	0.36	0.96	0.95	1.00
+68100	2018	5	16	18	54	59	-86.17	34.50	237.36	10697.90	0	999999	92.84	125.47	999999	999999	968.50	202.00	999999	999999	999999	1.04	338.44	237.36	223.47	337.19	28.80	109049.90	184.22	345.25	12.74	204.60	196.52	181.75	118454.50	120949.27	125750.50	127951.08	175.34	350.08	340.33	341.81	346.41	1749.74	49.32	405.99	217.25	491.20	187.07	321.05	115.26	111.66	0.70	0.17	0.33	0.96	0.94	1.00
+70739	2018	5	16	19	38	59	-80.54	38.57	215.50	11310.52	0	93.54	45.15	68.35	999999	999999	1040.00	144.50	999999	999999	999999	0.88	338.86	215.50	217.63	337.57	27.91	115193.91	162.90	349.51	13.48	185.61	178.20	162.43	124402.73	126867.73	132437.09	136299.16	152.30	356.02	341.82	343.81	349.80	1749.65	51.37	406.27	215.60	488.63	109.10	319.67	137.91	78.68	0.73	0.20	0.36	0.96	0.94	1.00
+73379	2018	5	16	20	22	59	-73.81	42.47	215.58	11308.74	0	109.16	90.04	87.62	999999	999999	999999	999999	999999	999999	-1.29	0.68	337.52	215.58	216.88	336.36	25.97	114427.65	170.25	343.79	13.13	179.47	174.94	166.25	125651.19	127185.36	130231.64	131130.67	163.76	347.58	340.89	342.12	346.00	1746.26	42.68	405.81	215.33	488.42	45.05	319.45	138.92	103.26	0.84	0.37	0.41	0.95	0.94	1.00
+76019	2018	5	16	21	6	59	-65.56	46.05	215.58	11307.98	0	98.57	120.93	29.83	999999	999999	936.00	191.50	999999	999999	-0.52	2.57	337.37	215.58	216.70	336.10	39.80	112416.10	195.95	341.55	12.06	230.63	221.17	198.94	108192.38	110823.91	117409.38	118888.74	194.23	342.25	333.60	335.17	340.37	1711.54	41.94	405.23	202.21	469.16	28.79	308.47	288.91	239.82	1.32	0.37	0.58	0.95	0.93	1.00
+78660	2018	5	16	21	50	59	-55.89	48.72	215.58	11308.25	0	37.24	447.39	9.67	999999	999999	266.50	151.00	999999	999999	1.47	6.66	344.77	215.58	220.38	341.80	48.15	110625.65	247.08	329.91	10.41	291.21	279.75	257.36	91429.88	94018.59	99375.60	100819.98	251.56	328.89	321.22	322.81	327.40	1591.87	23.08	401.78	165.63	415.97	4.87	277.81	710.69	460.63	1.85	0.37	0.83	0.94	0.93	1.00
+81298	2018	5	16	22	34	58	-45.47	51.07	215.54	11309.42	0	31.73	501.78	7.44	999999	999999	188.00	120.00	999999	999999	2.16	7.66	351.20	215.54	225.70	350.07	57.39	110186.42	260.60	331.28	9.98	375.43	341.28	303.10	73811.27	80182.52	88004.05	89650.55	295.57	322.93	314.41	317.25	321.48	1603.23	23.43	402.00	169.16	421.26	4.42	280.83	689.69	509.85	2.07	0.54	0.94	0.94	0.92	1.00
+83937	2018	5	16	23	18	57	-34.57	53.21	215.56	11308.80	0	65.99	239.57	27.77	999999	999999	636.00	166.50	999999	999999	0.32	3.81	339.20	215.56	217.84	337.87	42.01	111824.77	201.46	342.26	11.83	253.45	237.99	212.18	101568.10	105599.35	112839.77	114807.88	205.60	340.84	330.43	332.44	338.75	1713.06	36.82	404.79	204.42	472.66	24.23	310.36	266.23	301.71	1.32	0.37	0.58	0.95	0.93	1.00
+86581	2018	5	17	0	3	1	-23.45	54.12	195.37	11920.83	0	89.59	135.38	47.64	999999	999999	929.50	202.00	999999	999999	-0.31	2.23	338.29	195.37	211.70	337.72	37.65	118818.25	185.26	341.02	12.44	200.89	195.18	183.52	117120.43	118877.60	122625.29	123650.12	180.43	343.28	336.42	337.73	341.81	1709.40	37.31	404.81	203.07	470.63	26.96	309.21	278.91	221.84	1.25	0.37	0.54	0.95	0.94	1.00
+89220	2018	5	17	0	46	59	-13.18	53.84	195.31	11921.61	0	32.34	509.60	9.99	999999	999999	238.00	132.50	999999	999999	2.27	8.75	346.63	195.31	216.18	344.91	76.48	118098.65	231.78	325.01	10.96	248.43	243.79	233.47	103306.62	104453.96	107069.36	107759.50	230.84	325.63	322.17	322.88	324.94	1589.33	23.38	401.75	164.82	414.71	5.01	277.11	733.97	556.85	1.91	0.39	0.86	0.94	0.92	1.00
+91860	2018	5	17	1	31	0	-3.39	52.39	195.35	11921.00	0	28.99	564.44	10.51	999999	999999	236.00	138.50	999999	999999	2.80	8.20	343.24	195.35	215.08	343.14	69.96	117838.96	223.68	326.74	11.16	268.32	250.85	231.75	98224.88	102457.89	107348.52	108434.27	227.69	325.57	319.92	321.31	324.49	1563.11	22.12	401.18	156.40	402.26	4.49	269.99	817.89	619.64	2.36	0.71	1.21	0.93	0.92	1.00
+94500	2018	5	17	2	15	0	5.44	50.58	195.38	11920.51	0	42.73	351.54	10.13	999999	999999	244.33	154.00	999999	999999	0.76	6.80	345.04	195.38	216.92	346.05	47.67	117474.69	230.81	325.20	10.92	258.65	247.37	230.49	100096.26	102879.61	107249.53	108126.52	227.23	326.53	320.32	321.77	325.36	1610.41	25.42	402.25	171.69	424.73	6.23	282.86	639.96	531.86	1.83	0.37	0.83	0.94	0.93	1.00
