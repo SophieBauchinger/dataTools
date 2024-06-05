@@ -6,22 +6,19 @@
 @Date: Fri Apr 28 09:51:49 2023
 
 Functions: 
-    # --- Data extraction ---
+    # --- Data extraction --- 
     time_mean(df, f, first_of_month, minmax)
     ds_to_gdf(ds)
     rename_columns(columns)
+    
+    # --- EMAC data handling --- 
     process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
     process_emac_s4d_s(ds, incl_model, incl_tropop, incl_subs)
-    process_caribic(ds)
-    clams_variables
-    process_clams(ds)
-    process_atom_clams(ds)
-    clams_variables_v03
-    flight_nr_from_flight_info(flight_info)
-    start_time_from_flight_info(flight_info, as_datetime)
-    start_datetime_by_flight_number(MS_df, load, save)
-    get_start_datetime(flight_no, **kwargs)
-    process_clams_v03(ds)
+    
+    # --- TPChange ERA5 / CLaMS reanalysis ---
+    ERA5_variables()
+    process_TPC_V02(ds)
+    process_TPC(ds)
     interpolate_onto_timestamps(dataframe, times, prefix)
 
     # --- Data selection ---
@@ -46,6 +43,7 @@ Functions:
     make_gif(pdir, fnames)
       
 """
+
 import datetime as dt
 import dill
 import geopandas
@@ -674,4 +672,3 @@ def gif_from_images(images, output_path='test_output.gif', duration=500):
 class InitialisationError(Exception): 
     """ Raised when initialisation of a class is not intended. """
     pass
-
