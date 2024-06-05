@@ -446,7 +446,7 @@ class TropopausePlotter(GlobalData):
                         bbox_to_anchor=[0.5, 0.94])
             plt.show()
 
-    def timeseries_subs_STsorted(self, subs, **kwargs):
+    def timeseries_subs_STsorted(self, subs, tps = None, **kwargs):
         """ Plot timeseries of datapoints sorted into stratophere / troposphere for given tps
 
         Args:
@@ -459,7 +459,7 @@ class TropopausePlotter(GlobalData):
             popt0 / popt1 (tuple[float]): initial / filtered baseline fit parameters
         """
 
-        tps = (self.tps if not kwargs.get('tps') else kwargs.get('tps'))
+        tps = self.tps if tps is None else tps
 
         fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200,
                                 figsize=(7, math.ceil(len(tps)/2)*2),
@@ -498,7 +498,7 @@ class TropopausePlotter(GlobalData):
         ax.scatter(tp_tropo.index, tp_tropo[subs.col_name],
                     c='xkcd:kelly green',  marker='.', zorder=1, label='Troposphere')
 
-    def subs_vs_ycoord_STsorted(self, subs, ycoord, tps, **kwargs): 
+    def subs_vs_ycoord_STsorted(self, subs, ycoord, tps = None, **kwargs): 
         """ Show distribution of tropospheric and stratospheric substance measurements. 
         
         Args: 
@@ -513,7 +513,7 @@ class TropopausePlotter(GlobalData):
             key s (int): Marker size
             key facecolors (str): Marker inner colour 
         """
-        tps = (self.tps if not kwargs.get('tps') else kwargs.get('tps'))
+        tps = self.tps if tps is None else tps
         if not ycoord: [ycoord] = self.get_coords(vcoord='pt', tp_def='nan', model='ERA5') # backup solution 
 
         no_of_axs = len(tps)
@@ -1060,7 +1060,7 @@ class TropopausePlotter(GlobalData):
         fig.show()
 
     # --- Matrix plots per substance for tropopause definitions --- 
-    def create_matrix_plot(self, subs, tps, atm_layer, bin_attr, **kwargs): 
+    def create_lat_binned_matrix_plot(self, subs, tps, atm_layer, bin_attr, **kwargs): 
         """ Find matrix values for the given substance to compare tropoause definitions. 
         
         Args:
@@ -1108,7 +1108,56 @@ class TropopausePlotter(GlobalData):
             av_values[i] = weighted_average
         
         return values, av_values
+
+    def create_lon_binned_matrix_plot(self, subs, tps, atm_layer, bin_attr, **kwargs): 
+        """ Find matrix values for the given substance to compare tropoause definitions. 
+        
+        Args:
+            subs (dcts.Substance): Substance to be investigated
+            tps (list[dcts.Coordinate]): Tropopause definitions 
+            atm_layer (str): Atmospheric layer i.e. tropo / strato / LMS
+            bin_attr (str): vstdv / rvstd / vmean
             
+            key lon_bmin/lon_bmax: Minimum / Maximum longitude values for binning
+            
+        """
+        shared_indices = self.get_shared_indices(tps=tps)
+        
+        lon_bmin = 30 if not 'lon_bmin' in kwargs else kwargs.get('lon_bmin')
+        lon_bmax = 90 if not 'lon_bmax' in kwargs else kwargs.get('lon_bmax')
+        lon_bci = bp.Bin_equi1d(lon_bmin, lon_bmax, self.grid_size)
+        
+        # initialise output variables 
+        # out_dict = {}
+        values = np.full((len(tps), lon_bci.nx), np.nan)
+        av_values = np.full(len(tps), np.nan)
+        
+        [lon_coord] = self.get_coords(hcoord='lon')
+        
+        # 2. Separate into stratospheric / tropospheric for each tps
+        for i, tp in enumerate(tps): 
+            if atm_layer == 'tropo': 
+                data = self.sel_tropo(**tp.__dict__).df
+            elif atm_layer == 'strato': 
+                data = self.sel_strato(**tp.__dict__).df
+            elif atm_layer == 'LMS': 
+                data = self.sel_LMS(**tp.__dict__).df
+
+            data = data[data.index.isin(shared_indices)]
+            
+            # 3. Latitude binning for each tps and atm. layer 
+            binned = self.bin_1d(subs, lon_coord, bci_1d=lon_bci, xbsize=self.grid_size, df=data)
+            # out_dict[tp.col_name] = binned
+            vals = getattr(binned, bin_attr)
+            values[i] = vals
+            
+            # 4. Calcualte weighted average across latitudes for each tp and atm. layer
+            weighted_average = np.average(vals[~ np.isnan(vals)], 
+                                          weights = binned.vcount[~ np.isnan(vals)])
+            av_values[i] = weighted_average
+        
+        return values, av_values
+
     def matrix_plot_stdev_subs(self, subs,  note='', tps=None, savefig=False, **kwargs):
         """
         Create matrix plot showing variability per latitude bin per tropopause definition
@@ -1166,7 +1215,7 @@ class TropopausePlotter(GlobalData):
                 [ax.remove() for ax in axs[4, 0:]]
                 cax = plt.subplot(gs[4, 0:])
             
-            values, av_values = self.create_matrix_plot(subs, tps, atm_layer, bin_attr, **kwargs)
+            values, av_values = self.create_lat_binned_matrix_plot(subs, tps, atm_layer, bin_attr, **kwargs)
             if bin_attr == '  ': 
                 values, av_values = values *100, av_values*100 # make into percentages !! 
                             
@@ -1236,13 +1285,51 @@ class TropopausePlotter(GlobalData):
             plt.savefig(f'E:/CARIBIC/Plots/variability_lat_binned/variability_{subs.col_name}.png', format='png')
         fig.show()
 
-    def matrix_plot_stdev(self, tps = None, note='', savefig=False, **subs_kwargs):
-        """ Create matrix plots for given substances and tropopause definitions. """
-        tps = self.tps if not tps else tps
-        substances = self.get_substs(**subs_kwargs) 
+    def create_3d_matrix_plot(self, subs, tps, bin_attr, **kwargs): 
+        """ Create matrix plot for 3D-binned data. """
+        pass
 
-        for subs in substances:
-            self.matrix_plot_stdev_subs(subs = subs, tps=tps, note=note, savefig=savefig)
+    def matrix_3d_binned(self, subs, tps, bin_attr=False, **kwargs): 
+        """ Create table for seasonally and inner-atmospheric layer binned substance data. 
+        
+        1. (if seasonal): Separate data into seasons
+        2. data is binned into lon / (eq.) lat / tp cells
+            x - lon, y - (eq.) lat, z - tp
+        3. The bin_attr of those boxes is found
+        4. Visualisation of the calculated quantities 
+        
+        Args: 
+            subs (dcts.Substance)
+            tps (List[dcts.Coordinate])
+            bin_attr (str): e.g. vmean, vstdv, rvstd
+            
+            key eql (bool): Take equivalent latitude instead of latitude
+            key seasonal (bool). Separate data into seasons before making calculations
+        """
+
+        for tp in self.tps if not tps else tps: 
+            binned_3d = self.bin_3d(subs, tp, 
+                                    eql = (True if kwargs.get('eql') else False) )
+            data = getattr(binned_3d, bin_attr)
+            
+            for ix in range(binned_3d.nx):
+                for iy in range(binned_3d.ny): 
+                    for iz in range(binned_3d.nz):
+                        datapoint = data[ix, iy, iz]
+                        
+        # what do I want? 
+        # lat matrix but with data separated into potential temperature bins as well? 
+        # or sth else? 
+        
+        # zonal mean 
+        zonal_mean = np.nanmean(data, axis=1) 
+        # get the zonal mean of the standard deviation of the 3D cells (not equivalant to 2D binning!)
+        # show same as Millan23 or as boxenplots 
+        
+        for ix in range(binned_3d.nx): 
+            for iz in range(binned_3d.nz):
+                datapoint = zonal_mean[ix, iz]
+                
 
 #%% Combine functionality of TropopausePlotter with specific GlobalData sub-classes 
 class CaribicTropopause(Caribic, TropopausePlotter): 

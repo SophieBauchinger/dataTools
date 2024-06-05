@@ -17,7 +17,7 @@ fctn n2o_tp_stdv_rms
 
 """
 #%% Imports
-
+import io
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -26,6 +26,7 @@ import matplotlib.patheffects as mpe
 import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
 import pandas as pd
+from PIL import Image
 import itertools
 from mpl_toolkits.axes_grid1 import AxesGrid
 import geopandas
@@ -1213,27 +1214,29 @@ class BinPlotter3D(BinPlotter):
         stratosphere_map(subs, tp, bin_attr)
     """
 
-    def z_crossection(self, subs, tp, bin_attr, threshold = 3, zbsize=None, **kwargs): 
-        """ Create lat/lon gridded plots for all z-bins. """
-        binned_data = self.bin_3d(subs, tp, zbsize=zbsize)
+    def z_crossection(self, subs, tp, bin_attr, 
+                      save_gif_path=None, **kwargs): 
+        """ Create lat/lon gridded plots for all z-bins. 
         
+        Args: 
+            subs (dcts.Substance)
+            tp (dcts.Coordinate)
+            bin_attr (str): e.g. vmean, vsdtv, rvstd
+            save_gif_path (str): Save all generated images as a gif to the given location
+            
+            key eql (bool): Use equivalent latitude for binning 
+            key threshold (int): Minimum number of datapoints per plot
+            key zbsize (float): Size of vertical bin 
+            key zoom_factor (float): Use spline interpolation to zoom data by this factor)
+        """
+        
+        binned_data = self.bin_3d(subs, tp, zbsize=zbsize, eql=eql)
         data3d = getattr(binned_data, bin_attr)
-
-        lon_bins = binned_data.xintm
-        lat_bins = binned_data.yintm
-        z_bins = binned_data.zintm
-
-        vcounts_per_z_level = [sum(j) for j in [sum(i) for i in binned_data.vcount]]
         
-        # first z level: binned_data.vcount[:,:,0]
-        
-        for ix in range(binned_data.nx):
-            for iy in range(binned_data.ny): 
-                for iz in range(binned_data.nz):
-                    datapoint = data3d[ix, iy, iz]
-
-        
-        # fig = plt.figure(dpi=150)
+        eql = False if 'eql' not in kwargs else kwargs.get('eql')
+        threshold = 3 if 'threshold' not in kwargs else kwargs.get('threshold')
+        zbsize=None if 'zbsize' not in kwargs else kwargs.get('zbsize')
+        zoom_factor = 1 if 'zoom_factor' not in kwargs else kwargs.get('zoom_factor')
         
         vlims = kwargs.get('vlims')
         if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
@@ -1243,24 +1246,26 @@ class BinPlotter3D(BinPlotter):
         data_title = 'Mixing ratio' if bin_attr=='vmean' else 'Varibility'
         # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
 
-        cmap = dcts.dict_colors()[bin_attr]
-        world = geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
-        
         if tp.rel_to_tp:
             title = f'Cross section binned relative to {tp.label(filter_label=True)} Tropopause'
         else: 
             title = '' # f' in {tp.label()}'
 
+        images = []
+
         for iz in range(binned_data.nz):
             data2d = data3d[:,:,iz]
             if sum(~np.isnan(data2d.flatten())) > threshold: 
                 fig, ax = plt.subplots(dpi=200)
-                world.boundary.plot(ax=ax, color='grey', linewidth=0.3, zorder=0)
+                tools.add_world(ax)
                 ax.set_title(title)
-                ax.text(s = '{:.0f} to {:.0f} {}'.format(binned_data.zbinlimits[iz], binned_data.zbinlimits[iz+1], tp.unit),
+                ax.text(s = '{} to {} {}'.format(
+                    binned_data.zbinlimits[iz], 
+                    binned_data.zbinlimits[iz+1], 
+                    tp.unit),
                         **dcts.note_dict(ax, x=0.025, y=0.05))
 
-                img = ax.imshow(data2d.T,
+                img = ax.imshow(tools.nan_zoom(data2d, zoom_factor).T,
                                 cmap = cmap, norm=norm,
                                 aspect='auto', origin='lower',
                                 # if not ycoord.vcoord in ['p', 'mxr'] else 'upper',
@@ -1271,14 +1276,32 @@ class BinPlotter3D(BinPlotter):
                 cbar = fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
                 cbar.ax.set_xlabel(f'{data_title} of {subs.label()}')
                 
-                plt.show()
+                if save_gif_path is not None:
+                    # Save the figure to a BytesIO object
+                    buf = io.BytesIO()
+                    plt.savefig(buf, format='png')
+                    plt.close(fig)
+                    buf.seek(0)
+                    
+                    # Open the image from the BytesIO object
+                    img = Image.open(buf)
+                    images.append(img)
+                else: 
+                    plt.show()
     
+        if save_gif_path is not None:
+            if not save_gif_path.endswith('.gif'): 
+                save_gif_path = save_gif_path + '.gif'
+            tools.gif_from_images(images, save_gif_path)
+
         return binned_data
 
     def stratosphere_map(self, subs, tp, bin_attr, **kwargs): 
         """ Plot (first two ?) stratospheric bins on a lon-lat binned map. """
         df = self.sel_strato(**tp.__dict__).df
         # df = self.sel_tropo(**tp.__dict__).df
+        
+        #!!! df = self.sel_LMS(**tp.__dict__).df
 
         fig, ax = plt.subplots(figsize=(9,9))
         ax.set_title(tp.label(True))
@@ -1546,6 +1569,52 @@ class CaribicBin1D(Caribic, BinPlotter1D):
     def __init__(self, **kwargs): 
         """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic
+        
+    def filtered_gradient_over_theta(self, subs, tp=None, 
+                                     rel=False, lat_bounds = (-90, 90)): 
+        """ Show RMS improvements when using N2O Filtering: STDV over potential temperature.   
+        
+        Calculate and plot the seasonal RMS variability gradient for the given substance. 
+        """
+        if tp is None: 
+            [tp] = self.get_substs(short_name='n2o', model='MSMT')
+        [vcoord] = self.get_coords(vcoord = 'pt', tp_def = 'nan', model='ERA5')
+        
+        bin_attr = 'rms_rvstd' if rel else 'rms_vstdv'
+        
+        bp1d = self.sel_latitude(*lat_bounds)
+        var_df = bp1d.rms_seasonal_vstdv(subs, vcoord)
+        
+        strato = bp1d.sel_strato(tp)
+        s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) 
+
+        tropo = bp1d.sel_tropo(tp)
+        t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord)
+        
+        _, ax = plt.subplots(dpi=150, figsize=(5,3))
+        
+        ax.plot(var_df[bin_attr]*(100 if rel else 1), var_df.index, 
+                ls='dashed', marker='d', c='grey', 
+                label='Unfiltered',
+                path_effects=[self.outline], zorder=2)
+
+        ax.plot(t_var_df[bin_attr]*(100 if rel else 1), t_var_df.index, 
+                '-', marker='d', c='orange',
+                label='Tropospheric',
+                path_effects=[self.outline], zorder=2)
+        
+        ax.plot(s_var_df[bin_attr]*(100 if rel else 1), s_var_df.index, 
+                '-', marker='d', c='teal',
+                label='Stratospheric',
+                path_effects=[self.outline], zorder=2)
+
+        ax.set_ylabel(vcoord.label())
+
+        ax.grid('both', ls='dotted')
+        label_rel = 'relative ' if rel else ''
+        unit = '%' if rel else subs.unit
+        ax.set_xlabel(f'Mean seasonal {label_rel}variability of {subs.label(name_only=True)} [{unit}]')
+        ax.legend(loc='lower right')
 
 class CaribicBin2D(Caribic, BinPlotter2D): 
     """ Class holding data and binned plotting functionality for Caribic. """
@@ -1559,45 +1628,6 @@ class CaribicBin3D(Caribic, BinPlotter3D):
         """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic
 
-#%% Show RMS improvements when using N2O Filtering 
-def n2o_tp_stdv_rms( subs, rel=False, lat_bounds = (-90, 90)): 
-    """ Plot seasonal RMS variability for given substance. """
-    n2o = dcts.get_coord(col_name='N2O')
-    vcoord = dcts.get_coord(col_name='int_ERA5_THETA')
-    
-    bin_attr = 'rms_rvstd' if rel else 'rms_vstdv'
-    
-    bp1d = CaribicBin1D().sel_latitude(*lat_bounds)
-    var_df = bp1d.rms_seasonal_vstdv(subs, vcoord)
-    
-    strato = bp1d.sel_strato(**n2o.__dict__)
-    s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) 
 
-    tropo = bp1d.sel_tropo(**n2o.__dict__)
-    t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord)
-    
-    fig, ax = plt.subplots(dpi=250, figsize=(5,3))
-    
-    ax.plot(var_df[bin_attr]*(100 if rel else 1), var_df.index, 
-            ls='dashed', marker='d', c='grey', 
-            label='Unfiltered',
-            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
 
-    ax.plot(t_var_df[bin_attr]*(100 if rel else 1), t_var_df.index, 
-            '-', marker='d', c='orange',
-            label='Tropospheric',
-            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
-    
-    ax.plot(s_var_df[bin_attr]*(100 if rel else 1), s_var_df.index, 
-            '-', marker='d', c='teal',
-            label='Stratospheric',
-            path_effects=[mpe.withStroke(linewidth=2, foreground='white')], zorder=2)
-
-    ax.set_ylabel(vcoord.label())
-
-    ax.grid('both', ls='dotted')
-    label_rel = 'relative ' if rel else ''
-    unit = '%' if rel else subs.unit
-    ax.set_xlabel(f'Mean {label_rel}variability of {subs.label(name_only=True)} [{unit}]')
-    ax.legend(loc='lower right')
     
