@@ -56,6 +56,7 @@ import pandas as pd
 from PIL import Image
 import os
 from shapely.geometry import Point
+from scipy.ndimage import zoom, gaussian_filter
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -217,12 +218,8 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
-def process_caribic(ds):
-    # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
-    variables = [v for v in ds.variables if ds[v].dims == ('time',)]
-    return ds[variables]
-
 def clams_variables(): 
+    """ Variables for TPChange data versions 01 and 02. """
     return [
     'ERA5_PV',
     'ERA5_EQLAT',
@@ -254,6 +251,26 @@ def process_clams(ds):
     variables = clams_variables()
     return ds[variables]
 
+def process_TPdims(ds):
+    """ Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+    Used for ERA5 / CLaMS reanalysis datasets from version .03
+    """
+    TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+    TP_qualifier_dict = {0 : '_Main', 
+                         1 : '_Second', 
+                         2 : '_Third'}
+    
+    for variable in TP_vars: 
+        # get secondary dimension for the current multi-dimensional variable
+        [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+        
+        for TP_value in ds[variable][TP_dim].values: 
+            ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+        
+        ds = ds.drop_vars(variable)
+    
+    return ds
+
 def process_atom_clams(ds):
     """ Additional time values for ATom as otherwise the function breaks """
     variables = ['ATom_UTC_Start'] + clams_variables()
@@ -277,6 +294,7 @@ def process_atom_clams(ds):
     return ds
 
 def clams_variables_v03(): 
+    """ Variable names after processing TP dimensions. """
     met_vars = [
     'ERA5_PV',
     'ERA5_EQLAT',
@@ -285,6 +303,29 @@ def clams_variables_v03():
     'ERA5_PRESS',
     'ERA5_THETA',
     'ERA5_PHI', #!!! used to be ERA5_GPH
+    ]
+    
+    dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
+               for pvu in ['1_5', '2_0', '3_5'] 
+               for vcoord in ['PHI', 'THETA', 'PRESS']]
+
+    therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
+               for vcoord in ['Z', 'THETA', 'PRESS']]
+    
+    return met_vars + dyn_tps + therm_tps
+
+def ERA5s_variables_v04(): 
+    """ Variable names after processing TP dimensions. """
+    met_vars = [
+    'ERA5_PV',
+    'ERA5_EQLAT',
+    'ERA5_TEMP',
+    
+    'ERA5_PRESS',
+    'ERA5_THETA',
+    'ERA5_PHI', #!!! used to be ERA5_GPH
+    
+    'ERA5_O3'
     ]
     
     dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
@@ -367,19 +408,8 @@ def process_clams_v03(ds):
         if decode_times = True )
         
     """
-    TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-    TP_qualifier_dict = {0 : '_Main', 
-                         1 : '_Second', 
-                         2 : '_Third'}
-    
-    for variable in TP_vars: 
-        [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-        
-        for TP_value in ds[variable][TP_dim].values: 
-            ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-        
-        ds = ds.drop_vars(variable)
-    
+    ds = process_TPdims(ds)
+
     flight_nr = flight_nr_from_flight_info(ds.flight_info)
     start_datetime = start_time_from_flight_info(ds.flight_info, as_datetime=True)
     
@@ -388,9 +418,27 @@ def process_clams_v03(ds):
         start_datetime = get_start_datetime(flight_nr)
         start_secofday = int(datetime_to_secofday(start_datetime))
         ds = ds.assign(Time = lambda x: x.Time + np.timedelta64(start_secofday, 's'))
-
     
     return ds[[v for v in clams_variables_v03() if v in ds.variables]]
+
+def process_TPC_v04(ds): 
+    """ 
+    Preprocess datasets for ERA5 / CLaMS renalayis data version .04
+    Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+    
+    NB for CARIBIC: 
+        function call needs to include 
+        drop_variables = 'CARIBIC2_LocalTime'
+        if decode_times = True 
+        
+    """
+    # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
+    ds = process_TPdims(ds)
+    
+    # !!! Check if the timestamps are correct now
+    
+    return ds[[v for v in ERA5s_variables_v04() if v in ds.variables]]
+
 
 def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
     """ Interpolate met data onto given measurement timestamps. 
@@ -599,6 +647,72 @@ def add_zero_line(ax, axis='y'):
         ax.hlines(0, *xlims)
         ax.set_xlim(*xlims)
 
+def add_world(axs, fname = \
+    r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp'): 
+    """ Adds country outlines to the given axis with zorder 0 as thin grey lines. """
+    world = geopandas.read_file(fname)
+    if isinstance(axs, list): 
+        for ax in axs: 
+            world.boundary.plot(ax=ax, color='grey', linewidth=0.3, zorder=0)
+    else: 
+        world.boundary.plot(ax=axs, color='grey', linewidth=0.3, zorder=0)
+
+def nan_zoom(input, factor, order=1, mode='grid-constant', grid_mode=False, **kwargs):
+    """ The array is zoomed using spline interpolation of the requested order and may contain NaN values.
+    Args: 
+        input (array_like): The input array
+        zoom (float or sequence): The zoom factor along the axes. 
+    Based on scipy.ndimage.zoom: https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.zoom.html
+    """
+    array_copy = np.copy(input)
+    nan_mask = np.isnan(array_copy)
+    array_copy[nan_mask] = 0
+
+    # Create a weight array with 0 at NaN positions and 1 elsewhere
+    weights = np.ones_like(input)
+    weights[nan_mask] = 0
+
+    # Apply zoom to both arrays
+    zoomed_array = zoom(array_copy, factor, order=order, mode=mode, grid_mode=grid_mode, **kwargs)
+    zoomed_weights = zoom(weights, factor, order=order, mode=mode, grid_mode=grid_mode, **kwargs)
+
+    # Restore NaN values
+    if not all(i == 1 for i in zoomed_weights.flatten()):
+        zoomed_array[zoomed_weights == 0] = np.nan
+
+    return zoomed_array
+
+def nan_gaussian_filter(input, sigma, **kwargs):
+    """ Multidimensional Gaussian filter for arrays containing NaN values.
+    
+    Args: 
+        input (array_like): The input array
+        sigma (scalar / sequence of scalars): Standard deviation for Gaussian kernel. 
+    
+    Based on scipy.ndimage.gaussian_filter: https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter.html
+    """
+    array_copy = np.copy(input)
+    nan_mask = np.isnan(array_copy)
+    array_copy[nan_mask] = 0
+
+    # Create a weight array with 0 at NaN positions and 1 elsewhere
+    weights = np.ones_like(input)
+    weights[nan_mask] = 0
+
+    # Apply Gaussian filter to both arrays
+    filtered_array = gaussian_filter(array_copy, sigma=sigma, **kwargs)
+    filtered_weights = gaussian_filter(weights, sigma=sigma, **kwargs)
+
+    if all(weight == 1 for weight in weights.flatten()): 
+        return filtered_array
+
+    # Avoid division by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        filtered_array /= filtered_weights
+        filtered_array[filtered_weights == 0] = np.nan  # Restore NaNs where weights are 0
+
+    return filtered_array
+
 # %% Binning of global data sets
 def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
     """
@@ -706,6 +820,17 @@ def make_gif(pdir=None, fnames=None): # Animate changes over years
                            format="GIF", append_images=frames,
                            save_all=True, duration=200, loop=0)
 
+def gif_from_images(images, output_path='test_output.gif', duration=500):
+    """ Saves given images to the output path as a gif. """
+    images[0].save(
+        output_path,
+        save_all=True,
+        append_images=images[1:],
+        duration=duration,
+        loop=0
+    )
+
 class InitialisationError(Exception): 
     """ Raised when initialisation of a class is not intended. """
     pass
+
