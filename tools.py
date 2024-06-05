@@ -212,46 +212,42 @@ def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     return ds
 
 def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
-    """ Keep only variables that depend only on time and are available in
-    subsampled data """
+    """ Keep only variables that depend only on time and are available in subsampled data """
     ds = process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
-def clams_variables(): 
-    """ Variables for TPChange data versions 01 and 02. """
-    return [
-    'ERA5_PV',
-    'ERA5_EQLAT',
-    'ERA5_TEMP',
+def ERA5_variables(): 
+    """ All variables for TPChange ERA5 reanalysis datasets. """
+    met_vars = [
+        'ERA5_PV',
+        'ERA5_EQLAT',
+        'ERA5_TEMP',
+        'ERA5_PRESS',
+        'ERA5_THETA',
+        'ERA5_PHI', 
+        'ERA5_GPH',
+        ]
+
+    dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
+               for pvu in ['1_5', '2_0', '3_5'] 
+               for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
+
+    therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
+               for vcoord in ['Z', 'THETA', 'PRESS']]
     
-    'ERA5_PRESS',
-    'ERA5_THETA',
-    'ERA5_GPH',
+    therm_tps_V02 = [f'ERA5_TROP1_{vcoord}' 
+            for vcoord in ['Z', 'THETA', 'PRESS']]
     
-    'ERA5_TROP1_PRESS',
-    'ERA5_TROP1_THETA',
-    'ERA5_TROP1_Z',
+    other_vars = ['ERA5_O3']
     
-    'ERA5_PRESS_1_5_Main',
-    'ERA5_THETA_1_5_Main',
-    'ERA5_GPH_1_5_Main',
-    
-    'ERA5_PRESS_2_0_Main',
-    'ERA5_THETA_2_0_Main',
-    'ERA5_GPH_2_0_Main',
-    
-    'ERA5_PRESS_3_5_Main',
-    'ERA5_THETA_3_5_Main',
-    'ERA5_GPH_3_5_Main',
-    ]
+    return set(met_vars + dyn_tps + therm_tps + therm_tps_V02 + other_vars)
 
 def process_clams(ds):
     """ Select certain variables to import from CLaMS Data for aircraft campaigns. """
-    variables = clams_variables()
-    return ds[variables]
+    ds[[v for v in ERA5_variables() if v in ds.variables]]
 
-def process_TPdims(ds):
+def flatten_TPdims(ds):
     """ Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
     Used for ERA5 / CLaMS reanalysis datasets from version .03
     """
@@ -273,11 +269,9 @@ def process_TPdims(ds):
 
 def process_atom_clams(ds):
     """ Additional time values for ATom as otherwise the function breaks """
-    variables = ['ATom_UTC_Start'] + clams_variables()
+    ds[['ATom_UTC_Start'] + [v for v in ERA5_variables() if v in ds.variables]]
 
-    ds = ds[variables]
-
-    # find flight date from file name
+    # get flight date from file name
     filepath = ds['ATom_UTC_Start'].encoding['source']
     fname = os.path.basename(filepath) # get just the file name (contains info)
     date_string = fname.split('_')[1]
@@ -288,54 +282,11 @@ def process_atom_clams(ds):
     # generate datetimes for each timestamp
     datetimes = [secofday_to_datetime(date, secofday + 5) for secofday in ds['ATom_UTC_Start'].values]
     ds = ds.assign(Time = datetimes)
-
     ds = ds.drop_vars('ATom_UTC_Start')
 
     return ds
 
-def clams_variables_v03(): 
-    """ Variable names after processing TP dimensions. """
-    met_vars = [
-    'ERA5_PV',
-    'ERA5_EQLAT',
-    'ERA5_TEMP',
-    
-    'ERA5_PRESS',
-    'ERA5_THETA',
-    'ERA5_PHI', #!!! used to be ERA5_GPH
-    ]
-    
-    dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
-               for pvu in ['1_5', '2_0', '3_5'] 
-               for vcoord in ['PHI', 'THETA', 'PRESS']]
-
-    therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
-               for vcoord in ['Z', 'THETA', 'PRESS']]
-    
-    return met_vars + dyn_tps + therm_tps
-
-def ERA5s_variables_v04(): 
-    """ Variable names after processing TP dimensions. """
-    met_vars = [
-    'ERA5_PV',
-    'ERA5_EQLAT',
-    'ERA5_TEMP',
-    
-    'ERA5_PRESS',
-    'ERA5_THETA',
-    'ERA5_PHI', #!!! used to be ERA5_GPH
-    
-    'ERA5_O3'
-    ]
-    
-    dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
-               for pvu in ['1_5', '2_0', '3_5'] 
-               for vcoord in ['PHI', 'THETA', 'PRESS']]
-
-    therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
-               for vcoord in ['Z', 'THETA', 'PRESS']]
-    
-    return met_vars + dyn_tps + therm_tps
+''' For TPC_V03: Need to get timestamp info from flight_info or flight number
 
 def flight_nr_from_flight_info(flight_info) -> int: 
     """ Get Flight number from flight_info attribute in .nc file 
@@ -397,6 +348,7 @@ def get_start_datetime(flight_no, **kwargs) -> dt.datetime:
 Start time could not be evaluated using MS files, not in 200/201, \
 so dataset is incorrect for Flight {flight_no}]')
 
+
 def process_clams_v03(ds): 
     """ 
     Preprocess CLaMS datasets for e.g. CARIBIC-2 renalayis data version .03
@@ -421,24 +373,22 @@ def process_clams_v03(ds):
     
     return ds[[v for v in clams_variables_v03() if v in ds.variables]]
 
-def process_TPC_v04(ds): 
-    """ 
-    Preprocess datasets for ERA5 / CLaMS renalayis data version .04
-    Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+'''
+
+def process_TPC_V02(ds): 
+    """ Preprocess datasets for ERA5 / CLaMS renalayis data up to version 2. """
+    return ds[[v for v in ERA5_variables() if v in ds.variables]]
+
+def process_TPC(ds): 
+    """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
     
-    NB for CARIBIC: 
-        function call needs to include 
-        drop_variables = 'CARIBIC2_LocalTime'
-        if decode_times = True 
-        
+    NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
+    NB ATom:    drop_variables = ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']
+
     """
     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
-    ds = process_TPdims(ds)
-    
-    # !!! Check if the timestamps are correct now
-    
-    return ds[[v for v in ERA5s_variables_v04() if v in ds.variables]]
-
+    ds = flatten_TPdims(ds)
+    return ds[[v for v in ERA5_variables() if v in ds.variables]]
 
 def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
     """ Interpolate met data onto given measurement timestamps. 

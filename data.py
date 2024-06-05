@@ -281,7 +281,6 @@ class GlobalData:
         """ Creates dataframe for CLaMS data from netcdf files. """
 
         if self.ID in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
-            
             alldata_fname = {
                 'CAR' : 'caribic_clams_V03.nc'
                 }
@@ -292,31 +291,29 @@ class GlobalData:
             
             else: 
                 print('Importing CLAMS data')
-                campaign_dir_dict = {
-                    'CAR'  : 'CaribicTPChange',
-                    'SHTR' : 'SouthtracTPChange',
-                    'WISE' : 'WiseTPChange',
-                    'ATOM' : 'AtomTPChange',
-                    'HIPPO': 'HippoTPChange',
-                    'PGS'  : 'PolstraccTPChange',
+                campaign_dir_version_dict = { # campaign_pdir, version
+                    'CAR'  : ('CaribicTPChange',    4),
+                    'SHTR' : ('SouthtracTPChange',  2),
+                    'WISE' : ('WiseTPChange',       2),
+                    'ATOM' : ('AtomTPChange',       4),
+                    'HIPPO': ('HippoTPChange',      2),
+                    'PGS'  : ('PolstraccTPChange',  2),
+                    'PHL' : ('PhileasTPChange',     4),
                     }
-
-                preprocess_fcts = {
-                    'CAR' : tools.process_clams_v03, 
-                    'ATOM' : tools.process_atom_clams
-                    }
-
-                met_pdir = r'E:/TPChange/' + campaign_dir_dict[self.ID] if met_pdir is None else met_pdir
-                fnames = met_pdir + "/*.nc"
+                campaign_pdir, version = campaign_dir_version_dict[self.ID]
+                met_pdir = r'E:/TPChange/' + campaign_pdir
                 
+                fnames = met_pdir + "/*.nc"
                 if self.ID == 'CAR': 
                     fnames = met_pdir + "/2*/*.nc"
                     
+                drop_variables = {'CAR' : ['CARIBIC2_LocalTime'], 
+                                  'ATOM' : ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']}
+                    
                 # extract data, each file goes through preprocess first to filter variables & convert units
-                with xr.open_mfdataset(fnames, decode_times=False if self.ID in ('ATOM') else True,
-                                       preprocess = preprocess_fcts[self.ID] if self.ID in preprocess_fcts.keys() 
-                                       else tools.process_clams,
-                                       drop_variables = 'CARIBIC2_LocalTime' if self.ID =='CAR' else None,
+                with xr.open_mfdataset(fnames, 
+                                       preprocess = tools.process_TPC if not version==2 else tools.process_TPC_V02,
+                                       drop_variables = drop_variables.get(self.ID),
                                        ) as ds:
                     ds = ds
 
