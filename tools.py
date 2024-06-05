@@ -162,6 +162,7 @@ def rename_columns(columns) -> dict:
         col_name_dict.update({x: col_name})
     return col_name_dict
 
+# EMAC data handling
 def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     """ Choose which variables to keep when importing EMAC data .
 
@@ -217,6 +218,7 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
     return ds[variables]
 
+# TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
 def ERA5_variables(): 
     """ All variables for TPChange ERA5 reanalysis datasets. """
     met_vars = [
@@ -243,153 +245,42 @@ def ERA5_variables():
     
     return set(met_vars + dyn_tps + therm_tps + therm_tps_V02 + other_vars)
 
-def process_clams(ds):
-    """ Select certain variables to import from CLaMS Data for aircraft campaigns. """
-    ds[[v for v in ERA5_variables() if v in ds.variables]]
-
-def flatten_TPdims(ds):
-    """ Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
-    Used for ERA5 / CLaMS reanalysis datasets from version .03
-    """
-    TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-    TP_qualifier_dict = {0 : '_Main', 
-                         1 : '_Second', 
-                         2 : '_Third'}
-    
-    for variable in TP_vars: 
-        # get secondary dimension for the current multi-dimensional variable
-        [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-        
-        for TP_value in ds[variable][TP_dim].values: 
-            ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-        
-        ds = ds.drop_vars(variable)
-    
-    return ds
-
-def process_atom_clams(ds):
-    """ Additional time values for ATom as otherwise the function breaks """
-    ds[['ATom_UTC_Start'] + [v for v in ERA5_variables() if v in ds.variables]]
-
-    # get flight date from file name
-    filepath = ds['ATom_UTC_Start'].encoding['source']
-    fname = os.path.basename(filepath) # get just the file name (contains info)
-    date_string = fname.split('_')[1]
-    date = dt.datetime(year = int(date_string[:4]),
-                        month = int(date_string[4:6]),
-                        day = int(date_string[-2:]))
-
-    # generate datetimes for each timestamp
-    datetimes = [secofday_to_datetime(date, secofday + 5) for secofday in ds['ATom_UTC_Start'].values]
-    ds = ds.assign(Time = datetimes)
-    ds = ds.drop_vars('ATom_UTC_Start')
-
-    return ds
-
-''' For TPC_V03: Need to get timestamp info from flight_info or flight number
-
-def flight_nr_from_flight_info(flight_info) -> int: 
-    """ Get Flight number from flight_info attribute in .nc file 
-    Applicable for flight_info of the following format: 
-        'Campaign: CARIBIC2; Flightnumber: 544; Start: 11:09:55 22.03.2018; End: 21:20:55 22.03.2018'
-    """
-    flight_nr_string = flight_info.split(';')[1].replace('Flightnumber: ', '').strip()
-    return int(flight_nr_string)
-
-def start_time_from_flight_info(flight_info, as_datetime=False):
-    """ Get Timestamp from flight_info attribute in .nc file (time WRONG in V03 !!!) 
-    Applicable for flight_info of the following format: 
-        'Campaign: CARIBIC2; Flightnumber: 544; Start: 11:09:55 22.03.2018; End: 21:20:55 22.03.2018'
-    """
-    # tmp_str = ncfile.flight_info.split(';')[2]
-    starttime_string = flight_info.split(';')[2]
-    datetime_string = starttime_string.replace('Start: ', '').strip()
-    startdate = dt.datetime.strptime(datetime_string, '%H:%M:%S %d.%m.%Y')
-    
-    if as_datetime: 
-        return startdate
-    else: 
-        return [getattr(startdate, i) for i in 
-                ['year', 'month', 'day', 'hour', 'minute', 'second']]
-
-def start_datetime_by_flight_number(MS_df=None, load = True, save = False) -> pd.Series:
-    """  Get start time for each flight number from complete (!) MS dataframe with datetime index. """
-    if load or not MS_df: 
-        with open(get_path()+'misc_data\\start_dates_per_flight.pkl', 'rb') as f: 
-            start_dates = dill.load(f)
-    else: 
-        MS_df.sort_index()
-        flight_numbers = list(set(MS_df['Flight number'].values))
-
-        start_dates = pd.Series(index = flight_numbers, 
-                                dtype=object, 
-                                name='start_dates_per_flight_no') 
-
-        for flight_no in flight_numbers: 
-            start_dates[flight_no] = MS_df['Flight number'].ne(flight_no).idxmin()
-    
-    if save: 
-        with open(get_path()+'misc_data\\start_dates_per_flight.pkl', 'wb') as f: 
-            dill.dump(start_dates, f)
-            
-    return start_dates
-
-def get_start_datetime(flight_no, **kwargs) -> dt.datetime: 
-    """ Returns flight start as datetime if given CARIBIC-2 Flight number. """
-    info = start_datetime_by_flight_number(**kwargs)
-    if flight_no in info: 
-        return info[flight_no]
-    elif flight_no == 200: 
-        return dt.datetime(2007, 7, 18) + dt.timedelta(seconds = 49545)
-    elif flight_no == 201: 
-        return dt.datetime(2007, 7, 18) + dt.timedelta(seconds = 61095)
-    else:
-        raise KeyError(f'\
-Start time could not be evaluated using MS files, not in 200/201, \
-so dataset is incorrect for Flight {flight_no}]')
-
-
-def process_clams_v03(ds): 
-    """ 
-    Preprocess CLaMS datasets for e.g. CARIBIC-2 renalayis data version .03
-    Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
-    
-    (for CARIBIC: 
-        function call needs to include 
-        drop_variables = 'CARIBIC2_LocalTime'
-        if decode_times = True )
-        
-    """
-    ds = process_TPdims(ds)
-
-    flight_nr = flight_nr_from_flight_info(ds.flight_info)
-    start_datetime = start_time_from_flight_info(ds.flight_info, as_datetime=True)
-    
-    if start_datetime.hour == 0 and start_datetime.minute == 0 and start_datetime.second == 0:
-        # very likely that datetime is wrong in file (V03)
-        start_datetime = get_start_datetime(flight_nr)
-        start_secofday = int(datetime_to_secofday(start_datetime))
-        ds = ds.assign(Time = lambda x: x.Time + np.timedelta64(start_secofday, 's'))
-    
-    return ds[[v for v in clams_variables_v03() if v in ds.variables]]
-
-'''
-
-def process_TPC_V02(ds): 
+def process_TPC_V02(ds): # up to V02
     """ Preprocess datasets for ERA5 / CLaMS renalayis data up to version 2. """
     return ds[[v for v in ERA5_variables() if v in ds.variables]]
 
-def process_TPC(ds): 
+def process_TPC(ds): # from V04
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
     
     NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
     NB ATom:    drop_variables = ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']
 
     """
+    def flatten_TPdims(ds):
+        """ Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+        Used for ERA5 / CLaMS reanalysis datasets from version .03
+        """
+        TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+        TP_qualifier_dict = {0 : '_Main', 
+                            1 : '_Second', 
+                            2 : '_Third'}
+        
+        for variable in TP_vars: 
+            # get secondary dimension for the current multi-dimensional variable
+            [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+            
+            for TP_value in ds[variable][TP_dim].values: 
+                ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+            
+            ds = ds.drop_vars(variable)
+        
+        return ds
+    
     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
     ds = flatten_TPdims(ds)
     return ds[[v for v in ERA5_variables() if v in ds.variables]]
 
+# Interpolation
 def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
     """ Interpolate met data onto given measurement timestamps. 
     
