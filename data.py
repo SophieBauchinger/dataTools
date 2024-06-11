@@ -51,6 +51,14 @@ from pandas.errors import SettingWithCopyWarning
 
 warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 
+""" 
+Current DEFINITIONS
+class GlobalData
+
+class Caribic
+class CampaignData
+
+"""
 
 # %% Global data
 class GlobalData:
@@ -279,56 +287,57 @@ class GlobalData:
 
     def get_clams_data(self, met_pdir=None, save_ds=False, recalculate=False) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
+        if self.ID not in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
+            raise KeyError(f'Cannot import CLaMS data for ID {self.ID}')
 
-        if self.ID in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
-            alldata_fname = {
-                'CAR' : 'caribic_clams_V03.nc'
+        alldata_fname = {
+            'CAR' : 'caribic_clams_V03.nc'
+            }
+        if (self.ID in alldata_fname \
+            and os.path.exists(tools.get_path() + 'misc_data/' + alldata_fname.get(self.ID)) \
+            and not recalculate):
+                with xr.open_dataset(tools.get_path() + 'misc_data/' + alldata_fname.get(self.ID)) as ds: 
+                    ds = ds
+        else: 
+            print('Importing CLAMS data')
+            campaign_dir_version_dict = { # campaign_pdir, version
+                'CAR'  : ('CaribicTPChange',    4),
+                'SHTR' : ('SouthtracTPChange',  2),
+                'WISE' : ('WiseTPChange',       2), #!!! 4
+                'ATOM' : ('AtomTPChange',       4),
+                'HIPPO': ('HippoTPChange',      2),
+                'PGS'  : ('PolstraccTPChange',  2),
+                'PHL' : ('PhileasTPChange',     4),
                 }
-            all_data_path = tools.get_path()+'misc_data/' + alldata_fname.get(self.ID)
-            if os.path.exists(all_data_path) and not recalculate:
-                with xr.open_dataset(all_data_path) as ds: 
-                    ds = ds
+            campaign_pdir, version = campaign_dir_version_dict[self.ID]
+            met_pdir = r'E:/TPChange/' + campaign_pdir
             
-            else: 
-                print('Importing CLAMS data')
-                campaign_dir_version_dict = { # campaign_pdir, version
-                    'CAR'  : ('CaribicTPChange',    4),
-                    'SHTR' : ('SouthtracTPChange',  2),
-                    'WISE' : ('WiseTPChange',       2),
-                    'ATOM' : ('AtomTPChange',       4),
-                    'HIPPO': ('HippoTPChange',      2),
-                    'PGS'  : ('PolstraccTPChange',  2),
-                    'PHL' : ('PhileasTPChange',     4),
-                    }
-                campaign_pdir, version = campaign_dir_version_dict[self.ID]
-                met_pdir = r'E:/TPChange/' + campaign_pdir
+            fnames = met_pdir + "/*.nc"
+            if self.ID == 'CAR': 
+                fnames = met_pdir + "/2*/*.nc"
                 
-                fnames = met_pdir + "/*.nc"
-                if self.ID == 'CAR': 
-                    fnames = met_pdir + "/2*/*.nc"
-                    
-                drop_variables = {'CAR' : ['CARIBIC2_LocalTime'], 
-                                  'ATOM' : ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']}
-                    
-                # extract data, each file goes through preprocess first to filter variables & convert units
-                with xr.open_mfdataset(fnames, 
-                                       preprocess = tools.process_TPC if not version==2 else tools.process_TPC_V02,
-                                       drop_variables = drop_variables.get(self.ID),
-                                       ) as ds:
-                    ds = ds
+            drop_variables = {'CAR' : ['CARIBIC2_LocalTime'], 
+                                'ATOM' : ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']}
+                
+            # extract data, each file goes through preprocess first to filter variables & convert units
+            with xr.open_mfdataset(fnames, 
+                                    preprocess = tools.process_TPC if not version==2 else tools.process_TPC_V02,
+                                    drop_variables = drop_variables.get(self.ID),
+                                    ) as ds:
+                ds = ds
 
-            if save_ds: 
-                self.data['met_ds'] = ds
+        if save_ds: 
+            self.data['met_ds'] = ds
 
-            met_df = ds.to_dataframe()
+        met_df = ds.to_dataframe()
 
-            if self.ID=='CAR': 
-                self.data['CLAMS'] = met_df
-                self.pfxs = self.pfxs.append('CLAMS')
-            else: 
-                self.data['met_data'] = met_df
+        if self.ID=='CAR': 
+            self.data['CLAMS'] = met_df
+            self.pfxs = self.pfxs.append('CLAMS')
+        else: 
+            self.data['met_data'] = met_df
 
-            return met_df
+        return met_df
 
     def calc_coordinates(self, **kwargs): # Calculates mostly tropopause coordinates
         """ Calculate coordinates as specified in through .var1 and .var2. """
@@ -1676,6 +1685,8 @@ class Caribic(GlobalData):
         self.pfxs = pfxs
         # self.flights = ()
         self.get_data(verbose=verbose, recalculate=recalculate, fname=fname)  # creates self.data dictionary
+        if 'df' not in self.data: 
+            self.create_df()
         self.set_tps(**tps_dict)
 
         if 'met_data' not in self.data:
@@ -1787,38 +1798,41 @@ class Caribic(GlobalData):
             verbose (bool): Makes function more talkative.
         """
         self.data = {}  # easiest way of keeping info which file the data comes from
-        if not recalculate:
-            if not fname:
-                resource = tools.get_path() + "misc_data\\caribic_data_dict.pkl"
-            else:
-                resource = tools.get_path() + "misc_data\\" + fname
+        
+        if not recalculate: 
+            # Check if data is already available in compact form
+            lowres_fname = tools.get_path() + "misc_data\\caribic_data_dict.pkl"
+            highres_fname = tools.get_path() + "misc_data\\caribic_10s_data.pkl"
+            
+            data_dict = {}
+            
+            if any(pfx in self.pfxs for pfx in ['MS']) \
+                and os.path.exists(highres_fname): 
+                    with open(highres_fname, 'rb') as f:
+                        data_dict.update(dill.load(f))
 
-            if os.path.exists(resource):
-                with open(resource, 'rb') as f:
-                    data_dict = dill.load(f)
-
-                if 'MS' in self.pfxs and 'MS' not in data_dict:
-                    with open(tools.get_path() + "\\misc_data\\caribic_10s_data.pkl", 'rb') as f:
-                        data_MS = dill.load(f)['MS']
-                    data_dict['MS'] = data_MS
+            if any(pfx in self.pfxs for pfx in ['GHG', 'INT', 'INTtpc']) \
+                and os.path.exists(lowres_fname): 
+                    with open(lowres_fname, 'rb') as f:
+                        data_dict.update(dill.load(f))
+            
+            # check if loaded data contains given pfxs and vice versa
+            if all(pfx in data_dict.keys() for pfx in self.pfxs):
+                self.data = {k:data_dict[k] for k in self.pfxs} # choose only pfxs as specified
+                self.data = self.sel_year(*self.years).data
                 
-                # check if loaded data contains given pfxs and vice versa
-                if all(pfx in data_dict.keys() for pfx in self.pfxs):
-                    self.data = {k:data_dict[k] for k in self.pfxs} # choose only pfxs as specified
-                    self.data = self.sel_year(*self.years).data
+                for special_item, generator in [('df', '.create_df()'),
+                                                ('met_data', '.get_met_data()'),
+                                                ('df_sorted', '.get_df_sorted()'),
+                                                ('CLAMS', '.get_clams_data(recalculate=True)')]:
+                    if special_item in data_dict: 
+                        self.data[special_item] = data_dict[special_item]
+                        if verbose: 
+                            print(f'Loaded \'{special_item}\' from saved data. Call {generator} to generate anew. ')
                     
-                    for special_item, generator in [('df', '.create_df()'),
-                                                    ('met_data', '.get_met_data()'),
-                                                    ('df_sorted', '.get_df_sorted()'),
-                                                    ('CLAMS', '.get_clams_data(recalculate=True)')]:
-                        if special_item in data_dict: 
-                            self.data[special_item] = data_dict[special_item]
-                            if verbose: 
-                                print(f'Loaded \'{special_item}\' from saved data. Call {generator} to generate anew. ')
-                        
-                    return self.data
+                return self.data
 
-            elif 'Y' != input(f'{resource} not found, complile data structure from source? [Y/N]').upper():
+            elif 'Y' != input(f'Some pfxs not found in saved data, complile data structure from source? [Y/N]').upper():
                 return {}
 
         parent_dir = r'E:\CARIBIC\Caribic2data' if not pdir else pdir
@@ -2143,8 +2157,9 @@ class CampaignData(GlobalData):
     
         """
         fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
-        if not kwargs.get('recalculate') and os.path.exists(r'misc_data/' + fname):
-            with open(r'misc_data/' + fname, 'rb') as f:
+        dict_path = tools.get_path() + 'misc_data\\' + fname
+        if not kwargs.get('recalculate') and os.path.exists(dict_path):
+            with open(dict_path, 'rb') as f:
                 self.data = dill.load(f)
 
             if not 'df' in self.data:
@@ -2249,7 +2264,7 @@ class CampaignData(GlobalData):
         self.data['df'] = gdf
         return gdf
 
-    def get_met_data(self, met_pdir=None) -> pd.DataFrame:
+    def get_met_data(self) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
         if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
             return self.get_clams_data()
