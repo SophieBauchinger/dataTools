@@ -45,14 +45,12 @@ Functions:
 """
 
 import datetime as dt
-import dill
 import geopandas
 import glob
 from metpy.units import units
 import numpy as np
 import pandas as pd
 from PIL import Image
-import os
 from shapely.geometry import Point
 from scipy.ndimage import zoom, gaussian_filter
 
