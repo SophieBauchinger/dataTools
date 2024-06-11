@@ -24,16 +24,13 @@ from matplotlib.patches import Patch, Rectangle
 # from matplotlib.pyplot import pcolormesh as pcm
 import numpy as np
 
-# if '..' not in sys.path:
-#     sys.path.append('..')
-
 from mpl_toolkits.axes_grid1 import AxesGrid
 # from mpl_toolkits.basemap import Basemap
 import toolpac.calc.binprocessor as bp # type: ignore
 
 from dataTools import tools
 import dataTools.dictionaries as dcts
-from dataTools.data import GlobalData
+from dataTools.data._global import GlobalData
 
 world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
 

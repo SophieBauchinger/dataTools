@@ -35,7 +35,7 @@ import toolpac.calc.binprocessor as bp # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-from dataTools.data import Caribic
+from dataTools.data.Caribic import Caribic
 
 import warnings
 warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")

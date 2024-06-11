@@ -8,8 +8,8 @@ Test functions on miscellaneous data
 import numpy as np
 import xarray as xr
 
-from toolpac.readwrite import find
-from toolpac.readwrite.FFI1001_reader import FFI1001DataReader
+from toolpac.readwrite import find # type: ignore
+from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
 from dataTools import tools
 import dataTools.dictionaries as dcts
@@ -210,7 +210,7 @@ class CaribicINTtpc(GlobalData):
             except IndexError: 
                 pass
 
-        return gdf_yr, col_dict
+        return gdf_yr
 
     def get_pfx_data(self, pfx, parent_dir, verbose) -> pd.DataFrame:
         """ Data import for chosen prefix. """

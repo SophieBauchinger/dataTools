@@ -14,7 +14,7 @@ import pandas as pd
 import itertools
 
 import cmasher as cmr
-import toolpac.calc.binprocessor as bp
+import toolpac.calc.binprocessor as bp # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools

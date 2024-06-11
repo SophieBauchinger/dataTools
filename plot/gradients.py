@@ -9,7 +9,7 @@ Plot vertical profiles of Caribic data split into seasons.
 import numpy as np
 import matplotlib.pyplot as plt
 
-import toolpac.calc.binprocessor as bp
+import toolpac.calc.binprocessor as bp # type: ignore
 
 from dataTools import tools
 import dataTools.dictionaries as dcts

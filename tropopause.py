@@ -11,26 +11,23 @@ class CaribicTropopause(Caribic, TropopausePlotter)
 
 """
 # %matplotlib inline
-import cmasher as cmr
-import copy
 import geopandas
 import math
 import matplotlib.pyplot as plt
-from matplotlib import cm
 from matplotlib.colors import Normalize, LogNorm
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
 import matplotlib.patheffects as mpe
 import numpy as np
 import pandas as pd
-from PIL import Image
 from shapely.geometry import Point
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
 
 import dataTools.dictionaries as dcts
-from dataTools.data import Caribic, GlobalData
+from dataTools.data.Caribic import Caribic
+from dataTools.data._global import GlobalData
 from dataTools import tools
 
 world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')

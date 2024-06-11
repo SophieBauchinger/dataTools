@@ -16,11 +16,11 @@ pd.options.mode.chained_assignment = None
 import warnings; warnings.filterwarnings("ignore", category=UserWarning,
                                          module='matplotlib')
 
-from toolpac.outliers import outliers
-from toolpac.conv.times import datetime_to_fractionalyear
+from toolpac.outliers import outliers # type: ignore
+from toolpac.conv.times import datetime_to_fractionalyear # type: ignore
 
 from dataTools.dictionaries import get_col_name, get_fct_substance
-from dataTools.data import MaunaLoa
+from dataTools.data._local import MaunaLoa
 
 mlo_data = MaunaLoa().data
 
