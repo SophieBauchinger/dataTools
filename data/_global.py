@@ -114,7 +114,7 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
             fname = fname + '.pkl'
         
         if not pdir: 
-            pdir = tools.get_path() + '\\misc_data\\'
+            pdir = tools.get_path('\\misc_data\\pickled_dicts\\')
         
         with open(pdir + fname, 'wb') as f:
             dill.dump(self.data, f)

@@ -46,7 +46,7 @@ class Mozart(GlobalData):
             remap_lon (bool): convert longitude from 0-360 to ±180 degrees
             verbose (bool): make the function more talkative
         """
-        if not fname: fname = tools.get_path('misc_data\\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc')
+        if not fname: fname = tools.get_path('misc_data\\reference_data\\RIGBY_2010_SF6_MOLE_FRACTION_1970_2008.nc')
         
         with xr.open_dataset(fname) as ds:
             ds = ds.isel(level=27)

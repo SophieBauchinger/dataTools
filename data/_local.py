@@ -72,7 +72,7 @@ class MaunaLoa(LocalData):
         self.ID = 'MLO'
         super().__init__(years=years, substances=substances)
         if data_D: self.data_D = {}
-        if not path_dir: path_dir = tools.get_path() + "misc_data"
+        if not path_dir: path_dir = tools.get_path() + "misc_data\\reference_data"
         self.get_data(path_dir, data_D)
 
     def __repr__(self):
@@ -98,7 +98,7 @@ class MaunaLoa(LocalData):
             subs (str): short name of substance data to import
             freq (str): data frequency, 'M' / 'D'
         """
-        if subs not in ['sf6', 'n2o', 'ch4', 'co2', 'co']:
+        if subs.short_name not in ['sf6', 'n2o', 'ch4', 'co2', 'co']:
             raise NotImplementedError(f'Data format and filepaths not defined for {subs}')
 
         if freq == 'D' and subs != 'sf6':
@@ -195,7 +195,7 @@ class MaceHead(LocalData):
         self.source = 'Mace_Head'
         self.ID = 'MHD'
         super().__init__(years, substances=substances)
-        if not path: path = tools.get_path('misc_data\\MHD-medusa_2012.dat') 
+        if not path: path = tools.get_path('misc_data\\reference_data\\MHD-medusa_2012.dat') 
         self.path = path
         self.data_Hour = {}
         self.get_data()

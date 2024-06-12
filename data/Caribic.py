@@ -173,8 +173,8 @@ class Caribic(GlobalData):
         
         if not recalculate: 
             # Check if data is already available in compact form
-            lowres_fname = tools.get_path() + "misc_data\\caribic_data_dict.pkl"
-            highres_fname = tools.get_path() + "misc_data\\caribic_10s_data.pkl"
+            lowres_fname = tools.get_path() + "misc_data\\pickled_dicts\\caribic_data_dict.pkl"
+            highres_fname = tools.get_path() + "misc_data\\pickled_dicts\\caribic_10s_data.pkl"
             
             data_dict = {}
             

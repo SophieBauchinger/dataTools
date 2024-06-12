@@ -31,7 +31,7 @@ class CampaignData(GlobalData):
         df: Pandas GeoDataFrame
     """
 
-    def __init__(self, campaign, grid_size=5, v_limits=None, tps_dict={}, **kwargs):
+    def __init__(self, campaign, grid_size=5, tps_dict={}, **kwargs):
         """ Initialise HALO_campaign object. """
         years = dcts.years_per_campaign(campaign)
         super().__init__(years, grid_size)
@@ -77,7 +77,7 @@ class CampaignData(GlobalData):
     status: {self.status}""")
 
     @property
-    def _log_in(self, **kwargs):
+    def _log_in(self):
         user = keyring.get_password('IAU_SQL', 'username_key')
         log_in = {"host": '141.2.225.99',
                   "user": user,
@@ -130,7 +130,7 @@ class CampaignData(GlobalData):
     
         """
         fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
-        dict_path = tools.get_path() + 'misc_data\\' + fname
+        dict_path = tools.get_path() + 'misc_data\\pickled_dicts\\' + fname
         if not kwargs.get('recalculate') and os.path.exists(dict_path):
             with open(dict_path, 'rb') as f:
                 self.data = dill.load(f)

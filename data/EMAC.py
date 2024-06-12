@@ -51,20 +51,20 @@ class EMAC(GlobalData):
 
         if not recalculate:
             if s4d:
-                with xr.open_dataset(tools.get_path()+r'misc_data\emac_ds.nc') as ds:
+                with xr.open_dataset(tools.get_path()+r'misc_data\EMAC\emac_ds.nc') as ds:
                     self.data['s4d'] = ds
             if s4d_s:
-                with xr.open_dataset(tools.get_path()+r'misc_data\emac_ds_s.nc') as ds_s:
+                with xr.open_dataset(tools.get_path()+r'misc_data\EMAC\emac_ds_s.nc') as ds_s:
                     self.data['s4d_s'] = ds_s
             if tp:
-                if os.path.exists(tools.get_path()+r'misc_data\emac_tp.nc'):
-                    with xr.open_dataset(tools.get_path()+r'misc_data\emac_tp.nc') as tp:
+                if os.path.exists(tools.get_path()+r'misc_data\EMAC\emac_tp.nc'):
+                    with xr.open_dataset(tools.get_path()+r'misc_data\EMAC\emac_tp.nc') as tp:
                         self.data['tp'] = tp
                 else:
                     self.create_tp()
             if df:
-                if os.path.exists(tools.get_path()+r'misc_data\emac_df.pkl'):
-                    with open(tools.get_path()+r'misc_data\emac_df.pkl', 'rb') as f:
+                if os.path.exists(tools.get_path()+r'misc_data\EMAC\emac_df.pkl'):
+                    with open(tools.get_path()+r'misc_data\EMAC\emac_df.pkl', 'rb') as f:
                         self.data['df'] = dill.load(f)
                 elif tp:
                     self.create_df()
@@ -222,7 +222,7 @@ class EMAC(GlobalData):
     def save_to_dir(self):
         """ Save emac data etc to files """
         dt.datetime.now().strftime("%Y_%m_%d-%p%I_%M_%S")
-        pdir = f'misc_data/Emac-{dt.datetime.now().strftime("%Y_%m_%d-%I_%M_%S")}'
+        pdir = f'misc_data/EMAC/Emac-{dt.datetime.now().strftime("%Y_%m_%d-%I_%M_%S")}'
         os.mkdir(pdir)
 
         with open(pdir + '/Emac_inst.pkl', 'wb') as f:

@@ -17,8 +17,8 @@ import dataTools.dictionaries as dcts
 #%% Test changes to FFI1001ReadHeader, FFI1001DataReader
 # =============================================================================
 # fnames = [
-#     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/b47_cryosampler_GCMS_ECD_PIC_w_cat.csv',
-#     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/ACinst_GUF003_202108122119_RA.ict',
+#     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/testing_data/b47_cryosampler_GCMS_ECD_PIC_w_cat.csv',
+#     r'C:/Users/sophie_bauchinger/Documents/GitHub/iau-caribic/misc_data/testing_data/ACinst_GUF003_202108122119_RA.ict',
 #     r'E:\CARIBIC\Caribic2data\Flight148_20060428\GHG_20060428_148_MNL_CAN_V11.txt',
 #     ]
 # 
@@ -32,9 +32,9 @@ import dataTools.dictionaries as dcts
 # print(ac_flat.df.shape, ac_flat.df.columns[:4])
 # print(c.df.shape, c.df.columns[:4])
 # =============================================================================
-pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data'
+pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\testing_data\\'
 
-# fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
+# fname = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\testing_data\\INTtpc_20150115_492_GRU_MUC_10s_V02.txt'
 # fnameV02 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V02.txt'
 # fnameV03 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V03.txt'
 # fnameV04 = pdir + 'INTtpc_20190501_569_PVG_MUC_10s_V04(1).txt'
@@ -43,8 +43,8 @@ pdir = r'C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_da
 # c3 = FFI1001DataReader(fnameV02, sep_variables=';', df=True, xtype='secofday')
 # c4 = FFI1001DataReader(fnameV02, sep_variables=';', df=True, xtype='secofday')
 
-fl547_nc = dcts.get_path() + 'misc_data\\CARIBIC2_20180516_547_TPC_V04.nc'
-fl547_V05 = dcts.get_path() + 'misc_data\\INTtpc_20180516_547_MEX_MUC_10s_V05.txt'
+fl547_nc = dcts.get_path() + 'misc_data\\testing_data\\CARIBIC2_20180516_547_TPC_V04.nc'
+fl547_V05 = dcts.get_path() + 'misc_data\\testing_data\\INTtpc_20180516_547_MEX_MUC_10s_V05.txt'
 
 
 with xr.open_dataset(fl547_nc, drop_variables = ['CARIBIC2_LocalTime']) as ds: 
