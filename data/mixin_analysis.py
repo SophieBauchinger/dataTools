@@ -40,8 +40,7 @@ class AnalysisMixin:
         data = self.df_sorted if not df else self.df
         prefix = 'tropo_' if not df else ''
         
-        if not tps:
-            tps = self.tps #tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan', source=self.source))
+        tps = self.tps if tps is None else tps
         
         if self.source != 'MULTI': 
             tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
@@ -91,7 +90,6 @@ class AnalysisMixin:
         
         return out
 
-# --- Manipulate substances mixing ratios ---
     def detrend_substance(self, subs, loc_obj=None, save=True, plot=False, note='', 
                           **kwargs) -> tuple[pd.DataFrame, np.ndarray]:
         """

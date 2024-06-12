@@ -4,15 +4,6 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Fri Apr 28 14:13:28 2023
 
-class GlobalData
-class Caribic(GlobalData)
-class EMAC(GlobalData)
-class TropopauseData(GlobalData)
-class Mozart(GlobalData)
-
-class LocalData
-class Mauna_Loa(LocalData)
-class Mace_Head(LocalData)
 """
 
 # TODO ATOM flight & latitude selection
@@ -273,3 +264,36 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
         out.data['df'] = df
         out.data['ID_per_timestamp'] = combined_df.reset_index().set_index('DATETIME')['ID']
         return out
+
+
+class Era5ModelData(AnalysisMixin, ModelDataMixin): 
+    """ Holds ERA5 reanalysis / CLaMS model data as available from TPChange. """
+    def __init__(self, campaign, met_pdir=None, recalculate=False): 
+        """ Initialise object with imported reanalysis model data """
+        if not campaign=='CAR': 
+            years = dcts.years_per_campaign(campaign)
+        else: 
+            years = range(2005, 2021)
+            self.pfxs = []
+        self.years = years
+        
+        self.ID = campaign
+        source_dict = {
+            'SHTR' : 'HALO',
+            'WISE' : 'HALO',
+            'PGS'  : 'HALO',
+            'TACTS': 'HALO',
+            'ATOM' : 'ATOM',
+            'HIPPO': 'HIAPER', 
+            'CAR'  : 'Caribic'}
+        self.source = source_dict[campaign]
+
+        self.data = {}
+        met_data = self.get_clams_data(met_pdir, recalculate)
+        self.data['df'] = met_data
+        self.calc_coordinates()
+
+    @property
+    def df(self): 
+        return self.data['df']
+        
