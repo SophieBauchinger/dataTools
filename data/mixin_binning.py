@@ -6,10 +6,8 @@
 
 class BinningMixin
 """
-
 import pandas as pd
 import numpy as np
-import matplotlib.patheffects as mpe
 
 import toolpac.calc.binprocessor as bp # type: ignore
 
@@ -18,7 +16,26 @@ from dataTools import tools
 class BinningMixin: 
     """ Holds methods for binning global data in 1D/2D/3D in selected coordinates. 
     
-    
+    Methods:
+        binned_1d(subs, **kwargs)
+            Bin substance data over latitude
+
+        binned_2d(subs, **kwargs)
+            Bin substance data on a longitude/latitude grid
+
+        bin_1d(subs, coord, bci_1d, xbsize, df)
+
+        bin_2d(subs, xcoord, ycoord, bci_2d, xbsize, ybsize)
+        
+        bin_3d(subs, zcoord, bci_3d, xbsize, ybsize, zbsize, eql)
+        
+        bin_LMS(subs, tp, df, bci_3d, zbsize, nr_of_bins)
+        
+        bin_1d_seasonal(subs, coord, bci_1d, xbsize, df)
+        
+        bin_2d_seasonal(subs, xcoord, ycoord, bci_2d, xbsize, ybsize, df)
+            Bin substance data onto a 2D-grid of the given coordinates for each season. 
+        
     """
     
     def binned_1d(self, subs, **kwargs) -> tuple[list, list]:
@@ -36,11 +53,6 @@ class BinningMixin:
             subs (Substance): dcts.Substance instance
         """
         return tools.bin_2d(self, subs, **kwargs)  # out_list
-
-    @property
-    def outline(self): 
-        """ Helper function to add outline to lines in plots. """
-        return mpe.withStroke(linewidth=2, foreground='white')
 
     def bin_1d(self, subs, coord, bci_1d=None, xbsize=None, df=None) -> bp.Simple_bin_1d: 
         """ Bin substance data in self.df onto 1D-bins of the given coordinate. 
@@ -259,8 +271,7 @@ class BinningMixin:
         return out_dict
 
     def bin_2d_seasonal(self, subs, xcoord, ycoord,
-                        bci_2d=None, xbsize=None, ybsize=None, df=None,
-                        **kwargs) -> dict[bp.Simple_bin_1d]:
+                        bci_2d=None, xbsize=None, ybsize=None, df=None) -> dict[bp.Simple_bin_1d]:
         """ Bin substance data onto a 2D-grid of the given coordinates for each season. 
         Args: 
             subs (dcts.Substance)

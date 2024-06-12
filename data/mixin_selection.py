@@ -31,6 +31,15 @@ class SelectionMixin:
             Remove all data not in the chosen season
         sel_flight(flights)
             Remove all data that is not from the chosen flight numbers
+        
+        sel_atm_layer(atm_layer, **kwargs)
+            Remove all data not in the chosen atmospheric layer (tropo/strato)
+        sel_tropo()
+            Remove all stratospheric datapoints
+        sel_strato()
+            Remove all tropospheric datapoints
+            
+        
     """
 
     def sel_subset(self, **kwargs):
@@ -273,3 +282,80 @@ class SelectionMixin:
         # out.flights.sort()
 
         return out
+
+
+# --- Make selections based on strato / tropo characteristics --- 
+    def sel_atm_layer(self, atm_layer: str, tp=None, **kwargs):
+        """ Create GlobalData object with strato / tropo sorting.
+
+        Parameters:
+            atm_layer (str): atmospheric layer: 'tropo' or 'strato'
+
+            key tp_def (str): 'chem', 'therm' or 'dyn'
+            key crit (str): 'n2o', 'o3'
+            key coord (str): 'pt', 'dp', 'z'
+            key pvu (float): 1.5, 2.0, 3.5
+            key limit (float): pre-flag limit for chem. TP sorting
+        """
+        out = type(self).__new__(self.__class__)  # create new class instance
+        for attribute_key in self.__dict__:  # copy stuff like pfxs
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+
+        if not tp: 
+            if 'source' not in kwargs and self.source in ['Caribic', 'EMAC']:
+                kwargs.update({'source': self.source})
+    
+            if 'rel_to_tp' not in kwargs and any(
+                    c.rel_to_tp for c in self.get_coords(**kwargs)):
+                kwargs.update({'rel_to_tp': True})
+    
+            [tp] = self.get_coords(**kwargs)
+
+        if 'df_sorted' not in self.data:
+            df_sorted = self.create_df_sorted(save=False, **kwargs)
+        else:
+            df_sorted = self.df_sorted
+
+        if f'{atm_layer}_{tp.col_name}' not in df_sorted:
+            raise KeyError(f'Could not find {tp.col_name} in df_sorted.')
+
+        atm_layer_col = f'{atm_layer}_{tp.col_name}'
+
+        # Filter all dataframes to only include indices in df_sorted
+        df_list = [k for k in self.data
+                   if isinstance(self.data[k], pd.DataFrame)
+                   and k not in ['df_sorted']]  # list of all datasets to cut
+        for k in df_list:
+            out.data[k] = out.data[k][out.data[k].index.isin(df_sorted.index)]
+            out.data[k] = out.data[k][df_sorted[atm_layer_col].loc[out.data[k].index]]
+
+        if self.source == 'Caribic':
+            out.pfxs = [k for k in out.data if k in self.pfxs]
+
+        # update object status
+        out.status.update({atm_layer: True})
+        if 'TP filter' in out.status:
+            out.status['TP filter'] = (out.status['TP filter'], atm_layer_col)
+        else:
+            out.status['TP filter'] = atm_layer_col
+
+        return out
+
+    def sel_tropo(self, tp=None, **kwargs):
+        """ Returns GlobalData object containing only tropospheric data points. """
+        return self.sel_atm_layer('tropo', tp, **kwargs)
+
+    def sel_strato(self, tp=None, **kwargs):
+        """ Returns GlobalData object containing only tropospheric data points. """
+        return self.sel_atm_layer('strato', tp, **kwargs)
+
+    def sel_LMS(self, tp=None, nr_of_bins = 3, **kwargs): #!!!
+        """ Returns GlobalData object containing only lowermost stratospheric data points. """
+        strato_data = self.sel_strato(tp, **kwargs).df
+        
+        zbsize = tp.get_bsize() if not kwargs.get('zbsize') else kwargs.get('zbsize')
+        
+        LMS_data = strato_data[strato_data[tp.col_name] <= zbsize * nr_of_bins]
+        
+        return LMS_data
+
