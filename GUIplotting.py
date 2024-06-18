@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 from PyQt5 import QtCore #conda install pyqt
 from PyQt5 import QtWidgets
 
-from dataTools.tropopause import TropopausePlotter
+from dataTools.plot.tropopause import TropopausePlotter
 
 tp = TropopausePlotter(2012)
 

@@ -40,7 +40,7 @@ class LocalData():
         if not hasattr(self, 'ID'): self.ID = None
         if not hasattr(self, 'source'): self.source = None
         if substances == 'all':
-            self.substances = [s.short_name for s in
+            self.substances = [s.short_name for s in 
                                dcts.get_substances(source=self.source)
                                if not s.short_name.startswith('d_')]
         elif isinstance(substances, (list, set)):
@@ -90,7 +90,7 @@ class MaunaLoa(LocalData):
                     continue
         return self
 
-    def get_subs_data(self, path_dir: str, subs: dcts.Substance, freq='M') -> pd.DataFrame:
+    def get_subs_data(self, path_dir: str, short_name: str, freq='M') -> pd.DataFrame:
         """ Import data from Mauna Loa files.
     
         Parameters:
@@ -98,10 +98,10 @@ class MaunaLoa(LocalData):
             subs (str): short name of substance data to import
             freq (str): data frequency, 'M' / 'D'
         """
-        if subs.short_name not in ['sf6', 'n2o', 'ch4', 'co2', 'co']:
-            raise NotImplementedError(f'Data format and filepaths not defined for {subs}')
+        if short_name not in ['sf6', 'n2o', 'ch4', 'co2', 'co']:
+            raise NotImplementedError(f'Data format and filepaths not defined for {short_name}')
 
-        if freq == 'D' and subs != 'sf6':
+        if freq == 'D' and short_name != 'sf6':
             raise Warning('Daily data from Mauna Loa only available for sf6.')
 
         # get correct path for the chosen substance
@@ -113,17 +113,17 @@ class MaunaLoa(LocalData):
             'ch4': '\\ch4_mlo_surface-insitu_1_ccgg_MonthlyData.txt',
             }
 
-        path = path_dir + fnames[subs]
+        path = path_dir + fnames[short_name]
 
         # 'ch4', 'co', 'co2' : 1st line has header_lines
-        if subs in ['co2', 'ch4', 'co']:
+        if short_name in ['co2', 'ch4', 'co']:
             data_format = 'ccgg'
             with open(path, encoding='utf-8') as f:
                 header_lines = int(f.readline().split(' ')[-1].strip())
                 title = f.readlines()[header_lines - 2].split()
                 if title[0].startswith('#'): title = title[2:]  # CO data
 
-        elif subs in ['sf6', 'n2o']:
+        elif short_name in ['sf6', 'n2o']:
             data_format = 'CATS'
             header_lines = 0
             with open(path, encoding='utf-8') as f:
@@ -168,17 +168,17 @@ class MaunaLoa(LocalData):
             filter_cols = [c for c in df.columns if c not in ['value', 'value_std_dev']]
             df.drop(filter_cols, axis=1, inplace=True)
             df.dropna(how='any', subset='value', inplace=True)
-            df.rename(columns={'value': f'{subs}_{self.ID}', 'value_std_dev': f'{subs}_std_dev_{self.ID}'},
+            df.rename(columns={'value': f'{short_name}_{self.ID}', 'value_std_dev': f'{short_name}_std_dev_{self.ID}'},
                       inplace=True)
 
         df.astype(float)
         df['Date_Time'] = time
         df.set_index('Date_Time', inplace=True)  # make the datetime object the new index
         if data_format == 'CATS':
-            df.dropna(how='any', subset=str(str(subs).upper() + 'catsMLOm'), inplace=True)
-        if data_format == 'ccgg' and subs != 'co':
+            df.dropna(how='any', subset=str(str(short_name).upper() + 'catsMLOm'), inplace=True)
+        if data_format == 'ccgg' and short_name != 'co':
             df.replace([-999.999, -999.99, -99.99, -9], np.nan, inplace=True)
-            df.dropna(how='any', subset=f'{subs}_{self.ID}', inplace=True)
+            df.dropna(how='any', subset=f'{short_name}_{self.ID}', inplace=True)
 
         if 'dict' not in self.data:
             self.data['dict'] = {}

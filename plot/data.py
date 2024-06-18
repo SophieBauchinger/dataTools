@@ -7,10 +7,7 @@ Defines different plotting possibilities for objects of the type GlobalData
 or LocalData as defined in data_classes
 
 """
-import sys
-import warnings
 from calendar import monthrange
-import cartopy.crs as ccrs
 import datetime as dt
 import geopandas
 import math
@@ -21,11 +18,11 @@ from matplotlib.colors import Normalize, BoundaryNorm
 from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch, Rectangle
-# from matplotlib.pyplot import pcolormesh as pcm
 import numpy as np
+import plotly.express as px
 
 from mpl_toolkits.axes_grid1 import AxesGrid
-# from mpl_toolkits.basemap import Basemap
+
 import toolpac.calc.binprocessor as bp # type: ignore
 
 from dataTools import tools
@@ -34,35 +31,10 @@ from dataTools.data._global import GlobalData
 
 world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
 
-"""
-# set up orthographic map projection with perspective of satellite looking 
-# down at 50N, 100W. use low resolution coastlines.
-plt.figure(dpi=200)
-map = Basemap(projection='ortho',lat_0=50,lon_0=8,resolution='l')
-# draw coastlines, country boundaries, fill continents.
-map.drawcoastlines(linewidth=0.25)
-map.drawcountries(linewidth=0.25)
-"""
-
-# supress a gui backend userwarning, not really advisable
-warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib')
-# ignore warning for np.nanmin / np.nanmax for all-nan sclice
-warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
-
-
-transform = ccrs.PlateCarree()
-# ax._autoscaleXon = False
-# ax._autoscaleYon = False
-
 # %% GlobalData plotting
 
-class GlobalDataPlotter(GlobalData): 
+class GlobalDataPlotterMixin: 
     """ Simple plotting capabilities for GlobalData objects. """
-    def __init__(self, glob_obj): 
-        super().__init__(glob_obj.years)
-        # self = type(glob_obj).__new__(glob_obj.__class__)
-        self.__dict__ = glob_obj.__dict__
-        self.__dict__['data'] = glob_obj.__dict__['data']
 
     def timeseries_global(self, substances=None, colorful=True, note=''):
         """ Scatter plots of timeseries data incl. monthly averages of chosen substances. """
@@ -139,7 +111,7 @@ class GlobalDataPlotter(GlobalData):
             fig.autofmt_xdate()
             plt.show()
 
-    def scatter_lat_lon_binned(self, substances=None, bin_attr='vmean', **subs_kwargs):
+    def scatter_lat_lon_binned(self, substances=None, bin_attr='vmean'):
         """ Plots 1D averaged values over latitude / longitude including colormap
 
         Parameters:
@@ -263,7 +235,7 @@ class GlobalDataPlotter(GlobalData):
             cbar = plt.colorbar(img, ax=ax, extend='neither' if not bin_attr=='vcount' else 'max')
             cbar.ax.set_xlabel(f'[{subs.unit}]' if bin_attr!='vcount' else '[# Points]')
 
-    def yearly_plot_binned_2d(self, detr=False, bin_attr='vmean', **subs_kwargs):
+    def yearly_plot_binned_2d(self, bin_attr='vmean', **subs_kwargs):
         # self, subs, single_yr=None, c_pfx=None, years=None, detr=False):
         """ Create a 2D plot of binned mixing ratios for each available year on a grid.
 
@@ -420,6 +392,35 @@ class GlobalDataPlotter(GlobalData):
         ax21.set_visible(False)
         
         plt.show()
+
+    def make_3d_scatter(self, vcoord, color_var, eql=False): 
+        """ Plot the given substance on a 3D plot of lon-lat-vcoord. """
+        x = self.df.geometry.x
+        
+        xcoord = dcts.get_coord('geometry.x')
+        ycoord = (dcts.get_coord('geometry.y') \
+                    if not eql else self.get_coords(hcoord='eql', model='ERA5') )
+        
+        if not eql: 
+            y = self.df.geometry.y if not eql else self.get_coords()
+        else: 
+            [eql_coord] = self.get_coords(hcoord='eql', model='ERA5')
+            y = self.df[eql_coord.col_name]
+        
+        fig = px.scatter_3d(self.df, 
+                            x=x, 
+                            y=y, 
+                            z=vcoord.col_name,
+                            color = color_var.col_name,
+                            size = 1,
+                            labels = {
+                                'x' : dcts.get_coord('geometry.x').label(),
+                                'y'  : dcts.get_coord('geometry.y').label(),
+                                # vcoord.col_name : vcoord.label(),
+                                # color_var.col_name : color_var.label(),
+                                }
+                            )
+        fig.show()
 
 # Mozart
 def lonlat_1d(mzt_obj, subs='sf6',

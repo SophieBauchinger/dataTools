@@ -1,20 +1,16 @@
 # -*- coding: utf-8 -*-
-""" Visualisation of binned aircraft campaign data primarily in regards to the local tropopause. 
+""" Visualisation Mixins for binned aircraft campaign data / wrt. local tropopause. 
 
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun  6 13:59:31 2023
+ 
+class SimpleBinPlotter
 
-Showing mixing ratios per season on a plot of coordinate relative to the
-tropopause (in km or K) versus equivalent latitude (in deg N)
-
-class BinPlotter
-
-class BinPlotter1D(BinPlotter)
-class BinPlotter2D(BinPlotter)
-class BinPlotter3D(BinPlotter)
-
-fctn n2o_tp_stdv_rms
-
+class BinPlotterBaseMixin
+> class BinPlotter1DMixin
+> class BinPlotter2DMixin
+> class BinPlotter3DMixin
+>> class BinPlotterMixin
 """
 #%% Imports
 import io
@@ -35,15 +31,11 @@ import toolpac.calc.binprocessor as bp # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-from dataTools.data.Caribic import Caribic
 
-import warnings
-warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
-
-# outline = mpe.withStroke(linewidth=2, foreground='white')
+# import warnings
+# warnings.filterwarnings("ignore", message="Boolean Series key will be reindexed to match DataFrame index. result = super().__getitem__(key)")
 
 #TODO map of distance to tropopause (stratosphere only?)
-#TODO might want to implement a logarithmic scale for pressure at some point
 
 #%%% BinPlotter classes for multiple dimensionalities
 
@@ -75,7 +67,7 @@ class SimpleBinPlotter:
         fig.colorbar(img, ax = ax, aspect=30, pad=0.09, orientation='horizontal')
         plt.show()
 
-class BinPlotter:
+class BinPlotterBaseMixin:
     """ Structure for binning & plotting classes for any choice of x/y/z.
 
     Methods:
@@ -84,6 +76,7 @@ class BinPlotter:
         get_coord_lims(coord, xyz)
         _get_bsize(coord, xyz)
     """
+
     def __init__(self, filter_tps = None, **kwargs):
         """ Initialise class instances. 
         Paramters:
@@ -93,24 +86,18 @@ class BinPlotter:
             key ybsize (float)
             key vlims / xlims / ylims (Tuple[float])
             """
+        super().__init__(**kwargs)
+
         if filter_tps: 
             self.remove_non_shared_indices(filter_tps, inplace=True)
 
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         self.outline = mpe.withStroke(linewidth=2, foreground='white')
 
-    def __repr__(self):
-        return f'<class eqlat.BinPlotter> with minimum points per bin: {self.count_limit} \n\
-based on {self.__repr__()}'
-
     def set_kwargs(self, **kwargs): 
         """ Set shared kwargs used by various class methods. """
         self._kwargs = kwargs
         return self
-
-    @property
-    def df(self) -> pd.DataFrame:
-        return self.data['df']
 
     def get_vlimit(self, subs: dcts.Substance, bin_attr: str) -> tuple: 
         """ Get colormap limits for given substance and bin attribute. """
@@ -172,18 +159,22 @@ based on {self.__repr__()}'
                 bsize=0.5
         return bsize
 
-class BinPlotter1D(BinPlotter):
+class BinPlotter1DMixin(BinPlotterBaseMixin):
     """ Single dimensional binning & plotting. 
     
     Methods: 
-        plot_1d_gradient(subs, coord, bin_attr)
-        make_bar_plot(subs, xcoord, tp, bin_attr)
-        plot_bar_plots(subs, xcoord, bin_attr)
-        matrix_plot_stdv_subs()
-        matrix_plot_stdv()
+        flight_height_histogram
+        overlapping_histograms
+        plot_vertial_profile_variability_comparison
+        plot_1d_seasonal_gradient
+        plot_1d_gradient
+        plot_1d_seasonal_gradient_with_vstdv
+        stdv_rms_non_pt
+        calc_bin_avs
+        plot_bar_plots
+        matrix_plot_stdev_subs
+        matrix_plot_stdev
     """
-    def __init__(self,  **kwargs):
-        super().__init__( **kwargs)
 
     def flight_height_histogram(self, tp, alpha: float = 0.7, ax=None, **kwargs): 
         """ Make a histogram of the number of datapoints for each tp bin. """
@@ -785,14 +776,13 @@ class BinPlotter1D(BinPlotter):
             self.matrix_plot_stdev_subs(subs, note=note, minimise_tps=minimise_tps,
                                        atm_layer=atm_layer, savefig=savefig)
 
-class BinPlotter2D(BinPlotter): 
+class BinPlotter2DMixin(BinPlotterBaseMixin): 
     """ Two-dimensional binning & plotting. 
     
     Methods: 
         calc_average(bin2d_inst, bin_attr)
         calc_ts_averages(bin2d_inst, bin_attr)
-        single_2d_plot(ax, bin2d_inst, bin_attr, xcoord, ycoord,
-                       cmap, norm, xlims, ylims)
+        yearly_maps(subs, bin_attr)
         seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, cmap)
         plot_2d_mxr(subs, xcoord, ycoord)
         plot_2d_stdv(subs, xcoord, ycoord)
@@ -801,10 +791,9 @@ class BinPlotter2D(BinPlotter):
         plot_total_2d(subs, xcoord, ycoord, bin_attr)
         plot_mxr_diff(params_1, params2)
         plot_differences()
+        single_2d_plot(ax, bin2d_inst, bin_attr, xcoord, ycoord,
+                       cmap, norm, xlims, ylims)
     """
-    def __init__(self,  **kwargs): 
-        """ Initialise bin plotter. """
-        super().__init__( **kwargs)
 
     def calc_average(self, bin2d_inst, bin_attr='vstdv'):
         """ Calculate weighted overall average. """
@@ -1134,8 +1123,8 @@ class BinPlotter2D(BinPlotter):
         cbar = fig.colorbar(img, ax = axs.ravel().tolist(), aspect=30,
                             pad=0.09, orientation='horizontal')
         cbar.ax.set_xlabel(
-            f'{subs1.label()} {xcoord1.label()} {ycoord1.label()} \n vs.\n\
-{subs2.label()} {xcoord2.label()} {ycoord2.label()}')
+            f'{subs1.label()} {xcoord1.label()} {ycoord1.label()} \n vs.\n' + \
+                f'{subs2.label()} {xcoord2.label()} {ycoord2.label()}')
         plt.show()
 
     def plot_differences(self, subs_params={}, **kwargs):
@@ -1207,11 +1196,14 @@ class BinPlotter2D(BinPlotter):
         
         return img
 
-class BinPlotter3D(BinPlotter): 
+class BinPlotter3DMixin(BinPlotterBaseMixin): 
     """ Three-dimensional binning & plotting. 
     
     Methods: 
+        z_crossection(subs, tp, bin_attr, save_gif_path)
         stratosphere_map(subs, tp, bin_attr)
+        matrix_plot_3d_stdev_subs(substance, note, tps, save_fig)
+        matrix_plot_stdev(note, atm_layer, savefig)
     """
 
     def z_crossection(self, subs, tp, bin_attr, 
@@ -1344,8 +1336,8 @@ class BinPlotter3D(BinPlotter):
         plt.colorbar(img, ax=ax, pad=0.1, orientation='horizontal') # colorbar
         plt.show()
 
-    def matrix_plot_3d_stdev_subs(self, substance, note='', tps=None,
-                                  atm_layer='both', savefig=False) -> tuple[np.array, np.array]:
+    def matrix_plot_3d_stdev_subs(self, substance, note='', tps=None, savefig=False
+                                  ) -> tuple[np.array, np.array]:
         """
         Create matrix plot showing variability per latitude bin per tropopause definition
     
@@ -1553,81 +1545,84 @@ class BinPlotter3D(BinPlotter):
     
         return tropo_out_list, strato_out_list
     
-    def matrix_plot_stdev(self, note='', atm_layer='both', savefig=False,
-                          minimise_tps=True, **subs_kwargs):
+    def matrix_plot_stdev(self, note='', savefig=False):
         substances = [s for s in self.substances
                       if not s.col_name.startswith('d_')]
-    
         for subs in substances:
-            self.matrix_plot_stdev_subs(subs, note=note, minimise_tps=minimise_tps,
-                                       atm_layer=atm_layer, savefig=savefig)
+            self.matrix_plot_stdev_subs(subs, note=note,savefig=savefig)
 
+class BinPlotterMixin(BinPlotter1DMixin, BinPlotter2DMixin, BinPlotter3DMixin): 
+    pass
 
 #%% Define global-data specific subclasses using multiple inheritance
-class CaribicBin1D(Caribic, BinPlotter1D): 
-    """ Class holding data and binned plotting functionality for Caribic. """
-    def __init__(self, **kwargs): 
-        """ Initialise object according to Caribic.__init__() """
-        super().__init__(**kwargs) # Caribic
+# class CaribicBin1D(Caribic, BinPlotter1DMixin): 
+#     """ Class holding data and binned plotting functionality for Caribic. """
+#     def __init__(self, **kwargs): 
+#         """ Initialise object according to Caribic.__init__() """
+#         super().__init__(**kwargs) # Caribic
         
-    def filtered_gradient_over_theta(self, subs, tp=None, 
-                                     rel=False, lat_bounds = (-90, 90)): 
-        """ Show RMS improvements when using N2O Filtering: STDV over potential temperature.   
+#     def filtered_gradient_over_theta(self, subs, tp=None, 
+#                                      rel=False, lat_bounds = (-90, 90)): 
+#         """ Show RMS improvements when using N2O Filtering: STDV over potential temperature.   
         
-        Calculate and plot the seasonal RMS variability gradient for the given substance. 
-        """
-        if tp is None: 
-            [tp] = self.get_substs(short_name='n2o', model='MSMT')
-        [vcoord] = self.get_coords(vcoord = 'pt', tp_def = 'nan', model='ERA5')
+#         Calculate and plot the seasonal RMS variability gradient for the given substance. 
+#         """
+#         if tp is None: 
+#             [tp] = self.get_substs(short_name='n2o', model='MSMT')
+#         [vcoord] = self.get_coords(vcoord = 'pt', tp_def = 'nan', model='ERA5')
         
-        bin_attr = 'rms_rvstd' if rel else 'rms_vstdv'
+#         bin_attr = 'rms_rvstd' if rel else 'rms_vstdv'
         
-        bp1d = self.sel_latitude(*lat_bounds)
-        var_df = bp1d.rms_seasonal_vstdv(subs, vcoord)
+#         bp1d = self.sel_latitude(*lat_bounds)
+#         var_df = bp1d.rms_seasonal_vstdv(subs, vcoord)
         
-        strato = bp1d.sel_strato(tp)
-        s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) 
+#         strato = bp1d.sel_strato(tp)
+#         s_var_df = strato.rms_seasonal_vstdv(subs, vcoord) 
 
-        tropo = bp1d.sel_tropo(tp)
-        t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord)
+#         tropo = bp1d.sel_tropo(tp)
+#         t_var_df = tropo.rms_seasonal_vstdv(subs, vcoord)
         
-        _, ax = plt.subplots(dpi=150, figsize=(5,3))
+#         _, ax = plt.subplots(dpi=150, figsize=(5,3))
         
-        ax.plot(var_df[bin_attr]*(100 if rel else 1), var_df.index, 
-                ls='dashed', marker='d', c='grey', 
-                label='Unfiltered',
-                path_effects=[self.outline], zorder=2)
+#         ax.plot(var_df[bin_attr]*(100 if rel else 1), var_df.index, 
+#                 ls='dashed', marker='d', c='grey', 
+#                 label='Unfiltered',
+#                 path_effects=[self.outline], zorder=2)
 
-        ax.plot(t_var_df[bin_attr]*(100 if rel else 1), t_var_df.index, 
-                '-', marker='d', c='orange',
-                label='Tropospheric',
-                path_effects=[self.outline], zorder=2)
+#         ax.plot(t_var_df[bin_attr]*(100 if rel else 1), t_var_df.index, 
+#                 '-', marker='d', c='orange',
+#                 label='Tropospheric',
+#                 path_effects=[self.outline], zorder=2)
         
-        ax.plot(s_var_df[bin_attr]*(100 if rel else 1), s_var_df.index, 
-                '-', marker='d', c='teal',
-                label='Stratospheric',
-                path_effects=[self.outline], zorder=2)
+#         ax.plot(s_var_df[bin_attr]*(100 if rel else 1), s_var_df.index, 
+#                 '-', marker='d', c='teal',
+#                 label='Stratospheric',
+#                 path_effects=[self.outline], zorder=2)
 
-        ax.set_ylabel(vcoord.label())
+#         ax.set_ylabel(vcoord.label())
 
-        ax.grid('both', ls='dotted')
-        label_rel = 'relative ' if rel else ''
-        unit = '%' if rel else subs.unit
-        ax.set_xlabel(f'Mean seasonal {label_rel}variability of {subs.label(name_only=True)} [{unit}]')
-        ax.legend(loc='lower right')
+#         ax.grid('both', ls='dotted')
+#         label_rel = 'relative ' if rel else ''
+#         unit = '%' if rel else subs.unit
+#         ax.set_xlabel(f'Mean seasonal {label_rel}variability of {subs.label(name_only=True)} [{unit}]')
+#         ax.legend(loc='lower right')
 
-class CaribicBin2D(Caribic, BinPlotter2D): 
-    """ Class holding data and binned plotting functionality for Caribic. """
-    def __init__(self, **kwargs): 
-        """ Initialise object according to Caribic.__init__() """
-        super().__init__(**kwargs) # Caribic
+# class CaribicBin2D(Caribic, BinPlotter2DMixin): 
+#     """ Class holding data and binned plotting functionality for Caribic. """
+#     def __init__(self, **kwargs): 
+#         """ Initialise object according to Caribic.__init__() """
+#         super().__init__(**kwargs) # Caribic
 
-class CaribicBin3D(Caribic, BinPlotter3D): 
-    """ Class holding data and binned plotting functionality for Caribic. """
-    def __init__(self, **kwargs): 
-        """ Initialise object according to Caribic.__init__() """
-        super().__init__(**kwargs) # Caribic
+# class CaribicBin3D(Caribic, BinPlotter3DMixin): 
+#     """ Class holding data and binned plotting functionality for Caribic. """
+#     def __init__(self, **kwargs): 
+#         """ Initialise object according to Caribic.__init__() """
+#         super().__init__(**kwargs) # Caribic
 
+# class CaribicBinPlotter(BinPlotterMixin, Caribic): 
+#     def __init__(self, **kwargs): 
+#         """ Caribic initialisation. """
+#         super().__init__(**kwargs)
 
-
-    
+# if __name__=='__main__': 
+#     cbp = CaribicBinPlotter()
