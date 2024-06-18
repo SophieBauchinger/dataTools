@@ -30,14 +30,14 @@ from dataTools.data.Caribic import Caribic
 from dataTools.data._global import GlobalData
 from dataTools import tools
 
-world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
+world = geopandas.read_file('c:\\Users\\sophie_bauchinger\\Documents\\GitHub\\110m_cultural_511\\ne_110m_admin_0_map_units.shp')
 # geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}
 rel_vlims = {'p':(-100,100), 'pt':(-30, 40), 'z':(-1,2.5)}
 count_limit = 5
 
 #%% Define TropopausePlotter
-class TropopausePlotter(GlobalData): 
+class TropopausePlotterMixin(GlobalData): 
     """ Class to hold plotting functionality for GlobalData objecs. 
     
     Needs to be used in multiple inheritance together with a subclass of GlobalData: 
@@ -466,7 +466,7 @@ class TropopausePlotter(GlobalData):
         fig.suptitle(subs.label())
 
         for tp, ax in zip(tps, axs.flatten()):
-            self.AX_timeseries_subs_STsorted(ax=ax, subs=subs, tp=tp, **kwargs) 
+            self._ax_timeseries_subs_STsorted(ax=ax, subs=subs, tp=tp, **kwargs) 
 
         if tp.vcoord=='p': 
             ax.invert_yaxis()
@@ -479,7 +479,7 @@ class TropopausePlotter(GlobalData):
                     bbox_to_anchor=[0.5, 0.94])
         plt.show()
 
-    def AX_timeseries_subs_STsorted(self, ax, subs, tp, **kwargs): 
+    def _ax_timeseries_subs_STsorted(self, ax, subs, tp, **kwargs): 
         """ Plot timeseries of subs mixing ratios with strato / tropo colours. 
         Parameters: 
             subs(dcts.Substance)
@@ -529,7 +529,7 @@ class TropopausePlotter(GlobalData):
         fig.suptitle(subs.label())
         
         for tp, ax in zip(tps, axs.flatten()):
-            df_tropo, df_strato = self.AX_subs_vs_ycoord_STsorted(
+            df_tropo, df_strato = self._ax_subs_vs_ycoord_STsorted(
                 ax=ax, subs=subs, ycoord=ycoord, tp=tp, **kwargs) 
         
         if kwargs.get('heatmap') or kwargs.get('joint'): 
@@ -667,7 +667,7 @@ class TropopausePlotter(GlobalData):
         cbar = plt.colorbar(img, ax = axs, orientation='vertical')
         cbar.set_label(f'Distribution of {subs.label(True)} msmts [#]')
 
-    def AX_subs_vs_ycoord_STsorted(self, ax, subs, ycoord, tp, popt0=None, popt1=None, **kwargs):
+    def _ax_subs_vs_ycoord_STsorted(self, ax, subs, ycoord, tp, popt0=None, popt1=None, **kwargs):
         """ Plot strat / trop sorted data """
         # only take data with index that is available in df_sorted
         data = self.df[self.df.index.isin(self.df_sorted.index)]
@@ -1329,10 +1329,11 @@ class TropopausePlotter(GlobalData):
                 
 
 #%% Combine functionality of TropopausePlotter with specific GlobalData sub-classes 
-class CaribicTropopause(Caribic, TropopausePlotter): 
+class CaribicTropopause(TropopausePlotterMixin, Caribic): 
     """ Add functionality of TropopausePlotter to Caribic objects. """
     def __init__(self, **kwargs): 
         """ Initialise object according to Caribic.__init__() """
         super().__init__(**kwargs) # Caribic
 
 # %%
+
