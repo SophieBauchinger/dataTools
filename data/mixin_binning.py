@@ -174,7 +174,8 @@ class BinningMixin:
                                    zbmin, zbmax, zbsize)
         
         out = bp.Simple_bin_3d(np.array(self.df[subs.col_name]), 
-                               x, y, z, bci_3d)
+                               x, y, z, bci_3d, 
+                               count_limit = self.count_limit)
         
         return out
 
@@ -221,7 +222,8 @@ class BinningMixin:
                                    zbmin, zbmax, zbsize)
 
         out = bp.Simple_bin_3d(np.array(df[subs.col_name]), 
-                               x, y, z, bci_3d)
+                               x, y, z, bci_3d, 
+                               count_limit = self.count_limit)
         return out
 
     def bin_1d_seasonal(self, subs, coord, bci_1d=None, xbsize=None, df=None) -> dict[bp.Simple_bin_1d]:

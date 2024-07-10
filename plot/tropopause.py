@@ -26,37 +26,20 @@ import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
 
 import dataTools.dictionaries as dcts
-from dataTools.data.Caribic import Caribic
-from dataTools.data._global import GlobalData
 from dataTools import tools
 
-world = geopandas.read_file('c:\\Users\\sophie_bauchinger\\Documents\\GitHub\\110m_cultural_511\\ne_110m_admin_0_map_units.shp')
-# geopandas.read_file(geopandas.datasets.get_path('naturalearth_lowres'))
+# Coordinate vlimits (for e.g. tropopause height colormaps)
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}
 rel_vlims = {'p':(-100,100), 'pt':(-30, 40), 'z':(-1,2.5)}
-count_limit = 5
 
 #%% Define TropopausePlotter
-class TropopausePlotterMixin(GlobalData): 
+class TropopausePlotterMixin: 
     """ Class to hold plotting functionality for GlobalData objecs. 
     
     Needs to be used in multiple inheritance together with a subclass of GlobalData: 
         class GlobalSubclassTropopause(GlobalSubclass, TropopausePlotter)
     """
 # --- Plot differences in tropopause heights for TP definitions / seasons / years ---       
-    def _make_two_column_axs(self, tps, extra_axes=0): 
-        no_of_axs = len(tps) + extra_axes
-
-        fig, axs = plt.subplots(math.ceil(no_of_axs/2), 2, 
-                                dpi=100,
-                                figsize=(7, math.ceil(no_of_axs/2)*2),
-                                sharey=True, sharex=True)
-
-        if no_of_axs%2: 
-            axs.flatten()[len(tps)].axis('off')
-            axs.flatten()[-1].axis('off')
-        
-        return fig, axs
 
     def tp_height_global_2D_overview(self, rel=False, tps=None):
         """ Show 2D-binned latitude-longitude maps of tropopause height for various definitions. """
@@ -72,11 +55,11 @@ class TropopausePlotterMixin(GlobalData):
                                    self.df.geometry.y, 
                                    bci, count_limit = self.count_limit)
 
-            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+            self.world.boundary.plot(ax=ax, color='black', linewidth=0.3)
             # ax.set_title(dcts.dict_season()[f'name_{s}'])
             cmap = 'viridis_r' if tp.vcoord=='p' else 'viridis'
 
-            v_lims = vlims[tp.vcoord] if not rel else rel_vlims[tp.vcoord]
+            v_lims = tp.vcoord.vlims('vstdv' if not rel else 'rvstd')
             norm = Normalize(*v_lims)
 
             # df_r.plot(tp.col_name, cmap=cmap, legend=True, ax=ax)
@@ -123,7 +106,7 @@ class TropopausePlotterMixin(GlobalData):
                 out = bp.Simple_bin_2d(df_r[tp.col_name], lon, lat, bci,
                                        count_limit = self.count_limit)
 
-                world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+                self.world.boundary.plot(ax=ax, color='black', linewidth=0.3)
                 ax.set_title(dcts.dict_season()[f'name_{s}'])
                 cmap = 'viridis_r' if tp.vcoord=='p' else 'viridis'
 
@@ -304,8 +287,8 @@ class TropopausePlotterMixin(GlobalData):
             ax.set_title(tp.label(True))
             if tp.vcoord=='pt' and not all(tp.rel_to_tp is False for tp in tps): 
                 ax.set_ylim(290, 380)
-            elif tp.vcoord=='z' and not all(tp.rel_to_tp is False for tp in tps): 
-                ax.set_ylim(6, 14)
+            elif tp.vcoord=='z' and not tp.rel_to_tp: # and not all(tp.rel_to_tp is False for tp in tps): 
+                ax.set_ylim(6, 16)
 
             for s in ['av', 1,2,3,4]:
                 data = self.sel_season(s).df if not s=='av' else self.df
@@ -363,7 +346,7 @@ class TropopausePlotterMixin(GlobalData):
                 ax.set_yticks(np.arange(-30, 60, 15))
                 ax.set_ylim(-35, 60)
             if tp.vcoord=='z' and tp.rel_to_tp: 
-                ax.set_ylim(-2.5,4.1)
+                ax.set_ylim(-4.5,4.5)
             ax.grid(True, ls='dotted')
             
             if tp.rel_to_tp: 
@@ -374,7 +357,7 @@ class TropopausePlotterMixin(GlobalData):
             return ax
 
         if not kwargs.get('separate_plots'):
-            fig, axs = self._make_two_column_axs(tps)
+            fig, axs = self._make_two_column_axs(tps, sharey=False)
             fig.suptitle('Vertical extent of tropopauses')
             # tools.resize_figure(fig, scaling factor)
             size = fig.get_size_inches()
@@ -400,6 +383,146 @@ class TropopausePlotterMixin(GlobalData):
                 plot_tp_heights(ax, tp)
                 ax.legend(loc='upper left' if tp.rel_to_tp else 'upper right',
                           fontsize=9)
+
+# --- Basic quantification of differences between tropopause definitions ---
+    def show_strato_tropo_vcounts(self, tps=None, shared=True, note='', **tp_kwargs): 
+        """ Bar plots of data point allocation for multiple tp definitions. """
+        if not tps: 
+            tps = self.tps
+        
+        if shared is False: 
+            tropo_counts = self.calc_ratios(ratios=False) # dataframe
+            # tropo_counts = tropo_counts[[tp.col_name for tp in tps 
+            #                              if tp.col_name in tropo_counts.columns]]
+            note += ' all'
+        elif shared is True: 
+            tropo_counts = self.calc_shared_ratios(tps = tps, ratios=False)
+            # note += ' shared'
+        elif shared == 'No': 
+            tropo_counts = self.calc_non_shared_ratios(tps = tps, ratios=False)
+            note += ' non-shared'
+        else: 
+            raise KeyError(f'Invalid value for shared: {shared}')
+
+        tropo_counts = tropo_counts[[tp.col_name for tp in tps 
+                                     if tp.col_name in tropo_counts.columns]]
+        tps = [tp for tp in tps if tp.col_name in tropo_counts.columns] # not all tps have ratios (chekkkk)
+        tp_labels = [tp.label(filter_label=True) for tp in tps]
+        
+        tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
+        strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
+
+        # cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
+        #                                 for tp in tps]))
+
+        fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=400, 
+                                        figsize=(9,4), sharey=True)
+        
+        # fig.suptitle('Number of tropospheric / stratospheric datapoints')
+        fig.subplots_adjust(top=0.85)
+        ax_t.set_title('# Tropospheric points', fontsize=9, loc='right')
+        ax_s.set_title('# Stratospheric points', fontsize=9, loc='left')
+
+        bar_labels = tp_labels
+        
+        bar_params = dict(align='center', edgecolor='k',  rasterized=True,
+                          alpha=0.65, zorder=10)
+        nums = range(len(bar_labels))
+
+        t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
+        s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
+        for i in nums: 
+            ax_label.text(0.5, i, bar_labels[i], 
+                          horizontalalignment='center', verticalalignment='center')
+        ax_label.axis('off')
+        
+        maximum = np.nanmax(tropo_bar_vals+strato_bar_vals)
+        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals)
+        for decimal_place in [4,3,2,1,0]:
+            if all(i>np.round(minimum, decimal_place) for i in tropo_bar_vals+strato_bar_vals): 
+                minimum = np.round(minimum, decimal_place)
+            else: 
+                break
+        padding = (maximum-minimum)/3
+        
+        ax_t.set_xlim(maximum +padding , minimum-padding if not minimum-padding<0 else 0)
+        ax_s.set_xlim(minimum-padding if not minimum-padding<0 else 0, maximum +padding)
+        
+        ax_t.grid('both', ls='dotted')
+        ax_s.grid('both', ls='dotted')
+        # ax_t.axis('off')
+        # ax_s.axis('off')
+        
+        ax_t.bar_label(t_bars, ['{0:.0f}'.format(t_val) for t_val in tropo_bar_vals], 
+                       padding=2)
+        ax_s.bar_label(s_bars, ['{0:.0f}'.format(s_val) for s_val in strato_bar_vals], 
+                       padding=2)
+
+        for ax in [ax_t, ax_s]: 
+            ax.yaxis.set_major_locator(ticker.NullLocator())
+        if note: ax.text(s=note, **dcts.note_dict(ax, y=1.1))
+        fig.subplots_adjust(wspace=0)
+
+    def show_ratios(self, tps, shared=False, note=''):
+        """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
+        
+        Args: 
+            tps (list[dcts.Coordinate]): Tropopause definitions to compare
+            shared (str, bool): True / False / 'No'
+            note (str)
+        """
+        tropo_counts = self.calc_ratios() # dataframe
+        if shared: 
+            tropo_counts = self.calc_shared_ratios()
+        if shared == 'No': 
+            tropo_counts = self.calc_non_shared_ratios()
+
+        ratios = tropo_counts.loc['ratios']
+        tropo_counts.drop(index='ratios', inplace=True)
+        n_values = [tropo_counts[i].loc[True] + tropo_counts[i].loc[False] 
+                    for i in tropo_counts.columns]
+
+        bar_labels = ['{:.2f} (n={:.2f}'.format(r, n) for r,n in zip(ratios, n_values)]
+        # bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in zip(ratios, n_values)]
+
+        # make sure cols and labels are related 
+        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
+                                        for tp in tps]))
+
+        fig, ax = plt.subplots(dpi=240, figsize=(8,6))
+        ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {self.ID}')
+
+        # tp_defs = set([tp.tp_def for tp in tps])
+        # ax.grid(True, axis='x', c='k', alpha=0.3)
+        ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
+        ax.set_axisbelow(True)
+
+        for tp in tps:
+            color = dcts.dict_tps()[f'color_{tp.tp_def}']
+            ratio = ratios[tp.col_name]
+            n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
+            label = tp.label(True)
+            
+            bars = ax.barh(label, ratio, rasterized=True, color=color, alpha=0.9)
+            bar_labels = ['{:.2f} (n={:.0f})'.format(r,n) for r,n in zip([ratio], [n_value])]
+
+            ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
+            ax.set_xlim(0,3) # np.nanmax(ratios)*1.2) #4.5)
+
+        if note: ax.text(s=note, **dcts.note_dict(ax))
+
+        fig.tight_layout()
+        plt.show()
+
+    def show_ratios_seasonal(self, note='', **tp_kwargs):
+        """ Create 2x2 plot for all trop/strat ratios per season """
+        fig, axs = plt.subplots(2,2, figsize=(12,12), dpi=350, sharey=True, sharex=True)
+        fig.suptitle('Ratio of tropospheric / stratospheric datapoints', fontsize=20)
+        for season, ax in zip([1,2,3,4], axs.flatten()):
+            self.sel_season(season).show_ratios(as_subplot=True, ax=ax, note=note, **tp_kwargs)
+            ax.set_title(dcts.dict_season()[f'name_{season}'])
+        fig.tight_layout()
+        plt.show()
 
 # --- Plot substance values sorted into stratosphere / troposphere
     def make_figures_per_vcoord(self, plotting_function, **kwargs): 
@@ -724,148 +847,6 @@ class TropopausePlotterMixin(GlobalData):
         ax.set_xlabel(subs.label())
         
         return df_tropo, df_strato
-
-# --- Basic quantification of differences between tropopause definitions ---
-    def show_strato_tropo_vcounts(self, tps=None, shared=True, note='', **tp_kwargs): 
-        """ Bar plots of data point allocation for multiple tp definitions. """
-        if not tps: 
-            tps = self.tps
-        
-        if shared is False: 
-            tropo_counts = self.calc_ratios(ratios=False) # dataframe
-            # tropo_counts = tropo_counts[[tp.col_name for tp in tps 
-            #                              if tp.col_name in tropo_counts.columns]]
-            note += ' all'
-        elif shared is True: 
-            tropo_counts = self.calc_shared_ratios(tps = tps, ratios=False)
-            # note += ' shared'
-        elif shared == 'No': 
-            tropo_counts = self.calc_non_shared_ratios(tps = tps, ratios=False)
-            note += ' non-shared'
-        else: 
-            raise KeyError(f'Invalid value for shared: {shared}')
-
-        tropo_counts = tropo_counts[[tp.col_name for tp in tps 
-                                     if tp.col_name in tropo_counts.columns]]
-        tps = [tp for tp in tps if tp.col_name in tropo_counts.columns] # not all tps have ratios (chekkkk)
-        tp_labels = [tp.label(filter_label=True) for tp in tps]
-        
-        tropo_bar_vals = [tropo_counts[i].loc[True] for i in tropo_counts.columns]
-        strato_bar_vals = [tropo_counts[i].loc[False] for i in tropo_counts.columns]
-
-        # cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
-        #                                 for tp in tps]))
-
-        fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=400, 
-                                        figsize=(9,4), sharey=True)
-        
-        # fig.suptitle('Number of tropospheric / stratospheric datapoints')
-        fig.subplots_adjust(top=0.85)
-        ax_t.set_title('# Tropospheric points', fontsize=9, loc='right')
-        ax_s.set_title('# Stratospheric points', fontsize=9, loc='left')
-
-        bar_labels = tp_labels
-        
-        bar_params = dict(align='center', edgecolor='k',  rasterized=True,
-                          alpha=0.65, zorder=10)
-        nums = range(len(bar_labels))
-
-        t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
-        s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
-        for i in nums: 
-            ax_label.text(0.5, i, bar_labels[i], 
-                          horizontalalignment='center', verticalalignment='center')
-        ax_label.axis('off')
-        
-        maximum = np.nanmax(tropo_bar_vals+strato_bar_vals)
-        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals)
-        for decimal_place in [4,3,2,1,0]:
-            if all(i>np.round(minimum, decimal_place) for i in tropo_bar_vals+strato_bar_vals): 
-                minimum = np.round(minimum, decimal_place)
-            else: 
-                break
-        padding = (maximum-minimum)/3
-        
-        ax_t.set_xlim(maximum +padding , minimum-padding if not minimum-padding<0 else 0)
-        ax_s.set_xlim(minimum-padding if not minimum-padding<0 else 0, maximum +padding)
-        
-        ax_t.grid('both', ls='dotted')
-        ax_s.grid('both', ls='dotted')
-        # ax_t.axis('off')
-        # ax_s.axis('off')
-        
-        ax_t.bar_label(t_bars, ['{0:.0f}'.format(t_val) for t_val in tropo_bar_vals], 
-                       padding=2)
-        ax_s.bar_label(s_bars, ['{0:.0f}'.format(s_val) for s_val in strato_bar_vals], 
-                       padding=2)
-
-        for ax in [ax_t, ax_s]: 
-            ax.yaxis.set_major_locator(ticker.NullLocator())
-        if note: ax.text(s=note, **dcts.note_dict(ax, y=1.1))
-        fig.subplots_adjust(wspace=0)
-
-    def show_ratios(self, tps, shared=False, note='', **tp_kwargs):
-    # , as_subplot=False, ax=None, single_tp_def=None, group_vc=False,
-    #                 unity_line=True, minimise_tps=True, note='', **tp_kwargs):
-        """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
-        
-        Args: 
-            tps (list[dcts.Coordinate]): Tropopause definitions to compare
-            shared (str, bool): True / False / 'No'
-            note (str)
-        """
-        tropo_counts = self.calc_ratios() # dataframe
-        if shared: 
-            tropo_counts = self.calc_shared_ratios()
-        if shared == 'No': 
-            tropo_counts = self.calc_non_shared_ratios()
-
-        ratios = tropo_counts.loc['ratios']
-        tropo_counts.drop(index='ratios', inplace=True)
-        n_values = [tropo_counts[i].loc[True] + tropo_counts[i].loc[False] 
-                    for i in tropo_counts.columns]
-
-        bar_labels = ['{:.2f} (n={:.2f}'.format(r, n) for r,n in zip(ratios, n_values)]
-        # bar_labels = ['{:.2f} (n={})'.format(r,nr) for r, nr in zip(ratios, n_values)]
-
-        # make sure cols and labels are related 
-        cols, tp_labels = map(list, zip(*[('tropo_'+tp.col_name, tp.label(filter_label=True)) 
-                                        for tp in tps]))
-
-        fig, ax = plt.subplots(dpi=240, figsize=(8,6))
-        ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {self.ID}')
-
-        # tp_defs = set([tp.tp_def for tp in tps])
-        # ax.grid(True, axis='x', c='k', alpha=0.3)
-        ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
-        ax.set_axisbelow(True)
-
-        for tp in tps:
-            color = dcts.dict_tps()[f'color_{tp.tp_def}']
-            ratio = ratios[tp.col_name]
-            n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
-            label = tp.label(True)
-            
-            bars = ax.barh(label, ratio, rasterized=True, color=color, alpha=0.9)
-            bar_labels = ['{:.2f} (n={:.0f})'.format(r,n) for r,n in zip([ratio], [n_value])]
-
-            ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
-            ax.set_xlim(0,3) # np.nanmax(ratios)*1.2) #4.5)
-
-        if note: ax.text(s=note, **dcts.note_dict(ax))
-
-        fig.tight_layout()
-        plt.show()
-
-    def show_ratios_seasonal(self, note='', **tp_kwargs):
-        """ Create 2x2 plot for all trop/strat ratios per season """
-        fig, axs = plt.subplots(2,2, figsize=(12,12), dpi=350, sharey=True, sharex=True)
-        fig.suptitle('Ratio of tropospheric / stratospheric datapoints', fontsize=20)
-        for season, ax in zip([1,2,3,4], axs.flatten()):
-            self.sel_season(season).show_ratios(as_subplot=True, ax=ax, note=note, **tp_kwargs)
-            ax.set_title(dcts.dict_season()[f'name_{season}'])
-        fig.tight_layout()
-        plt.show()
 
 # --- Tables of (seasonal & average) binned standard deviation ----
     def calculate_seasonal_stdv_dict(self, subs, tps, **kwargs): 
@@ -1326,14 +1307,3 @@ class TropopausePlotterMixin(GlobalData):
         for ix in range(binned_3d.nx): 
             for iz in range(binned_3d.nz):
                 datapoint = zonal_mean[ix, iz]
-                
-
-#%% Combine functionality of TropopausePlotter with specific GlobalData sub-classes 
-class CaribicTropopause(TropopausePlotterMixin, Caribic): 
-    """ Add functionality of TropopausePlotter to Caribic objects. """
-    def __init__(self, **kwargs): 
-        """ Initialise object according to Caribic.__init__() """
-        super().__init__(**kwargs) # Caribic
-
-# %%
-

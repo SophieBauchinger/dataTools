@@ -64,6 +64,25 @@ def get_path():
 
 # %% Coordinates
 class Coordinate:
+    """ Holds information on the properties of the current coordinate variable
+    
+    Attributes:
+        col_name (str)
+        long_name (str)
+        unit (str)
+        ID (str): 'INT', 'INT2', 'EMAC'
+
+        vcoord (str): p, z, pt, pv, eqpt
+        hcoord (str): lat, lon, eql
+        var (str): e.g. geopot
+
+        tp_def (str): chem, dyn, therm, cpt
+        rel_to_tp (bool): coordinate relative to tropopause
+        model (str): msmt, ECMWF, ERA5, EMAC
+        pvu (float): 1.5, 2.0, 3.5
+        crit (str): n2o / o3
+    
+    """
     def __init__(self, **kwargs):
         """ Correlate column names with corresponding descriptors
 
@@ -74,10 +93,13 @@ class Coordinate:
 
         vcoord (str): p, z, pt, pv, eqpt
         hcoord (str): lat, lon, eql
+        var (str): e.g. geopot
+
         tp_def (str): chem, dyn, therm, cpt
         rel_to_tp (bool): coordinate relative to tropopause
         model (str): msmt, ECMWF, ERA5, EMAC
         pvu (float): 1.5, 2.0, 3.5
+        crit (str): n2o / o3
         """
         self.col_name, self.long_name, self.unit, self.ID = [None] * 4
         self.vcoord, self.hcoord, self.var = [None] * 3
@@ -91,7 +113,7 @@ class Coordinate:
         return f'Coordinate: {self.col_name} [{self.unit}] from {self.ID}'
 
     def label(self, filter_label=False, coord_only=False):
-        """ Returns string to be used as axis label for a specific Coordinate object. """
+        """ Returns latex-formatted string to be used as axis label. """
 
         tp_defs = {'chem': 'Chemical',
                    'dyn': 'Dynamic',
@@ -221,7 +243,7 @@ def get_coord(*args, **kwargs):
     return coordinates[0]
 
 # %% Substances
-class Substance():
+class Substance:
     def __init__(self, col_name, **kwargs):
         """ Correlate substance column names with corresponding desriptors
         col_name (str)
@@ -242,27 +264,32 @@ class Substance():
     def __repr__(self):
         return f'Substance : {self.short_name} [{self.unit}] - \'{self.col_name}\' from {self.ID}'
 
-    def label(self, name_only=False):
+    def label(self, name_only:bool=False, bin_attr:str=None):
         """ Returns string to be used as axis label. """
+        detr_qualifier = 'rel. to BGD ' if self.detr else ''
 
+        # Define exceptions for labels with upper & lowercase substance labels
         special_names = {'ch2cl2': 'CH$_2$Cl$_2$',
-                         'noy': r'NO$_\mathrm{y}$',
-                         'f11': 'F11',
-                         'f12': 'F12',
-                         'mol mol-1': 'mol/mol'}
+                        'noy': r'NO$_\mathrm{y}$',
+                        'f11': 'F11',
+                        'f12': 'F12',
+                        'mol mol-1': 'mol/mol'}
 
-        code = self.short_name.split('_')[-1]
-        if code in special_names:
-            code = special_names[code]
+        # Get substance label
+        subs_abbr = self.short_name.split('_')[-1]
+        if subs_abbr in special_names:
+            subs_abbr = special_names[subs_abbr]
         else:
-            code = code.upper()
-            code = ''.join(f"$_{i}$" if i.isdigit() else i for i in code)
+            subs_abbr = subs_abbr.upper()
+            subs_abbr = ''.join(f"$_{i}$" if i.isdigit() else i for i in subs_abbr)
         if self.short_name.startswith('d_'):
-            code = r'$\mathrm{\sigma}\,$' + f'({code})'
+            subs_abbr = r'$\mathrm{\sigma}\,$' + f'({subs_abbr})'
 
-        if name_only:
-            return code
-
+        # name_only returns only the abbreviated substance name
+        if name_only is True:
+            return subs_abbr
+        
+        # Get data source identifier
         if self.model == 'MSMT':
             identifier = self.source if not self.source=='HALO' else self.ID
         elif self.model == 'CLAMS':
@@ -273,16 +300,25 @@ class Substance():
                 short_name=self.short_name, source=self.source, model=self.model)) > 1:
             identifier += f' - {self.ID}'
 
+        # Get the appropriate unit label
         unit = self.unit if not self.unit in special_names else special_names[self.unit]
 
-        if not self.detr:
-            return f'{code} [{unit}] ({identifier})'
+        # Special labels for binned data
+        bin_attr_qualifiers = {
+            'vmean': '', 
+            'vstdv' : 'Variability of ',
+            'rvstd' : 'Relative variability of '}
+        bin_attr_units = {
+            'vmean' : unit,
+            'vstdv' : unit,
+            'rvstd' : '%'}
+        if bin_attr is not None: 
+            qualifier = bin_attr_qualifiers[bin_attr]
+            bin_attr_unit = bin_attr_units[bin_attr]
+            return f'{qualifier}{subs_abbr} {detr_qualifier}[{bin_attr_unit}]'
 
-        elif self.detr:
-            return f'{code} rel. to BGD [{unit}]'
 
-        else:
-            raise KeyError('Could not generate a label')
+        return f'{subs_abbr} {detr_qualifier}[{unit}]' + (f' ({identifier})' if not self.detr else '')
 
     def vlims(self, bin_attr='vmean', atm_layer=None) -> tuple:
         """ Default colormap normalisation limits for substance mixing ratio or variabiliy. 

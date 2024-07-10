@@ -51,8 +51,9 @@ from metpy.units import units
 import numpy as np
 import pandas as pd
 from PIL import Image
-from shapely.geometry import Point
+from scipy import stats
 from scipy.ndimage import zoom, gaussian_filter
+from shapely.geometry import Point
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -468,6 +469,108 @@ def conv_PartsPer_molarity(x, unit):
               }
     return x * factor[unit]
 
+class LognormFit: 
+    def __init__(self, data_arr, bin_nr = 30, hist_kwargs = {}, **kwargs): 
+        """ Get lognormal fit for 1D data array. """
+        
+        self.x = data_arr[~np.isnan(data_arr)]
+        
+        self.hist_kwargs = hist_kwargs
+        if not 'bins' in hist_kwargs: 
+            hist_kwargs['bins'] = bin_nr
+        
+        self.counts, self.bins = np.histogram(self.x, **self.hist_kwargs)
+        self.normalise = False if not 'normalise' in kwargs else kwargs.get('normalise')
+
+        self._get_fit(**kwargs)
+        
+    def _get_fit(self, **kwargs) -> tuple[tuple, np.array]: 
+        """ Get scipy lognorm fit for the given data. """
+        fit_kwargs = {k:v for k,v in kwargs.items() \
+            if k in ['shape', 'loc', 'scale']}
+        
+        bin_center = self.bins[:-1] + np.diff(self.bins) / 2
+        self.bin_center = bin_center
+
+        self.shape, self.loc, self.scale = stats.lognorm.fit(self.x, *fit_kwargs)
+        self.fit_params = (self.shape, self.loc, self.scale)
+        normed_lognorm_fit = stats.lognorm.pdf(bin_center, *self.fit_params)
+ 
+        area = sum(np.diff(self.bins)*self.counts)
+        norm_factor = area if not self.normalise else 1
+
+        lognorm_fit = normed_lognorm_fit * norm_factor
+        self.lognorm_fit = lognorm_fit
+        
+        return self.fit_params, lognorm_fit
+    
+    @property
+    def sigma(self) -> float: 
+        return self.shape
+    
+    @property
+    def median(self) -> float: 
+        return stats.lognorm.median(*self.fit_params)
+    
+    @property
+    def mu(self) -> float: 
+        return np.log(self.median)
+
+    @property
+    def mode(self) -> float: 
+        """ Get mode of fitted lognorm distribution. """
+        return np.exp(self.mu - self.sigma**2) 
+    
+    def show_fit(self, **fig_kwargs):
+        """ Plot the fit of the distribution to the data. """
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(**fig_kwargs)
+        
+        ax.hist(self.bins[:-1], self.bins, weights = self.counts, 
+            orientation = 'horizontal',
+            edgecolor = 'white', 
+            alpha=0.7, color='tab:blue')
+
+        # ax.hist(
+        #     self.x, 
+        #     bins = self.bins, 
+        #     orientation = 'horizontal',
+        #     edgecolor = 'white', 
+        #     alpha=0.7, color='tab:blue',
+        #     )
+
+        bin_center = self.bins[:-1] + np.diff(self.bins) / 2
+
+        ax.plot(self.lognorm_fit, bin_center, c = 'k')
+        ax.hlines(self.mode, 0, max(self.counts), color = 'k', ls = 'dashed',
+                label = 'Mode: {:.2f}'.format(self.mode))
+        ax.hlines(self.median, 0, max(self.counts), color = 'g', ls = 'dashed',
+                label = 'Median: {:.2f}'.format(self.median))
+
+        sigma_mu = '$\sigma$ = {:.2f}, '.format(self.sigma) + '$\mu$ = {:.2f}\n'.format(self.mu)
+        ax.legend(title = sigma_mu)
+
+        fig.show()
+
+def get_lognorm_fit(x, counts, bins, normalised = False, **kwargs):
+    
+    fit_kwargs = {k:v for k,v in kwargs.items() \
+        if k in ['shape', 'loc', 'scale']}
+    
+    bin_center = bins[:-1] + np.diff(bins) / 2
+
+    shape, loc, scale = stats.lognorm.fit(x, *fit_kwargs)
+    lognorm_fit_norm = stats.lognorm.pdf(bin_center, shape, loc, scale)
+
+    # if not normalise: 
+    area = sum(np.diff(bins)*counts)
+    norm_factor = area if not normalised else 1
+
+    fit_params = (shape, loc, scale)
+    lognorm_fit = lognorm_fit_norm*norm_factor
+
+    return lognorm_fit, bin_center, fit_params
+
 # %% Plotting tools
 def add_zero_line(ax, axis='y'):
     """ Highlight the gridline at 0 for the chosen axis on the given Axes object.
@@ -485,7 +588,8 @@ def add_zero_line(ax, axis='y'):
         ax.set_xlim(*xlims)
 
 def add_world(axs, fname = \
-    r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp'): 
+    'c:/Users/sophie_bauchinger/Documents/GitHub/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 
+
     """ Adds country outlines to the given axis with zorder 0 as thin grey lines. """
     world = geopandas.read_file(fname)
     if isinstance(axs, list): 

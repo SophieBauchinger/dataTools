@@ -19,6 +19,7 @@ from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
 from matplotlib.patches import Patch, Rectangle
 import numpy as np
+import plotly.graph_objs as go
 import plotly.express as px
 
 from mpl_toolkits.axes_grid1 import AxesGrid
@@ -27,12 +28,8 @@ import toolpac.calc.binprocessor as bp # type: ignore
 
 from dataTools import tools
 import dataTools.dictionaries as dcts
-from dataTools.data._global import GlobalData
-
-world = geopandas.read_file(r'c:\Users\sophie_bauchinger\Documents\GitHub\110m_cultural_511\ne_110m_admin_0_map_units.shp')
 
 # %% GlobalData plotting
-
 class GlobalDataPlotterMixin: 
     """ Simple plotting capabilities for GlobalData objects. """
 
@@ -42,15 +39,6 @@ class GlobalDataPlotterMixin:
         df_mm = tools.time_mean(data, 'M')
 
         for subs in self.substances if substances is None else substances:
-            # col = subs.col_name
-            # if detr:
-            #     try:
-            #         subs = dcts.get_subs(col_name = f'detr_{subs.col_name}')
-            #     except KeyError:
-            #         print(f'Could not detrend {subs.short_name}')
-            #     else:
-            #         self.detrend_substance(subs.short_name)
-
             fig, ax = plt.subplots(dpi=250, figsize=(8, 4))
             if note:
                 ax.text(**dcts.note_dict(ax, s=note, y=0.075))
@@ -196,7 +184,7 @@ class GlobalDataPlotterMixin:
 
         for subs in (substances if not bin_attr=='vcount' else [dcts.get_subs(col_name='N2O')]): 
             fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
-            world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+            self.world.boundary.plot(ax=ax, color='black', linewidth=0.3)
             
             ax.set_title(subs.label() if bin_attr != 'vcount' \
                          else 'Distribution of greenhouse gas flask measurements')
@@ -393,34 +381,61 @@ class GlobalDataPlotterMixin:
         
         plt.show()
 
-    def make_3d_scatter(self, vcoord, color_var, eql=False): 
+    def make_3d_scatter(self, vcoord, color_var): 
         """ Plot the given substance on a 3D plot of lon-lat-vcoord. """
-        x = self.df.geometry.x
+        z_name = vcoord.col_name 
+        c_name = color_var.col_name
         
-        xcoord = dcts.get_coord('geometry.x')
-        ycoord = (dcts.get_coord('geometry.y') \
-                    if not eql else self.get_coords(hcoord='eql', model='ERA5') )
+        c_label = '$' + ''.join([i for i in color_var.label() if i != '$'])  +'$'
+        z_label = '$' + ''.join([i for i in vcoord.label() if i != '$']) + '$'
         
-        if not eql: 
-            y = self.df.geometry.y if not eql else self.get_coords()
-        else: 
-            [eql_coord] = self.get_coords(hcoord='eql', model='ERA5')
-            y = self.df[eql_coord.col_name]
+        c_label = fr'{c_label}'
+        z_label = fr'{z_label}'
         
+        labels = {
+            'x' : dcts.get_coord('geometry.x').label(),
+            'y' : dcts.get_coord('geometry.y').label(),
+            z_name : z_label,
+            c_name : c_label,
+            }
+
         fig = px.scatter_3d(self.df, 
-                            x=x, 
-                            y=y, 
-                            z=vcoord.col_name,
-                            color = color_var.col_name,
-                            size = 1,
-                            labels = {
-                                'x' : dcts.get_coord('geometry.x').label(),
-                                'y'  : dcts.get_coord('geometry.y').label(),
-                                # vcoord.col_name : vcoord.label(),
-                                # color_var.col_name : color_var.label(),
-                                }
+                            x=self.df.geometry.x,
+                            y=self.df.geometry.y,
+                            z=z_name,
+                            color = c_name,
+                            labels = labels,
                             )
-        fig.show()
+        fig.update_traces(marker_size=2.5)
+
+        # Add the world outline  
+        map_traces = []
+        for _, row in self.world.iterrows():
+            if row.geometry.geom_type == 'Polygon':
+                x, y = row.geometry.exterior.xy
+                x = np.array(x)
+                y = np.array(y) 
+                z = [self.df[vcoord.col_name].min()] * len(x)
+                map_traces.append(go.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color='black', width=1)))
+            elif row.geometry.geom_type == 'MultiPolygon':
+                for poly in row.geometry.geoms:
+                    x,y = poly.exterior.xy
+                    x = np.array(x)
+                    y = np.array(y)
+                    z = [self.df[vcoord.col_name].min()] * len(x)
+                    map_traces.append(go.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color='black', width=1)))
+
+        for trace in map_traces:
+            fig.add_trace(trace)
+            
+        fig.update_scenes(
+            aspectmode='data',
+            camera=dict(
+                eye = dict(x=0, y=-0.75, z=1.25))
+        )
+        fig.update_layout(showlegend=False) 
+        # fig.show()
+        return fig
 
 # Mozart
 def lonlat_1d(mzt_obj, subs='sf6',
