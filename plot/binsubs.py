@@ -18,12 +18,14 @@ import geopandas
 import math
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-import matplotlib.patheffects as mpe
-from matplotlib.patches import Patch
-import matplotlib.ticker as ticker
 import matplotlib.gridspec as gridspec
+import matplotlib.lines as mlines
+import matplotlib.patheffects as mpe
+# from matplotlib.patches import Patch
+import matplotlib.ticker as ticker
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.axes_grid1 import AxesGrid
+
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -37,28 +39,6 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
-
-#TODO map of distance to tropopause (stratosphere only?)
-
-def main_plus_sideplots(): 
-    fig,ax = plt.subplots(sharex=True, sharey = True)
-    ax.axis('off')
-
-    gs = gridspec.GridSpec(4, 4, # nrows, ncols 
-                        figure = fig,
-                        wspace=0, hspace=0,
-                        width_ratios=[1,1,1,1], height_ratios=[1,1,1,1])
-
-    ax_main = fig.add_subplot(gs[1:, :-1])
-    ax_upper = fig.add_subplot(gs[0, :-1])
-    ax_right = fig.add_subplot(gs[1:, -1])
-
-    ax_upper.tick_params(bottom=False, labelbottom=False, top=True, labeltop=True)
-    ax_right.tick_params(left=False, labelleft=False, right = True, labelright=True)
-    
-    axs = (ax, ax_main, ax_upper, ax_right)
-    
-    return fig, (axs)
 
 #%%% BinPlotter classes for multiple dimensionalities
 class SimpleBinPlotter: 
@@ -1003,137 +983,6 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         
         return img
 
-    def _make_right_plot(self, ax_right, ycoord, zcoord, subs, cmap, norm, bin_attr):
-        """ Right-hand-side plot for 3D projections. 
-        
-        Axes: zcoord on the abscissa ('x-axis') and ycoord / latitude on the ordinate ('y-axis'). 
-
-        """
-        bin2d_inst = self.bin_2d(subs, zcoord, ycoord)
-        bin_obj = bin2d_inst.binclassinstance
-        data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
-
-        img = ax_right.imshow(data,
-                        cmap = cmap, norm=norm,
-                        aspect='auto', origin='lower',
-                        extent=[bin_obj.xbmin, bin_obj.xbmax, 
-                                bin_obj.ybmin, bin_obj.ybmax] 
-                        )
-        ax_right.set_xlabel(zcoord.label(False, True))
-        ax_right.set_ylabel(ycoord.label())
-        ax_right.set_xlim(bin_obj.xbmin  - bin_obj.xbsize*1.5, bin_obj.xbmax + bin_obj.xbsize*1.5) # *self.get_coord_lims(zcoord))
-        ax_right.set_ylim(-90, 90)
-
-        ax_right.yaxis.set_label_position("right")
-        ax_right.xaxis.set_label_position("bottom")
-
-        ax_right.grid('both', lw=0.4, ls = '--')
-        
-        return img
-
-    def _make_upper_plot(self, ax_upper, xcoord, zcoord, subs, cmap, norm, bin_attr): 
-        """ Upper plot for 3D projections. 
-        
-        Axes: xcoord / longitude on the abscissa ('x-axis') and zcoord on the ordinate ('y-axis'). 
-        """
-        bin2d_inst = self.bin_2d(subs, xcoord, zcoord)
-        bin_obj = bin2d_inst.binclassinstance
-        data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
-
-        img = ax_upper.imshow(data.T,
-                        cmap = cmap, norm=norm,
-                        aspect='auto', origin='lower',
-                        extent=[bin_obj.xbmin, bin_obj.xbmax, 
-                                bin_obj.ybmin, bin_obj.ybmax] 
-                        )
-        ax_upper.set_xlabel(xcoord.label())
-        ax_upper.set_ylabel(zcoord.label(False, True))
-        ax_upper.set_ylim(bin_obj.ybmin  - bin_obj.ybsize*1.5, bin_obj.ybmax + bin_obj.ybsize*1.5) # *self.get_coord_lims(zcoord))
-        ax_upper.set_xlim(-180, 180)
-
-        ax_upper.yaxis.set_label_position("left")
-        ax_upper.xaxis.set_label_position("top")
-
-        ax_upper.grid('both', lw=0.4, ls = '--')
-        
-        return img
-    
-    def _make_center_plot(self, ax_main, xcoord, ycoord, subs, cmap, norm, bin_attr): 
-        """ Non-fancy Longitude-latitude binned 2D plot. 
-        
-        Note: This doesn't show anything related to tropopause coordinates, 
-        so don't be tempted to use it for anything going forwards. Just sayin'. 
-        """
-        bin2d_inst = self.bin_2d(subs, xcoord, ycoord)
-        bin_obj = bin2d_inst.binclassinstance
-        data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
-
-        img = ax_main.imshow(data.T,
-                        cmap = cmap, norm=norm,
-                        aspect='auto', origin='lower',
-                        extent=[bin_obj.xbmin, bin_obj.xbmax, 
-                                bin_obj.ybmin, bin_obj.ybmax] 
-                        )
-        ax_main.set_xlabel(xcoord.label())
-        ax_main.set_ylabel(ycoord.label())
-        ax_main.set_ylim(-90, 90)
-        ax_main.set_xlim(-180, 180)
-
-        ax_main.yaxis.set_label_position("left")
-        ax_main.xaxis.set_label_position("bottom")
-
-        ax_main.grid('both', lw=0.4, ls = '--')
-        
-        return img
-
-    def _add_cube(self, ax, 
-                  abc_colors=('tab:blue', 'tab:orange', 'tab:green'), 
-                  sides = (1,1,1)):
-        """
-        Plot a cube with individually colored edges.
-
-        Parameters:
-            ax (matplotlib 3D axis)
-            abc_colors (List[str]): Colors of the 3 front edges of the cube (a,b,c).
-            sides (List[float]): Length of a,b,c sides of the object
- 
-        """
-        edge_colors = [
-            'k', 'k', 'w', 'w', 
-            abc_colors[0], # a
-            abc_colors[1], # b
-            'k', 'k', 'k', 
-            abc_colors[2], # c
-            'k', 'w']
-
-        a, b, c = sides
-
-        vertices = np.array([
-            [0, 0, 0], [a, 0, 0], [a, b, 0], [0, b, 0],
-            [0, 0, c], [a, 0, c], [a, b, c], [0, b, c]
-            ])
-        
-        edges = [
-            [vertices[j] for j in [0, 1]],   # Bottom edges
-            [vertices[j] for j in [1, 2]],
-            [vertices[j] for j in [2, 3]],
-            [vertices[j] for j in [3, 0]],
-            [vertices[j] for j in [4, 5]],   # Top edges
-            [vertices[j] for j in [5, 6]],
-            [vertices[j] for j in [6, 7]],
-            [vertices[j] for j in [7, 4]],
-            [vertices[j] for j in [0, 4]],   # Vertical edges
-            [vertices[j] for j in [1, 5]],
-            [vertices[j] for j in [2, 6]],
-            [vertices[j] for j in [3, 7]]
-        ]
-
-        # Create a Line3DCollection for each edge with specified colors
-        for i, edge in enumerate(edges):
-            line = Line3DCollection([edge], colors=edge_colors[i], linewidths=2)
-            ax.add_collection3d(line)
-        ax.axis('off')
-
     def three_sideplots_2d_binned(self, subs, zcoord, eql=False, 
                            bin_attr = 'vmean', **kwargs): 
         """ """
@@ -1158,10 +1007,141 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         if not eql:
             tools.add_world(ax_main) 
 
-        img = self._make_right_plot(ax_right, ycoord, zcoord, *args)
-        _ = self._make_upper_plot(ax_upper, xcoord, zcoord, *args)
-        _ = self._make_center_plot(ax_main, xcoord, ycoord, *args)
-        _ = self._add_cube(ax_cube, sides = (1, 0.5, 0.4))
+        def _make_right_plot(self, ax_right, ycoord, zcoord, subs, cmap, norm, bin_attr):
+            """ Right-hand-side plot for 3D projections. 
+            
+            Axes: zcoord on the abscissa ('x-axis') and ycoord / latitude on the ordinate ('y-axis'). 
+
+            """
+            bin2d_inst = self.bin_2d(subs, zcoord, ycoord)
+            bin_obj = bin2d_inst.binclassinstance
+            data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
+
+            img = ax_right.imshow(data,
+                            cmap = cmap, norm=norm,
+                            aspect='auto', origin='lower',
+                            extent=[bin_obj.xbmin, bin_obj.xbmax, 
+                                    bin_obj.ybmin, bin_obj.ybmax] 
+                            )
+            ax_right.set_xlabel(zcoord.label(False, True))
+            ax_right.set_ylabel(ycoord.label())
+            ax_right.set_xlim(bin_obj.xbmin  - bin_obj.xbsize*1.5, bin_obj.xbmax + bin_obj.xbsize*1.5) # *self.get_coord_lims(zcoord))
+            ax_right.set_ylim(-90, 90)
+
+            ax_right.yaxis.set_label_position("right")
+            ax_right.xaxis.set_label_position("bottom")
+
+            ax_right.grid('both', lw=0.4, ls = '--')
+            
+            return img
+
+        def _make_upper_plot(self, ax_upper, xcoord, zcoord, subs, cmap, norm, bin_attr): 
+            """ Upper plot for 3D projections. 
+            
+            Axes: xcoord / longitude on the abscissa ('x-axis') and zcoord on the ordinate ('y-axis'). 
+            """
+            bin2d_inst = self.bin_2d(subs, xcoord, zcoord)
+            bin_obj = bin2d_inst.binclassinstance
+            data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
+
+            img = ax_upper.imshow(data.T,
+                            cmap = cmap, norm=norm,
+                            aspect='auto', origin='lower',
+                            extent=[bin_obj.xbmin, bin_obj.xbmax, 
+                                    bin_obj.ybmin, bin_obj.ybmax] 
+                            )
+            ax_upper.set_xlabel(xcoord.label())
+            ax_upper.set_ylabel(zcoord.label(False, True))
+            ax_upper.set_ylim(bin_obj.ybmin  - bin_obj.ybsize*1.5, bin_obj.ybmax + bin_obj.ybsize*1.5) # *self.get_coord_lims(zcoord))
+            ax_upper.set_xlim(-180, 180)
+
+            ax_upper.yaxis.set_label_position("left")
+            ax_upper.xaxis.set_label_position("top")
+
+            ax_upper.grid('both', lw=0.4, ls = '--')
+            
+            return img
+        
+        def _make_center_plot(self, ax_main, xcoord, ycoord, subs, cmap, norm, bin_attr): 
+            """ Non-fancy Longitude-latitude binned 2D plot. 
+            
+            Note: This doesn't show anything related to tropopause coordinates, 
+            so don't be tempted to use it for anything going forwards. Just sayin'. 
+            """
+            bin2d_inst = self.bin_2d(subs, xcoord, ycoord)
+            bin_obj = bin2d_inst.binclassinstance
+            data = getattr(bin2d_inst, bin_attr) # atttribute: 'vmean', 'vstdv'
+
+            img = ax_main.imshow(data.T,
+                            cmap = cmap, norm=norm,
+                            aspect='auto', origin='lower',
+                            extent=[bin_obj.xbmin, bin_obj.xbmax, 
+                                    bin_obj.ybmin, bin_obj.ybmax] 
+                            )
+            ax_main.set_xlabel(xcoord.label())
+            ax_main.set_ylabel(ycoord.label())
+            ax_main.set_ylim(-90, 90)
+            ax_main.set_xlim(-180, 180)
+
+            ax_main.yaxis.set_label_position("left")
+            ax_main.xaxis.set_label_position("bottom")
+
+            ax_main.grid('both', lw=0.4, ls = '--')
+            
+            return img
+
+        def add_cube(ax, 
+                    abc_colors=('tab:blue', 'tab:orange', 'tab:green'), 
+                    sides = (1,1,1)):
+            """
+            Plot a cube with individually colored edges.
+
+            Parameters:
+                ax (matplotlib 3D axis)
+                abc_colors (List[str]): Colors of the 3 front edges of the cube (a,b,c).
+                sides (List[float]): Length of a,b,c sides of the object
+    
+            """
+            edge_colors = [
+                'k', 'k', 'w', 'w', 
+                abc_colors[0], # a
+                abc_colors[1], # b
+                'k', 'k', 'k', 
+                abc_colors[2], # c
+                'k', 'w']
+
+            a, b, c = sides
+
+            vertices = np.array([
+                [0, 0, 0], [a, 0, 0], [a, b, 0], [0, b, 0],
+                [0, 0, c], [a, 0, c], [a, b, c], [0, b, c]
+                ])
+            
+            edges = [
+                [vertices[j] for j in [0, 1]],   # Bottom edges
+                [vertices[j] for j in [1, 2]],
+                [vertices[j] for j in [2, 3]],
+                [vertices[j] for j in [3, 0]],
+                [vertices[j] for j in [4, 5]],   # Top edges
+                [vertices[j] for j in [5, 6]],
+                [vertices[j] for j in [6, 7]],
+                [vertices[j] for j in [7, 4]],
+                [vertices[j] for j in [0, 4]],   # Vertical edges
+                [vertices[j] for j in [1, 5]],
+                [vertices[j] for j in [2, 6]],
+                [vertices[j] for j in [3, 7]]
+            ]
+
+            # Create a Line3DCollection for each edge with specified colors
+            for i, edge in enumerate(edges):
+                line = Line3DCollection([edge], colors=edge_colors[i], linewidths=2)
+                ax.add_collection3d(line)
+            ax.axis('off')
+
+        img = _make_right_plot(self, ax_right, ycoord, zcoord, *args)
+        _ = _make_upper_plot(self, ax_upper, xcoord, zcoord, *args)
+        _ = _make_center_plot(self, ax_main, xcoord, ycoord, *args)
+        _ = add_cube(ax_cube, sides = (1, 0.5, 0.4))
 
         # longitude / a
         for spine in (ax_main.spines['right'], 
@@ -1205,39 +1185,66 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         matrix_plot_stdev(note, atm_layer, savefig)
     """
 
-    def calc_SimpleBin3D_dict(self, subs, zcoord, eql, **kwargs) -> tuple[dict, dict]: 
-        """ Calculate stratos & tropos 3D binned data in lon / (eql) lat / zcoord. 
+    def calc_Bin3DFitted_dict(self, *args, **kwargs): # NotImplemented
+        return NotImplementedError
+
+    def Bin3DFitted_dict(self, subs, zcoord, eql, **kwargs
+                         ) -> tuple[dict[tools.Bin3DFitted]]:
+        """ Get Bin3DFitted instances for tropospheric data sorted with each tps. 
         
-        Returns dictionaries such that {tp_col : bp.Simple_Bin_3d}
-        """
-        strato_3d_dict_Bin3d, tropo_3d_dict_Bin3d = {}, {}
-
-        for tp in self.tps:
-            strato_plotter = self.sel_strato(tp)
-            strato_3d = strato_plotter.bin_3d(subs, zcoord, eql=eql, **kwargs)
-            strato_3d_dict_Bin3d[tp.col_name] = strato_3d
-
-            tropo_plotter = self.sel_tropo(tp)                                              
-            tropo_3d = tropo_plotter.bin_3d(subs, zcoord , eql=eql, **kwargs)
-            tropo_3d_dict_Bin3d[tp.col_name] = tropo_3d
+        Parameters: 
+            subs (dcts.Substance)
+            zcoord (dcts.Coordinate): Vertical coordinate used for binning
+            eql (bool): Use equivalent latitude instead of latitude
             
-        return strato_3d_dict_Bin3d, tropo_3d_dict_Bin3d
-    
-    def get_data_3d_dicts(self, subs, zcoord, eql, bin_attr,
-                          strato_3d_dict_Bin3d = None, tropo_3d_dict_Bin3d = None,
-                          **kwargs) -> tuple[dict, dict]: 
-        """ Get dictionary of specific 3d-binned bin_attr per tp. 
-        
-        Returns dictionaries such that {tp_col : np.ndarray} 
+            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
+            key *(xbsize, ybsize, zbsize) (float): Binsize for x/y/z dimensions. Optional
+
+        Returns stratospheric, tropospheric 3D-bin dictionaries keyed by tropopause definition.
         """
-        if strato_3d_dict_Bin3d is None or tropo_3d_dict_Bin3d is None: 
-            strato_3d_dict_Bin3d, tropo_3d_dict_Bin3d = self.calc_SimpleBin3D_dict(
-                subs, zcoord, eql, **kwargs)
+        if hasattr(self, 'temp_tropo_3d') and hasattr(self, 'temp_strato_3d') and not kwargs.get('calc'):
+            return self.temp_strato_3d, self.temp_tropo_3d
         
-        strato_3d_dict = {k:getattr(v, bin_attr) for k,v in strato_3d_dict_Bin3d.items()}
-        tropo_3d_dict = {k:getattr(v, bin_attr) for k,v in tropo_3d_dict_Bin3d.items()}
+        tropo_Bin3D_dict, strato_Bin3D_dict = {}, {}
+        for tp in self.tps:
+            tropo_plotter = self.sel_tropo(tp)
+            tropo_Bin3D_dict[tp.col_name] = tropo_plotter.bin_3d(
+                subs, zcoord, eql=eql, **kwargs)
+            
+            strato_plotter = self.sel_strato(tp)
+            strato_Bin3D_dict[tp.col_name] = strato_plotter.bin_3d(
+                subs, zcoord, eql=eql, **kwargs)
+            
+        self.temp_strato_3d = strato_Bin3D_dict
+        self.temp_tropo_3d = tropo_Bin3D_dict
+
+        return strato_Bin3D_dict, tropo_Bin3D_dict
+
+    def get_data_3d_dicts(self, subs, zcoord, eql, bin_attr,
+                          **kwargs) -> tuple[dict, dict]: 
+        """ Extract specific attributes from Bin3D dictionaries. 
+        Returns data dictionaries such that {tp_col : np.ndarray} """
+        strato_Bin3D_dict, tropo_Bin3D_dict = self.Bin3DFitted_dict(
+            subs, zcoord, eql, **kwargs)
+
+        strato_attr_dict = {k:getattr(v, bin_attr) for k,v in strato_Bin3D_dict.items()}
+        tropo_attr_dict = {k:getattr(v, bin_attr) for k,v in tropo_Bin3D_dict.items()}
         
-        return strato_3d_dict, tropo_3d_dict
+        if bin_attr == 'rvstd': 
+            # Multiply everything by 100 to get spercentages
+            strato_attr_dict = {k:v*100 for k,v in strato_attr_dict.items()}
+            tropo_attr_dict = {k:v*100 for k,v in tropo_attr_dict.items()}
+        
+        return strato_attr_dict, tropo_attr_dict
+
+    def get_lognorm_stats_df(self, Bin3D_dict: dict, lognorm_attr: str) -> pd.DataFrame: 
+        """ Create combined lognorm-fit statistics dataframe for all tps. 
+        
+        Parameters: 
+            Bin3D_dict (dict[tools.Bin3DFitted]): Binned data incl. lognorm fits
+            lognorm_attr (str): vmean_fit / vsdtv_fit / rvstd_fit
+        """
+        return pd.DataFrame({k:getattr(v, lognorm_attr).stats() for k,v in Bin3D_dict.items()})
 
     def three_sideplots_3d_binned(self, subs, zcoord, eql=False, 
                            bin_attr = 'vmean', **kwargs): 
@@ -1348,7 +1355,7 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         """ Plotting basic histograms of bin_attr for Stratos & Tropos on separate figures. """
         if strato_3d_dict is None or tropo_3d_dict is None:
             strato_3d_dict, tropo_3d_dict = self.get_data_3d_dicts(
-                subs, zcoord, eql, **kwargs)
+                subs, zcoord, eql, bin_attr, **kwargs)
         
         # Stratospheric           
         fig_s, axs_s = self.lil_histogram_3d_helper(strato_3d_dict)
@@ -1366,26 +1373,38 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
           
     def fancy_histogram_plots_nested(self, subs, zcoord, eql=False, bin_attr='vstdv', 
                                      tropo_3d_dict = None, strato_3d_dict = None, 
-                                     **kwargs): 
-        """ Comparison plot for tropopause definition substance histogram thingies. With lognorm fit. """
+                                     xscale = 'linear',
+                                     fig_kwargs = {}, **kwargs): 
+        """ Comparison plot for tropopause definition substance histograms + lognorm fit. 
+
+        Parameters: 
+            subs (dcts.Substance): 
+                Substance to be evaluated
+            zcoord (dcts.Coordinate): 
+                Vertical coordinate to use for binning
+
+            eql (bool): Default False
+                Use equivalent latitude instead of latitude. 
+            bin_attr (str): Default 'vsdtv'
+                Which bin-box quantity to plot. 
+            tropo_3d_dict (dict[np.ndarray]): Default None
+                Precalculated tropospheric data per tropopause. 
+            strato_3d_dict (dct[np.ndarray]): Default None
+                Precalculated stratospheric data per tropopause. 
+            xscale (str): Default 'linear' 
+                x-axis scaling (e.g. linear/log/symlog). 
+                
+            key show_stats (bool): 
+                Adds mode and sigma values to the plot. 
+        """
+                      
         # Get the 3D binned data
         if strato_3d_dict is None or tropo_3d_dict is None:
             strato_3d_dict, tropo_3d_dict = self.get_data_3d_dicts(
-                subs, zcoord, eql, **kwargs)
+                subs, zcoord, eql, bin_attr, **kwargs)
         
         # Create the figure 
-        fig, main_axes, sub_ax_arr = self._nested_subplots_two_column_axs(self.tps)
-        # fig.subplots_adjust(top = 0.9)
-        
-        # titles = {'vmean' : 'Distribution of mean mixing ratios in 3D binned data', 
-        #           'vstdv' : 'Distribution of  '}
-        
-        # title = titles[bin_attr] +  '\n Lon / {} / {}'.format(
-        #     'Lat' if not eql else 'Eq. Lat', 
-        #     zcoord.label(coord_only=True)
-        # )
-        
-        # fig.suptitle()
+        fig, main_axes, sub_ax_arr = self._nested_subplots_two_column_axs(self.tps, **fig_kwargs)
         self._adjust_labels_ticks(sub_ax_arr)
         
         gs = main_axes.flat[0].get_gridspec()
@@ -1398,18 +1417,22 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         colors = colors_20c[:2] + colors_20c[4:7] + colors_20c[8:9]
 
         # Set axis titles and labels """
+        pad = 12 if kwargs.get('show_stats') else 5
+        
         for ax in sub_ax_arr[0,:,0].flat: # Top row inner left
-            ax.set_title('Troposphere', style = 'oblique')
+            ax.set_title('Troposphere', style = 'oblique', pad = pad)
         for ax in sub_ax_arr[0,:,-1].flat: # Top row inner right
-            ax.set_title('Stratosphere', style = 'oblique')
+            ax.set_title('Stratosphere', style = 'oblique', pad = pad)
 
         for ax in sub_ax_arr.flat: 
             # All subplots
             ax.set_xlabel('Frequency [#]')
-            ax.set_ylabel(subs.label(bin_attr=bin_attr))
-            ax.grid(axis='x', ls ='dotted', lw = 1, color='grey', zorder=0)
-            ax.set_xscale('log')
-
+            ax.set_ylabel(subs.label(bin_attr=bin_attr), fontsize = 8)
+            ax.grid(
+                # axis='x', 
+                ls ='dotted', lw = 1, color='grey', zorder=0)
+            ax.set_xscale(xscale)
+            
         # Add histograms and lognorm fits
         for axes, data_3d_dict in zip([tropo_axs, strato_axs],
                                       [tropo_3d_dict, strato_3d_dict]):     
@@ -1424,28 +1447,106 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
                 data3d = data_3d_dict[tp_col]
                 data_flat = data3d.flatten()
                 
-                # Adding the histograms to the figure         
-                fit_params = self._hist_lognorm_fitted(data_flat,
-                                                (bin_lim_min, bin_lim_max), ax, c,
-                                                hist_kwargs = dict(range = (bin_lim_min, bin_lim_max)))
-        
-        # freq_lims = (np.nan, np.nan)
-        # freq_max = np.nan
+                # Adding the histograms to the figure
+                lognorm_inst = self._hist_lognorm_fitted(
+                    data_flat, (bin_lim_min, bin_lim_max), ax, c,
+                    hist_kwargs = dict(range = (bin_lim_min, bin_lim_max)))
+                
+                # Show values of mode and sigma
+                if kwargs.get('show_stats'):
+                    ax.text(x = 0, y = 1.015, 
+                        s = 'Mode = {:.1f} / $\sigma$ = {:.2f}'.format(
+                        lognorm_inst.mode,
+                        lognorm_inst.sigma),
+                        fontsize = 6,
+                        transform = ax.transAxes,
+                        style = 'italic'
+                        )
 
-        # for ax in sub_ax_arr.flat: 
-        #     freq_max = np.nanmax([freq_max, max(ax.get_xlim())])
+        # Set xlims to maximum xlim for each subplot in tropos / stratos
+        tropo_xmax = max([max(ax.get_xlim()) for ax in sub_ax_arr[:,:,0].flat])
+        for ax in sub_ax_arr[:,:,0].flat: 
+            ax.set_xlim(0 if xscale == 'linear' else 0.7, tropo_xmax)
 
-        # for ax in sub_ax_arr.flat: 
-        #     ax.set_xlim(0.7, freq_max)
+        strato_xmax = max([max(ax.get_xlim()) for ax in sub_ax_arr[:,:,-1].flat])
+        for ax in sub_ax_arr[:,:,-1].flat: 
+            ax.set_xlim(0 if xscale == 'linear' else 0.7, strato_xmax)
+
+        if bin_attr == 'rvstd': 
+            # Equal y-limits for tropo / strato
+            max_y = max([max(ax.get_ylim()) for ax in sub_ax_arr.flat])
+            for ax in sub_ax_arr.flat: 
+                ax.set_ylim(0, max_y)
             
+
         # Add tropopause definition text boxes and invert tropo x-axis
         for ax, tp_col in zip(sub_ax_arr[:,:,0].flat, tropo_3d_dict):
             ax.invert_xaxis()
             tp_title = dcts.get_coord(tp_col).label(filter_label=True).split("(")[0] # shorthand of tp label
             ax.text(**dcts.note_dict(ax, s = tp_title, x = 0.1, y = 0.85))
         
-        return strato_3d_dict, tropo_3d_dict
+        return fig, main_axes, sub_ax_arr # strato_3d_dict, tropo_3d_dict
 
+    def make_lognorm_fit_comparison(self, subs, zcoord, bin_attr = 'vstdv', eql=False, **kwargs): 
+        """ Compare characteristic quantities for lognorm fits of strato/tropo data between tps. """
+        strato_dict, tropo_dict = self.get_data_3d_dicts(subs, zcoord, eql, bin_attr, **kwargs)
+        
+        tropo_stats = self.get_lognorm_stats_df(tropo_dict, f'{bin_attr}_fit')
+        strato_stats = self.get_lognorm_stats_df(strato_dict, f'{bin_attr}_fit')
+        
+        fig, axs = plt.subplots(1,2, figsize = (6,3.5), sharey = True)
+        colors_20c = plt.cm.tab20c.colors
+        colors = colors_20c[:2] + colors_20c[4:7] + colors_20c[8:9]
+
+        axs[0].set_title('Troposphere',  size = 9, pad = 3)
+        axs[1].set_title('Stratosphere', size = 9, pad = 3)
+
+        marker_kw = dict(color = 'xkcd:dark grey',
+                        path_effects = [self.outline])
+
+        for df, ax in zip([tropo_stats, strato_stats], axs):
+            ax.grid(axis='x', ls = 'dashed')
+            for i, (tp, c) in enumerate(zip(df.columns, colors)): 
+                y = dcts.get_coord(tp).label(filter_label = True).split('(')[0]
+
+                # Lines
+                line_kw = dict(color = c, lw = 7)
+                ax.fill_betweenx([y]*2, *df[tp].int_68, **line_kw, alpha = 0.8)
+                ax.fill_betweenx([y]*2, *df[tp].int_95, **line_kw, alpha = 0.5)
+
+                # Markers
+                kw_mode = dict(alpha = 0.7, zorder = 9, marker = 'D')
+                kw_68   = dict(alpha = 0.7, zorder = 8, marker = 'd')
+                kw_95   = dict(alpha = 1.0, zorder = 7, marker = '|')
+
+                ax.scatter(df[tp].Mode,    y,    **kw_mode, **marker_kw)
+                ax.scatter(df[tp].int_68, [y]*2, **kw_68,   **marker_kw)
+                ax.scatter(df[tp].int_95, [y]*2, **kw_95,   **marker_kw)
+            
+                # Numeric values 
+                ax.annotate(
+                    text = f'{df[tp].Mode}', size = 8, 
+                    xy = (df[tp].Mode, y),
+                    xytext = (df[tp].Mode, i+0.35),
+                    ha = 'center', va = 'center', )
+
+        axs[0].invert_yaxis()
+        axs[0].set_ylim(-0.5, len(df.columns)- 0.25)
+        axs[0].tick_params(labelleft=True, left=False)
+        axs[1].tick_params(left=False)
+
+        m_Mode = mlines.Line2D([], [], ls = 'None', **kw_mode, **marker_kw)
+        m_68 =   mlines.Line2D([], [], ls = 'None', **kw_68,   **marker_kw)
+        m_95 =   mlines.Line2D([], [], ls = 'None', **kw_95,   **marker_kw)
+
+        l = ['Mode', '68$\,$% Interval', '95$\,$% Interval']
+        h = [m_Mode, m_68, m_95]
+
+        fig.tight_layout()
+        fig.subplots_adjust(bottom = 0.2, top = 0.85)
+        fig.suptitle('Distribution of ' + subs.label(bin_attr=bin_attr))
+        fig.legend(h, l, loc = 'lower center', ncols = len(h))
+        
     def z_crossection(self, subs, tp, bin_attr, 
                       save_gif_path=None, **kwargs): 
         """ Create lat/lon gridded plots for all z-bins. 

@@ -470,8 +470,18 @@ def conv_PartsPer_molarity(x, unit):
     return x * factor[unit]
 
 class LognormFit: 
+    """ Holds information on Lognorm Fits on distributions of the given dataset. """
     def __init__(self, data_arr, bin_nr = 30, hist_kwargs = {}, **kwargs): 
-        """ Get lognormal fit for 1D data array. """
+        """ Get lognormal fit for 1D data array. 
+        Parameters: 
+            data_arr (array): Flattened array of v data
+            bin_nr (int): Number of bins for histogram to fit lognorm to
+            
+            hist_kwargs (dict): Kwargs to pass to np.histogram funtion (bins, range, density, weights)
+
+            key normalise (bool). Toggle normalising the histogram. Defaults to False 
+            key *(shape, loc, scale) (float): Initial guesses for lognorm fit. Optional       
+        """
         
         self.x = data_arr[~np.isnan(data_arr)]
         
@@ -485,7 +495,12 @@ class LognormFit:
         self._get_fit(**kwargs)
         
     def _get_fit(self, **kwargs) -> tuple[tuple, np.array]: 
-        """ Get scipy lognorm fit for the given data. """
+        """ Get scipy lognorm fit for the given data. 
+        
+        Parameters: 
+            key normalise (bool). Toggle normalising the histogram. Defaults to False 
+            key *(shape, loc, scale) (float): Initial guesses for lognorm fit. Optional   
+        """
         fit_kwargs = {k:v for k,v in kwargs.items() \
             if k in ['shape', 'loc', 'scale']}
         
@@ -503,23 +518,43 @@ class LognormFit:
         self.lognorm_fit = lognorm_fit
         
         return self.fit_params, lognorm_fit
+
+    @property
+    def mu(self) -> float: 
+        """ Get the mean of the corresponding normal distributed Y = log(X). """
+        return np.log(self.median)
     
     @property
     def sigma(self) -> float: 
+        """ Get the std. of the corresponding normal distributed Y = log(X). """
         return self.shape
-    
+
+    @property
+    def multiplicative_std(self) -> float: 
+        """ Multiplicative standard deviation of the lognorm 
+        so that with sigma* = e^(sigma) and mu* = e^(mu):
+
+        68.3% interval: [mu* / sigma*, mu* x sigma*]
+        95.5% interval: [mu* / (sigma*)^2, mu* x (sigma*)^2]        
+        """
+        return np.exp(self.sigma)
+
     @property
     def median(self) -> float: 
         return stats.lognorm.median(*self.fit_params)
-    
-    @property
-    def mu(self) -> float: 
-        return np.log(self.median)
 
     @property
     def mode(self) -> float: 
         """ Get mode of fitted lognorm distribution. """
-        return np.exp(self.mu - self.sigma**2) 
+        return np.exp(self.mu - self.sigma**2)
+    
+    @property
+    def variance(self) -> tuple[float]: 
+        """ Get the variance of the lognorm distribution. """
+        var = stats.lognorm.var(*self.fit_params)
+        var_calc = np.exp(2*(self.mu + self.sigma**2)) - np.exp(2*self.mu + self.sigma**2)
+        # return var, var_calc
+        return stats.lognorm.var(*self.fit_params)
     
     def show_fit(self, **fig_kwargs):
         """ Plot the fit of the distribution to the data. """
@@ -552,6 +587,33 @@ class LognormFit:
 
         fig.show()
 
+    def stats(self) -> pd.Series: 
+        """ Returns a pandas series containing the relevant lognorm fit parameters. """
+
+        var_dict = dict(
+            Mode = self.mode,
+            Median = self.median, 
+            Sigma = self.sigma, 
+            Std = np.sqrt(self.variance),
+            Variance = self.variance, 
+            Mult_std = self.multiplicative_std,
+            )
+
+        stats_dict = {k:float('{:.1f}'.format(v)) for k,v in var_dict.items()}
+        stats_dict['int_68'] = (float('{:.1f}'.format(self.median/self.multiplicative_std)), 
+                                float('{:.1f}'.format(self.median*self.multiplicative_std)))
+        stats_dict['int_95'] = (float('{:.1f}'.format(self.median/self.multiplicative_std/2)), 
+                                float('{:.1f}'.format(self.median*self.multiplicative_std*2)))
+        return pd.Series(stats_dict)
+
+def get_lognorm_stats_df(data_3d_dict) -> pd.DataFrame:
+    """ Returns dataframe with lognorm stats for all tps present in the data_3d_dict. """
+    stats_df = pd.DataFrame()
+    for tp_col in data_3d_dict: 
+        data_flat = data_3d_dict[tp_col].flatten()
+        stats_df[tp_col] = LognormFit(data_flat, bin_nr = 50).stats()
+    return stats_df
+
 def get_lognorm_fit(x, counts, bins, normalised = False, **kwargs):
     
     fit_kwargs = {k:v for k,v in kwargs.items() \
@@ -571,6 +633,82 @@ def get_lognorm_fit(x, counts, bins, normalised = False, **kwargs):
 
     return lognorm_fit, bin_center, fit_params
 
+class Bin3DFitted(bp.Simple_bin_3d): 
+    """ Extending Bin3D class to hold lognorm fits for distributions. """
+    
+    def __init__(self, v, x, y, z, binclassinstance, count_limit=1, fit_bin_nr=50): 
+        super().__init__(v, x, y, z, binclassinstance, count_limit)
+        
+        self.calc_lognorm_fits(fit_bin_nr)
+    
+    def calc_lognorm_fits(self, bin_nr): 
+        """ Add lognormal fits to distribution of values in 3D bins. """
+        self.vmean_fit = LognormFit(self.vmean, bin_nr=bin_nr)
+        self.vstdv_fit = LognormFit(self.vstdv, bin_nr=bin_nr)
+        self.rvstd_fit = LognormFit(self.rvstd, bin_nr=bin_nr)
+
+        return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
+
+class SimpleBinDict: 
+    """ Data class to hold binned 3D data, metadata and performs lognorm fits on 3D distributions. """
+    def __init__(self, SimpleBinDict, 
+                 subs, zcoord, eql, 
+                 atm_layer = None):
+        """ Class to hold binned 3d data, metadata and lognorm fits with the given specifications 
+
+        Parameters:
+            SimpleBinDict (dict[str, bp.Simple_bin_Xd]): Dictionary with binned substance data in x dimensions
+            subs (dcts.Substance): Substance 
+            zcoord (dcts.Coordinate): Vertical coordinate used for binning
+            eql (bool): Equivalent latitude or latitude 
+            atm_layer (str, optional): e.g. strato / tropo. Defaults to None.            
+        """
+        self.DATA = SimpleBinDict
+        self.subs = subs
+        self.zcoord = zcoord
+        self.eql = eql
+        self.atm_layer = atm_layer
+        
+        self.tp_cols = SimpleBinDict.keys()
+        self.bin_attrs = [i for i in ['vmean', 'vstdv', 'rvstd'] if i in 
+                                      list(self.DATA.values())[0].__dict__]
+        self.lognorm_fits = self.calc_lognorm_fits()
+    
+    def __repr__(self): 
+        return f"""{self.__class__}; {str(self.subs)}; {str(self.zcoord)}; {'eql:True' if self.eql else 'eql:True'}"""
+    
+    def get_data_dict(self, bin_attr) -> dict:
+        """ Returns bin_attr dictionary with tp_cols as keys.  """
+        if bin_attr == 'rvstd': 
+            # Multiply everything by 100 to get spercentages
+            return  {k:getattr(v, bin_attr)*100 for k,v in self.DATA.items()}
+        return {k:getattr(v, bin_attr) for k,v in self.DATA.items()}
+    
+    def calc_lognorm_fits(self) -> dict[dict[LognormFit]]: 
+        """ Returns nested dictionary for bin_attr -> tp_col -> Lognorm fits. """
+        fits_per_attr = {}
+        for bin_attr in self.bin_attrs: 
+            fits_per_tp = {}
+            for tp_col in self.tp_cols: 
+                data_flat = self.get_data_dict(bin_attr)[tp_col].flatten()
+                fits_per_tp[tp_col] = LognormFit(data_flat, bin_nr = 50)
+            fits_per_attr[bin_attr] = fits_per_tp
+            
+        return fits_per_attr
+    
+    def get_lognorm_stat_dictionary(self) -> dict[pd.DataFrame]:
+        """ Returns dictionary of DataFrames for each bin_attr -> df[tp_cols, stats_params] """
+        stats_dictionary = {}
+        for bin_attr in self.bin_attrs: 
+            stats_dictionary[bin_attr] = pd.DataFrame()
+            for tp_col in self.tp_cols:
+                stats_dictionary[bin_attr][tp_col] = self.lognorm_fits[bin_attr][tp_col].get_stats_series()
+        return stats_dictionary
+    
+    def get_lognorm_stats(self, bin_attr) -> pd.DataFrame: 
+        """ Returns DataFrame with lognorm stats for each tp_col. """
+        return self.get_lognorm_stat_dictionary().get(bin_attr)
+    
 # %% Plotting tools
 def add_zero_line(ax, axis='y'):
     """ Highlight the gridline at 0 for the chosen axis on the given Axes object.

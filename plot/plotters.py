@@ -201,7 +201,8 @@ class PlotterMixin(GlobalDataPlotterMixin,
         
         return sub_ax_arr
 
-    def _hist_lognorm_fitted(self, x, range, ax, c, hist_kwargs = {}, bin_nr = 50): 
+    def _hist_lognorm_fitted(self, x, range, ax, c, hist_kwargs = {}, bin_nr = 50,
+                             **kwargs): 
         """ Adds a horizontal histogram with a lognorm best fit to the given axis. 
         
         x ((n,) array or sequence of (n,) arrays): 1D array with data to be histogrammed
@@ -214,16 +215,21 @@ class PlotterMixin(GlobalDataPlotterMixin,
         ax.hist(x, 
             bins = bin_nr, range = range, 
             orientation = 'horizontal',
-            edgecolor = 'white', 
+            edgecolor = 'white', lw = 0.3, 
             color=c,
             )
         lognorm_inst = tools.LognormFit(x, bin_nr = bin_nr, hist_kwargs = hist_kwargs)
         lognorm_fit = lognorm_inst.lognorm_fit
         bin_center = lognorm_inst.bin_center
-        fit_params = lognorm_inst.fit_params
         ax.plot(lognorm_fit, bin_center,
                 c = 'k', lw = 1)
-        return fit_params
+        
+        ax.hlines(lognorm_inst.mode, 0, max(lognorm_fit),
+                  ls = 'dashed', 
+                  color = 'k', 
+                  lw = 1)
+
+        return lognorm_inst
 
 class CaribicPlotter(PlotterMixin,
                      Caribic): 

@@ -134,7 +134,7 @@ class BinningMixin:
 
     def bin_3d(self, subs, zcoord, bci_3d=None, 
                xbsize = None, ybsize = None, zbsize = None,
-               eql=False) -> bp.Simple_bin_3d: 
+               eql=False) -> tools.Bin3DFitted: 
         """ Bin substance data onto a 3D-grid given by z-coordinate / (equivalent) latitude / longitude. 
         
         Args: 
@@ -148,7 +148,7 @@ class BinningMixin:
             
             eql (bool): Use equivalalent latitude instead of latitude as y-coordinate 
         
-        Returns a bp.Simple_bin_3d object. 
+        Returns a tools.Bin3DFitted object. 
         """
         xbsize = self.grid_size if not xbsize else xbsize 
         ybsize = self.grid_size if not ybsize else ybsize 
@@ -173,7 +173,7 @@ class BinningMixin:
                                    ybmin, ybmax, ybsize,
                                    zbmin, zbmax, zbsize)
         
-        out = bp.Simple_bin_3d(np.array(self.df[subs.col_name]), 
+        out = tools.Bin3DFitted(np.array(self.df[subs.col_name]), 
                                x, y, z, bci_3d, 
                                count_limit = self.count_limit)
         
@@ -190,7 +190,7 @@ class BinningMixin:
             df (pd.DataFrame): Stratospheric dataset (filtered using TP)
             bci_3d(bp.Bin_equi3d, bp.Bin_notequi3d): Binned data
             zbsize (float): Size of vertical bins
-            nr_of_bins (int): Max nr. of bins over the tropopause that sshould be returned 
+            nr_of_bins (int): Max nr. of bins over the tropopause that should be returned 
 
         Returns bp.Simple_bin_3d object
         """
