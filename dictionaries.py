@@ -181,7 +181,7 @@ class Coordinate:
         bsizes_dict = {
             'pt': 10,
             'p': 25,
-            'z': 0.75,
+            'z': 1,
             'mxr': 5,  # n2o
             'eqpt': 5,
             'eql': 5,
@@ -196,6 +196,35 @@ class Coordinate:
         else:
             raise KeyError(f'No default bin size for v: {self.vcoord} / h: {self.hcoord} / var: {self.var}')
 
+    def get_color(self): 
+        """ Allows harmonisation of color usage across plots comparing tropopause definitions. """
+        colors_20c = plt.cm.tab20c.colors       
+        chem_colors = colors_20c[:4] # blue
+        dyn_colors = colors_20c[4:8] # red
+        therm_colors = colors_20c[8:12] # green
+       
+        filter_label = self.label(filter_label=True)
+
+        # Standard blues -> chemical
+        if 'Chemical, O$_3$' in filter_label: 
+            return chem_colors[0]
+        if 'Chemical, N$_2$O' in filter_label: 
+            return chem_colors[1]
+        
+        # Standard reds -> dynamic
+        if 'Dynamic, 3.5' in filter_label: 
+            return dyn_colors[0]
+        if 'Dynamic, 2.0' in filter_label: 
+            return dyn_colors[1]
+        if 'Dynamic, 1.5' in filter_label: 
+            return dyn_colors[2]
+
+        # Standard greens -> thermal 
+        if 'Thermal' in filter_label: 
+            return therm_colors[0]
+
+        return 'grey'
+        
 def coordinate_df():
     """ Get dataframe containing all info about all coordinate variables """
     with open(get_path() + 'coordinates.csv', 'rb') as f:
@@ -697,6 +726,7 @@ def years_per_campaign(campaign: str) -> tuple:
         'WISE' : (2017),
         'SHTR' : (2019),
         'ATOM' : (2016, 2017, 2018),
+        'PHL' : (2023),
         }
     if campaign not in year_dict:
         raise NotImplementedError(f'Campaign {campaign} does not have a year list.')
@@ -710,6 +740,7 @@ def instruments_per_campaign(campaign: str) -> tuple:
         'WISE' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'UMAQS', 'HAGARV_LI', 'HAI14', 'HAI16', 'CLAMS_MET', 'HAGARV_ECD'),
         'SHTR' : ('BAHAMAS', 'FAIRO', 'GHOST_ECD', 'UMAQS', 'HAGARV_LI', 'CLAMS_MET', 'GLORIA'),
         'ATOM' : ('GCECD', 'MMS', 'UCATS-O3', 'CLAMS_MET'),
+        'PHL' : ('FAIRO', 'GHOST_ECD', 'GHOST_MS')
         }
     if campaign not in instr_dict:
         raise NotImplementedError(f'Campaign {campaign} does not have an instrument list.')
