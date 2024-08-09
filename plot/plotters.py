@@ -16,6 +16,7 @@ from dataTools.plot.binsubs import BinPlotterMixin
 from dataTools.plot.tropopause import TropopausePlotterMixin
 
 from dataTools.data.Caribic import Caribic
+from dataTools.data.CampaignData import CampaignData
 from dataTools import tools
 import dataTools.dictionaries as dcts  
 
@@ -236,3 +237,9 @@ class CaribicPlotter(PlotterMixin,
     def __init__(self, **kwargs): 
         super().__init__(**kwargs)
         self.base_class = Caribic
+
+class CampaignPlotter(PlotterMixin,
+                     CampaignData): 
+    def __init__(self, **kwargs): 
+        super().__init__(**kwargs)
+        self.base_class = CampaignData

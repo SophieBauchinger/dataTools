@@ -8,11 +8,14 @@
 import dill
 import geopandas
 import keyring
+import numpy as np
 import os
 import pandas as pd
 from shapely.geometry import Point
+import xarray as xr
 
 from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
+from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
@@ -44,7 +47,8 @@ class CampaignData(GlobalData):
             'PGS'  : 'HALO',
             'TACTS': 'HALO',
             'ATOM' : 'ATOM',
-            'HIPPO': 'HIAPER', }
+            'HIPPO': 'HIAPER', 
+            'PHL'  : 'HALO'}
         self.source = source_dict[campaign]
 
         self.ID = campaign
@@ -52,7 +56,8 @@ class CampaignData(GlobalData):
         self.data = {}
         self.get_data(**kwargs)
 
-        self.create_df()
+        if not 'df' in self.data: 
+            self.create_df()
         self.calc_coordinates()
 
         # if 'flight_id' in self.df:
@@ -140,6 +145,12 @@ class CampaignData(GlobalData):
                     self.get_data(recalculate=True)
 
         else:
+            if self.ID == 'PHL': 
+                print('Importing PHILEAS data from Flights 07 and 19.')
+                data_dict = get_phileas_data(time_res = kwargs.get('time_res', '10s'))
+                self.data = data_dict
+                return self.data
+            
             print('Importing Campaign Data from SQL Database.')
 
             time_data = client_data_choice(
@@ -293,3 +304,118 @@ class CampaignData(GlobalData):
             return self.data['met_data']
         return self.get_met_data()
 
+def get_phileas_data(time_res = '10s'): 
+    """ Temporary function for creating merge files for the PHILEAS campaign. """  
+    # GHOST_ECD
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07_Frankfurt_20230821_HALO_GHOST_ECD_v1.csv"
+    ghost_7 = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    ghost_7['Flight number'] = 7
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F19_Solingen_20230922_HALO_GHOST_ECD_v1.csv"
+    ghost_19 = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    ghost_19['Flight number'] = 19
+    ghost = pd.concat([ghost_7, ghost_19])
+    ghost = ghost.drop(columns = ['Mean', 'Time_Start', 'Time_End'])
+    ghost.index = ghost.index.round('s')
+    ghost.dropna(how = 'all', inplace = True)
+    
+    # FAIRO
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07a_2023-08-21_HALO_FAIRO_O3_V02.ames"
+    fairo_7a = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    fairo_7a['Flight number'] = 7
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07b_2023-08-21_HALO_FAIRO_O3_V02.ames"
+    fairo_7b = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    fairo_7b['Flight number'] = 7
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F19_2023-09-22_HALO_FAIRO_O3_V02.ames"
+    fairo_19 = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    fairo_19['Flight number'] = 19
+    fairo = pd.concat([fairo_7a, fairo_7b, fairo_19])
+    fairo.drop(columns = ['Mid_UTC;'], inplace = True)
+    fairo.index = fairo.index.round('s')
+    fairo.rename(columns = {c : c.split(';')[0] for c in fairo.columns}, inplace = True)
+    
+    # UMAQS
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07_Frankfurt_20230821_HALO_UMAQS_v1.ames"
+    umaqs_7 = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    umaqs_7['Flight number'] = 7
+    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F19_Solingen_20230922a_HALO_UMAQS_v1.ames"
+    umaqs_19 = FFI1001DataReader(fname, df=True, xtype='secofday').df
+    umaqs_19['Flight number'] = 19
+    umaqs = pd.concat([umaqs_7, umaqs_19])
+    umaqs.index = umaqs.index.round('s')
+    umaqs.drop(columns = ['UTC_seconds;'], inplace = True)
+    
+    # ERA5 Data
+    def process_ERA5_PHILEAS(ds): 
+        """ Preprocess datasets for ERA5 / CLaMS renalayis data for PHILEAS - include BAHAMAS. """
+        def flatten_TPdims(ds):
+            TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+            TP_qualifier_dict = {0 : '_Main', 1 : '_Second', 2 : '_Third'}
+            for variable in TP_vars: 
+                # get secondary dimension for the current multi-dimensional variable
+                [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+                for TP_value in ds[variable][TP_dim].values: 
+                    ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+                ds = ds.drop_vars(variable)
+            return ds
+        # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
+        ds = flatten_TPdims(ds)
+        vars = set(list(tools.ERA5_variables()) + ['Lat', 'Lon', 'PAlt', 'Pres', 'Theta']) # include Bahamas MET data
+        return ds[[v for v in vars if v in ds.variables]]
+    
+    era5_7a = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_20230821_F07a_TPC_V04.nc"
+    era5_7b = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_20230821_F07b_TPC_V04.nc"
+    era5_19 = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_20230922_F19_TPC_V04.nc"
+    with xr.open_mfdataset([era5_7a, era5_7b, era5_19], preprocess = process_ERA5_PHILEAS) as ds: 
+        era5_ds = ds
+    era5 = era5_ds.to_dataframe()
+    era5_rename_vars = {
+        'Lat' : 'BAHAMAS_LAT',
+        'Lon' : 'BAHAMAS_LON',
+        'PAlt' : 'BAHAMAS_ALT',
+        'Pres' : 'BAHAMAS_PSTAT', # NB_PSIA
+        'Theta' : 'BAHAMAS_POT', # source Bahamas?
+        }
+    # era5_rename_tps = {c:c[:-5] for c in era5.columns if '_Main' in c}
+    # era5_rename = dict(era5_rename_vars, **era5_rename_tps)
+    era5.rename(columns = era5_rename_vars, inplace=True)
+
+    # Interpolate onto 
+    times = era5.resample(time_res).mean().index
+    umaqs_resampled = tools.interpolate_onto_timestamps(umaqs, times)
+    ghost_resampled = tools.interpolate_onto_timestamps(ghost, times)
+    fairo_resampled = tools.interpolate_onto_timestamps(fairo, times)
+    era5_resampled = tools.interpolate_onto_timestamps(era5, times)
+    
+    for instr, df in {'UMAQS' : umaqs_resampled, 
+                      'GHOST_ECD' : ghost_resampled, 
+                      'FAIRO' : fairo_resampled}.items():
+        for col in df.columns:
+            # if kwargs.get('verbose'):
+            #     print(f'Renaming: {col} -> {dcts.harmonise_variables(instr, col)}')
+            df[dcts.harmonise_variables(instr, col)] = df.pop(col)
+   
+    msmt_data = pd.concat([umaqs_resampled, ghost_resampled, fairo_resampled], axis = 'columns').dropna(how = 'all')
+    era5_resampled.drop([i for i in times if i not in msmt_data.index], inplace = True)
+    df_resampled = pd.concat([msmt_data, era5_resampled], axis = 'columns') # this results in duplicate values (most likely)
+
+    geodata = [Point(lon, lat) for lon, lat in zip(
+        df_resampled['BAHAMAS_LON'], df_resampled['BAHAMAS_LAT'])]
+    df = geopandas.GeoDataFrame(df_resampled, geometry=geodata)
+    df = df[[c for c in df.columns if c not in ['C2H6', 'CFC12']]][df['BAHAMAS_LAT'].notna()]
+    # df.rename(columns = {c:c[4:] for c in df.columns if 'BAHAMAS' in c}, inplace = True)
+    
+    # Quite possibly the ugliest way of dealing with duplicate flight number columns but behold it works: 
+    def same_merge(x): return np.nanmin(x)
+    flight_nr = df['Flight number'].T.groupby(level=0).apply(lambda x: x.apply(same_merge,)).T
+    df.drop(columns = ['Flight number'], inplace = True)
+    df['Flight number'] = flight_nr
+
+    # Create output     
+    data_dictionary = {
+        'GHOST' : ghost_resampled, 
+        'UMAQS' : umaqs_resampled, 
+        'FAIRO' : fairo_resampled, 
+        'met_data' : era5_resampled, 
+        'df' : df,
+    }
+    return data_dictionary

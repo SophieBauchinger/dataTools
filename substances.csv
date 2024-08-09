@@ -15,6 +15,7 @@ TRIHOP_CO,Carbon monoxide,co,ppb,TRIHOP,HALO,MSMT,h,FALSE
 awas_CO,awas Carbon monoxide from flask / RGD (CO) - U. Miami ,co,ppbv,AWAS ,HIAPER,MSMT,h,FALSE
 nwas_CO,nwas Carbon monoxide from flask / MAGICC (CO) - noaa,co,ppb,NWAS,HIAPER,MSMT,h,FALSE
 co_MLO,CO CCGG (Individual Flasks),co,ppb,MLO,Mauna_Loa,MSMT,h,FALSE
+UMAQS_CO,CO volume mixing ratio,co,ppbv,UMAQS,HALO,MSMT,h,FALSE
 CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h,FALSE
 int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h,FALSE
 int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INTtpc,Caribic,CLAMS,h,FALSE
@@ -81,6 +82,7 @@ int_O3,Ozone integrated over flask sampling time from high resolution measuremen
 int_CLaMS_O3,O3 (CLaMS),o3,ppb,INTtpc,Caribic,CLAMS,,FALSE
 tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,,FALSE
 FAIRO_O3,"Ozone, volume mixing ratio (ppbv)",o3,ppbv,FAIRO ,HALO,MSMT,,FALSE
+FAIRO_d_O3,standard_error_of_mole_fraction_of_ozone_in_air [ppb],d_o3,ppbv,FAIRO ,HALO,MSMT,,FALSE
 HIPPO_O3,Ozone (O3) ???????????? ,o3,,HIPPO,HIAPER,MSMT,,FALSE
 GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q,FALSE
 SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q,FALSE
