@@ -59,7 +59,8 @@ class TropopauseSorterMixin:
                 raise Warning(f'Could not find {n2o_coord.col_name} in {self.ID} data.')
 
         # Get reference dataset
-        loc_obj = MaunaLoa(self.years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
+        ref_years = np.arange(min(self.years)-2, max(self.years)+3)
+        loc_obj = MaunaLoa(ref_years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
         ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID)  # dcts.get_col_name(subs, loc_obj.source)
 
         if kwargs.get('verbose'):
@@ -166,7 +167,7 @@ class TropopauseSorterMixin:
         # N2O filter
         for tp in [tp for tp in tps if tp.crit == 'n2o']:
             # if self.source == 'MULTI': break
-            n2o_sorted = self.n2o_filter(coord=tp)
+            n2o_sorted = self.n2o_filter(coord=tp, **kwargs)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
