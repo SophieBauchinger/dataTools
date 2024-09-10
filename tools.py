@@ -45,6 +45,7 @@ Functions:
 """
 
 import datetime as dt
+import dill
 import geopandas
 import glob
 from metpy.units import units
@@ -622,6 +623,35 @@ class Bin3DFitted(bp.Simple_bin_3d):
 
         return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
 
+def load_reload_Bin3D_df(action, pickle_obj = None, fname = None):
+    """ Either saves Bin3D_df to file or reloads it from there. 
+    
+    Current files: 
+        caribic_Bin3D_df.pkl
+        caribic_10s_Bin3D_df.pkl
+    """
+    
+    fname = dcts.get_path() + 'misc_data\\cache\\' + ('caribic_Bin3D_df.pkl' 
+                                                      if fname is None else fname)
+
+    if action == 'pickle' and pickle_obj is not None: 
+        with open(fname, 'wb') as f: 
+            dill.dump(pickle_obj.Bin3D_df, f)
+        return pickle_obj.Bin3D_df
+    elif action == 'load': 
+        with open(fname, 'rb') as f: 
+            output = dill.load(f)
+        
+        # reload LognormFit instances
+        for tp_dict in output['strato_Bin3D_dict']: 
+            for k,v in tp_dict.items(): 
+                v.calc_lognorm_fits(50) 
+        for tp_dict in output['tropo_Bin3D_dict']: 
+            for k,v in tp_dict.items(): 
+                v.calc_lognorm_fits(50)
+
+    return output
+
 # %% Plotting tools
 def add_zero_line(ax, axis='y'):
     """ Highlight the gridline at 0 for the chosen axis on the given Axes object.
@@ -637,6 +667,10 @@ def add_zero_line(ax, axis='y'):
         xlims = ax.get_xlim()
         ax.hlines(0, *xlims)
         ax.set_xlim(*xlims)
+
+def world(fname = \
+    'c:/Users/sophie_bauchinger/Documents/GitHub/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 
+    return geopandas.read_file(fname)
 
 def add_world(axs, fname = \
     'c:/Users/sophie_bauchinger/Documents/GitHub/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 

@@ -4,7 +4,6 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun 11 17:35:00 2024
 """
-
 import dill
 import geopandas
 import keyring
@@ -17,10 +16,9 @@ import xarray as xr
 from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
+from dataTools.data._global import GlobalData
 import dataTools.dictionaries as dcts
 from dataTools import tools
-
-from dataTools.data._global import GlobalData
 
 # HALO and ATOM campaigns from SQL Database
 class CampaignData(GlobalData):
@@ -268,9 +266,9 @@ class CampaignData(GlobalData):
     def create_df(self) -> pd.DataFrame:
         """ Combine available data into single dataframe, interpolate ERA5 data. """
 
-        data = self.df if 'df' in self.data else self.merge_instr_data()
+        df = self.df if 'df' in self.data else self.merge_instr_data()
         met_data = self.data['met_data'] if 'met_data' in self.data else self.get_met_data()
-        times = self.data['time'].values
+        times = self.data['time'].values if 'time' in self.data else df.index
 
         try:
             interpolated_met_data = tools.interpolate_onto_timestamps(met_data, times, 'int_')
@@ -280,11 +278,11 @@ class CampaignData(GlobalData):
 
         # Drop non-int columns
         int_cols = [c[4:] for c in interpolated_met_data.columns if (
-            c.startswith('int_') and c[4:] in data.columns)]
-        data.drop(columns = int_cols, inplace=True)
+            c.startswith('int_') and c[4:] in df.columns)]
+        df.drop(columns = int_cols, inplace=True)
         
         # met_data = self.get_met_data()
-        df = data.join(interpolated_met_data, rsuffix='_dupe')
+        df = df.join(interpolated_met_data, rsuffix='_dupe')
         df.drop(columns = [c for c in df.columns if '_dupe' in c], inplace=True)
 
         self.data['df'] = df

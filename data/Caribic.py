@@ -6,8 +6,6 @@
 """
 import dill
 import geopandas
-from metpy import calc
-from metpy.units import units
 import numpy as np
 import os
 import pandas as pd
@@ -17,10 +15,9 @@ import traceback
 from toolpac.readwrite import find # type: ignore
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
+from dataTools.data._global import GlobalData
 import dataTools.dictionaries as dcts
 from dataTools import tools
-
-from dataTools.data._global import GlobalData
 
 # Caribic
 class Caribic(GlobalData):
@@ -148,6 +145,12 @@ class Caribic(GlobalData):
                             gdf_pfx[col] = np.nan
                         gdf_pfx[col] = gdf_pfx[col].combine_first(gdf_pfx[col.lower()])
                         gdf_pfx.drop(columns=col.lower(), inplace=True)
+
+            elif pfx == 'MS': 
+                MS_cols = ['CO', 'CO2', 'CH4', 'CH4_Err']
+                MS_col_dict = {c:'MS_'+c for c in MS_cols}
+                gdf_pfx.rename(columns = MS_col_dict, inplace=True)
+
             # In Integrated data, drop Acetone and Acetonitrile columns
             columns_ac_an = ['int_acetone', 'int_acetonitrile',
                             'int_CARIBIC2_Ac', 'int_CARIBIC2_AN', 
@@ -247,39 +250,6 @@ class Caribic(GlobalData):
 
         self.data['met_data'] = df[columns]
         return self.data['met_data']
-
-    def create_tp_coords(self) -> pd.DataFrame:
-        """ Add calculated relative / absolute tropopause values to .met_data """
-        df = self.met_data.copy()
-        new_coords = dcts.get_coordinates(**{'ID': 'calc', 'source': 'Caribic'})
-        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'calc', 'source': 'CLAMS'})
-        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'CLAMS'})
-        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'Caribic'})
-
-        for coord in new_coords:
-            # met = tp + rel -> MET - MINUS for either one
-            met_col = coord.var1
-            met_coord = dcts.get_coord(col_name = met_col)
-            minus_col = coord.var2
-
-            if met_col in df.columns and minus_col in df.columns:
-                df[coord.col_name] = df[met_col] - df[minus_col]
-
-            elif met_coord.var == 'geopot' and met_col in df.columns:
-                met_data = df[met_col].values * units(met_coord.unit)
-                height_m = calc.geopotential_to_height(met_data)
-                height_km = height_m * 1e-3
-
-                if coord.unit == 'm': 
-                    df[coord.col_name] = height_m
-                elif coord.unit == 'km': 
-                    df[coord.col_name] = height_km
-
-            else:
-                print(f'Could not generate {coord.col_name} as precursors are not available')
-
-        self.data['met_data'] = df
-        return df
 
     def create_df(self) -> pd.DataFrame:
         df = self.met_data.copy() # CLAMS data should be included here already

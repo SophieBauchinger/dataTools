@@ -176,15 +176,14 @@ class GlobalDataPlotterMixin:
             break
 
     def plot_binned_2d(self, bin_attr='vmean', hide_lats=False, substances=None,
-                       
-                    projection='moll'): 
+                       projection='moll'): 
         """ 2D plot of binned substance data for all years at once. """
         data = self.df
         substances = self.substances if substances is None else substances
 
         for subs in (substances if not bin_attr=='vcount' else [dcts.get_subs(col_name='N2O')]): 
             fig, ax = plt.subplots(dpi=300, figsize=(9, 3.5))
-            self.world.boundary.plot(ax=ax, color='black', linewidth=0.3)
+            tools.world().boundary.plot(ax=ax, color='black', linewidth=0.3)
             
             ax.set_title(subs.label() if bin_attr != 'vcount' \
                          else 'Distribution of greenhouse gas flask measurements')
@@ -381,10 +380,13 @@ class GlobalDataPlotterMixin:
         
         plt.show()
 
-    def make_3d_scatter(self, vcoord, color_var): 
+    def make_3d_scatter(self, vcoord, color_var, eql=False, **plot_kwargs): 
         """ Plot the given substance on a 3D plot of lon-lat-vcoord. """
+               
         z_name = vcoord.col_name 
         c_name = color_var.col_name
+        
+        df = self.df.dropna(subset = [c_name])
         
         c_label = '$' + ''.join([i for i in color_var.label() if i != '$'])  +'$'
         z_label = '$' + ''.join([i for i in vcoord.label() if i != '$']) + '$'
@@ -398,31 +400,37 @@ class GlobalDataPlotterMixin:
             z_name : z_label,
             c_name : c_label,
             }
+        print(labels)
 
-        fig = px.scatter_3d(self.df, 
-                            x=self.df.geometry.x,
-                            y=self.df.geometry.y,
+        y = df.geometry.y
+        x = df.geometry.x
+        if eql:
+            [eql_coord] = self.get_coords(hcoord = 'eql')
+            x = df[eql_coord.col_name]
+            
+        fig = px.scatter_3d(df, x=x, y=y,
                             z=z_name,
                             color = c_name,
-                            labels = labels,
+                            # labels = labels,
+                            **plot_kwargs,
                             )
         fig.update_traces(marker_size=2.5)
 
-        # Add the world outline  
+        # Add the world outline
         map_traces = []
-        for _, row in self.world.iterrows():
+        for _, row in tools.world().iterrows():
             if row.geometry.geom_type == 'Polygon':
                 x, y = row.geometry.exterior.xy
                 x = np.array(x)
                 y = np.array(y) 
-                z = [self.df[vcoord.col_name].min()] * len(x)
+                z = [df[vcoord.col_name].min()] * len(x)
                 map_traces.append(go.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color='black', width=1)))
             elif row.geometry.geom_type == 'MultiPolygon':
                 for poly in row.geometry.geoms:
                     x,y = poly.exterior.xy
                     x = np.array(x)
                     y = np.array(y)
-                    z = [self.df[vcoord.col_name].min()] * len(x)
+                    z = [df[vcoord.col_name].min()] * len(x)
                     map_traces.append(go.Scatter3d(x=x, y=y, z=z, mode='lines', line=dict(color='black', width=1)))
 
         for trace in map_traces:
@@ -436,6 +444,8 @@ class GlobalDataPlotterMixin:
         fig.update_layout(showlegend=False) 
         # fig.show()
         return fig
+
+    # def timeseries_over_vcoord
 
 # Mozart
 def lonlat_1d(mzt_obj, subs='sf6',

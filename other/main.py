@@ -11,7 +11,7 @@ from  dataTools.data.Caribic import Caribic
 from  dataTools.data.CampaignData import CampaignData
 from  dataTools.data.EMAC import EMAC
 from  dataTools.data.Mozart import Mozart
-from  dataTools.data._local import MaunaLoa, MaceHead
+from  dataTools.data.local import MaunaLoa, MaceHead
 
 import dataTools.dictionaries as dcts
 from dataTools import tools

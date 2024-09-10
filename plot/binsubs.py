@@ -1174,6 +1174,15 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
                      )
         plt.show()
 
+    def seasonal_fit_comp_2d(self, subs, zcoord, eql, bin_attr = 'vstdv'): 
+        """ Kinda the same as make_lognorm_fit_comparison but without longitude binning - but with seasonality. """
+        raise NotImplementedError('Currently still developing')
+
+        # for s in set(self.df['season']): 
+
+        #TODO need to get the bin2d_dict infrastructure going 
+        #TODO need to figure out how to best represent the seasonal results
+
 class BinPlotter3DMixin(BinPlotterBaseMixin): 
     """ Three-dimensional binning & plotting. 
     
@@ -1279,14 +1288,15 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         
         return strato_attr_dict, tropo_attr_dict
 
-    def get_lognorm_stats_df(self, Bin3D_dict: dict, lognorm_attr: str, prec:int = 1) -> pd.DataFrame: 
+    def get_lognorm_stats_df(self, Bin3D_dict: dict, lognorm_attr: str, prec:int = 1, use_percentage = False) -> pd.DataFrame: 
         """ Create combined lognorm-fit statistics dataframe for all tps. 
+        Relative standard deviations are multiplied by 100 to return percentages instead of fractions. 
         
         Parameters: 
             Bin3D_dict (dict[tools.Bin3DFitted]): Binned data incl. lognorm fits
             lognorm_attr (str): vmean_fit / vsdtv_fit / rvstd_fit
         """
-        if not 'rvstd' in lognorm_attr: 
+        if not 'rvstd' in lognorm_attr and not use_percentage: 
             return pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec) for k,v in Bin3D_dict.items()})
 
         # else: need to multiple by 100 to get percentage 
@@ -1424,7 +1434,119 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         fig_t.suptitle(f'Tropospheric 3D-binned distribution in {zcoord.label(coord_only=True)}')
         for ax in axs_t.flatten(): 
             ax.set_ylabel(subs.label(bin_attr=bin_attr))
-          
+ 
+    def improved_fancy_histogram_plots_nested(self, subs, bin_attr='vstdv', 
+                                     xscale = 'linear', show_stats = True, fig_kwargs = {}): 
+        """ Comparison plot for tropopause definition substance histograms + lognorm fit. 
+
+        Parameters: 
+            subs (dcts.Substance): 
+                Substance to be evaluated
+            zcoord (dcts.Coordinate): 
+                Vertical coordinate to use for binning
+
+            eql (bool): Default False
+                Use equivalent latitude instead of latitude. 
+            bin_attr (str): Default 'vsdtv'
+                Which bin-box quantity to plot. 
+            tropo_3d_dict (dict[np.ndarray]): Default None
+                Precalculated tropospheric data per tropopause. 
+            strato_3d_dict (dct[np.ndarray]): Default None
+                Precalculated stratospheric data per tropopause. 
+            xscale (str): Default 'linear' 
+                x-axis scaling (e.g. linear/log/symlog). 
+                
+            key show_stats (bool): 
+                Adds mode and sigma values to the plot. 
+        """
+   
+        [s_zcoord] = self.get_coords(vcoord = 'pt', model = 'ERA5', tp_def = 'nan')
+        [t_zcoord] = self.get_coords(vcoord = 'z', model = 'ERA5', tp_def = 'nan', var='nan')
+   
+        # Get the 3D binned data
+        strato_3d_dict, _ = self.get_data_3d_dicts(subs, s_zcoord, eql = True, bin_attr = bin_attr)
+        _, tropo_3d_dict = self.get_data_3d_dicts(subs, t_zcoord, eql = False, bin_attr = bin_attr)
+        
+        # Create the figure 
+        fig, main_axes, sub_ax_arr = self._nested_subplots_two_column_axs(self.tps, **fig_kwargs)
+        self._adjust_labels_ticks(sub_ax_arr)
+        
+        gs = main_axes.flat[0].get_gridspec()
+        gs.update(wspace = 0.3)
+
+        tropo_axs = sub_ax_arr[:,:,0].flat
+        strato_axs = sub_ax_arr[:,:,-1].flat
+
+        # Set axis titles and labels """
+        pad = 12 if show_stats else 5
+        
+        for ax in sub_ax_arr[0,:,0].flat: # Top row inner left
+            ax.set_title('Troposphere', style = 'oblique', pad = pad)
+        for ax in sub_ax_arr[0,:,-1].flat: # Top row inner right
+            ax.set_title('Stratosphere', style = 'oblique', pad = pad)
+
+        for ax in sub_ax_arr.flat: 
+            # All subplots
+            ax.set_xlabel('Frequency [#]')
+            ax.set_ylabel(subs.label(bin_attr=bin_attr), fontsize = 8)
+            ax.grid(
+                # axis='x', 
+                ls ='dotted', lw = 1, color='grey', zorder=0)
+            ax.set_xscale(xscale)
+            
+        # Add histograms and lognorm fits
+        for axes, data_3d_dict in zip([tropo_axs, strato_axs],
+                                      [tropo_3d_dict, strato_3d_dict]):     
+            bin_lim_min, bin_lim_max = np.nan, np.nan
+            for data3d in data_3d_dict.values(): 
+                bin_lim_min = np.nanmin([bin_lim_min] + list(data3d.flatten()))
+                bin_lim_max = np.nanmax([bin_lim_max] + list(data3d.flatten()))
+
+            for ax, tp_col in zip(axes,
+                                    data_3d_dict): 
+                data3d = data_3d_dict[tp_col]
+                data_flat = data3d.flatten()
+                
+                # Adding the histograms to the figure
+                lognorm_inst = self._hist_lognorm_fitted(
+                    data_flat, (bin_lim_min, bin_lim_max), ax, dcts.get_coord(tp_col).get_color(),
+                    hist_kwargs = dict(range = (bin_lim_min, bin_lim_max)))
+                
+                # Show values of mode and sigma
+                if show_stats:
+                    ax.text(x = 0, y = 1.015, 
+                        s = 'Mode = {:.1f} / $\sigma$ = {:.2f}'.format(
+                        lognorm_inst.mode,
+                        lognorm_inst.sigma),
+                        fontsize = 6,
+                        transform = ax.transAxes,
+                        style = 'italic'
+                        )
+
+        # Set xlims to maximum xlim for each subplot in tropos / stratos
+        tropo_xmax = max([max(ax.get_xlim()) for ax in sub_ax_arr[:,:,0].flat])
+        for ax in sub_ax_arr[:,:,0].flat: 
+            ax.set_xlim(0 if xscale == 'linear' else 0.7, tropo_xmax)
+
+        strato_xmax = max([max(ax.get_xlim()) for ax in sub_ax_arr[:,:,-1].flat])
+        for ax in sub_ax_arr[:,:,-1].flat: 
+            ax.set_xlim(0 if xscale == 'linear' else 0.7, strato_xmax)
+
+        if bin_attr == 'rvstd': 
+            # Equal y-limits for tropo / strato
+            max_y = max([max(ax.get_ylim()) for ax in sub_ax_arr.flat])
+            for ax in sub_ax_arr.flat: 
+                ax.set_ylim(0, max_y)
+            
+
+        # Add tropopause definition text boxes and invert tropo x-axis
+        for ax, tp_col in zip(sub_ax_arr[:,:,0].flat, tropo_3d_dict):
+            ax.invert_xaxis()
+            tp_title = dcts.get_coord(tp_col).label(filter_label=True).split("(")[0] # shorthand of tp label
+            ax.text(**dcts.note_dict(ax, s = tp_title, x = 0.1, y = 0.85))
+        
+        return fig, main_axes, sub_ax_arr # strato_3d_dict, tropo_3d_dict
+
     def fancy_histogram_plots_nested(self, subs, zcoord, eql=False, bin_attr='vstdv', 
                                      xscale = 'linear', show_stats = True, fig_kwargs = {}): 
         """ Comparison plot for tropopause definition substance histograms + lognorm fit. 
@@ -1532,6 +1654,79 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
             ax.text(**dcts.note_dict(ax, s = tp_title, x = 0.1, y = 0.85))
         
         return fig, main_axes, sub_ax_arr # strato_3d_dict, tropo_3d_dict
+
+    def improved_coords_lognorm_fit_comparison(self, subs, bin_attr = 'vstdv', **kwargs): 
+        """ 
+        Compare characteristic quantities for lognorm fits of strato/tropo data between tps.
+        BUT: Using theta / eqlat for the stratosphere but alt / lat for the troposphere. 
+        """
+
+        [s_zcoord] = self.get_coords(vcoord = 'pt', model = 'ERA5', tp_def = 'nan')
+        strato_BinDict,_ = self.get_Bin3D_dict(subs, s_zcoord, eql = True, **kwargs)
+   
+        [t_zcoord] = self.get_coords(vcoord = 'z', model = 'ERA5', tp_def = 'nan', var='nan')
+        _, tropo_BinDict = self.get_Bin3D_dict(subs, t_zcoord, eql = False, **kwargs)
+   
+        strato_stats = self.get_lognorm_stats_df(strato_BinDict, 
+                                                 f'{bin_attr}_fit', 
+                                                 prec = kwargs.get('prec', 1), 
+                                                 use_percentage = subs.detr)
+        tropo_stats = self.get_lognorm_stats_df(tropo_BinDict, 
+                                                f'{bin_attr}_fit', 
+                                                prec = kwargs.get('prec', 1),
+                                                use_percentage = subs.detr)
+        
+        fig, axs = plt.subplots(1,2, figsize = (6,3.5), sharey = True, dpi = 250)
+
+        axs[0].set_title('Troposphere',  size = 10, pad = 3)
+        axs[1].set_title('Stratosphere', size = 10, pad = 3)
+
+        marker_kw = dict(color = 'k')
+
+        for df, ax in zip([tropo_stats, strato_stats], axs):
+            ax.grid(axis='x', ls = 'dashed')
+            for i, tp_col in enumerate(df.columns): 
+                tp = dcts.get_coord(tp_col)
+                y = tp.label(filter_label = True).split('(')[0]
+
+                # Lines
+                line_kw = dict(color = tp.get_color(), lw = 10)
+                ax.fill_betweenx([y]*2, *df[tp_col].int_68, **line_kw, alpha = 0.8)
+                ax.fill_betweenx([y]*2, *df[tp_col].int_95, **line_kw, alpha = 0.5)
+
+                # Mode marker
+                kw_mode = dict(alpha = 1, zorder = 9, marker = 'o')
+                ax.scatter(df[tp_col].Mode, y, **kw_mode, **marker_kw)
+            
+                # Numeric value of mode
+                ax.annotate(
+                    text = f'{df[tp_col].Mode}', size = 9, 
+                    xy = (df[tp_col].Mode, y),
+                    xytext = (df[tp_col].Mode, i+0.35),
+                    ha = 'center', va = 'center', 
+                    fontweight = 'medium',
+                    )
+
+        # axs[0].invert_yaxis()
+        axs[0].set_ylim(-0.5, len(df.columns)- 0.25)
+        axs[0].tick_params(labelleft=True, left=False)
+        axs[1].tick_params(left=False)
+
+        h_Mode = mlines.Line2D([], [], ls = 'None', **kw_mode, **marker_kw)
+        h_68 = Patch(color = 'grey', alpha = 0.8)
+        h_95 = Patch(color = 'grey', alpha = 0.5)
+
+        l = ['Mode', '68$\,$% Interval', '95$\,$% Interval']
+        h = [h_Mode, h_68, h_95]
+
+        fig.tight_layout()
+        fig.subplots_adjust(bottom = 0.2, top = 0.85)
+        if not subs.detr: 
+           fig.suptitle('Distribution of ' + subs.label(bin_attr=bin_attr))
+        else:
+           fig.suptitle('Distribution of ' + subs.label(bin_attr=bin_attr).split('[')[0] + '[%]')
+            
+        fig.legend(h, l, loc = 'lower center', ncols = len(h))
 
     def make_lognorm_fit_comparison(self, subs, zcoord, bin_attr = 'vstdv', eql=False, **kwargs): 
         """ Compare characteristic quantities for lognorm fits of strato/tropo data between tps. """
@@ -1773,6 +1968,9 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
 
     def stratosphere_map(self, subs, tp, bin_attr, **kwargs): 
         """ Plot (first two ?) stratospheric bins on a lon-lat binned map. """
+        
+        raise NotImplementedError('sel_LMS works, calling bin_3d needs to be updated, ...')
+        
         df = self.sel_strato(**tp.__dict__).df
         # df = self.sel_tropo(**tp.__dict__).df
         
@@ -1794,9 +1992,8 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         xbsize = self._get_bsize(xcoord, 'x')
         ybsize = self._get_bsize(ycoord, 'y')
         zbsize = self._get_bsize(tp)
-
         
-        bin_equi3d = bp.Bin_equi2d(-180, 180, xbsize, 
+        bin_equi3d = bp.Bin_equi3d(-180, 180, xbsize, 
                                    -90, 90, ybsize, 
                                    0, zbsize*2, zbsize)
         
@@ -1808,12 +2005,12 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
 
         # ---------------------------------------------------------------------
 
-        out = self.bin_3d(subs, xcoord, ycoord, tp, bin_equi3d, df=df)         
+        out = self.bin_3d(subs, xcoord, ycoord, tp, bin_equi3d, df=df)
         data = getattr(out, bin_attr)
 
         img = ax.imshow(data.T, origin='lower',
                         cmap=dcts.dict_colors()[bin_attr], norm=norm,
-                        extent=[bin_equi3d.xbmin, bin_equi3d.xbmax, 
+                        extent=[bin_equi3d.xbmin, bin_equi3d.xbmax,
                                 bin_equi3d.ybmin, bin_equi3d.ybmax])
         # cbar = 
         plt.colorbar(img, ax=ax, pad=0.1, orientation='horizontal') # colorbar

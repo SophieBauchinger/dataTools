@@ -10,11 +10,10 @@ class CaribicTropopause(Caribic, TropopausePlotter)
  ->> can create ..TP classes for all GlobalData subclasses 
 
 """
-# %matplotlib inline
-import geopandas
 import math
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize, LogNorm
+from matplotlib.cm import ScalarMappable
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
 import matplotlib.patheffects as mpe
@@ -479,6 +478,7 @@ class TropopausePlotterMixin:
 
         ratios = tropo_counts.loc['ratios']
         tropo_counts.drop(index='ratios', inplace=True)
+        tropo_counts.index = tropo_counts.index.astype(bool)
         n_values = [tropo_counts[i].loc[True] + tropo_counts[i].loc[False] 
                     for i in tropo_counts.columns]
 
@@ -498,7 +498,7 @@ class TropopausePlotterMixin:
         ax.set_axisbelow(True)
 
         for tp in tps:
-            color = dcts.dict_tps()[f'color_{tp.tp_def}']
+            color = tp.get_color()
             ratio = ratios[tp.col_name]
             n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
             label = tp.label(True)
@@ -566,7 +566,7 @@ class TropopausePlotterMixin:
                         bbox_to_anchor=[0.5, 0.94])
             plt.show()
 
-    def timeseries_subs_STsorted(self, subs, tps = None, **kwargs):
+    def timeseries_subs_STsorted(self, subs, tps = None):
         """ Plot timeseries of datapoints sorted into stratophere / troposphere for given tps
 
         Args:
@@ -589,12 +589,11 @@ class TropopausePlotterMixin:
         fig.suptitle(subs.label())
 
         for tp, ax in zip(tps, axs.flatten()):
-            self._ax_timeseries_subs_STsorted(ax=ax, subs=subs, tp=tp, **kwargs) 
+            self._ax_timeseries_subs_STsorted(ax=ax, subs=subs, tp=tp) 
 
         if tp.vcoord=='p': 
             ax.invert_yaxis()
-        if kwargs.get('xdate'): 
-            fig.autofmt_xdate()
+        fig.autofmt_xdate()
         fig.tight_layout()
         fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
         lines, labels = axs.flatten()[0].get_legend_handles_labels()
@@ -602,7 +601,84 @@ class TropopausePlotterMixin:
                     bbox_to_anchor=[0.5, 0.94])
         plt.show()
 
-    def _ax_timeseries_subs_STsorted(self, ax, subs, tp, **kwargs): 
+    def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis,  **kwargs): 
+        """ Plot x over y data with coloring based on substance mixing ratios indicating S/T sorting per tp. 
+        
+        Parameters: 
+            x_axis (dcts.Coordinate or dcts.Substance)
+            y_axis (dcts.Coordinate or dcts.Substance)
+            c_axis (dcts.Substance): Values used to colour the datapoints according to mixing ratio 
+        
+        """
+        tps = kwargs.get('tps', self.tps)
+        
+        vlims = kwargs.get('vlims')# kwargs.get('vlims', c_axis.vlims())
+        norm = Normalize(*vlims)#np.nanmin(df[o3_subs.col_name]), np.nanmax(df[o3_subs.col_name]))
+        cmap = plt.cm.viridis_r
+
+        fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=200,
+                                figsize=(7, math.ceil(len(tps)/2)*2),
+                                sharey=True, sharex=True)
+        if len(tps)%2: axs.flatten()[-1].axis('off')
+        # fig.suptitle(c_axis.label())
+
+        for tp, ax in zip(tps, axs.flatten()):
+            tp_tropo = self.df[self.df_sorted['tropo_'+tp.col_name] == True].copy()
+            tp_strato = self.df[self.df_sorted['strato_'+tp.col_name] == True].copy()
+            
+            tp_tropo.dropna(subset = [c_axis.col_name], inplace=True)
+            tp_strato.dropna(subset = [c_axis.col_name], inplace=True)
+            
+            c_tropo = cmap(norm(tp_tropo[c_axis.col_name]))
+            c_strato = cmap(norm(tp_strato[c_axis.col_name]))
+            
+            ax.set_title(tp.label(filter_label=True), fontsize=8)
+            ax.grid('both', ls = 'dashed', color = 'grey', lw = 0.5, zorder=0)
+
+            ax.scatter(tp_strato.index if x_axis == 'time' else tp_strato[x_axis.col_name], 
+                       tp_strato[y_axis.col_name],
+                       color=c_strato, zorder = 0, 
+                       )
+            ax.scatter(tp_strato.index if x_axis == 'time' else tp_strato[x_axis.col_name], 
+                       tp_strato[y_axis.col_name],
+                       color = 'r', marker = 'x', s = 1, 
+                       label = 'Stratosphere')
+
+            ax.scatter(tp_tropo.index if x_axis == 'time' else tp_tropo[x_axis.col_name], 
+                       tp_tropo[y_axis.col_name],
+                       color=c_tropo, 
+                       marker='o', zorder = 0,
+                       )
+            ax.scatter(tp_tropo.index if x_axis == 'time' else tp_tropo[x_axis.col_name], 
+                       tp_tropo[y_axis.col_name],
+                       color='k', marker='x', s = 1, 
+                       label='Troposphere')
+        
+        ax.set_ylabel(y_axis.label())
+        ax.set_xlabel('Time' if x_axis == 'time' else x_axis.label())
+
+        if tp.vcoord=='p': 
+            ax.invert_yaxis()
+        fig.autofmt_xdate()
+        fig.tight_layout()
+        fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150, 
+                            bottom = 0.15 + math.ceil(len(tps))/150)
+        
+        # fig.subplots_adjust(bottom = 0.2)
+        cax = fig.add_axes([0.1, 0, 0.8, 0.1])
+        cax.axis('off')
+        
+        fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), 
+                     ax = cax, fraction = 0.6, aspect = 30,  
+                     orientation = 'horizontal', 
+                     label = c_axis.label())
+        
+        lines, labels = axs.flatten()[0].get_legend_handles_labels()
+        fig.legend(lines, labels, loc='upper center', ncol=2,
+                    bbox_to_anchor=[0.5, 0.94])
+        plt.show()       
+
+    def _ax_timeseries_subs_STsorted(self, ax, subs, tp): 
         """ Plot timeseries of subs mixing ratios with strato / tropo colours. 
         Parameters: 
             subs(dcts.Substance)

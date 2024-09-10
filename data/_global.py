@@ -5,22 +5,20 @@
 @Date: Fri Apr 28 14:13:28 2023
 
 """
-
-# TODO ATOM flight & latitude selection
 from abc import abstractmethod
 import dill
 import pandas as pd
 import matplotlib.patheffects as mpe
+from metpy import calc
+from metpy.units import units
 import warnings
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
 
 from dataTools.data.mixin_selection import SelectionMixin
-from dataTools.data.mixin_binning import BinningMixin
-from dataTools.data.mixin_tropopause import TropopauseSorterMixin
-from dataTools.data.mixin_analysis import AnalysisMixin
-from dataTools.data.mixin_model_data import ModelDataMixin
+from dataTools.data.mixin_analysis import AnalysisMixin, BinningMixin, TropopauseSorterMixin 
+from dataTools.data.Model import ModelDataMixin
 
 # #!! TODO: fix the underlying problem in toolpac rather than just suppressing stuff
 # from pandas.errors import SettingWithCopyWarning
@@ -114,7 +112,7 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
             fname = fname + '.pkl'
         
         if not pdir: 
-            pdir = tools.get_path('\\misc_data\\pickled_dicts\\')
+            pdir = tools.get_path() + '\\misc_data\\pickled_dicts\\'
         
         with open(pdir + fname, 'wb') as f:
             dill.dump(self.data, f)
@@ -196,6 +194,42 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
         """ Set .tps (shorthand for tropopause coordinates) in accordance with tp_kwargs. """
         self.tps = self.get_tps(**tp_kwargs)
 
+# --- Calculate additional variables from existing information ---
+    def create_tp_coords(self) -> pd.DataFrame:
+        """ Add calculated relative / absolute tropopause values to .met_data """
+        df = self.met_data.copy()
+        new_coords = dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'Caribic'})
+        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'CLAMS'})
+        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'CLAMS'})
+        new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'Caribic'})
+
+        for coord in new_coords:
+            # met = tp + rel -> MET - MINUS for either one
+            met_col = coord.var1
+            met_coord = dcts.get_coord(col_name = met_col)
+            minus_col = coord.var2
+
+            if met_col in df.columns and minus_col in df.columns:
+                df[coord.col_name] = df[met_col] - df[minus_col]
+
+            elif met_coord.var == 'geopot' and met_col in df.columns:
+                met_data = df[met_col].values * units(met_coord.unit)
+                height_m = calc.geopotential_to_height(met_data)
+                height_km = height_m * 1e-3
+
+                if coord.unit == 'm': 
+                    df[coord.col_name] = height_m
+                elif coord.unit == 'km': 
+                    df[coord.col_name] = height_km
+
+            else:
+                print(f'Could not generate {coord.col_name} as precursors are not available')
+
+        self.data['met_data'] = df
+        if 'df' in self.data: 
+            self.create_df() # Recompile self.df with new TP coordinates
+        return df
+
 # --- Define additional attributes ---
     @property
     def flights(self):
@@ -265,35 +299,3 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
         out.data['ID_per_timestamp'] = combined_df.reset_index().set_index('DATETIME')['ID']
         return out
 
-
-class Era5ModelData(AnalysisMixin, ModelDataMixin): 
-    """ Holds ERA5 reanalysis / CLaMS model data as available from TPChange. """
-    def __init__(self, campaign, met_pdir=None, recalculate=False): 
-        """ Initialise object with imported reanalysis model data """
-        if not campaign=='CAR': 
-            years = dcts.years_per_campaign(campaign)
-        else: 
-            years = range(2005, 2021)
-            self.pfxs = []
-        self.years = years
-        
-        self.ID = campaign
-        source_dict = {
-            'SHTR' : 'HALO',
-            'WISE' : 'HALO',
-            'PGS'  : 'HALO',
-            'TACTS': 'HALO',
-            'ATOM' : 'ATOM',
-            'HIPPO': 'HIAPER', 
-            'CAR'  : 'Caribic'}
-        self.source = source_dict[campaign]
-
-        self.data = {}
-        met_data = self.get_clams_data(met_pdir, recalculate)
-        self.data['df'] = met_data
-        self.calc_coordinates()
-
-    @property
-    def df(self): 
-        return self.data['df']
-        

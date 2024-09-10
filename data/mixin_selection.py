@@ -283,7 +283,6 @@ class SelectionMixin:
 
         return out
 
-
 # --- Make selections based on strato / tropo characteristics --- 
     def sel_atm_layer(self, atm_layer: str, tp=None, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.

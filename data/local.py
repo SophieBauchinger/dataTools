@@ -74,6 +74,11 @@ class MaunaLoa(LocalData):
         if data_D: self.data_D = {}
         if not path_dir: path_dir = tools.get_path() + "misc_data\\reference_data"
         self.get_data(path_dir, data_D)
+        if self.df.empty: 
+            raise Warning(f'No data available for any of the given years: {self.years}')
+        # years = set([]); [years.update(self.data[subs].index.year) for subs in self.substances]
+        # self.years = years # update actually available years
+        self.years = set(self.df.index.year)
 
     def __repr__(self):
         return f'Mauna Loa - {self.substances}'
