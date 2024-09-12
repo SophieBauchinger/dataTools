@@ -13,16 +13,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import toolpac.calc.binprocessor as bp # type: ignore
-from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
-from toolpac.outliers import outliers # type: ignore
+import toolpac.calc.binprocessor as bp  # type: ignore
+from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy  # type: ignore
+from toolpac.outliers import outliers  # type: ignore
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
 from dataTools.data.local import MaunaLoa
 
-#%% Mixin for implementing data analysis 
-class AnalysisMixin: 
+
+# %% Mixin for implementing data analysis
+class AnalysisMixin:
     """ Mixin for GlobalData classes to allow further data manipulation, e.g. detrending and homogenisation. 
     
     Methods: 
@@ -37,46 +38,47 @@ class AnalysisMixin:
         filter_extreme_events(**kwargs)
             Filter for tropospheric data, then remove extreme events
     """
+
     # --- Helper for comparing datasets properly ---
     def get_shared_indices(self, tps=None, df=False):
         """ Make reference for shared indices of chosen tropopause definitions. """
-        if not 'df_sorted' in self.data:
+        if 'df_sorted' not in self.data:
             self.create_df_sorted()
-            
+
         data = self.df_sorted if not df else self.df
         prefix = 'tropo_' if not df else ''
-        
+
         tps = self.tps if tps is None else tps
-        
-        if self.source != 'MULTI': 
+
+        if self.source != 'MULTI':
             tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
             indices = data.dropna(subset=tropo_cols, how='any').index
 
-        else: 
+        else:
             # Cannot do this without mashing together all the n2o / o3 tropopauses!
             tps_non_chem = [tp for tp in tps if not tp.tp_def == 'chem']
             tropo_cols_non_chem = [prefix + tp.col_name for tp in tps_non_chem if prefix + tp.col_name in data]
-            indices_non_chem = data.dropna(subset=tropo_cols_non_chem, 
+            indices_non_chem = data.dropna(subset=tropo_cols_non_chem,
                                            how='any').index
             # Combine N2O tropopauses. (ignore Caribic O3 tropopause bc only one source)
             tps_n2o = [tp for tp in tps if tp.crit == 'n2o']
             tropo_cols_n2o = [prefix + tp.col_name for tp in tps_n2o if prefix + tp.col_name in data]
             n2o_indices = data.dropna(subset=tropo_cols_n2o,
                                       how='all').index
-            
+
             print('Getting shared indices using\nN2O measurements: {} and dropping O3 TPs: {}'.format(
-                [str(tp)+'\n' for tp in tps_non_chem], 
+                [str(tp) + '\n' for tp in tps_non_chem],
                 [tp for tp in tps if tp not in tps_n2o + tps_non_chem]))
-            
+
             indices = indices_non_chem[[i in n2o_indices for i in indices_non_chem]]
-            
+
             # indices = [i for i in indices_non_chem if i in n2o_indices]
-        
+
         return indices
 
-    def remove_non_shared_indices(self, inplace = True, **kwargs): # filter_non_shared_indices
+    def remove_non_shared_indices(self, inplace=True, **kwargs):  # filter_non_shared_indices
         """ Returns a class instances with all non-shared indices of the given tps filtered out. """
-        tps = (self.tps if 'tps' not in kwargs else kwargs.get('tps'))
+        tps = kwargs.get('tps', self.tps)
         shared_indices = self.get_shared_indices(tps)
 
         out = type(self).__new__(self.__class__)  # new class instance
@@ -90,14 +92,13 @@ class AnalysisMixin:
             out.data[k] = self.data[k][self.data[k].index.isin(shared_indices)]
 
         out.status['shared_i_coords'] = tps
-        
-        if inplace: 
+
+        if inplace:
             self.data = out.data
-        
+
         return out
 
-    def detrend_substance(self, subs, loc_obj=None, save=True, plot=False, note='', 
-                          **kwargs) -> tuple[pd.DataFrame, np.ndarray]:
+    def detrend_substance(self, subs, **kwargs) -> tuple[pd.DataFrame, np.ndarray]:
         """
         Remove multi-year linear trend from substance wrt. free troposphere measurements from main dataframe.
 
@@ -106,18 +107,16 @@ class AnalysisMixin:
         Parameters:
             subs (Substance): Substance to detrend
 
-            loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa. Optional
-            save (bool): adds detrended values to main dataframe. Optional
-            plot (bool): show original, detrended and reference data. Optional
-            note (str): add note to plot. Optional
+            key loc_obj (LocalData): free troposphere data, defaults to Mauna_Loa. Optional
+            key save (bool): adds detrended values to main dataframe. Optional, default True
+            key plot (bool): show original, detrended and reference data. Optional
+            key note (str): add note to plot. Optional
             
             Returns the polyfit trend parameters as array. 
         """
         # Prepare reference data
-        if loc_obj is None:
-            loc_obj = MaunaLoa(substances=[subs.short_name],
-                               years=range(2005, max(self.years) + 2))
-
+        loc_obj = kwargs.get('loc_obj', MaunaLoa(substances=[subs.short_name],
+                                                 years=range(2005, max(self.years) + 2)))
         ref_df = loc_obj.df
         ref_subs = dcts.get_subs(substance=subs.short_name, ID=loc_obj.ID)
         ref_df.dropna(how='any', subset=ref_subs.col_name, inplace=True)  # remove NaN rows
@@ -138,40 +137,38 @@ class AnalysisMixin:
 
         # convert data units to reference data units if they don't match
         if str(subs.unit) != str(ref_subs.unit):
-            if kwargs.get('verbose'): 
+            if kwargs.get('verbose'):
                 print(f'Units do not match : {subs.unit} vs {ref_subs.unit}')
 
             if subs.unit == 'mol mol-1':
                 c_obs = tools.conv_molarity_PartsPer(c_obs, ref_subs.unit)
             elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
                 pass
-            else: 
+            else:
                 raise NotImplementedError(f'Units do not match: \
                                           {subs.unit} vs {ref_subs.unit} \n\
                                               Solution not yet available. ')
 
-        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs)) 
+        detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
         c_obs_detr = c_obs - detrend_correction
 
         # get variance (?) by subtracting offset from 0
         c_obs_delta = c_obs_detr - c_fit(min(t_obs))
 
-        df_detr = pd.DataFrame({f'DATA_{subs.col_name}'   : c_obs,
-                                f'DETRtmin_{subs.col_name}'   : c_obs_detr,
-                                f'delta_{subs.col_name}'  : c_obs_delta,
-                                f'detrFit_{subs.col_name}': c_fit(t_obs), 
-                                f'detr_{subs.col_name}' : c_obs / c_fit(t_obs)},
+        df_detr = pd.DataFrame({f'DATA_{subs.col_name}'    : c_obs,
+                                f'DETRtmin_{subs.col_name}': c_obs_detr,
+                                f'delta_{subs.col_name}'   : c_obs_delta,
+                                f'detrFit_{subs.col_name}' : c_fit(t_obs),
+                                f'detr_{subs.col_name}'    : c_obs / c_fit(t_obs)},
                                index=df.index)
 
         # maintain relationship between detr and fit columns
         df_detr[f'detrFit_{subs.col_name}'] = df_detr[f'detrFit_{subs.col_name}'].where(
             ~df_detr[f'detr_{subs.col_name}'].isnull(), np.nan)
-            
-
-        if save:
+        if kwargs.get('save', True):
             self.df[f'detr_{subs.col_name}'] = df_detr[f'detr_{subs.col_name}']
-            
-        if plot:
+
+        if kwargs.get('plot'):
             fig, ax = plt.subplots(dpi=150, figsize=(6, 4))
 
             ax.scatter(df_detr.index, df_detr['DATA_' + subs.col_name], label='Flight data',
@@ -188,8 +185,8 @@ class AnalysisMixin:
 
             ax.set_ylabel(subs.label())  # ; ax.set_xlabel('Time')
             # if not self.source=='Caribic': ax.set_ylabel(f'{subs.col_name} [{ref_subs.unit}]')
-            if note != '':
-                leg = ax.legend(title=note)
+            if 'note' in kwargs:
+                leg = ax.legend(title=kwargs.get('note'))
                 leg._legend_box.align = "left"
             else:
                 ax.legend()
@@ -198,14 +195,14 @@ class AnalysisMixin:
 
     def detrend_all(self, verbose=False):
         """ Add detrended data wherever possible for all available substances. """
-        ref_substances = set(s.short_name for s in dcts.get_substances(ID='MLO') 
-                                   if not s.short_name.startswith('d_'))
+        ref_substances = set(s.short_name for s in dcts.get_substances(ID='MLO')
+                             if not s.short_name.startswith('d_'))
         substances = [s for s in self.substances if s.short_name in ref_substances]
         for subs in substances:
             if verbose: print(f'Detrending {subs}. ')
             self.detrend_substance(subs, save=True)
 
-# --- Calculate standard deviation statistics ---
+    # --- Calculate standard deviation statistics ---
     def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
         """ Calculate overall variability of stratospheric and tropospheric air (not binned). 
         
@@ -222,7 +219,7 @@ class AnalysisMixin:
         tps = self.tps if not tps else tps
         shared_indices = self.get_shared_indices(tps)
         shared_df = self.df_sorted[self.df_sorted.index.isin(shared_indices)]
-        
+
         stdv_df = pd.DataFrame(columns=['tropo_stdv', 'strato_stdv',
                                         'tropo_mean', 'strato_mean',
                                         'rel_tropo_stdv', 'rel_strato_stdv'],
@@ -245,30 +242,29 @@ class AnalysisMixin:
 
             stdv_df.loc[tp.col_name, 'rel_tropo_stdv'] = t_stdv / t_mean * 100
             stdv_df.loc[tp.col_name, 'rel_strato_stdv'] = s_stdv / s_mean * 100
-        
+
         if kwargs.get('seasonal'):
-            for s in set(self.df.season): 
+            for s in set(self.df.season):
                 data = subs_data[subs_data.season == s]
-                tp_df = shared_df[shared_df.index.isin(subs_data.index)]
                 for tp in tps:
                     t_stdv = data[shared_df['tropo_' + tp.col_name + f'_{s}']].std(skipna=True)
                     s_stdv = data[shared_df['strato_' + tp.col_name + f'_{s}']].std(skipna=True)
-    
+
                     t_mean = data[shared_df['tropo_' + tp.col_name + f'_{s}']].mean(skipna=True)
                     s_mean = data[shared_df['tropo_' + tp.col_name + f'_{s}']].mean(skipna=True)
-    
+
                     stdv_df.loc[tp.col_name + f'_{s}', 'tropo_stdv'] = t_stdv
                     stdv_df.loc[tp.col_name + f'_{s}', 'strato_stdv'] = s_stdv
-    
+
                     stdv_df.loc[tp.col_name + f'_{s}', 'tropo_mean'] = t_mean
                     stdv_df.loc[tp.col_name + f'_{s}', 'strato_mean'] = s_mean
-    
+
                     stdv_df.loc[tp.col_name + f'_{s}', 'rel_tropo_stdv'] = t_stdv / t_mean * 100
                     stdv_df.loc[tp.col_name + f'_{s}', 'rel_strato_stdv'] = s_stdv / s_mean * 100
 
         return stdv_df
 
-    def rms_seasonal_vstdv(self, subs, coord, **kwargs) -> pd.DataFrame: # binned and seasonal 
+    def rms_seasonal_vstdv(self, subs, coord, **kwargs) -> pd.DataFrame:  # binned and seasonal
         """ Root mean squared of seasonal variability in 1D bins for given substance and tp. 
         Args: 
             subs (dcts.Substance)
@@ -282,11 +278,11 @@ class AnalysisMixin:
         data_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
         seasons = list(data_dict.keys())
 
-        df = pd.DataFrame(index = data_dict[seasons[0]].xintm)
+        df = pd.DataFrame(index=data_dict[seasons[0]].xintm)
         df['rms_vstdv'] = np.nan
         df['rms_rvstd'] = np.nan
-        
-        for s in data_dict: 
+
+        for s in data_dict:
             df[f'vstdv_{s}'] = data_dict[s].vstdv
             df[f'rvstd_{s}'] = data_dict[s].rvstd
             df[f'vcount_{s}'] = data_dict[s].vcount
@@ -294,23 +290,23 @@ class AnalysisMixin:
         s_cols_vstd = [c for c in df.columns if c.startswith('vstdv')]
         s_cols_rvstd = [c for c in df.columns if c.startswith('rvstd')]
         n_cols = [c for c in df.columns if c.startswith('vcount')]
-        
-        # for each bin, calculate the root mean square of the season's standard deviations
-        for i in df.index: 
+
+        # for each bin, calculate the root-mean-square of the season's standard deviations
+        for i in df.index:
             n = df.loc[i][n_cols].values
             nom = sum(n) - len([i for i in n if i])
-            
+
             s_std = df.loc[i][s_cols_vstd].values
-            denom_std = np.nansum([( n[j]-1 ) * s_std[j]**2 for j in range(len(seasons))])
-            df.loc[i, 'rms_vstdv'] = np.sqrt(denom_std / nom) if not nom==0 else np.nan
-            
+            denom_std = np.nansum([(n[j] - 1) * s_std[j] ** 2 for j in range(len(seasons))])
+            df.loc[i, 'rms_vstdv'] = np.sqrt(denom_std / nom) if not nom == 0 else np.nan
+
             s_rstd = df.loc[i][s_cols_rvstd].values
-            denom_rstd = np.nansum([( n[j]-1 ) * s_rstd[j]**2 for j in range(len(seasons))])
-            df.loc[i, 'rms_rvstd'] = np.sqrt(denom_rstd / nom) if not nom==0 else np.nan
-        
+            denom_rstd = np.nansum([(n[j] - 1) * s_rstd[j] ** 2 for j in range(len(seasons))])
+            df.loc[i, 'rms_rvstd'] = np.sqrt(denom_rstd / nom) if not nom == 0 else np.nan
+
         return df
 
-# --- Filter for extreme events in tropospheric air ---
+    # --- Filter for extreme events in tropospheric air ---
     def filter_extreme_events(self, plot_ol=False, **tp_kwargs):
         """ Returns only tropospheric background data (filter out tropospheric extreme events)
         1. tp_kwargs are used to select tropospheric data only (if object is not already purely tropospheric)
@@ -380,7 +376,8 @@ class AnalysisMixin:
         out.status.update({'EE_filter': True})
         return out
 
-#%% Mixin for tropopause-related sorting and data manipulation
+
+# %% Mixin for tropopause-related sorting and data manipulation
 class TropopauseSorterMixin:
     """Filters for stratosphere / troposphere --- TropopauseSorterMixin 
     
@@ -406,9 +403,9 @@ class TropopauseSorterMixin:
         data = self.df
 
         # Choose N2O data to use (Substance object)
-        if 'coord' in kwargs: 
+        if 'coord' in kwargs:
             n2o_coord = kwargs.get('coord')
-        
+
         elif len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
             [n2o_coord] = [c for c in self.coordinates if c.crit == 'n2o']
 
@@ -423,7 +420,7 @@ class TropopauseSorterMixin:
                 raise Warning(f'Could not find {n2o_coord.col_name} in {self.ID} data.')
 
         # Get reference dataset
-        ref_years = np.arange(min(self.years)-2, max(self.years)+3)
+        ref_years = np.arange(min(self.years) - 2, max(self.years) + 3)
         loc_obj = MaunaLoa(ref_years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
         ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID)  # dcts.get_col_name(subs, loc_obj.source)
 
@@ -471,7 +468,7 @@ class TropopauseSorterMixin:
         fit_function = dcts.lookup_fit_function('n2o')
 
         ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
-                              flag=flag, verbose=False, plot=False, ctrl_plots=False, 
+                              flag=flag, verbose=False, plot=False, ctrl_plots=False,
                               limit=kwargs.get('ol_limit', 0.1), direction='n')
         # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
         df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
@@ -483,9 +480,9 @@ class TropopauseSorterMixin:
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
-# rename n2o_filter into n2o_baseline_filter
+    # rename n2o_filter into n2o_baseline_filter
 
-# create o3_baseline_filter
+    # create o3_baseline_filter
 
     def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
         """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
@@ -493,22 +490,22 @@ class TropopauseSorterMixin:
 
     def o3_filter_lt60(self) -> pd.DataFrame:
         """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
-        o3_substs = self.get_substs(short_name = 'o3') 
-        
-        if len(o3_substs) == 1: 
+        o3_substs = self.get_substs(short_name='o3')
+
+        if len(o3_substs) == 1:
             [o3_subs] = o3_substs
 
         elif self.source == 'Caribic':
-            if any(s.ID == 'INT' for s in o3_substs): 
-                [o3_subs] = [s for s in o3_substs if s.ID=='INT']
-            elif any(s.ID == 'MS' for s in o3_substs): 
-                [o3_subs] = [s for s in o3_substs if s.ID=='MS']
-            else: 
+            if any(s.ID == 'INT' for s in o3_substs):
+                [o3_subs] = [s for s in o3_substs if s.ID == 'INT']
+            elif any(s.ID == 'MS' for s in o3_substs):
+                [o3_subs] = [s for s in o3_substs if s.ID == 'MS']
+            else:
                 [o3_subs] = o3_substs[0]
                 print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
         else:
             raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
-        
+
         o3_sorted = pd.DataFrame(index=self.df.index)
         o3_sorted.loc[self.df[o3_subs.col_name].lt(60),
         (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
@@ -535,7 +532,7 @@ class TropopauseSorterMixin:
 
         # Get tropopause coordinates
         tps = self.get_tps()
-        
+
         # N2O filter
         for tp in [tp for tp in tps if tp.crit == 'n2o']:
             # if self.source == 'MULTI': break
@@ -564,20 +561,20 @@ class TropopauseSorterMixin:
             strato = 'strato_' + tp.col_name
 
             tp_sorted = pd.DataFrame({strato: pd.Series(np.nan, dtype=object),
-                                      tropo : pd.Series(np.nan, dtype=object)},
+                                      tropo: pd.Series(np.nan, dtype=object)},
                                      index=tp_df.index)
 
             # tropo: high p (gt 0), low everything else (lt 0)
             tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].lt(0),
-            (strato, tropo)] = (False, True)
+                (strato, tropo)] = (False, True)
 
             # strato: low p (lt 0), high everything else (gt 0)
             tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].gt(0),
-            (strato, tropo)] = (True, False)
-                
+                (strato, tropo)] = (True, False)
+
             # # add data for current tp def to df_sorted
             tp_sorted = tp_sorted.convert_dtypes()
-            
+
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
 
@@ -602,7 +599,7 @@ class TropopauseSorterMixin:
             self.create_df_sorted(save=True)
         return self.data['df_sorted']
 
-    def calc_tropo_strato_ratios(self, tps = None, ratios = True, shared_only = True) -> pd.DataFrame:
+    def calc_tropo_strato_ratios(self, tps=None, ratios=True, shared_only=True) -> pd.DataFrame:
         """ Calculate ratio of tropospheric / stratospheric datapoints for given tropopause definitions.
         
         Parameters: 
@@ -612,33 +609,33 @@ class TropopauseSorterMixin:
         
         Returns a dataframe with counts (and ratios) for True / False values for all available tps
         """
-        
-        if tps is None: 
+
+        if tps is None:
             tps = self.tps
-        
-        tropo_cols = ['tropo_' + tp.col_name for tp in tps 
+
+        tropo_cols = ['tropo_' + tp.col_name for tp in tps
                       if 'tropo_' + tp.col_name in self.df_sorted]
 
         # Implement 'shared_only' parameter 
         shared_df_sorted = self.df_sorted[tropo_cols].dropna(how='any')
-        if shared_only: 
+        if shared_only:
             tropo_df = shared_df_sorted
         elif not shared_only:
             tropo_df = self.df_sorted[tropo_cols]
-        elif shared_only == 'No': 
+        elif shared_only == 'No':
             tropo_df = self.df_sorted[tropo_cols][~ self.df_sorted.index.isin(shared_df_sorted.index)]
-        else: 
+        else:
             raise KeyError(f'Invalid value for shared: {shared_only}')
 
         # Get counts 
-        tropo_counts = tropo_df[tropo_df==True].count(axis=0)
-        strato_counts = tropo_df[tropo_df==False].count(axis=0)
-        
-        count_df = pd.DataFrame({True : tropo_counts, False : strato_counts}).transpose()
+        tropo_counts = tropo_df[tropo_df == True].count(axis=0)
+        strato_counts = tropo_df[tropo_df == False].count(axis=0)
+
+        count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
         count_df.dropna(axis=1, inplace=True)
         count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
-        
-        if not ratios: 
+
+        if not ratios:
             return count_df
 
         ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
@@ -666,9 +663,9 @@ class TropopauseSorterMixin:
         """ Get indices of datapoints that are identified consistently as tropospheric / stratospheric. """
         shared_tropo = shared_strato = self.get_shared_indices(tps)
 
-        for tp in tps: # iteratively remove non-shared indices 
-            shared_tropo = shared_tropo[self.df_sorted.loc[shared_tropo, 'tropo_'+tp.col_name]] 
-            shared_strato = shared_strato[self.df_sorted.loc[shared_strato, 'strato_'+tp.col_name]] 
+        for tp in tps:  # iteratively remove non-shared indices
+            shared_tropo = shared_tropo[self.df_sorted.loc[shared_tropo, 'tropo_' + tp.col_name]]
+            shared_strato = shared_strato[self.df_sorted.loc[shared_strato, 'strato_' + tp.col_name]]
 
         return shared_tropo, shared_strato
 
@@ -676,18 +673,13 @@ class TropopauseSorterMixin:
         """ Flag each datapoint according to its distance to specific tropopause definitions. """
         # TODO implement this
 
-#%% Mixin for adding binning methods to GlobalData objects
 
-class BinningMixin: 
+# %% Mixin for adding binning methods to GlobalData objects
+
+class BinningMixin:
     """ Holds methods for binning global data in 1D/2D/3D in selected coordinates. 
     
     Methods:
-        binned_1d(subs, **kwargs)
-            Bin substance data over latitude
-
-        binned_2d(subs, **kwargs)
-            Bin substance data on a longitude/latitude grid
-
         bin_1d(subs, coord, bci_1d, xbsize, df)
 
         bin_2d(subs, xcoord, ycoord, bci_2d, xbsize, ybsize)
@@ -702,171 +694,139 @@ class BinningMixin:
             Bin substance data onto a 2D-grid of the given coordinates for each season. 
         
     """
-    
-    def binned_1d(self, subs, **kwargs) -> tuple[list, list]:
-        """
-        Returns 1D binned objects for each year as lists (lat / lon)
-        Parameters:
-            subs (Substance): dcts.Substance instance
-        """
-        return tools.bin_1d(self, subs, **kwargs)  # out_x_list, out_y_list
 
-    def binned_2d(self, subs, **kwargs) -> list:
-        """
-        Returns 2D binned object for each year as a list
-        Parameters:
-            subs (Substance): dcts.Substance instance
-        """
-        return tools.bin_2d(self, subs, **kwargs)  # out_list
+    def make_bci(self, xcoord, ycoord=None, zcoord=None, **kwargs): 
+        """ Create n-dimensional binclassinstance using standard coordinate limits / bin sizes. """
+        dims = sum([dim is not None for dim in [xcoord, ycoord, zcoord]])
 
-    def bin_1d(self, subs, coord, bci_1d=None, xbsize=None, df=None) -> bp.Simple_bin_1d: 
+        if dims not in [1,2,3]:
+            raise ValueError('Something went wrong when evaluating dimension numbers. ') 
+
+        xbsize = kwargs.get('xbsize', xcoord.get_bsize())
+        xbmin, xbmax = self.get_var_lims(xcoord, bsize = xbsize, **kwargs)
+        
+        if dims == 1: 
+            return bp.Bin_equi1d(xbmin, xbmax, xbsize)
+
+        ybsize = kwargs.get('ybsize', ycoord.get_bsize())
+        ybmin, ybmax = self.get_var_lims(ycoord, bsize = ybsize, **kwargs)
+        
+        if dims == 2: 
+            return bp.Bin_equi2d(xbmin, xbmax, xbsize, 
+                                 ybmin, ybmax, ybsize)
+        
+        zbsize = kwargs.get('zbsize', zcoord.get_bsize())
+        zbmin, zbmax = self.get_var_lims(zcoord, bsize = zbsize, **kwargs)
+        
+        return bp.Bin_equi3d(xbmin, xbmax, xbsize,
+                             ybmin, ybmax, ybsize,
+                             zbmin, zbmax, zbsize)
+
+    def bin_1d(self, var, xcoord, **kwargs) -> bp.Simple_bin_1d:
         """ Bin substance data in self.df onto 1D-bins of the given coordinate. 
         
         Args: 
-            subs (dcts.Substance)
-            coord (dcts.Coordinate)
+            var (dcts.Substance, dcts.Coordinate)
             
-            bci_1d (bp.Bin_equi1d, bp.Bin_notequi1d): 1D-Binning structure
-            xbsize (float)
+            xcoord (dcts.Substance, dcts.Coordinate) - 1st bin dimension 
+            ycoord (dcts.Substance, dcts.Coordinate) - 2nd bin dimension 
+            
+            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
+            key xbsize (float): 1st dim bin size
+            key ybsize (float): 2nd dim bin size
         
         Returns bp.Simple_bin_1d object
         """
-        df = self.df if (df is None) else df
-        xbsize = coord.get_bsize() if not xbsize else xbsize
+        df = kwargs.get('df', self.df)
+        x = self.get_var_data(xcoord, df=df)
+        bci_1d = kwargs.get('bci_1d', self.make_bci(xcoord, **kwargs))
 
-        if coord.col_name == 'geometry.y': # latitude
-            x = df.geometry.y
-        elif coord.col_name == 'geometry.x':
-            x = df.geometry.x
-        else:
-            x = np.array(df[coord.col_name])
-
-        # get bins as multiples of the bin size
-        xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-        xbmin = (np.nanmin(x) // xbsize) * xbsize
-        
-        if not isinstance(bci_1d, (bp.Bin_equi1d, bp.Bin_notequi1d)): 
-            bci_1d = bp.Bin_equi1d(xbmin, xbmax, xbsize)
-
-        out = bp.Simple_bin_1d(np.array(df[subs.col_name]), x,
+        out = bp.Simple_bin_1d(np.array(df[var.col_name]), x,
                                bci_1d, count_limit=self.count_limit)
 
         return out
 
-    def bin_2d(self, subs, xcoord, ycoord, 
-               bci_2d=None, xbsize = None, ybsize= None) -> bp.Simple_bin_2d: 
+    def bin_2d(self, var, xcoord, ycoord, **kwargs) -> bp.Simple_bin_2d:
         """ Bin substance data in self.df onto an x-y grid spanned by the given coordinates. 
-        
+
         Args: 
-            subs (dcts.Substance)
-            xcoord (dcts.Coordinate)
-            ycoord (dcts.Coordinate)
+            var (dcts.Substance, dcts.Coordinate)
             
-            bci_2d (bp.Bin_equi2d, bp.Bin_notequi2d): 2D-Binning structure
-            xbsize (float)
-            ybsize (float)
+            xcoord (dcts.Substance, dcts.Coordinate) - 1st bin dimension 
+            ycoord (dcts.Substance, dcts.Coordinate) - 2nd bin dimension 
+            
+            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
+            key xbsize (float): 1st dim bin size
+            key ybsize (float): 2nd dim bin size
         
         Returns bp.Simple_bin_2d object
         """
-        
-        xbsize = xcoord.get_bsize() if not xbsize else xbsize
-        ybsize = ycoord.get_bsize() if not ybsize else ybsize
-        
-        if xcoord.col_name.startswith('geometry.'):
-            x = self.df.geometry.y if xcoord.col_name == 'geometry.y' else self.df.geometry.x
-        else:
-            x = np.array(self.df[xcoord.col_name])
+        x = self.get_var_data(xcoord)
+        y = self.get_var_data(ycoord)
+        bci_2d = kwargs.get('bci_2d', self.make_bci(xcoord, ycoord, **kwargs))
 
-        if ycoord.col_name.startswith('geometry.'):
-            y = self.df.geometry.y if ycoord.col_name == 'geometry.y' else self.df.geometry.x
-        else: 
-            y = np.array(self.df[ycoord.col_name])
-
-        # get bins as multiples of the bin size
-        xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-        xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-        ybmax = ((np.nanmax(y) // ybsize) + 1) * ybsize
-        ybmin = (np.nanmin(y) // ybsize) * ybsize
-
-        if not isinstance(bci_2d, (bp.Bin_equi2d, bp.Bin_notequi2d)):
-            bci_2d = bp.Bin_equi2d(xbmin, xbmax, xbsize,
-                                   ybmin, ybmax, ybsize)
-
-        out = bp.Simple_bin_2d(np.array(self.df[subs.col_name]), x, y,
+        out = bp.Simple_bin_2d(np.array(self.df[var.col_name]), x, y,
                                bci_2d, count_limit=self.count_limit)
         return out
 
-    def bin_3d(self, subs, zcoord, bci_3d=None, 
-               xbsize = None, ybsize = None, zbsize = None,
-               eql=False) -> tools.Bin3DFitted: 
-        """ Bin substance data onto a 3D-grid given by z-coordinate / (equivalent) latitude / longitude. 
-        
-        Args: 
-            subs (dcts.Substance)
-            zcoord (dcts.Coordinate) - vertical coordinate
-            
-            bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
-            xbsize (float)
-            ybsize (float)
-            zbsize (float)
-            
-            eql (bool): Use equivalalent latitude instead of latitude as y-coordinate 
-        
-        Returns a tools.Bin3DFitted object. 
-        """
-        xbsize = self.grid_size if not xbsize else xbsize 
-        ybsize = self.grid_size if not ybsize else ybsize 
-        zbsize = zcoord.get_bsize() if not zbsize else zbsize
-        
-        x = self.df.geometry.x # longitude
-        y = self.df.geometry.y # latitude
-        
-        if eql:
-            [ycoord] = self.get_coords(hcoord='eql', model='ERA5')
-            y = self.df[ycoord.col_name]
-        
-        xbmin, xbmax = -180, 180
-        ybmin, ybmax = -90, 90
+    def bin_3d(self, var, xcoord, ycoord, zcoord, **kwargs) -> tools.Bin3DFitted:
+        """ Bin variable data onto a 3D-grid given by z-coordinate / (equivalent) latitude / longitude. 
 
-        z = self.df[zcoord.col_name]
-        zbmax = ((np.nanmax(z) // zbsize) + 1) * zbsize
-        zbmin = (np.nanmin(z) // zbsize) * zbsize
+        Args: 
+            var (dcts.Substance, dcts.Coordinate)
+            
+            xcoord (dcts.Substance, dcts.Coordinate) - 1st bin dimension 
+            ycoord (dcts.Substance, dcts.Coordinate) - 2nd bin dimension 
+            zcoord (dcts.Substance, dcts.Coordinate) - 3rd bin dimension 
+            
+            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
+            key xbsize (float): 1st dim bin size
+            key ybsize (float): 2nd dim bin size
+            key zbsize (float): 3rd dim bin size
+            key lognorm_fit (bool): Toggle fitting a lognorm distr. to the binned data
         
-        if not isinstance(bci_3d, (bp.Bin_equi3d, bp.Bin_notequi3d)):
-            bci_3d = bp.Bin_equi3d(xbmin, xbmax, xbsize,
-                                   ybmin, ybmax, ybsize,
-                                   zbmin, zbmax, zbsize)
+        Returns a Simple_bin_2d object or tools.Bin3DFitted object including LogNorm distribution fits.
+        """
+
+        x = self.get_var_data(xcoord)
+        y = self.get_var_data(ycoord)
+        z = self.get_var_data(zcoord)
+        bci_3d = kwargs.get('bci_3d', self.make_bci(xcoord, ycoord, zcoord, **kwargs))
         
-        out = tools.Bin3DFitted(np.array(self.df[subs.col_name]), 
-                               x, y, z, bci_3d, 
-                               count_limit = self.count_limit)
-        
+        if kwargs.get('lognorm_fit'): 
+            out = tools.Bin3DFitted(np.array(self.df[var.col_name]),
+                                    x, y, z, bci_3d,
+                                    count_limit=self.count_limit)
+
+        else: 
+            out = bp.Simple_bin_3d(np.array(self.df[var.col_name]), 
+                                   x, y, z, bci_3d, 
+                                   count_limit=self.count_limit)
         return out
 
-    def bin_LMS(self, subs, tp, df=None, bci_3d=None, zbsize=None, nr_of_bins = 3) -> bp.Simple_bin_3d: 
+    def bin_LMS(self, subs, tp, df=None, nr_of_bins=3, **kwargs) -> bp.Simple_bin_3d:
         """ Bin data onto lon-lat-tp grid, then return only the lowermost stratospheric bins. 
         
         Args: 
             subs (dcts.Substance): Substance data to bin
             tp (dcts.Coordinate): Tropopause Definition used to select LMS data
-            
-        Optional:
-            df (pd.DataFrame): Stratospheric dataset (filtered using TP)
-            bci_3d(bp.Bin_equi3d, bp.Bin_notequi3d): Binned data
-            zbsize (float): Size of vertical bins
-            nr_of_bins (int): Max nr. of bins over the tropopause that should be returned 
+
+            df (pd.DataFrame): Stratospheric dataset (filtered using TP). Optional
+            nr_of_bins (int): Max nr. of bins over the tropopause that should be returned
+
+            key bci_3d(bp.Bin_equi3d, bp.Bin_notequi3d): Binned data
+            key zbsize (float): Size of vertical bins
 
         Returns bp.Simple_bin_3d object
         """
-        
-        if not tp.rel_to_tp: 
-            raise Exception('tp has to be relative to tropopause')
-        
-        xbsize = ybsize = self.grid_size
-        zbsize = tp.get_bsize() if not zbsize else zbsize
 
-        if not isinstance(df, pd.DataFrame): 
+        if not tp.rel_to_tp:
+            raise Exception('tp has to be relative to tropopause')
+
+        xbsize = ybsize = self.grid_size
+        zbsize = kwargs.get('zbsize', tp.get_bsize())
+
+        if not isinstance(df, pd.DataFrame):
             df = self.sel_strato(**tp.__dict__).df
 
         x = df.geometry.x
@@ -881,115 +841,63 @@ class BinningMixin:
         zbmax = min(zbsize * nr_of_bins, zbmax)
         zbmin = (np.nanmin(z) // zbsize) * zbsize
 
-        if not isinstance(bci_3d, (bp.Bin_equi3d, bp.Bin_notequi3d)):
-            bci_3d = bp.Bin_equi3d(xbmin, xbmax, xbsize,
-                                   ybmin, ybmax, ybsize,
-                                   zbmin, zbmax, zbsize)
-
-        out = bp.Simple_bin_3d(np.array(df[subs.col_name]), 
-                               x, y, z, bci_3d, 
-                               count_limit = self.count_limit)
+        bci_3d = kwargs.get('bci_3d', bp.Bin_equi3d(xbmin, xbmax, xbsize,
+                                                    ybmin, ybmax, ybsize,
+                                                    zbmin, zbmax, zbsize))
+        out = bp.Simple_bin_3d(np.array(df[subs.col_name]),
+                               x, y, z, bci_3d,
+                               count_limit=self.count_limit)
         return out
 
-    def bin_1d_seasonal(self, subs, coord, bci_1d=None, xbsize=None, df=None) -> dict[bp.Simple_bin_1d]:
+    def bin_1d_seasonal(self, var, xcoord, **kwargs) -> dict[bp.Simple_bin_1d]:
         """ Bin substance data onto the given coordinate for each season. 
         Args: 
             subs (dcts.Substance)
             coord (dcts.Coordinate)
             
-            bci_1d (bp.Bin_equi1d, bp.Bin_notequi1d): 1D-binning structure
-            xbsize (float)
+            key bci_1d (bp.Bin_equi1d, bp.Bin_notequi1d): 1D-binning structure
+            key xbsize (float)
         
         Returns dictionary of bp.Simple_bin_1d objects for each season. 
         """
 
-        df = self.df if (df is None) else df
-        
-        if not 'season' in df.columns: 
+        df = kwargs.get('df', self.df)
+        if 'season' not in df.columns:
             df['season'] = tools.make_season(df.index.month)
-        
+
+        bci_1d = self.make_bci(xcoord, **kwargs)
+
         out_dict = {}
-        xbsize = coord.get_bsize() if not xbsize else xbsize
-
-        for s in set(df['season'].tolist()):
-            df_s = df[df['season'] == s]
-
-            if coord.col_name == 'geometry.y': # latitude
-                x = df_s.geometry.y
-            elif coord.col_name == 'geometry.x':
-                x = df_s.geometry.x
-            else:
-                x = np.array(df_s[coord.col_name])
-            
-            # skip seasons that have no data
-            if all(str(xi) == 'nan' for xi in x): continue
-            
-            # get bins as multiples of the bin size
-            xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-            xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-            if not isinstance(bci_1d, (bp.Bin_equi1d, bp.Bin_notequi1d)):
-                bci_1d = bp.Bin_equi1d(xbmin, xbmax, xbsize)
-
-            out = bp.Simple_bin_1d(np.array(df_s[subs.col_name]), x,
-                                   bci_1d, count_limit=self.count_limit)
-            out_dict[s] = out
-
+        for s in set(self.df['season']): 
+            out_dict[s] = self.sel_season(s).bin_1d(var, xcoord, 
+                                                    bci_1d = bci_1d, 
+                                                    **kwargs)
         return out_dict
 
-    def bin_2d_seasonal(self, subs, xcoord, ycoord,
-                        bci_2d=None, xbsize=None, ybsize=None, df=None) -> dict[bp.Simple_bin_1d]:
-        """ Bin substance data onto a 2D-grid of the given coordinates for each season. 
-        Args: 
-            subs (dcts.Substance)
-            xcoord (dcts.Coordinate)
-            ycoord (dcts.Coordinate)
+    def bin_2d_seasonal(self, var, xcoord, ycoord, **kwargs) -> dict[bp.Simple_bin_3d]: 
+        """ Seasonal binning of var along xyz coordinates. """
+        if 'season' not in self.df.columns:
+            self.df['season'] = tools.make_season(self.df.index.month)
             
-            bci_2d (bp.Bin_equi2d, bp.Bin_notequi2d): 1D-binning structure
-            xbsize (float)
-            ybsize (float)
-        
-        Returns dictionary of bp.Simple_bin_2d objects for each season. 
-        """
-        
-        df = self.df if (df is None) else df
-        
-        if not 'season' in df.columns: 
-            df['season'] = tools.make_season(df.index.month)
-        
+        bci_2d = self.make_bci(xcoord, ycoord, **kwargs)
+
         out_dict = {}
-        xbsize = xcoord.get_bsize() if not xbsize else xbsize
-        ybsize = ycoord.get_bsize() if not ybsize else ybsize
-
-        # calculate binned output per season
-        for s in set(df['season'].tolist()):
-            df_s = df[df['season'] == s]
-
-            if xcoord.col_name == 'geometry.y': # latitude
-                x = df_s.geometry.y
-            else:
-                x = np.array(df_s[xcoord.col_name])
-            
-            # skip seasons that have no data
-            if all(str(xi) == 'nan' for xi in x): continue
-
-            y = np.array(df_s[ycoord.col_name])
-
-            # get bins as multiples of the bin size
-            xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-            xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-            ybmax = ((np.nanmax(y) // ybsize) + 1) * ybsize
-            ybmin = (np.nanmin(y) // ybsize) * ybsize
-
-            if not isinstance(bci_2d, (bp.Bin_equi2d, bp.Bin_notequi2d)):
-                bci_2d = bp.Bin_equi2d(xbmin, xbmax, xbsize,
-                                           ybmin, ybmax, ybsize)
-
-            out = bp.Simple_bin_2d(np.array(df_s[subs.col_name]), x, y,
-                                   bci_2d, count_limit=self.count_limit)
-            out_dict[s] = out
-
+        for s in set(self.df['season']): 
+            out_dict[s] = self.sel_season(s).bin_2d(var, xcoord, ycoord, 
+                                                    bci_2d = bci_2d, 
+                                                    **kwargs)
         return out_dict
 
-
+    def bin_3d_seasonal(self, var, xcoord, ycoord, zcoord, **kwargs) -> dict[bp.Simple_bin_3d]: 
+        """ Seasonal binning of var along xyz coordinates. """
+        if 'season' not in self.df.columns:
+            self.df['season'] = tools.make_season(self.df.index.month)
+            
+        bci_3d = self.make_bci(xcoord, ycoord, zcoord, **kwargs)
+        
+        out_dict = {}
+        for s in set(self.df['season']): 
+            out_dict[s] = self.sel_season(s).bin_3d(var, xcoord, ycoord, zcoord, 
+                                                    bci_3d = bci_3d, 
+                                                    **kwargs)
+        return out_dict
