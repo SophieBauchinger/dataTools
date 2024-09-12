@@ -118,54 +118,6 @@ class BinPlotterBaseMixin:
             raise KeyError('Could not generate colormap limits.')
         return vlims
 
-    def get_coord_lims(self, coord, xyz: str = None) -> tuple: 
-        """ Returns default maximum / minimum boundary of the coordinate for plotting. """
-
-        if coord.hcoord == 'lat': 
-            return (-90, 90)
-        elif coord.hcoord == 'lon': 
-            return (-180, 180)
-
-        if xyz=='x': 
-            if 'xlims' in self._kwargs: 
-                lims = self._kwargs.get('xlims')
-            else: 
-                lims = (-90, 90)
-        elif xyz=='y': 
-            if 'ylims' in self._kwargs: 
-                lims = self._kwargs.get('ylims')
-            else: 
-                lims = (np.floor(np.nanmin(self.df[coord.col_name])),
-                         np.ceil(np.nanmax(self.df[coord.col_name])))
-        else: 
-            lims = (np.floor(np.nanmin(self.df[coord.col_name])),
-                     np.ceil(np.nanmax(self.df[coord.col_name])))
-        return lims
-
-    def _get_bsize(self, coord, xyz: str = None) -> float: 
-        """ Get bin size for given coordinate. """
-        bsize = None
-
-        if hasattr(self, '_kwargs'):
-            if xyz=='x' and 'xbsize' in self._kwargs: 
-                bsize = self._kwargs.get('xbsize')
-            elif xyz=='y' and 'ybsize' in self._kwargs: 
-                bsize = self._kwargs.get('ybsize')
-            elif xyz=='z' and 'zbsize' in self._kwargs: 
-                bsize = self._kwargs.get('zbsize')
-            if bsize: 
-                return bsize 
-
-        bsize = coord.get_bsize()# dcts.get_default_bsize(coord.hcoord)
-        if not bsize and xyz=='x': 
-            bsize = 10
-        if not bsize:    
-            lims = self.get_coord_lims(coord, xyz)
-            bsize = 5 * ( np.ceil((lims[1]-lims[0])/10) / 5 )
-            if (lims[1]-lims[0])/10<1: 
-                bsize=0.5
-        return bsize
-
 class BinPlotter1DMixin(BinPlotterBaseMixin):
     """ Single dimensional binning & plotting. 
     
@@ -183,22 +135,20 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         matrix_plot_stdev
     """
 
-    def flight_height_histogram(self, tp, alpha: float = 0.7, ax=None, **kwargs): 
+    def flight_height_histogram(self, tp, alpha: float = 0.7, **kwargs): 
         """ Make a histogram of the number of datapoints for each tp bin. """
-        if ax is None: 
-            fig, ax = plt.subplots(dpi=250, figsize=(6,4))
-            ax.set_ylabel(tp.label())
-        
+        _, ax = plt.subplots(dpi=250, figsize=(6,4))
+        ax.set_ylabel(tp.label())
         data = self.df[tp.col_name].dropna()
-
         ax.set_title(f'Distribution of {self.source} measurements')
-        rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (data.min(), 
-                                                                      data.max())
+        rlims = (-70, 70) if (tp.vcoord=='pt' and tp.rel_to_tp) else (data.min(), data.max())
         hist = ax.hist(data.values, 
                         bins=30, range=rlims, alpha=alpha, 
                         orientation='horizontal',
+                        edgecolor = kwargs.pop('edgecolor', 'white'), 
+                        lw=kwargs.pop('lw', 0.2),
                         **kwargs)
-        ax.grid(ls='dotted')
+        ax.grid(ls='dotted', zorder = 0)
         if (tp.rel_to_tp is True) and ax is not None: 
             ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
         ax.set_xlabel('# Datapoints')
@@ -208,25 +158,15 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
             ax.hlines(320.459, max(hist[0]), 0, color='k', ls='dashed', lw=0.5)
         return hist
 
-    def overlapping_histograms(self, tps: list): 
-        """ """
-        # tps = [tp for tp in tps if tp.vcoord=='pt']
-        fig, ax = plt.subplots(dpi=250, figsize=(6,4))
-        for tp in tps: 
-            hist = self.flight_height_histogram(tp, alpha=0.6, ax=ax,
-                                                label=tp.label(True))
-            
-        ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
-        if all((tp.rel_to_tp and tp.vcoord=='pt') for tp in tps): 
-            ax.set_ylabel('$\Delta\,\Theta$ relative to Tropopause')
-        ax.legend(fontsize=7)
-
     def plot_vertial_profile_variability_comparison(self, subs, tps: list, 
                                                     rel: bool = True, 
                                                     bin_attr: str = 'vstdv', 
                                                     seasons: list[int] = [1,3],
                                                     **kwargs): 
         """ Compare relative mixing ratio varibility between tropopause definitions. """
+        
+        
+        
         fig, ax = plt.subplots(dpi=500, figsize=(5,6))
         outline = mpe.withStroke(linewidth=2, foreground='white')
         
@@ -370,197 +310,6 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         ax.scatter(vdata, y, 
                     marker=marker,
                     c = color, zorder = 3)
-
-    def plot_1d_seasonal_gradient_with_vstdv(self, subs, coord): 
-        """ Add second axis to vertical gradient plots to indicate variability. """
-        bin_dict, fig = self.plot_1d_seasonal_gradient(subs, coord)
-
-        ax1 = fig.add_subplot(133)
-        outline = mpe.withStroke(linewidth=2, foreground='white')
-
-        for s in set(self.df['season'].tolist()):
-            y = bin_dict[s].xintm
-
-            ax1.plot(bin_dict[s].vstdv, y, '-', 
-                    c=dcts.dict_season()[f'color_{s}'],
-                    label=dcts.dict_season()[f'name_{s}'],
-                    path_effects=[outline], zorder=2)
-        ax1.grid('both')
-        ax1.tick_params(labelleft=False)
-
-        fig.set_size_inches(8,5)
-
-    def stdv_rms_non_pt(self, subs, tp): 
-        """ Same as plot_vertical_profile_mean_vstdv but for other vcoords. """
-        fig, ax = plt.subplots(dpi=250, figsize=(2.5, 6))
-
-        for tp in [tp]: 
-            df = self.rms_seasonal_vstdv(subs, tp)
-            ax.plot(df['rms_vstdv'], df.index, '-', marker='d', 
-                    # c=dcts.dict_season()[f'color_{s}'],
-                    label=tp.label(True),
-                    path_effects=[self.outline], zorder=2)
-
-            ax.set_ylabel(tp.label()) 
-
-            ax.grid('both', ls='dotted')
-            ax.set_xlabel(f'Mean variability of {subs.label(name_only=True)}')
-            ax.legend(loc='lower right')
-
-    def calc_bin_avs(self, data: pd.DataFrame, 
-                     subs, xcoord, bin_attr: str,
-                     **kwargs) -> float: 
-        """ Data is 1D-binned along xcoord and the average bin_atrr value is calculated for the dataset. 
-        
-        Parameters: 
-            data (pd.DataFrame): Data to be binned
-            subs (dcts.Substance): Substance instance to be binned
-            xcoord (dcts.Coordinate): Coordinate instance along which to bin
-            bin_attr (str): e.g. vmean/vstdv/rvstd, binned output to be averaged
-            
-            key xbsize (float): Bin-size along x-axis
-            key bin_equi1d (bp.Bin_equi1d, bp.Bin_notequi1d): Binning structure
-        
-        Returns the averaged value of bin_attr for the whole dataset. 
-        """
-
-        if not isinstance(kwargs.get('xbsize'), float):
-            xbsize = xcoord.get_bsize()
-
-        if xcoord.col_name == 'geometry.y': # latitude
-            x = self.df.geometry.y
-        elif xcoord.col_name == 'geometry.x':
-            x = self.df.geometry.x
-        else:
-            x = self.df[xcoord.col_name]
-
-        # get bins as multiples of the bin size
-        xbmax = ((np.nanmax(x) // xbsize) + 1) * xbsize
-        xbmin = (np.nanmin(x) // xbsize) * xbsize
-
-        if not isinstance(kwargs.get('bin_equi1d'), (bp.Bin_equi1d, bp.Bin_notequi1d)): 
-            bin_equi1d = bp.Bin_equi1d(xbmin, xbmax, xbsize)
-        else: 
-            bin_equi1d = kwargs.get('bin_equi1d')
-
-        if bin_attr=='vcount':
-            total = len(data[data[subs.col_name].notna()])
-            return total
-
-        binned_1d = bp.Simple_bin_1d(np.array(data[subs.col_name]), x[x.index.isin(data.index)],
-                                      bin_equi1d, count_limit=self.count_limit if not bin_attr=='vcount' else 1)
-        values = getattr(binned_1d, bin_attr)
-        nans = np.isnan(values)
-        av = np.average(values[~nans], weights = binned_1d.vcount[~nans])
-
-        return av
-
-    def plot_bar_plots(self, subs, xcoord, bin_attr, **kwargs):
-        """ Plot a bar plot to compare average bin_attr values across tropopause definitions. 
-        1. Data is separated into stratospheric / tropospheric values for each TP definiton
-        2. Data is binned along the x-axis as defined by xcoord
-        3. The average value of bin_attr for the specified substance is calculated for each atm_layer
-        
-        Parameters: 
-            subs (dcts.Substance): Substance instance indicating data to be binned
-            xcoord (dcts.Coordinate): Coordinate to use for 1D-binning
-            bin_attr (str): e.g. vmean/vstdv/rvstd, binned output to be averaged
-
-            key xbsize (float): Bin-size along x-axis
-            key bin_equi1d (bp.Bin_equi1d, bp.Bin_notequi1d): Binning structure
-            key tps ([dcts.Coordinate]): specify tropopause definitions to display 
-        """
-        tps = self.tp_coords() if not kwargs.get('tps') else kwargs.get('tps')
-        
-        #TODO shared_indices
-        fig, (ax_t, ax_label, ax_s) = plt.subplots(1, 3, dpi=200, 
-                                         figsize=(9,4), sharey=True)
-        
-        bin_description = f'{self.grid_size}°' \
-            + ('latitude' if xcoord.hcoord=='lat' else ('longitude' if xcoord.hcoord=='lon' else 'HUH')) \
-                + ' bins'
-        description_dict = dict(
-            vmean = f'Average mixing ratio in {bin_description}',
-            vstdv = f'Variability in {bin_description}',
-            vcount ='Total number of datapoints',
-            rvstd = 'Relative variability', )
-        description = description_dict.get(bin_attr)
-        if not description: 
-            description = bin_attr
-        
-        fig.suptitle(f'{description} of {subs.label()}' if not bin_attr=='vcount' else description)
-        fig.subplots_adjust(top=0.85)
-        ax_t.set_title('Troposphere', fontsize=9, loc='right')
-        ax_s.set_title('Stratosphere', fontsize=9, loc='left')
-        
-        tropo_bar_vals = []
-        strato_bar_vals = []
-        bar_labels = []
-        
-        self.create_df_sorted() # create df_sorted
-        shared_indices = self.get_shared_indices(tps)
-
-        for i, tp in enumerate(tps):
-            tropo_data = self.sel_tropo(**tp.__dict__).df
-            strato_data = self.sel_strato(**tp.__dict__).df
-            
-            if kwargs.get('shared_index'): 
-                tropo_data[tropo_data.index.isin(shared_indices)]
-                strato_data[strato_data.index.isin(shared_indices)]
-
-            t_av = self.calc_bin_avs(tropo_data,
-                                     subs, xcoord, bin_attr, **kwargs)
-            s_av = self.calc_bin_avs(strato_data,
-                                     subs, xcoord, bin_attr, **kwargs)
-
-            tropo_bar_vals.append(t_av)
-            strato_bar_vals.append(s_av)
-            bar_labels.append(tp.label(True))
-            
-        bar_params = dict(align='center', edgecolor='k',  rasterized=True,
-                          alpha=0.65, zorder=10)
-        
-        nums = range(len(bar_labels))
-
-        t_bars = ax_t.barh(nums, tropo_bar_vals, **bar_params)
-        s_bars = ax_s.barh(nums, strato_bar_vals, **bar_params)
-        for i in nums: 
-            ax_label.text(0.5, i, bar_labels[i], 
-                          horizontalalignment='center', verticalalignment='center')
-        ax_label.axis('off')
-
-        maximum = np.nanmax(tropo_bar_vals+strato_bar_vals)
-        minimum = np.nanmin(tropo_bar_vals+strato_bar_vals) if bin_attr != 'rvstd' else 0
-        for decimal_place in [4,3,2,1,0]:
-            if all(i>np.round(minimum, decimal_place) for i in tropo_bar_vals+strato_bar_vals): 
-                minimum = np.round(minimum, decimal_place)
-            else: 
-                break
-        padding = (maximum-minimum)/3 
-
-        ax_t.set_xlim(maximum +padding , minimum-padding if not minimum-padding<0 else 0)
-        ax_s.set_xlim(minimum-padding if not minimum-padding<0 else 0, maximum +padding)
-        
-        ax_t.grid('both', ls='dotted')
-        ax_s.grid('both', ls='dotted')
-        
-        if not bin_attr=='vcount':
-            ax_t.bar_label(t_bars, ['{0:.3f}'.format(t_val)
-                                    for t_val in tropo_bar_vals], 
-                           padding=2)
-            ax_s.bar_label(s_bars, ['{0:.3f}'.format(s_val)
-                                    for s_val in strato_bar_vals], 
-                           padding=2)
-
-        else:
-            ax_t.bar_label(t_bars, ['{0:.0f}'.format(t_val) for t_val in tropo_bar_vals], 
-                           padding=2)
-            ax_s.bar_label(s_bars, ['{0:.0f}'.format(s_val) for s_val in strato_bar_vals], 
-                           padding=2)
-
-        for ax in [ax_t, ax_s]: 
-            ax.yaxis.set_major_locator(ticker.NullLocator())
-        fig.subplots_adjust(wspace=0)
 
 class BinPlotter2DMixin(BinPlotterBaseMixin): 
     """ Two-dimensional binning & plotting. 
@@ -2232,6 +1981,7 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
             self.matrix_plot_stdev_subs(subs, note=note,savefig=savefig)
 
 class BinPlotterMixin(BinPlotter1DMixin, BinPlotter2DMixin, BinPlotter3DMixin): 
+    """ Combines binning functionality for all dimensionalities into one class.  """
     pass
 
 # %%
