@@ -58,7 +58,7 @@ import os
 
 from toolpac.outliers import ol_fit_functions as fct # type: ignore
 
-def get_path():
+def get_path() -> str:
     """ Get parent directory of current module, i.e. location of dataTools. """
     return os.path.dirname(os.path.abspath(__file__)) + "\\"
 
@@ -109,10 +109,10 @@ class Coordinate:
         if self.pvu is not np.nan:
             self.pvu = float(self.pvu)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'Coordinate: {self.col_name} [{self.unit}] from {self.ID}'
 
-    def label(self, filter_label=False, coord_only=False):
+    def label(self, filter_label=False, coord_only=False) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
         tp_defs = {'chem': 'Chemical',
@@ -187,6 +187,7 @@ class Coordinate:
             'eql': 5,
             'lat': 10,
             'lon': 10,
+            'pv' : 0.5,
         }
 
         if self.vcoord in bsizes_dict:
@@ -196,7 +197,7 @@ class Coordinate:
         else:
             raise KeyError(f'No default bin size for v: {self.vcoord} / h: {self.hcoord} / var: {self.var}')
 
-    def get_color(self): 
+    def get_color(self) -> str: 
         """ Allows harmonisation of color usage across plots comparing tropopause definitions. """
         colors_20c = plt.cm.tab20c.colors       
         chem_colors = colors_20c[:4] # blue
@@ -224,8 +225,39 @@ class Coordinate:
             return therm_colors[0]
 
         return 'grey'
+
+    def get_lims(self, df:pd.DataFrame=None) -> tuple[float]: 
+        """ Returns default maximum / minimum boundary of the coordinate for plotting. """
+        if self.hcoord in ['lat', 'eql']: 
+            return (-90, 90)
+        elif self.hcoord == 'lon': 
+            return (-180, 180)
         
-def coordinate_df():
+        if self.rel_to_tp is True: 
+            limits_per_unit_RelToTp = {
+                'K' :  (-100, 100),
+                'km' : (-10, 5),
+                'hPa' : (-400, 600)
+                }
+            if self.unit in limits_per_unit_RelToTp: 
+                return limits_per_unit_RelToTp[self.unit]
+        else: 
+            limits_per_unit = {
+                'K' :  (260, 400), # ignoring temperature here
+                'PVU' : (-5, 10),
+                'km' : (0, 15),
+                'hPa' : (150, 700), 
+                'm' : (0, 15e3),
+                'mbar' : (150, 700), 
+                'm2s-2' : (0, 15e4),
+                'ppb' : (250, 350),
+                'year' : (0, 3.5),
+                }
+            if self.unit in limits_per_unit: 
+                return limits_per_unit[self.unit]       
+        raise ValueError(f'No default coordinate limits for {self}')
+
+def coordinate_df() -> pd.DataFrame:
     """ Get dataframe containing all info about all coordinate variables """
     with open(get_path() + 'coordinates.csv', 'rb') as f:
         coord_df = pd.read_csv(f, sep="\s*,\s*", engine='python')
@@ -233,7 +265,7 @@ def coordinate_df():
             coord_df['pvu'] = coord_df['pvu'].astype(object)  # allow comparison with np.nan
     return coord_df
 
-def get_coordinates(**kwargs):
+def get_coordinates(**kwargs) -> list[Coordinate]:
     """Return dictionary of col_name:Coordinate for all items where conditions are met
     Exclusion conditions need to have 'not_' prefix """
     df = coordinate_df()
@@ -262,7 +294,7 @@ def get_coordinates(**kwargs):
     coord = [Coordinate(**v) for k, v in coord_dict.items()]
     return coord
 
-def get_coord(*args, **kwargs):
+def get_coord(*args, **kwargs) -> Coordinate:
     for i, arg in enumerate(args):  # col_name, ID
         pot_args = ['col_name', 'ID']
         kwargs.update({pot_args[i]: arg})
@@ -501,7 +533,7 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
 
     return vlim_dict
 
-def substance_df():
+def substance_df() -> pd.DataFrame:
     """ Get dataframe containing all info about all substance variables """
     with open(get_path() + 'substances.csv', 'rb') as f:
         substances = pd.read_csv(f)
@@ -526,7 +558,7 @@ def get_substances(**kwargs) -> list['Substance']:
     subs = [Substance(k, **v) for k, v in subs_dict.items()]
     return subs
 
-def get_subs(*args, **kwargs):
+def get_subs(*args, **kwargs) -> Substance:
     """ Returns the unique Substance object with the given specifications. 
     
     Args (Optional): 
@@ -615,7 +647,7 @@ def variables_per_instrument(instr: str = None) -> list:
         raise KeyError(f'Could not retrieve list of variables for {instr}.')
     return variable_dict[instr]
 
-def harmonise_instruments(old_name):
+def harmonise_instruments(old_name) -> str:
     """ Harmonise campaign-speficic instrument names. """
     new_names = {
         'CLAMS_MET' : 'CLAMS',
@@ -633,7 +665,7 @@ def harmonise_instruments(old_name):
         return new_names[old_name]
     return old_name
 
-def harmonise_variables(instr, var_name):
+def harmonise_variables(instr, var_name) -> str:
     """ Harmonise campaign-specific variable names. """
     df = instr_vars_per_ID_df()
     df = df[df['instrument'] == instr]

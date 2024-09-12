@@ -5,6 +5,12 @@
 @Date: Tue Jun 11 16:45:00 2024
 
 class SelectionMixin
+
+#TODO: UTLS Selection
+ * 400 - 10 hPa 
+ *  6.5 - 30 km
+ * +- 5km around the tropopause
+
 """
 
 import copy 
