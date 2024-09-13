@@ -9,6 +9,7 @@ Class definitions for combining data structures and plotting possibilities.
 import math
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 
 from dataTools.plot.data import GlobalDataPlotterMixin
@@ -231,6 +232,51 @@ class PlotterMixin(GlobalDataPlotterMixin,
                   lw = 1)
 
         return lognorm_inst
+
+    def season_legend_handles(self, av = False, **kwargs) -> list[Line2D]:
+        """ Create a legend for the default season-color scale. 
+        
+        Args: 
+            av (bool): Include dashed grey line for average value
+            
+            key lw (float): linewidth
+            key seasons (list[int]): seasons to include, must be in [1,2,3,4]
+        """ 
+        lw = kwargs.pop('lw', 3)
+        seasons = kwargs.pop('seasons', range(1,5))
+        lines = [Line2D([0], [0], 
+                          label=dcts.dict_season()[f'name_{s}'], 
+                          color=dcts.dict_season()[f'color_{s}'], 
+                          path_effects = [self.outline], 
+                          lw = lw, **kwargs
+                          )
+                   for s in seasons]
+        
+        if av: 
+            lines.append(Line2D([0], [0], label='Average',
+                                color='dimgrey', ls = 'dashed', lw = 3, 
+                                path_effects = [self.outline]))
+        return lines
+    
+    def tp_legend_handles(self, **kwargs) -> list[Line2D]: 
+        """ Create a legend for all tropopause definitions in self.tps (or tps if given).         
+        Args: 
+            key tps (list[dcts.Coordinate]): Tropopause definition coordinates
+            key lw (float): linewidth
+            key ls (str): linestyle 
+            key marker (str) 
+            key markersize (float)
+        """ 
+        tps = kwargs.get('tps', self.tps)
+        lw = kwargs.pop('lw', 3)
+        lines = [Line2D([0], [0], 
+                          label=tp.label(filter_label=True), 
+                          color=tp.get_color(), 
+                          lw = lw,
+                          **kwargs
+                          )
+                   for tp in tps]
+        return lines
 
 class CaribicPlotter(PlotterMixin,
                      Caribic): 

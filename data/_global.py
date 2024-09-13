@@ -325,7 +325,7 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
         tps = [c for c in self.coordinates if (
             str(c.tp_def) != 'nan' and 
             c.var != 'geopot' and 
-            (c.vcoord =='mxr' or c.rel_to_tp) ) ]
+            (c.vcoord =='mxr' or str(c.rel_to_tp) != 'nan') ) ]
 
         # 2. reduce list further using given keyword arguments
         try: 
@@ -338,7 +338,7 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
         return tps
     
     def set_tps(self, **tp_kwargs): 
-        """ Set .tps (shorthand for tropopause coordinates) in accordance with tp_kwargs. """
+        """ Set .tps (shorthand for tropopause coordinates) in accordance with tp_kwargs. """       
         self.tps = self.get_tps(**tp_kwargs)
 
     def get_var_data(self, var, **kwargs) -> np.array: 
@@ -355,7 +355,7 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
             data = np.array(kwargs.get('df', self.df)[var.col_name])
         return data
 
-    def get_var_lims(self, var, bsize=None, databased=True, **kwargs) -> tuple[float]: 
+    def get_var_lims(self, var, bsize=None, **kwargs) -> tuple[float]: 
         """ Returns outer limits based on variable data and (optional) bin size. 
         Args: 
             var (dcts.Coordinate, dcts.Substance)
@@ -364,9 +364,7 @@ class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMi
 
             key df (pd.DataFrame): Limits will be calculated from data in this dataframe. Optional. 
         """
-        # if databased is not specified 
-        if isinstance(var, dcts.Coordinate) and (databased not in [True] \
-            or var.col_name.startswith('geometry.')): 
+        if isinstance(var, dcts.Coordinate) and not kwargs.get('databased'): 
             try: 
                 return var.get_lims()
             except ValueError: 

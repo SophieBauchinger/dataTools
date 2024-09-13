@@ -76,7 +76,7 @@ class AnalysisMixin:
 
         return indices
 
-    def remove_non_shared_indices(self, inplace=True, **kwargs):  # filter_non_shared_indices
+    def remove_non_shared_indices(self, inplace=True, **kwargs):
         """ Returns a class instances with all non-shared indices of the given tps filtered out. """
         tps = kwargs.get('tps', self.tps)
         shared_indices = self.get_shared_indices(tps)
@@ -202,6 +202,343 @@ class AnalysisMixin:
             if verbose: print(f'Detrending {subs}. ')
             self.detrend_substance(subs, save=True)
 
+    # --- Filter for extreme events in tropospheric air ---
+    def filter_extreme_events(self, plot_ol=False, **tp_kwargs):
+        """ Returns only tropospheric background data (filter out tropospheric extreme events)
+        1. tp_kwargs are used to select tropospheric data only (if object is not already purely tropospheric)
+        2. For each substance in the dataset, extreme 
+         
+        Filter out all tropospheric extreme events.
+
+        Returns new Caribic object where tropospheric extreme events have been removed.
+        Result depends on tropopause definition for tropo / strato sorting.
+
+        Parameters:
+            key tp_def (str): 'chem', 'therm' or 'dyn'
+            key crit (str): 'n2o', 'o3'
+            key vcoord (str): 'pt', 'dp', 'z'
+            key pvu (float): 1.5, 2.0, 3.5
+            key limit (float): pre-flag limit for chem. TP sorting
+
+            key ID (str): 'GHG', 'INT', 'INT2'
+            key verbose (bool)
+            key plot (bool)
+            key subs (str): substance for plotting
+        """
+        if self.status.get('tropo') is not None:
+            out = copy.deepcopy(self)
+        elif self.status.get('strato'):
+            raise Warning('Cannot filter extreme events in purely stratospheric dataset')
+        else:
+            out = self.sel_tropo(**tp_kwargs)
+        out.data = {k: v for k, v in self.data.items() if k not in ['sf6', 'n2o', 'ch4', 'co2']}
+
+        for k in out.data:
+            if not isinstance(out.data[k], pd.DataFrame) or k == 'met_data': continue
+            data = out.data[k].sort_index()
+
+            for column in data.columns:
+                # coordinates
+                if column in [c.col_name for c in dcts.get_coordinates(vcoord='not_mxr')] + ['Flight number']: continue
+                if column in [c.col_name + '_at_fl' for c in dcts.get_coordinates(vcoord='not_mxr')]: continue
+                if column.startswith('d_'):
+                    continue
+                # substances
+                if column in [s.col_name for s in dcts.get_substances()]:
+                    substance = column
+                    time = np.array(dt_to_fy(data.index, method='exact'))
+                    mxr = data[substance].tolist()
+                    if f'd_{substance}' in data.columns:
+                        d_mxr = data[f'd_{substance}'].tolist()
+                    else:
+                        d_mxr = None  # integrated values of high resolution data
+
+                    # Find extreme events
+                    tmp = outliers.find_ol(dcts.get_subs(col_name=substance).function,
+                                           time, mxr, d_mxr, flag=None,  # here
+                                           direction='p', verbose=False,
+                                           plot=plot_ol, limit=0.1, ctrl_plots=False)
+
+                    # Set rows that were flagged as extreme events to 9999, then nan
+                    for c in [c for c in data.columns if substance in c]:  # all related columns
+                        data.loc[(flag != 0 for flag in tmp[0]), c] = 9999
+                    out.data[k].update(data)  # essential to update before setting to nan
+                    out.data[k].replace(9999, np.nan, inplace=True)
+
+                else:
+                    print(f'Cannot filter {column}, removing it from the dataframe')
+                    out.data[k].drop(columns=[column], inplace=True)
+
+        out.status.update({'EE_filter': True})
+        return out
+
+
+# %% Mixin for tropopause-related sorting and data manipulation
+class TropopauseSorterMixin:
+    """ Filters for stratosphere / troposphere 
+    
+    Methods: 
+        n2o_filter(**kwargs)
+            Use N2O data to create strato/tropo reference for data.
+        o3_filter_lt60
+            Assign tropospheric flag to all Ozone values below 60 ppb. 
+        
+        create_df_sorted(**kwargs)
+            Use all chosen tropopause definitions to create strato/tropo reference.
+
+        calc_ratios(group_vc=False)
+            Calculate ratio of tropo/strato datapoints.
+
+        filter_extreme_events(**kwargs)
+            Filter for tropospheric data, then remove extreme events
+        detrend_substance(substance, ...)
+            Remove trend wrt. 2005 Mauna Loa from substance, then add to data
+    """
+
+    def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
+        """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
+        data = self.df
+
+        # Choose N2O data to use (Substance object)
+        if 'coord' in kwargs:
+            n2o_coord = kwargs.get('coord')
+
+        elif len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
+            [n2o_coord] = [c for c in self.coordinates if c.crit == 'n2o']
+
+        else:
+            default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', HIAPER='NWAS', EMAC='EMAC', TP='INT')
+            if self.source not in default_n2o_IDs.keys():
+                raise NotImplementedError(f'N2O sorting not available for {self.source}')
+
+            n2o_coord = dcts.get_coord(crit='n2o', ID=default_n2o_IDs[self.source])
+
+            if n2o_coord.col_name not in data.columns:
+                raise Warning(f'Could not find {n2o_coord.col_name} in {self.ID} data.')
+
+        # Get reference dataset
+        ref_years = np.arange(min(self.years) - 2, max(self.years) + 3)
+        loc_obj = MaunaLoa(ref_years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
+        ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID)  # dcts.get_col_name(subs, loc_obj.source)
+
+        if kwargs.get('verbose'):
+            print(f'N2O sorting: {n2o_coord} ')
+
+        n2o_column = n2o_coord.col_name
+
+        df_sorted = pd.DataFrame(index=data.index)
+        if 'Flight number' in data.columns: df_sorted['Flight number'] = data['Flight number']
+        df_sorted[n2o_column] = data[n2o_column]
+
+        if f'd_{n2o_column}' in data.columns:
+            df_sorted[f'd_{n2o_column}'] = data[f'd_{n2o_column}']
+        if f'detr_{n2o_column}' in data.columns:
+            df_sorted[f'detr_{n2o_column}'] = data[f'detr_{n2o_column}']
+
+        df_sorted.sort_index(inplace=True)
+        df_sorted.dropna(subset=[n2o_column], inplace=True)
+
+        mxr = df_sorted[n2o_column]  # measured mixing ratios
+        d_mxr = None if f'd_{n2o_column}' not in df_sorted.columns else df_sorted[f'd_{n2o_column}']
+        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
+
+        # Check if units of data and reference data match, if not change data
+        if str(n2o_coord.unit) != str(ref_subs.unit):
+            if kwargs.get('verbose'): print(f'Note units do not match: {n2o_coord.unit} vs {ref_subs.unit}')
+
+            if n2o_coord.unit == 'mol mol-1':
+                mxr = tools.conv_molarity_PartsPer(mxr, ref_subs.unit)
+                if d_mxr is not None: d_mxr = tools.conv_molarity_PartsPer(d_mxr, ref_subs.unit)
+            elif n2o_coord.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
+                pass
+            else:
+                raise NotImplementedError(f'No conversion between {n2o_coord.unit} and {ref_subs.unit}')
+
+        # Calculate simple pre-flag
+        ref_mxr = loc_obj.df.dropna(subset=[ref_subs.col_name])[ref_subs.col_name]
+        df_flag = tools.pre_flag(mxr, ref_mxr, 'n2o', **kwargs)
+        flag = df_flag['flag_n2o'].values if 'flag_n2o' in df_flag.columns else None
+
+        strato = f'strato_{n2o_column}'
+        tropo = f'tropo_{n2o_column}'
+
+        fit_function = dcts.lookup_fit_function('n2o')
+
+        ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
+                              flag=flag, verbose=False, plot=False, ctrl_plots=False,
+                              limit=kwargs.get('ol_limit', 0.1), direction='n')
+        # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
+        df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
+        df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
+
+        df_sorted.drop(columns=[s for s in df_sorted.columns
+                                if not s.startswith(('Flight', 'tropo', 'strato'))],
+                       inplace=True)
+        df_sorted = df_sorted.convert_dtypes()
+        return df_sorted
+
+    # TODO: implement o3_baseline_filter
+    def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
+        """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
+        raise NotImplementedError('O3 Baseline filter has not yet been implemented')
+
+    def o3_filter_lt60(self) -> pd.DataFrame:
+        """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
+        o3_substs = self.get_substs(short_name='o3')
+
+        if len(o3_substs) == 1:
+            [o3_subs] = o3_substs
+
+        elif self.source == 'Caribic':
+            if any(s.ID == 'INT' for s in o3_substs):
+                [o3_subs] = [s for s in o3_substs if s.ID == 'INT']
+            elif any(s.ID == 'MS' for s in o3_substs):
+                [o3_subs] = [s for s in o3_substs if s.ID == 'MS']
+            else:
+                [o3_subs] = o3_substs[0]
+                print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
+        else:
+            raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
+
+        o3_sorted = pd.DataFrame(index=self.df.index)
+        o3_sorted.loc[self.df[o3_subs.col_name].lt(60),
+        (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
+        return o3_sorted, o3_subs
+
+    def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
+        """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
+        If no kwargs are specified, df_sorted is calculated for all possible definitions
+        df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
+        
+        Parameters: 
+            key verbose (bool): Make the function more talkative
+            key relative_only (bool): Skip non-relative coords if rel. is available
+        
+        """
+        if self.source not in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER', 'MULTI']:
+            raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
+        
+        data = self.df.copy()
+
+        # create df_sorted with flight number if available
+        df_sorted = pd.DataFrame(data['Flight number'] if 'Flight number' in data.columns else None,
+                                 index=data.index)
+
+        # Get tropopause coordinates
+        tps = self.get_tps()
+
+        # N2O filter
+        for tp in [tp for tp in tps if tp.crit == 'n2o']:
+            # if self.source == 'MULTI': break
+            n2o_sorted = self.n2o_baseline_filter(coord=tp, **kwargs)
+            if 'Flight number' in n2o_sorted.columns:
+                n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
+            df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
+
+        # Dyn / Therm / CPT / Combo tropopauses
+        for tp in [tp for tp in tps if not tp.vcoord == 'mxr']:
+            if tp.col_name not in data.columns:
+                print(f'Note: {tp.col_name} not found, continuing.')
+                continue
+
+            if kwargs.get('verbose'): print(f'Sorting {tp}')
+
+            tp_df = data.dropna(axis=0, subset=[tp.col_name])
+
+            if tp.tp_def == 'dyn':  # dynamic TP only outside the tropics - latitude filter
+                tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
+            if tp.tp_def == 'cpt':  # cold point TP only in the tropics
+                tp_df = tp_df[np.array([(30 > i > -30) for i in np.array(tp_df.geometry.y)])]
+
+            # define new column names
+            tropo = 'tropo_' + tp.col_name
+            strato = 'strato_' + tp.col_name
+
+            tp_sorted = pd.DataFrame({strato: pd.Series(np.nan, dtype=object),
+                                      tropo: pd.Series(np.nan, dtype=object)},
+                                     index=tp_df.index)
+
+            # tropo: high p (gt 0), low everything else (lt 0)
+            tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].lt(0),
+                (strato, tropo)] = (False, True)
+
+            # strato: low p (lt 0), high everything else (gt 0)
+            tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].gt(0),
+                (strato, tropo)] = (True, False)
+
+            # # add data for current tp def to df_sorted
+            tp_sorted = tp_sorted.convert_dtypes()
+
+            df_sorted[tropo] = tp_sorted[tropo]
+            df_sorted[strato] = tp_sorted[strato]
+
+        # Ozone: Flag O3 < 60 ppb as tropospheric
+        if any(tp.crit == 'o3' for tp in tps) and not self.source == 'MULTI':
+            o3_sorted, o3_subs = self.o3_filter_lt60()
+            # rename O3_sorted columns to the corresponding O3 tropopause coord to update
+            for tp in [tp for tp in tps if tp.crit == 'o3']:
+                o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
+                o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
+                df_sorted.update(o3_sorted, overwrite=False)
+
+        df_sorted = df_sorted.convert_dtypes()
+        if save:
+            self.data['df_sorted'] = df_sorted
+        return df_sorted
+
+    @property
+    def df_sorted(self) -> pd.DataFrame:
+        """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
+        if 'df_sorted' not in self.data:
+            self.create_df_sorted(save=True)
+        return self.data['df_sorted']
+
+    def tropo_strato_ratios(self, filter='only_shared', **kwargs) -> tuple[pd.DataFrame]: 
+        """ Calculates the ratio of tropospheric / stratospheric datapoints for the given tropopause definitions.
+        
+        Args: 
+            tps (list[dcts.Coordinate]): Tropopause definitions to calculate ratios for
+            filter (str): only_shared | only_non_shared | None
+        
+        Returns a dataframe with tropospheric (True) and stratospheric (False) flags per TP definition. 
+        """
+        # Select data 
+        tps = kwargs.get('tps', self.tps)
+        tropo_cols = ['tropo_' + tp.col_name for tp in tps
+                      if 'tropo_' + tp.col_name in self.df_sorted]
+
+        shared_indices = self.get_shared_indices(tps)
+        df = self.df_sorted[tropo_cols]
+        if filter == 'only_shared': 
+            df = df[df.index.isin(shared_indices)]
+        elif filter == 'only_non_shared': 
+            df = df[~df.index.isin(shared_indices)]
+
+        # Get counts 
+        tropo_counts = df[df == True].count(axis=0)
+        strato_counts = df[df == False].count(axis=0)
+
+        count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
+        count_df.dropna(axis=1, inplace=True)
+        count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
+
+        # Calculate ratios 
+        ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
+        ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
+        ratio_df.loc['ratios'] = ratios  # set col
+
+        return count_df, ratio_df
+
+    def unambiguously_sorted_indices(self, tps) -> tuple[pd.Index, pd.Index]:
+        """ Get indices of datapoints that are identified consistently as tropospheric / stratospheric. """
+        shared_tropo = shared_strato = self.get_shared_indices(tps)
+
+        for tp in tps:  # iteratively remove non-shared indices
+            shared_tropo = shared_tropo[self.df_sorted.loc[shared_tropo, 'tropo_' + tp.col_name]]
+            shared_strato = shared_strato[self.df_sorted.loc[shared_strato, 'strato_' + tp.col_name]]
+
+        return shared_tropo, shared_strato
+
     # --- Calculate standard deviation statistics ---
     def strato_tropo_stdv(self, subs, tps=None, **kwargs) -> pd.DataFrame:
         """ Calculate overall variability of stratospheric and tropospheric air (not binned). 
@@ -306,373 +643,6 @@ class AnalysisMixin:
 
         return df
 
-    # --- Filter for extreme events in tropospheric air ---
-    def filter_extreme_events(self, plot_ol=False, **tp_kwargs):
-        """ Returns only tropospheric background data (filter out tropospheric extreme events)
-        1. tp_kwargs are used to select tropospheric data only (if object is not already purely tropospheric)
-        2. For each substance in the dataset, extreme 
-         
-        Filter out all tropospheric extreme events.
-
-        Returns new Caribic object where tropospheric extreme events have been removed.
-        Result depends on tropopause definition for tropo / strato sorting.
-
-        Parameters:
-            key tp_def (str): 'chem', 'therm' or 'dyn'
-            key crit (str): 'n2o', 'o3'
-            key vcoord (str): 'pt', 'dp', 'z'
-            key pvu (float): 1.5, 2.0, 3.5
-            key limit (float): pre-flag limit for chem. TP sorting
-
-            key ID (str): 'GHG', 'INT', 'INT2'
-            key verbose (bool)
-            key plot (bool)
-            key subs (str): substance for plotting
-        """
-        if self.status.get('tropo') is not None:
-            out = copy.deepcopy(self)
-        elif self.status.get('strato'):
-            raise Warning('Cannot filter extreme events in purely stratospheric dataset')
-        else:
-            out = self.sel_tropo(**tp_kwargs)
-        out.data = {k: v for k, v in self.data.items() if k not in ['sf6', 'n2o', 'ch4', 'co2']}
-
-        for k in out.data:
-            if not isinstance(out.data[k], pd.DataFrame) or k == 'met_data': continue
-            data = out.data[k].sort_index()
-
-            for column in data.columns:
-                # coordinates
-                if column in [c.col_name for c in dcts.get_coordinates(vcoord='not_mxr')] + ['Flight number']: continue
-                if column in [c.col_name + '_at_fl' for c in dcts.get_coordinates(vcoord='not_mxr')]: continue
-                if column.startswith('d_'):
-                    continue
-                # substances
-                if column in [s.col_name for s in dcts.get_substances()]:
-                    substance = column
-                    time = np.array(dt_to_fy(data.index, method='exact'))
-                    mxr = data[substance].tolist()
-                    if f'd_{substance}' in data.columns:
-                        d_mxr = data[f'd_{substance}'].tolist()
-                    else:
-                        d_mxr = None  # integrated values of high resolution data
-
-                    # Find extreme events
-                    tmp = outliers.find_ol(dcts.get_subs(col_name=substance).function,
-                                           time, mxr, d_mxr, flag=None,  # here
-                                           direction='p', verbose=False,
-                                           plot=plot_ol, limit=0.1, ctrl_plots=False)
-
-                    # Set rows that were flagged as extreme events to 9999, then nan
-                    for c in [c for c in data.columns if substance in c]:  # all related columns
-                        data.loc[(flag != 0 for flag in tmp[0]), c] = 9999
-                    out.data[k].update(data)  # essential to update before setting to nan
-                    out.data[k].replace(9999, np.nan, inplace=True)
-
-                else:
-                    print(f'Cannot filter {column}, removing it from the dataframe')
-                    out.data[k].drop(columns=[column], inplace=True)
-
-        out.status.update({'EE_filter': True})
-        return out
-
-
-# %% Mixin for tropopause-related sorting and data manipulation
-class TropopauseSorterMixin:
-    """Filters for stratosphere / troposphere --- TropopauseSorterMixin 
-    
-    Methods: 
-        n2o_filter(**kwargs)
-            Use N2O data to create strato/tropo reference for data
-        o3_filter_lt60
-        
-        
-        create_df_sorted(**kwargs)
-            Use all chosen tropopause definitions to create strato/tropo reference
-        calc_ratios(group_vc=False)
-            Calculate ratio of tropo/strato datapoints
-
-        filter_extreme_events(**kwargs)
-            Filter for tropospheric data, then remove extreme events
-        detrend_substance(substance, ...)
-            Remove trend wrt. 2005 Mauna Loa from substance, then add to data
-    """
-
-    def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
-        """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
-        data = self.df
-
-        # Choose N2O data to use (Substance object)
-        if 'coord' in kwargs:
-            n2o_coord = kwargs.get('coord')
-
-        elif len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
-            [n2o_coord] = [c for c in self.coordinates if c.crit == 'n2o']
-
-        else:
-            default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', HIAPER='NWAS', EMAC='EMAC', TP='INT')
-            if self.source not in default_n2o_IDs.keys():
-                raise NotImplementedError(f'N2O sorting not available for {self.source}')
-
-            n2o_coord = dcts.get_coord(crit='n2o', ID=default_n2o_IDs[self.source])
-
-            if n2o_coord.col_name not in data.columns:
-                raise Warning(f'Could not find {n2o_coord.col_name} in {self.ID} data.')
-
-        # Get reference dataset
-        ref_years = np.arange(min(self.years) - 2, max(self.years) + 3)
-        loc_obj = MaunaLoa(ref_years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
-        ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID)  # dcts.get_col_name(subs, loc_obj.source)
-
-        if kwargs.get('verbose'):
-            print(f'N2O sorting: {n2o_coord} ')
-
-        n2o_column = n2o_coord.col_name
-
-        df_sorted = pd.DataFrame(index=data.index)
-        if 'Flight number' in data.columns: df_sorted['Flight number'] = data['Flight number']
-        df_sorted[n2o_column] = data[n2o_column]
-
-        if f'd_{n2o_column}' in data.columns:
-            df_sorted[f'd_{n2o_column}'] = data[f'd_{n2o_column}']
-        if f'detr_{n2o_column}' in data.columns:
-            df_sorted[f'detr_{n2o_column}'] = data[f'detr_{n2o_column}']
-
-        df_sorted.sort_index(inplace=True)
-        df_sorted.dropna(subset=[n2o_column], inplace=True)
-
-        mxr = df_sorted[n2o_column]  # measured mixing ratios
-        d_mxr = None if f'd_{n2o_column}' not in df_sorted.columns else df_sorted[f'd_{n2o_column}']
-        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
-
-        # Check if units of data and reference data match, if not change data
-        if str(n2o_coord.unit) != str(ref_subs.unit):
-            if kwargs.get('verbose'): print(f'Note units do not match: {n2o_coord.unit} vs {ref_subs.unit}')
-
-            if n2o_coord.unit == 'mol mol-1':
-                mxr = tools.conv_molarity_PartsPer(mxr, ref_subs.unit)
-                if d_mxr is not None: d_mxr = tools.conv_molarity_PartsPer(d_mxr, ref_subs.unit)
-            elif n2o_coord.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
-                pass
-            else:
-                raise NotImplementedError(f'No conversion between {n2o_coord.unit} and {ref_subs.unit}')
-
-        # Calculate simple pre-flag
-        ref_mxr = loc_obj.df.dropna(subset=[ref_subs.col_name])[ref_subs.col_name]
-        df_flag = tools.pre_flag(mxr, ref_mxr, 'n2o', **kwargs)
-        flag = df_flag['flag_n2o'].values if 'flag_n2o' in df_flag.columns else None
-
-        strato = f'strato_{n2o_column}'
-        tropo = f'tropo_{n2o_column}'
-
-        fit_function = dcts.lookup_fit_function('n2o')
-
-        ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
-                              flag=flag, verbose=False, plot=False, ctrl_plots=False,
-                              limit=kwargs.get('ol_limit', 0.1), direction='n')
-        # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
-        df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
-        df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
-
-        df_sorted.drop(columns=[s for s in df_sorted.columns
-                                if not s.startswith(('Flight', 'tropo', 'strato'))],
-                       inplace=True)
-        df_sorted = df_sorted.convert_dtypes()
-        return df_sorted
-
-    # rename n2o_filter into n2o_baseline_filter
-
-    # create o3_baseline_filter
-
-    def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
-        """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
-        raise NotImplementedError('O3 Baseline filter has not yet been implemented')
-
-    def o3_filter_lt60(self) -> pd.DataFrame:
-        """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
-        o3_substs = self.get_substs(short_name='o3')
-
-        if len(o3_substs) == 1:
-            [o3_subs] = o3_substs
-
-        elif self.source == 'Caribic':
-            if any(s.ID == 'INT' for s in o3_substs):
-                [o3_subs] = [s for s in o3_substs if s.ID == 'INT']
-            elif any(s.ID == 'MS' for s in o3_substs):
-                [o3_subs] = [s for s in o3_substs if s.ID == 'MS']
-            else:
-                [o3_subs] = o3_substs[0]
-                print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
-        else:
-            raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
-
-        o3_sorted = pd.DataFrame(index=self.df.index)
-        o3_sorted.loc[self.df[o3_subs.col_name].lt(60),
-        (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
-        return o3_sorted, o3_subs
-
-    def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
-        """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
-        If no kwargs are specified, df_sorted is calculated for all possible definitions
-        df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
-        
-        Parameters: 
-            key verbose (bool): Make the function more talkative
-            key relative_only (bool): Skip non-relative coords if rel. is available
-        
-        """
-        if self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER', 'MULTI']:
-            data = self.df.copy()
-        else:
-            raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
-
-        # create df_sorted with flight number if available
-        df_sorted = pd.DataFrame(data['Flight number'] if 'Flight number' in data.columns else None,
-                                 index=data.index)
-
-        # Get tropopause coordinates
-        tps = self.get_tps()
-
-        # N2O filter
-        for tp in [tp for tp in tps if tp.crit == 'n2o']:
-            # if self.source == 'MULTI': break
-            n2o_sorted = self.n2o_baseline_filter(coord=tp, **kwargs)
-            if 'Flight number' in n2o_sorted.columns:
-                n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
-            df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
-
-        # Dyn / Therm / CPT / Combo tropopauses
-        for tp in [tp for tp in tps if not tp.vcoord == 'mxr']:
-            if tp.col_name not in data.columns:
-                print(f'Note: {tp.col_name} not found, continuing.')
-                continue
-
-            if kwargs.get('verbose'): print(f'Sorting {tp}')
-
-            tp_df = data.dropna(axis=0, subset=[tp.col_name])
-
-            if tp.tp_def == 'dyn':  # dynamic TP only outside the tropics - latitude filter
-                tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
-            if tp.tp_def == 'cpt':  # cold point TP only in the tropics
-                tp_df = tp_df[np.array([(30 > i > -30) for i in np.array(tp_df.geometry.y)])]
-
-            # define new column names
-            tropo = 'tropo_' + tp.col_name
-            strato = 'strato_' + tp.col_name
-
-            tp_sorted = pd.DataFrame({strato: pd.Series(np.nan, dtype=object),
-                                      tropo: pd.Series(np.nan, dtype=object)},
-                                     index=tp_df.index)
-
-            # tropo: high p (gt 0), low everything else (lt 0)
-            tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].lt(0),
-                (strato, tropo)] = (False, True)
-
-            # strato: low p (lt 0), high everything else (gt 0)
-            tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].gt(0),
-                (strato, tropo)] = (True, False)
-
-            # # add data for current tp def to df_sorted
-            tp_sorted = tp_sorted.convert_dtypes()
-
-            df_sorted[tropo] = tp_sorted[tropo]
-            df_sorted[strato] = tp_sorted[strato]
-
-        # Ozone: Flag O3 < 60 ppb as tropospheric
-        if any(tp.crit == 'o3' for tp in tps) and not self.source == 'MULTI':
-            o3_sorted, o3_subs = self.o3_filter_lt60()
-            # rename O3_sorted columns to the corresponding O3 tropopause coord to update
-            for tp in [tp for tp in tps if tp.crit == 'o3']:
-                o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
-                o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
-                df_sorted.update(o3_sorted, overwrite=False)
-
-        df_sorted = df_sorted.convert_dtypes()
-        if save:
-            self.data['df_sorted'] = df_sorted
-        return df_sorted
-
-    @property
-    def df_sorted(self) -> pd.DataFrame:
-        """ Bool dataframe indicating Troposphere / Stratosphere sorting of various coords"""
-        if 'df_sorted' not in self.data:
-            self.create_df_sorted(save=True)
-        return self.data['df_sorted']
-
-    def calc_tropo_strato_ratios(self, tps=None, ratios=True, shared_only=True) -> pd.DataFrame:
-        """ Calculate ratio of tropospheric / stratospheric datapoints for given tropopause definitions.
-        
-        Parameters: 
-            tps (List[Coordinate]): Tropopause definitions to calculate ratios for
-            ratios (bool): Include ratio of tropo/strato counts in output 
-            shared_only (True, False, No): True=Use only shared datapoints, False=all points, No=only non-shared
-        
-        Returns a dataframe with counts (and ratios) for True / False values for all available tps
-        """
-
-        if tps is None:
-            tps = self.tps
-
-        tropo_cols = ['tropo_' + tp.col_name for tp in tps
-                      if 'tropo_' + tp.col_name in self.df_sorted]
-
-        # Implement 'shared_only' parameter 
-        shared_df_sorted = self.df_sorted[tropo_cols].dropna(how='any')
-        if shared_only:
-            tropo_df = shared_df_sorted
-        elif not shared_only:
-            tropo_df = self.df_sorted[tropo_cols]
-        elif shared_only == 'No':
-            tropo_df = self.df_sorted[tropo_cols][~ self.df_sorted.index.isin(shared_df_sorted.index)]
-        else:
-            raise KeyError(f'Invalid value for shared: {shared_only}')
-
-        # Get counts 
-        tropo_counts = tropo_df[tropo_df == True].count(axis=0)
-        strato_counts = tropo_df[tropo_df == False].count(axis=0)
-
-        count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
-        count_df.dropna(axis=1, inplace=True)
-        count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
-
-        if not ratios:
-            return count_df
-
-        ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
-        ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
-        ratio_df.loc['ratios'] = ratios  # set col
-
-        return pd.concat([count_df, ratio_df])
-
-    def calc_ratios(self, tps=None, ratios=True) -> pd.DataFrame:
-        """ Calculate ratio of tropospheric / stratospheric datapoints for all TP definitions. """
-        return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared_only=False)
-
-    def calc_shared_ratios(self, tps=None, ratios=True) -> pd.DataFrame:
-        """ Calculate ratios of tropo / strato data for given tps on shared datapoints. """
-        return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared_only=True)
-
-    def calc_non_shared_ratios(self, tps=None, ratios=True) -> pd.DataFrame:
-        """ 
-        Calculate ratios of tropo / strato data for given tps only for non-shared datapoints.
-        Can be useful to check results of only using shared vs. all datapoints. 
-        """
-        return self.calc_tropo_strato_ratios(tps=tps, ratios=ratios, shared_only='No')
-
-    def shared_tropo_strato_indices(self, tps) -> tuple[pd.Index, pd.Index]:
-        """ Get indices of datapoints that are identified consistently as tropospheric / stratospheric. """
-        shared_tropo = shared_strato = self.get_shared_indices(tps)
-
-        for tp in tps:  # iteratively remove non-shared indices
-            shared_tropo = shared_tropo[self.df_sorted.loc[shared_tropo, 'tropo_' + tp.col_name]]
-            shared_strato = shared_strato[self.df_sorted.loc[shared_strato, 'strato_' + tp.col_name]]
-
-        return shared_tropo, shared_strato
-
-    def identify_bins_relative_to_tropopause(self, subs, tp, **kwargs) -> pd.DataFrame:
-        """ Flag each datapoint according to its distance to specific tropopause definitions. """
-        # TODO implement this
-
 
 # %% Mixin for adding binning methods to GlobalData objects
 
@@ -769,7 +739,7 @@ class BinningMixin:
                                bci_2d, count_limit=self.count_limit)
         return out
 
-    def bin_3d(self, var, xcoord, ycoord, zcoord, **kwargs) -> tools.Bin3DFitted:
+    def bin_3d(self, var, xcoord, ycoord, zcoord, **kwargs) -> bp.Simple_bin_3d:
         """ Bin variable data onto a 3D-grid given by z-coordinate / (equivalent) latitude / longitude. 
 
         Args: 
@@ -797,7 +767,6 @@ class BinningMixin:
             out = tools.Bin3DFitted(np.array(self.df[var.col_name]),
                                     x, y, z, bci_3d,
                                     count_limit=self.count_limit)
-
         else: 
             out = bp.Simple_bin_3d(np.array(self.df[var.col_name]), 
                                    x, y, z, bci_3d, 
@@ -874,7 +843,7 @@ class BinningMixin:
                                                     **kwargs)
         return out_dict
 
-    def bin_2d_seasonal(self, var, xcoord, ycoord, **kwargs) -> dict[bp.Simple_bin_3d]: 
+    def bin_2d_seasonal(self, var, xcoord, ycoord, **kwargs) -> dict[bp.Simple_bin_2d]: 
         """ Seasonal binning of var along xyz coordinates. """
         if 'season' not in self.df.columns:
             self.df['season'] = tools.make_season(self.df.index.month)

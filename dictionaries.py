@@ -112,7 +112,7 @@ class Coordinate:
     def __repr__(self) -> str:
         return f'Coordinate: {self.col_name} [{self.unit}] from {self.ID}'
 
-    def label(self, filter_label=False, coord_only=False) -> str:
+    def label(self, filter_label=False, coord_only=False, no_vc=False) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
         tp_defs = {'chem': 'Chemical',
@@ -148,6 +148,7 @@ class Coordinate:
                     vc = self.vcoord if not self.vcoord == 'pt' else '$\Theta$'
                     if self.rel_to_tp: vc = '$\Delta\,$' + vc
                     label = f'{tp + pv + crit} ({model}, {vc})'
+                    if no_vc: label = f'{tp + pv + crit} ({model})'
             else:
                 label = f'{vcoord} [{self.unit}]'
 
@@ -245,12 +246,12 @@ class Coordinate:
             limits_per_unit = {
                 'K' :  (260, 400), # ignoring temperature here
                 'PVU' : (-5, 10),
-                'km' : (0, 15),
+                'km' : (5, 17.5),
                 'hPa' : (150, 700), 
                 'm' : (0, 15e3),
                 'mbar' : (150, 700), 
                 'm2s-2' : (0, 15e4),
-                'ppb' : (250, 350),
+                'ppb' : (280, 350),
                 'year' : (0, 3.5),
                 }
             if self.unit in limits_per_unit: 
