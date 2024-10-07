@@ -152,6 +152,11 @@ class Coordinate:
             else:
                 label = f'{vcoord} [{self.unit}]'
 
+            if coord_only:
+                vcoord = f'$\Delta${self.vcoord}$_{{TP}}$' if self.rel_to_tp is True else f'{self.vcoord}'
+                if self.vcoord == 'pt': vcoord = '$\Delta\Theta_{{TP}}$' if self.rel_to_tp is True else '$\Theta$'
+                label = f'{vcoord}'
+
         elif self.hcoord is not np.nan:
             hcs = {'lon': 'Longitude',
                    'lat': 'Latitude',
@@ -163,17 +168,14 @@ class Coordinate:
                 label = f'{hcs[self.hcoord]} [{hcs[self.unit]}]'
             else:
                 label = f'{self.hcoord} [{self.unit}]'
+            if coord_only: 
+                label = label.split('[')[0].strip()
 
         elif self.var is not np.nan:
-            label = f'{self.var} [{self.unit}]'
+            label = f'{self.var} [{self.unit}]' if not coord_only else self.var
 
         else:
             raise NotImplementedError('Cannot create label, this should not have happened.')
-
-        if coord_only:
-            vcoord = f'$\Delta${self.vcoord}$_{{TP}}$' if self.rel_to_tp else f'{self.vcoord}'
-            if self.vcoord == 'pt': vcoord = '$\Delta\Theta_{{TP}}$' if self.rel_to_tp else '$\Theta$'
-            label = f'{vcoord} [{self.unit}]'
 
         return label
 
@@ -236,7 +238,7 @@ class Coordinate:
         
         if self.rel_to_tp is True: 
             limits_per_unit_RelToTp = {
-                'K' :  (-100, 100),
+                'K' :  (-70, 70),
                 'km' : (-10, 5),
                 'hPa' : (-400, 600)
                 }
@@ -496,7 +498,7 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
     elif short_name == 'o3': 
         vlim_dict.update(
             dict(vmean = (0.0, 1000),
-                 vstdv = (0, 200),
+                 vstdv = (0, 280),
                  vstdv_tropo = (15, 60),
                  vstdv_strato = (90, 200), 
                  rvstd = (0,10),
@@ -873,29 +875,32 @@ def dict_tps():
             'color_therm': '#ff7f0e',
             'color_dyn': '#2ca02c'}
 
-def note_dict(fig_or_ax, x=None, y=None, s=None, ha=None):
+def note_dict(fig_or_ax, s = None, bbox_kwargs=dict(), **kwargs):
     """ Return default arguments & bbox dictionary for adding notes to plots. """
     try:
         transform = fig_or_ax.transAxes
     except:
         transform = fig_or_ax.transFigure
-
-    bbox_defaults = dict(edgecolor='lightgrey',
-                         facecolor='lightcyan',
-                         boxstyle='round')
-
-    x = x if x else 0.97
-    y = y if y else 0.97
+        
+    x = kwargs.pop('x', 0.97)
+    y = kwargs.pop('y', 0.97)
+   
+    note_kwargs = dict(x = x,
+                       y = y,
+                       ha = 'right' if x > 0.5 else 'left',
+                       va = 'center_baseline' if y > 0.5 else 'bottom'
+                       )
+    note_kwargs.update(**kwargs)
     
-    if not ha: 
-        ha = 'right' if x > 0.5 else 'left'
-
-    note_dict = dict(x=x,
-                     y=y,
-                     horizontalalignment = ha,
-                     verticalalignment='center_baseline' if y > 0.5 else 'bottom',
+    bbox_defaults = dict(edgecolor='lightgrey',
+                        facecolor='lightcyan',
+                        boxstyle='round')
+    bbox_defaults.update(**bbox_kwargs)
+    
+    note_dict = dict(**note_kwargs,
                      transform=transform,
-                     bbox=bbox_defaults)
+                     bbox=bbox_defaults,
+                     )
     if s: note_dict.update(dict(s=s))
 
     return note_dict

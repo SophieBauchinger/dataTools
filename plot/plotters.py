@@ -10,6 +10,8 @@ import math
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import matplotlib.lines as mlines
+from matplotlib.patches import Patch
 import numpy as np
 
 from dataTools.plot.data import GlobalDataPlotterMixin
@@ -102,7 +104,8 @@ class PlotterMixin(GlobalDataPlotterMixin,
         """ Create the necessary nr of subplots and hide superfluous axes. """
         no_of_axs = len(tps) + extra_axes
 
-        fig = plt.figure(figsize=(7, math.ceil(no_of_axs/2)*2), dpi=100, **fig_kwargs)
+        figsize = fig_kwargs.pop('figsize', (7, math.ceil(no_of_axs/2)*2))
+        fig = plt.figure(figsize=figsize, dpi=100, **fig_kwargs)
         
         gs = fig.add_gridspec(math.ceil(no_of_axs/2), 2)
         axs = gs.subplots(sharex=sharex, sharey=sharey)
@@ -258,7 +261,7 @@ class PlotterMixin(GlobalDataPlotterMixin,
                                 path_effects = [self.outline]))
         return lines
     
-    def tp_legend_handles(self, **kwargs) -> list[Line2D]: 
+    def tp_legend_handles(self, filter_label=True, coord_only=False, no_vc=False, **kwargs) -> list[Line2D]: 
         """ Create a legend for all tropopause definitions in self.tps (or tps if given).         
         Args: 
             key tps (list[dcts.Coordinate]): Tropopause definition coordinates
@@ -267,16 +270,31 @@ class PlotterMixin(GlobalDataPlotterMixin,
             key marker (str) 
             key markersize (float)
         """ 
-        tps = kwargs.get('tps', self.tps)
+        tps = kwargs.pop('tps', self.tps)
         lw = kwargs.pop('lw', 3)
         lines = [Line2D([0], [0], 
-                          label=tp.label(filter_label=True), 
+                          label=tp.label(filter_label=filter_label, 
+                                         coord_only=coord_only,
+                                         no_vc=no_vc), 
                           color=tp.get_color(), 
                           lw = lw,
                           **kwargs
                           )
                    for tp in tps]
         return lines
+
+    def lognorm_legend_handles(self): 
+        """ Create a legend for Mode, 68% Interval and 95% Interval for lognorm stats. """
+        # loc = 'lower center', ncols = len(h)
+        
+        h_Mode = mlines.Line2D([], [], ls = 'None', alpha = 1, zorder = 9, marker = 'o', color = 'k')
+        h_68 = Patch(color = 'grey', alpha = 0.8)
+        h_95 = Patch(color = 'grey', alpha = 0.5)
+        
+        l = ['Mode', '68$\,$% Interval', '95$\,$% Interval']
+        h = [h_Mode, h_68, h_95]
+
+        return h, l
 
 class CaribicPlotter(PlotterMixin,
                      Caribic): 

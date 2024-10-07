@@ -607,6 +607,52 @@ class LognormFit:
                                 float('{0:.{1}f}'.format(self.median*self.multiplicative_std*2, prec)))
         return pd.Series(stats_dict)
 
+class Bin2DFitted(bp.Simple_bin_2d): 
+    """ Extending Bin2D class to hold lognorm fits for distributions. """
+    
+    def __init__(self, v, x, y, binclassinstance, count_limit=1, fit_bin_nr=50): 
+        super().__init__(v, x, y, binclassinstance, count_limit)
+        
+        self.calc_lognorm_fits(fit_bin_nr)
+    
+    def calc_lognorm_fits(self, bin_nr): 
+        """ Add lognormal fits to distribution of values in 3D bins. """
+        self.vmean_fit = LognormFit(self.vmean, bin_nr=bin_nr)
+        self.vstdv_fit = LognormFit(self.vstdv, bin_nr=bin_nr)
+        self.rvstd_fit = LognormFit(self.rvstd, bin_nr=bin_nr)
+
+        return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
+
+    def plot_hist(self, ax, hist_range = None, color = None, bin_nr = 50, bin_attr = 'vstdv'): 
+        """ Plots histogram with lognormal fit onto the given axis. 
+        
+        Args: 
+            ax (Axis)
+            hist_range (tuple[float]): Outer boundaries of the histogram
+            color (str): facecolor of the bins
+            bin_nr (int): Number of bins
+            bin_attr (str): Attribute of the binned data to show 
+        """
+        x = getattr(self, bin_attr)
+        ax.hist(x[~np.isnan(x)], 
+            bins = bin_nr, range = hist_range, 
+            orientation = 'horizontal',
+            edgecolor = 'white', lw = 0.3, 
+            color = color,
+            )
+
+        lognorm_inst = getattr(self, f'{bin_attr}_fit')
+        lognorm_fit = lognorm_inst.lognorm_fit
+        bin_center = lognorm_inst.bin_center
+        ax.plot(lognorm_fit, bin_center,
+                c = 'k', lw = 1)
+        
+        ax.hlines(lognorm_inst.mode, 0, max(lognorm_fit),
+                  ls = 'dashed', 
+                  color = 'k', 
+                  lw = 1)
+        
+
 class Bin3DFitted(bp.Simple_bin_3d): 
     """ Extending Bin3D class to hold lognorm fits for distributions. """
     
@@ -622,6 +668,40 @@ class Bin3DFitted(bp.Simple_bin_3d):
         self.rvstd_fit = LognormFit(self.rvstd, bin_nr=bin_nr)
 
         return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
+
+    def plot_hist(self, ax, hist_range = None, color = None, bin_attr = 'vstdv', bin_nr = 50): 
+        """ Plots histogram with lognormal fit onto the given axis. 
+        
+        Args: 
+            ax (Axis)
+            hist_range (tuple[float]): Outer boundaries of the histogram
+            color (str): facecolor of the bins
+            bin_nr (int): Number of bins
+            bin_attr (str): Attribute of the binned data to show 
+        """
+        x = getattr(self, bin_attr)
+        # Plot data
+        ax.hist(x[~np.isnan(x)], 
+            bins = bin_nr, range = hist_range, 
+            orientation = 'horizontal',
+            edgecolor = 'white', lw = 0.3, 
+            color = color,
+            )
+
+        # Plot lognorm fit 
+        lognorm_inst = getattr(self, f'{bin_attr}_fit')
+        lognorm_fit = lognorm_inst.lognorm_fit
+        bin_center = lognorm_inst.bin_center
+        ax.plot(lognorm_fit, bin_center,
+                c = 'k', lw = 1)
+        
+        # Plot stats
+        ax.hlines(lognorm_inst.mode, 0, max(lognorm_fit),
+                  ls = 'dashed', 
+                  color = 'k', 
+                  lw = 1)
+        
+        return lognorm_inst
 
 def load_reload_Bin3D_df(action, pickle_obj = None, fname = None):
     """ Either saves Bin3D_df to file or reloads it from there. 

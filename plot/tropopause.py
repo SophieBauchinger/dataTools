@@ -20,6 +20,7 @@ import matplotlib.patheffects as mpe
 import numpy as np
 import pandas as pd
 from shapely.geometry import Point
+from statistics import median 
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -39,7 +40,6 @@ class TropopausePlotterMixin:
         class GlobalSubclassTropopause(GlobalSubclass, TropopausePlotter)
     """
 # --- Plot differences in tropopause heights for TP definitions / seasons / years ---       
-
     def tp_height_global_2D_overview(self, rel=False, tps=None):
         """ Show 2D-binned latitude-longitude maps of tropopause height for various definitions. """
         for tp in (self.tps if not tps else tps): 
@@ -197,8 +197,7 @@ class TropopausePlotterMixin:
         for tp, ax in zip(tps, axs.flat): 
             self.tp_height_seasonal_1D_binned(tp, ax = ax, 
                                                 invert_yaxis =True if tp.vcoord =='mxr' else False,
-                                                xlims = (30, 80), 
-                                                ylims = (-4, 4) if tp.vcoord != 'mxr' else (340, 290), 
+                                                ylims = tp.get_lims(), 
                                                 **kwargs)
         fig.suptitle('Vertical extent of tropopauses')
         fig.tight_layout()
@@ -289,13 +288,179 @@ class TropopausePlotterMixin:
             label = tp.label(filter_label = True, no_vc = True)
             
             bars = ax.barh(label, ratio, rasterized=True, color=color, alpha=0.9)
-            bar_labels = ['{:.2f} (n={:.0f})'.format(r,n) for r,n in zip([ratio], [n_value])]
+            if kwargs.get('n_values'):
+                bar_labels = ['{:.2f} (n={:.0f})'.format(r,n) for r,n in zip([ratio], [n_value])]
+            else: 
+                bar_labels = ['{:.2f}'.format(ratio)]
 
             ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
-            ax.set_xlim(0,2)
+            ax.set_xlim(kwargs.get('xlim', (0,2)))
 
         if 'fig' in locals(): fig.tight_layout()
 
+    def distributions_1d_binned(self, var, xcoords, density=True, 
+                                note = None, **bci_kwargs): 
+        """ Show distribution of var-values in bins of xcoords (tps). 
+        
+        Args: 
+            var (dcts.Coordinate|dcts.Substance)
+            xcoords (dcts.Coordinate or array thereof)
+            density (bool): Normalise distributions
+            
+            key bci_1d (bp.binclassinstance)
+            key v_bins (array): Bins for variable distribution histograms
+            
+        Returns v_bins, bin_dict - var. distr. bins / data binned using xcoords. 
+        """
+
+        # Calculate bins for variable distributions
+        v = self.df[var.col_name]
+        vbsize = var.get_bsize()
+        v_bins= np.arange(np.floor(np.nanmin(v)),
+                          np.nanmax(v) + vbsize,
+                          step = vbsize)
+
+        bin_dict = {}
+        for xcoord in xcoords: 
+            bci_1d = self.make_bci(xcoord, **bci_kwargs)
+            x = self.df[xcoord.col_name]
+            bp1d = bp.Simple_bin_1d(v, x, bci_1d)
+            bin_dict[xcoord] = bp1d
+            
+        # Plot values 
+        fig, axs_top_to_bottom = plt.subplots(len(bp1d.xintm), 
+                                              len(xcoords)+1, 
+                                figsize = (2*(len(xcoords)+1), # width
+                                           0.8 * len(bp1d.xintm)), # height 
+                                sharey=True, sharex=True,)
+        
+        axs = np.flip(axs_top_to_bottom, axis = 0) # highest on top 
+        
+        # Add bin description, grid, top ticks, xlabel
+        for ax in axs_top_to_bottom[0,1:]: # top row 
+            ax.tick_params(axis = 'x', labeltop = True, top = True)
+            ax.xaxis.set_label_position('top')
+
+        # Show xlabel on top / bottom. Only outer axes if label is too long
+        label_axs = list(axs[0,1:]) + list(axs[-1, 1:])
+        if len(var.label()) > 18: 
+            label_axs = [axs[0,1], axs[0,-1], axs[-1, 1], axs[-1, -1]]
+        for ax in label_axs:
+            ax.set_xlabel(var.label())
+
+        # Get secondary axis to plot normalised distribution in the background 
+        flat_twin_axs = [ax.twinx() for ax in axs.flat]
+        for ax in flat_twin_axs[1:]: 
+            ax.sharey(flat_twin_axs[0])
+        twin_axs = np.reshape(flat_twin_axs, axs.shape).copy()
+
+        # Label bins in leftmost column
+        # NB: left edge inside the bin, right edge outside
+        for xi, ax in enumerate(axs[:,0]): 
+            ax.axis('off')
+            ax.text(s = f'[{bp1d.xbinlimits[xi]}, {bp1d.xbinlimits[xi+1]}) {xcoords[0].unit} ', 
+                    x = 0.7 if density=='both' else 0.9, 
+                    y = 0.5, transform = ax.transAxes, 
+                    va = 'center', ha = 'right', fontsize = 12)
+        for ax in axs.flat: # all 
+            ax.grid(True, axis = 'x', ls = 'dashed', color = 'grey', alpha = 0.5)
+
+        # Add histograms for var distribution within delta-xcoord bins
+        for tp_i, (tp, bp1d) in enumerate(bin_dict.items()): 
+            column = axs[:,tp_i + 1]
+            for xi, vdata in enumerate(bp1d.vbindata): 
+                if str(vdata) == 'nan': continue
+                if len(vdata) > self.count_limit:
+                    column[xi].hist(vdata, 
+                                    bins = v_bins, 
+                                    histtype='step',
+                                    edgecolor=tp.get_color(), 
+                                    density = density if not density=='both' else False, 
+                                    lw = 2, 
+                                    zorder = 3)
+                    if density == 'both': 
+                        twin_axs[xi,tp_i + 1].hist(vdata,
+                                        bins = v_bins, 
+                                        histtype='stepfilled',
+                                        color=tp.get_color(), 
+                                        density = True, 
+                                        alpha = 0.25,
+                                        zorder = 1)
+                        twin_axs[xi,tp_i + 1].hist(vdata,
+                                        bins = v_bins, 
+                                        histtype='step',
+                                        density = True, 
+                                        alpha = 0.5,
+                                        edgecolor=tp.get_color(), 
+                                        ls = 'dashed',
+                                        lw = 1)
+
+        # Add vlines for median now that ylims are set for all histograms
+        ymin = np.min([ax.get_ylim()[0] for ax in axs.flat])
+        ymax = np.max([ax.get_ylim()[1] for ax in axs.flat])
+        for tp_i, (tp, bp1d) in enumerate(bin_dict.items()): 
+            for xi, vdata in enumerate(bp1d.vbindata):
+                if str(vdata) == 'nan': continue
+                if len(vdata) > self.count_limit: 
+                    axs[xi, tp_i+1].vlines(median(vdata), ymin, ymax/2, 
+                                            color='k', ls = 'dashed', 
+                                            lw = 1.5, zorder = 5)
+
+        # Adjust yticks and spines 
+        for ax in axs[:,-1]: # rightmost column
+            ax.tick_params(axis = 'y', labelright = True, right = True)
+            if any(t%1 != 0 for t in ax.get_yticks()):
+                ax.set_yticks([float('%.1g' % v) for v in 
+                            [ymin, ymax*0.33, ymax*0.66]])
+            else: 
+                ax.set_yticks([float('%.3g' % v) for v in 
+                            [ymin, ymax*0.33, ymax*0.66]])
+        if density=='both':
+            norm_ymax = np.max([ax.get_ylim()[1] for ax in twin_axs.flat])
+            for ax in twin_axs.flat:
+                ax.tick_params(labelright=False, labelleft=False, 
+                            right = False, left = False)
+            for ax in twin_axs[:, 1].flat: # left data column
+                ax.tick_params(labelleft=True, left = True, 
+                            color='xkcd:dark grey',
+                            labelcolor='xkcd:dark grey')
+                ax.spines['left'].set(color = 'xkcd:dark grey')
+                ax.set_yticks([float('%.1g' % v) for v in 
+                        [0, norm_ymax*0.33, norm_ymax*0.66]])
+            for ax in twin_axs[:,0]:
+                ax.axis('off')
+            for ax in axs[:,1].flat:
+                ax.tick_params(left=False)
+
+        # Add tps description as legend
+        legend = fig.legend(handles = self.tp_legend_handles(tps = xcoords), 
+                loc = 'upper center', ncols = 1)
+        
+        # Make space for the legend dynamically 
+        legend_bbox = legend.get_window_extent(renderer=fig.canvas.get_renderer())
+        legend_height = legend_bbox.height / fig.dpi  # height in inches
+        
+        fig_bbox = fig.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        fig.set_size_inches(fig_bbox.width, fig_bbox.height + legend_height)
+        fig_bbox = fig.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        new_top = 1 - (legend_height / fig_bbox.height) * 1.75
+        fig.subplots_adjust(top = new_top,
+                            wspace=0, hspace=0)
+        
+        # Add textbox anchored to the legend location 
+        if note: 
+            legend_bbox = legend.get_window_extent(renderer=fig.canvas.get_renderer())
+            legend_loc = fig.transFigure.inverted().transform(legend_bbox.get_points())
+
+            fig.text(legend_loc[1,0] + 0.1, 
+                    (legend_loc[0, 1] + legend_loc[1, 1]) / 2, 
+                    note, 
+                    fontsize=10,
+                    bbox=dict(facecolor='white', alpha=0.8, 
+                                edgecolor='xkcd:dark grey', boxstyle='round,pad=0.5'),
+                    ha='left', va='center')
+        
+        return v_bins, bin_dict
 
 # --- Plot substance values sorted into stratosphere / troposphere
     def make_figures_per_vcoord(self, plotting_function, **kwargs): 

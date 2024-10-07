@@ -295,6 +295,10 @@ class TropopauseSorterMixin:
             Remove trend wrt. 2005 Mauna Loa from substance, then add to data
     """
 
+    def calculate_average_distange_to_tropopause(self, tps): 
+        """ Calculate the average distance of measurements around the tropopause. """
+
+
     def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
         data = self.df
@@ -666,27 +670,42 @@ class BinningMixin:
     """
 
     def make_bci(self, xcoord, ycoord=None, zcoord=None, **kwargs): 
-        """ Create n-dimensional binclassinstance using standard coordinate limits / bin sizes. """
+        """ Create n-dimensional binclassinstance using standard coordinate limits / bin sizes. 
+        
+        Args: 
+            *coord (dcts.Coordinate)
+            
+            key *bsize (float): Size of the bin
+            key *bmin, *bmax (float): Outer bounds for bins. Optional 
+            
+        Returns Bin_equi*d binning structure for all given dimensions.  
+        """
         dims = sum([dim is not None for dim in [xcoord, ycoord, zcoord]])
 
         if dims not in [1,2,3]:
             raise ValueError('Something went wrong when evaluating dimension numbers. ') 
 
         xbsize = kwargs.get('xbsize', xcoord.get_bsize())
-        xbmin, xbmax = self.get_var_lims(xcoord, bsize = xbsize, **kwargs)
+        def_xbmin, def_xbmax = self.get_var_lims(xcoord, bsize = xbsize, **kwargs)
+        xbmin = kwargs.get('xbmin', def_xbmin)
+        xbmax = kwargs.get('xbmax', def_xbmax)
         
         if dims == 1: 
             return bp.Bin_equi1d(xbmin, xbmax, xbsize)
 
         ybsize = kwargs.get('ybsize', ycoord.get_bsize())
-        ybmin, ybmax = self.get_var_lims(ycoord, bsize = ybsize, **kwargs)
+        def_ybmin, def_ybmax = self.get_var_lims(ycoord, bsize = ybsize, **kwargs)
+        ybmin = kwargs.get('ybmin', def_ybmin)
+        ybmax = kwargs.get('ybmax', def_ybmax)
         
         if dims == 2: 
             return bp.Bin_equi2d(xbmin, xbmax, xbsize, 
                                  ybmin, ybmax, ybsize)
-        
+
         zbsize = kwargs.get('zbsize', zcoord.get_bsize())
-        zbmin, zbmax = self.get_var_lims(zcoord, bsize = zbsize, **kwargs)
+        def_zbmin, def_zbmax = self.get_var_lims(zcoord, bsize = zbsize, **kwargs)
+        zbmin = kwargs.get('zbmin', def_zbmin)
+        zbmax = kwargs.get('zbmax', def_zbmax)
         
         return bp.Bin_equi3d(xbmin, xbmax, xbsize,
                              ybmin, ybmax, ybsize,
@@ -725,18 +744,26 @@ class BinningMixin:
             xcoord (dcts.Substance, dcts.Coordinate) - 1st bin dimension 
             ycoord (dcts.Substance, dcts.Coordinate) - 2nd bin dimension 
             
-            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
+            key bci_2d (bp.Bin_equi2d, bp.Bin_notequi2d): 2D-Binning structure
             key xbsize (float): 1st dim bin size
             key ybsize (float): 2nd dim bin size
+            key lognorm_fit (bool): Toggle fitting a lognorm distr. to the binned data. Default True
         
-        Returns bp.Simple_bin_2d object
+        Returns bp.Simple_bin_2d object or tools.Bin2DFitted object
         """
         x = self.get_var_data(xcoord)
         y = self.get_var_data(ycoord)
         bci_2d = kwargs.get('bci_2d', self.make_bci(xcoord, ycoord, **kwargs))
 
-        out = bp.Simple_bin_2d(np.array(self.df[var.col_name]), x, y,
-                               bci_2d, count_limit=self.count_limit)
+        if kwargs.get('lognorm_fit', True): 
+            out = tools.Bin2DFitted(np.array(self.df[var.col_name]),
+                                    x, y, bci_2d,
+                                    count_limit=self.count_limit)
+        else: 
+            out = bp.Simple_bin_2d(np.array(self.df[var.col_name]), 
+                                   x, y, bci_2d, 
+                                   count_limit=self.count_limit)
+
         return out
 
     def bin_3d(self, var, xcoord, ycoord, zcoord, **kwargs) -> bp.Simple_bin_3d:
@@ -753,7 +780,7 @@ class BinningMixin:
             key xbsize (float): 1st dim bin size
             key ybsize (float): 2nd dim bin size
             key zbsize (float): 3rd dim bin size
-            key lognorm_fit (bool): Toggle fitting a lognorm distr. to the binned data
+            key lognorm_fit (bool): Toggle fitting a lognorm distr. to the binned data. Default True
         
         Returns a Simple_bin_2d object or tools.Bin3DFitted object including LogNorm distribution fits.
         """
@@ -763,7 +790,7 @@ class BinningMixin:
         z = self.get_var_data(zcoord)
         bci_3d = kwargs.get('bci_3d', self.make_bci(xcoord, ycoord, zcoord, **kwargs))
         
-        if kwargs.get('lognorm_fit'): 
+        if kwargs.get('lognorm_fit', True): 
             out = tools.Bin3DFitted(np.array(self.df[var.col_name]),
                                     x, y, z, bci_3d,
                                     count_limit=self.count_limit)
@@ -870,3 +897,10 @@ class BinningMixin:
                                                     bci_3d = bci_3d, 
                                                     **kwargs)
         return out_dict
+
+    # def reorder_seasonal_dicts(self, dictionary): 
+    #     """ From var - season get to season - var for nested dictionaries. """
+    #     seasonal_dict = {}
+    #     for s in set(self.df['season']):
+    #         seasonal_dict[s] = {k:v[s] for k,v in dictionary.items()}
+    #     return seasonal_dict
