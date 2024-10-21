@@ -148,11 +148,13 @@ class TropopausePlotterMixin:
         df = kwargs.get('df', self.df)
         coord = kwargs.get('coord', dcts.get_coord(col_name = 'geometry.y'))
         bci = self.make_bci(coord, xbsize = kwargs.get('bsize', coord.get_bsize()))
+        n2o_color = 'xkcd:violet'
 
         # Prepare the plot
         ax = kwargs.get('ax') if 'ax' in kwargs else plt.subplots()
         ax.set_title(tp.label(filter_label=True))
-        ax.set_ylabel(tp.label(coord_only=True))
+        ax.set_ylabel(tp.label(coord_only=True), 
+                      color=n2o_color if tp.crit=='n2o' else 'k')
         ax.set_xlabel(coord.label())
         ax.grid(True, ls='dotted')
 
@@ -172,14 +174,14 @@ class TropopausePlotterMixin:
                                 bin1d.vmean - bin1d.vstdv, 
                                 bin1d.vmean + bin1d.vstdv,
                                 alpha=0.13, color=plot_kwargs['color'])
-                if kwargs.get('invert_yaxis'):
-                    ax.invert_yaxis() 
+
             else: 
                 plot_kwargs.update(dict(
                     label = dcts.dict_season()[f'name_{s}'], 
                     color = dcts.dict_season()[f'color_{s}']))
-
-            ax.plot(bin1d.xintm, bin1d.vmean, **plot_kwargs)
+            ax.plot(bin1d.xintm, bin1d.vmean,
+                     path_effects = plot_kwargs.pop('path_effects'),
+                     **plot_kwargs)
 
         if 'yscale' in kwargs:
             ax.set_yscale(kwargs.get('yscale'))
@@ -187,18 +189,28 @@ class TropopausePlotterMixin:
             ax.set_ylim(*kwargs.get('ylims'))
         if 'xlims' in kwargs: 
             ax.set_xlim(*kwargs.get('xlims'))
+        if kwargs.get('invert_yaxis'):
+            ax.invert_yaxis()
         if tp.rel_to_tp: 
             tools.add_zero_line(ax)
 
     def tps_height_comparison_seasonal_1D(self, **kwargs): 
         """ Default plot for comparing Tropopause heights in latitude bins. """ 
-        fig, axs = plt.subplots(3,2, figsize = (10, 10), sharex=True)
-        tps = kwargs.get('tps', self.tps)
+        tps = kwargs.pop('tps', self.tps)
+        fig, axs = plt.subplots(3,2, figsize = (10, 10), sharex=True, 
+                                dpi=kwargs.pop('dpi', 150))
+        ylims = kwargs.pop('ylims', None)
         for tp, ax in zip(tps, axs.flat): 
-            self.tp_height_seasonal_1D_binned(tp, ax = ax, 
-                                                invert_yaxis =True if tp.vcoord =='mxr' else False,
-                                                ylims = tp.get_lims(), 
-                                                **kwargs)
+            self.tp_height_seasonal_1D_binned(
+                tp, ax = ax, 
+                invert_yaxis = True if tp.vcoord =='mxr' else False,
+                ylims = ylims if not (tp.vcoord=='mxr' or ylims is None) else tp.get_lims(), 
+                **kwargs)
+            if tp.crit == 'n2o': 
+                n2o_color = 'xkcd:violet'
+                ax.tick_params(axis='y', color=n2o_color, labelcolor=n2o_color)
+                ax.spines['right'].set_color(n2o_color)
+                ax.spines['left'].set_color(n2o_color)
         fig.suptitle('Vertical extent of tropopauses')
         fig.tight_layout()
         fig.subplots_adjust(top = 0.85)
@@ -262,6 +274,31 @@ class TropopausePlotterMixin:
         if kwargs.get('note'): ax.text(s=kwargs.get('note'), **dcts.note_dict(ax, y=1.1))
         fig.subplots_adjust(wspace=0)
         return fig
+
+    def seasonal_ratio_comparison(self, **kwargs): 
+        """ Show tropospheric / stratospheric ratio of data points per season per TP def. 
+        Parameters: 
+            key dpi (int): Figure resolution
+            key title (bool): Show figure title 
+
+        """
+        fig, axs = plt.subplots(2, 2, figsize = (7,5), dpi=kwargs.get('dpi', 250))
+        for s, ax in zip(range(1,5), axs.flat): 
+            self.sel_season(s).show_ratios(ax=ax, xlim = kwargs.get('xlim', (0, 2.0)))
+            ax.set_ylabel('')
+            ax.yaxis.set_visible(False)
+            ax.set_title('')
+            # ax.set_title(dcts.dict_season()[f'name_{s}'])
+            s = dcts.dict_season()[f'name_{s}'].split()[0] + '\n' + dcts.dict_season()[f'name_{s}'].split()[1]
+            ax.text(s = s, y = 0.85, x = 0.85, 
+                    transform = ax.transAxes, ha = 'center', va = 'center_baseline', 
+                    bbox = dict(facecolor='white', edgecolor = 'grey'))
+        fig.tight_layout()
+        fig.subplots_adjust(top = 0.8)
+        if kwargs.get('title'):
+            fig.suptitle('Ratio of tropospheric / stratospheric data points per tropopause definition')
+        fig.legend(handles = self.tp_legend_handles(lw = 5, no_vc=True)[::-1], ncol = 3, 
+                loc='upper center', bbox_to_anchor=[0.5, 0.93]);
 
     def show_ratios(self, **kwargs):
         """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
@@ -540,17 +577,20 @@ class TropopausePlotterMixin:
         plt.show()
 
     def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis,  **kwargs): 
-        """ Plot x over y data with coloring based on substance mixing ratios indicating S/T sorting per tp. 
+        """ Plot x over y data with coloring based on substance mixing ratios 
+        Red / Black dots indicate S/T sorting per tp. 
         
         Parameters: 
             x_axis (dcts.Coordinate or dcts.Substance)
             y_axis (dcts.Coordinate or dcts.Substance)
             c_axis (dcts.Substance): Values used to colour the datapoints according to mixing ratio 
         
+            key tps (list[dcts.Coordinates]): TP defs for sorting
+            key ylims (tuple[float]): Colormap limits
         """
         tps = kwargs.get('tps', self.tps)
         
-        vlims = kwargs.get('vlims')# kwargs.get('vlims', c_axis.vlims())
+        vlims = kwargs.get('vlims', c_axis.vlims())
         norm = Normalize(*vlims)#np.nanmin(df[o3_subs.col_name]), np.nanmax(df[o3_subs.col_name]))
         cmap = plt.cm.viridis_r
 
@@ -809,7 +849,7 @@ class TropopausePlotterMixin:
         # only take data with index that is available in df_sorted
         data = self.df[self.df.index.isin(self.df_sorted.index)]
         data.sort_index(inplace=True)
-        
+
         tropo_col = 'tropo_'+tp.col_name
         strato_col = 'strato_'+tp.col_name
 
