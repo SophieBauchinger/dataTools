@@ -610,20 +610,20 @@ class LognormFit:
 class Bin2DFitted(bp.Simple_bin_2d): 
     """ Extending Bin2D class to hold lognorm fits for distributions. """
     
-    def __init__(self, v, x, y, binclassinstance, count_limit=1, fit_bin_nr=50): 
+    def __init__(self, v, x, y, binclassinstance, count_limit=1, bin_nr=50): 
         super().__init__(v, x, y, binclassinstance, count_limit)
-        
-        self.calc_lognorm_fits(fit_bin_nr)
+        self.bin_nr = bin_nr
+        self.calc_lognorm_fits(bin_nr)
     
     def calc_lognorm_fits(self, bin_nr): 
         """ Add lognormal fits to distribution of values in 3D bins. """
-        self.vmean_fit = LognormFit(self.vmean, bin_nr=bin_nr)
-        self.vstdv_fit = LognormFit(self.vstdv, bin_nr=bin_nr)
-        self.rvstd_fit = LognormFit(self.rvstd, bin_nr=bin_nr)
+        self.vmean_fit = LognormFit(self.vmean, bins=self.xbinlimits)
+        self.vstdv_fit = LognormFit(self.vstdv, bins=self.xbinlimits)
+        self.rvstd_fit = LognormFit(self.rvstd, bins=self.xbinlimits)
 
         return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
 
-    def plot_hist(self, ax, hist_range = None, color = None, bin_nr = 50, bin_attr = 'vstdv'): 
+    def plot_hist(self, ax, hist_range = None, color = None, bin_attr = 'vstdv'): 
         """ Plots histogram with lognormal fit onto the given axis. 
         
         Args: 
@@ -633,9 +633,10 @@ class Bin2DFitted(bp.Simple_bin_2d):
             bin_nr (int): Number of bins
             bin_attr (str): Attribute of the binned data to show 
         """
-        x = getattr(self, bin_attr)
-        ax.hist(x[~np.isnan(x)], 
-            bins = bin_nr, range = hist_range, 
+        x_binned = getattr(self, bin_attr)
+        ax.hist(
+            x_binned[~np.isnan(x_binned)], 
+            # bins = self.bin_nr, range = hist_range, 
             orientation = 'horizontal',
             edgecolor = 'white', lw = 0.3, 
             color = color,
