@@ -295,12 +295,14 @@ class TropopauseSorterMixin:
             Remove trend wrt. 2005 Mauna Loa from substance, then add to data
     """
 
-    def calculate_average_distange_to_tropopause(self, tps): 
+    def calculate_average_distange_to_tropopause(self, tps): # TODO: implement
         """ Calculate the average distance of measurements around the tropopause. """
 
-
     def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
-        """ Filter strato / tropo data based on specific column of N2O mixing ratios. """
+        """ Filter strato / tropo data based on specific column of N2O mixing ratios. 
+        Args: 
+            save_n2o_baseline (bool): Create self.data['n2o_baseline']. Default False
+        """
         data = self.df
 
         # Choose N2O data to use (Substance object)
@@ -369,11 +371,29 @@ class TropopauseSorterMixin:
         fit_function = dcts.lookup_fit_function('n2o')
 
         ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
-                              flag=flag, verbose=False, plot=False, ctrl_plots=False,
-                              limit=kwargs.get('ol_limit', 0.1), direction='n')
-        # ^ 4er tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
+                              flag=flag, 
+                              verbose=kwargs.get('verbose', False), 
+                              plot=kwargs.get('plot', False), 
+                              ctrl_plots=False,
+                              limit=kwargs.get('ol_limit', 0.1), 
+                              direction='n')
+        # ^tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
+        # flag, residual, warning, popt1, baseline
         df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
         df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
+
+        if kwargs.get('save_n2o_baseline'):
+            # Add baseline stats to data dictionary 
+            n2o_df = pd.DataFrame({
+                f'{n2o_column}' : mxr, 
+                f'{n2o_column}_flag' : ol[0], 
+                f'{n2o_column}_residual' : ol[1],
+                f'{n2o_column}_baseline' : ol[4]})
+            if d_mxr is not None: 
+                n2o_df[f'd_{n2o_column}'] = d_mxr
+            if 'n2o_baseline' not in self.data: 
+                self.data['n2o_baseline'] = pd.DataFrame()
+            self.data['n2o_baseline'] = self.data['n2o_baseline'].join(n2o_df, how = 'outer')
 
         df_sorted.drop(columns=[s for s in df_sorted.columns
                                 if not s.startswith(('Flight', 'tropo', 'strato'))],
@@ -415,9 +435,7 @@ class TropopauseSorterMixin:
         df_sorted: index(datetime), strato_{col_name}, tropo_{col_name} for all tp_defs
         
         Parameters: 
-            key verbose (bool): Make the function more talkative
-            key relative_only (bool): Skip non-relative coords if rel. is available
-        
+            key verbose (bool): Make the function more talkative        
         """
         if self.source not in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER', 'MULTI']:
             raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
