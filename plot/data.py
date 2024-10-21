@@ -303,11 +303,11 @@ class GlobalDataPlotterMixin:
             # fig.tight_layout()
             plt.show()
 
-    def mxr_vs_vcoord(self, subs, vcoord, tick_params = {}, ax=None, note=None): 
+    def mxr_vs_vcoord(self, subs, vcoord, tick_params = {}, ax=None, note=None, **kwargs): 
         """ Plot datapoints on a simple vcoord vs. substance mixing ratio plot. """
         self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
         if ax is None:
-            _, ax = plt.subplots(dpi=200)
+            _, ax = plt.subplots(figsize = (6,3), dpi=kwargs.pop('dpi', None))
         for s in set(self.df['season'].tolist()):
             df = self.df[self.df['season'] == s].dropna(subset=[vcoord.col_name, subs.col_name], how='any')
             if len(df) == 0: 
@@ -445,7 +445,6 @@ class GlobalDataPlotterMixin:
         # fig.show()
         return fig
 
-    # def timeseries_over_vcoord
 
 # Mozart
 def lonlat_1d(mzt_obj, subs='sf6',

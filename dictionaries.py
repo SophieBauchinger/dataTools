@@ -443,7 +443,7 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
     elif short_name == 'detr_sf6': 
         vlim_dict.update(
             dict(vmean = (0.95, 1.05),
-                 vstdv = (0, 0.05),
+                 vstdv = (0, 4),
                  vstdv_tropo = (0.005, 0.015),
                  vstdv_strato = (0.005, 0.03),
                  rvstd_tropo = (0.005, 0.015),
