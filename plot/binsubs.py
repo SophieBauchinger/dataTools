@@ -118,11 +118,13 @@ class BinPlotterBaseMixin:
             raise KeyError('Could not generate colormap limits.')
         return vlims
 
-    def plot_lognorm_stats(self, ax, df, s, xlims): 
+    def plot_lognorm_stats(self, ax, df, s = None, xlims = None): 
         for i, tp_col in enumerate(df.columns): 
             tp = dcts.get_coord(tp_col)
-            y = s*8+i # tp.label(filter_label = True).split('(')[0]
-
+            if s is not None: 
+                y = s*8+i
+            else: 
+                y = tp.label(filter_label = True).split('(')[0]
             # Lines
             line_kw = dict(color = tp.get_color(), lw = 5)
             ax.fill_betweenx([y]*2, *df[tp_col].int_68, **line_kw, alpha = 0.8) # avoids round edges
@@ -134,10 +136,10 @@ class BinPlotterBaseMixin:
 
             # Numeric value of mode
             ax.annotate(
-                text = f'{df[tp_col].Mode}', 
+                text = f'{df[tp_col].Mode}  ', 
                 xy = (df[tp_col].Mode, y),
-                xytext = (-xlims[1]/12, y),
-                ha = 'left', va = 'center', 
+                xytext = (0, y),
+                ha = 'right', va = 'center', 
                 size = 7, fontweight = 'medium',
                 )
 
@@ -187,7 +189,7 @@ class BinPlotterBaseMixin:
         axs[1].tick_params(left=False, labelleft=False)
         
         for ax in axs:
-            ax.set_xlim(xlims[0]-xlims[1]/10, ax.get_xlim()[1])
+            ax.set_xlim(ax.get_xlim()[0]-ax.get_xlim()[1]/8, ax.get_xlim()[1])
             ax.set_xlabel(var.label(bin_attr=bin_attr))
             ax.grid(axis='x', ls = 'dashed')
 
@@ -305,9 +307,9 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         matrix_plot_stdev
     """
 
-    def flight_height_histogram(self, tp, alpha: float = 0.7, **kwargs): 
+    def flight_height_histogram(self, tp, alpha: float = 0.7, **hist_kwargs): 
         """ Make a histogram of the number of datapoints for each tp bin. """
-        _, ax = plt.subplots(dpi=250, figsize=(6,4))
+        _, ax = plt.subplots(dpi=150, figsize=(6,4))
         ax.set_ylabel(tp.label())
         data = self.df[tp.col_name].dropna()
         ax.set_title(f'Distribution of {self.source} measurements')
@@ -315,9 +317,9 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         hist = ax.hist(data.values, 
                         bins=30, range=rlims, alpha=alpha, 
                         orientation='horizontal',
-                        edgecolor = kwargs.pop('edgecolor', 'white'), 
-                        lw=kwargs.pop('lw', 0.2),
-                        **kwargs)
+                        edgecolor = hist_kwargs.pop('edgecolor', 'white'), 
+                        lw=hist_kwargs.pop('lw', 0.2),
+                        **hist_kwargs)
         ax.grid(ls='dotted', zorder = 0)
         if (tp.rel_to_tp is True) and ax is not None: 
             ax.hlines(0, max(hist[0]), 0, color='k', ls='dashed')
@@ -395,14 +397,10 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         big = kwargs.pop('big') if 'big' in kwargs else False
         bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
         
-        fig, ax = plt.subplots(dpi=500, 
-                               figsize= (6,4) if not big else (3,4))
-        
+        fig, ax = plt.subplots(dpi=500, figsize= (6,4) if not big else (3,4))
     
         if coord.vcoord=='pt' and coord.rel_to_tp: 
             ax.set_yticks(np.arange(-60, 75, 20) + [0])
-
-
 
         for s in bin_dict.keys():
             self.plot_1d_gradient(ax, s, bin_dict[s], bin_attr, add_stdv)
@@ -428,7 +426,7 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
             #     ax.set_ylim(-4, 5.1)
 
         if not big: 
-            ax.legend(loc='lower left')
+            ax.legend(loc=kwargs.get('legend_loc', 'lower left'))
         ax.grid('both', ls='dashed', lw=0.5)
         ax.set_axisbelow(True)
         
@@ -629,10 +627,9 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         if not any(bin_attr in bin2d_inst.__dict__ for bin2d_inst in binned_seasonal.values()):
             raise KeyError(f'\'{bin_attr}\' is not a valid attribute of Bin2D objects.')
 
-        vlims = kwargs.get('vlims')
-        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
-        xlims = self.get_coord_lims(xcoord, 'x')
-        ylims = self.get_coord_lims(ycoord, 'y')
+        vlims = kwargs.get('vlims', self.get_vlimit(subs, bin_attr))
+        xlims = kwargs.pop('xlims', xcoord.get_lims())
+        ylims = kwargs.pop('ylims', ycoord.get_lims())
         
         # vlims, xlims, ylims = self.get_limits(subs, xcoord, ycoord, bin_attr)
         norm = Normalize(*vlims)
@@ -640,18 +637,15 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
                                 sharey=True, sharex=True)
 
         fig.subplots_adjust(top = 1.1)
-
-        data_title = 'Mixing ratio' if bin_attr=='vmean' else ('Varibility' + '(RSTD)' if bin_attr=='rvstd' else '')
-        # fig.suptitle(f'{data_title} of {subs.label()}', y=0.95)
-
-        seasons = binned_seasonal.keys()
-
-        for season, ax in zip(seasons, axs.flatten()):
+        
+        for season, ax in zip(binned_seasonal.keys(), axs.flatten()):
             bin2d_inst = binned_seasonal[season]
             ax.set_title(dcts.dict_season()[f'name_{season}'])
             
             img = self.single_2d_plot(ax, bin2d_inst, bin_attr, xcoord, ycoord, 
-                               cmap, norm, xlims, ylims, **kwargs)
+                                      cmap, norm, xlims, ylims, **kwargs)
+            ax.set_xlim(*xlims)
+            ax.set_ylim(*ylims)
 
         fig.subplots_adjust(right=0.9)
         fig.tight_layout(pad=2.5)
@@ -660,10 +654,7 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
                             orientation='horizontal', 
                             # location='top', ticklocation='bottom'
                             )
-        cbar.ax.set_xlabel(data_title +' of '+ subs.label(name_only=True) \
-                           + f' [{subs.unit}]' if not bin_attr=='rvstd' else ' [\%]', 
-                           # fontsize=13
-                           )
+        cbar.ax.set_xlabel(subs.label(bin_attr=bin_attr))
 
         cbar_vals = cbar.get_ticks()
         cbar_vals = [vlims[0]] + cbar_vals[1:-1].tolist() + [vlims[1]]
@@ -672,39 +663,38 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
 
         plt.show()
 
-    def plot_2d_mxr(self, subs, xcoord, ycoord, **kwargs):
-        """ Plot binned average mixing ratios on an x vs. y plot. """
-        bin_attr = 'vmean'
-        self.seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, **kwargs)
+    # def plot_2d_mxr(self, subs, xcoord, ycoord, **kwargs):
+    #     """ Plot binned average mixing ratios on an x vs. y plot. """
+    #     bin_attr = 'vmean'
+    #     self.seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, **kwargs)
 
-    def plot_2d_stdv(self, subs, xcoord, ycoord, averages=True, **kwargs):
-        """ Plot binned substance standard deviation on an x vs. y plot. """
-        bin_attr = 'vstdv'
-        self.seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, averages=averages, **kwargs)
+    # def plot_2d_stdv(self, subs, xcoord, ycoord, averages=True, **kwargs):
+    #     """ Plot binned substance standard deviation on an x vs. y plot. """
+    #     bin_attr = 'vstdv'
+    #     self.seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, averages=averages, **kwargs)
 
-    def plot_mixing_ratios(self, **kwargs):
-        """ Plot all possible permutations of subs, xcoord, ycoord. """
-        permutations = list(itertools.product(self.substances,
-                                              # self.x_coordinates,
-                                              [dcts.get_coord(col_name='int_ERA5_EQLAT')],
-                                              # self.y_coordinates
-                                              tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-                                              ))
-        for perm in permutations:
-            self.plot_2d_mxr(*perm, **kwargs)
+    # def plot_mixing_ratios(self, **kwargs):
+    #     """ Plot all possible permutations of subs, xcoord, ycoord. """
+    #     permutations = list(itertools.product(self.substances,
+    #                                           # self.x_coordinates,
+    #                                           [dcts.get_coord(col_name='int_ERA5_EQLAT')],
+    #                                           # self.y_coordinates
+    #                                           tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
+    #                                           ))
+    #     for perm in permutations:
+    #         self.plot_2d_mxr(*perm, **kwargs)
 
-    def plot_stdv_subset(self, **subs_kwargs):
-        """ Plot a small subset of standard deviation plots. """
-        tps = tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-        # xcoords = [dcts.get_coord(col_name='geometry.y'), dcts.get_coord(col_name='int_ERA5_EQLAT')]
-        xcoords = [dcts.get_coord(col_name='int_ERA5_EQLAT')]
-        substances = [s for s in dcts.get_substances(ID='GHG', **subs_kwargs) if s.short_name.startswith('detr_')]
+    # def plot_stdv_subset(self, **subs_kwargs):
+    #     """ Plot a small subset of standard deviation plots. """
+    #     # xcoords = [dcts.get_coord(col_name='geometry.y'), dcts.get_coord(col_name='int_ERA5_EQLAT')]
+    #     xcoords = [dcts.get_coord(col_name='int_ERA5_EQLAT')]
+    #     substances = [s for s in dcts.get_substances(ID='GHG', **subs_kwargs) if s.short_name.startswith('detr_')]
 
-        for subs in substances:
-            print(subs)
-            for tp in tps:
-                for xcoord in xcoords:
-                    self.plot_2d_stdv(subs, xcoord, tp)
+    #     for subs in substances:
+    #         print(subs)
+    #         for tp in self.tps:
+    #             for xcoord in xcoords:
+    #                 self.plot_2d_stdv(subs, xcoord, tp)
 
     def plot_total_2d(self, subs, xcoord, ycoord, bin_attr='vstdv', **kwargs):
         """ Single 2D plot of varibility of given substance. """
@@ -739,8 +729,7 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         bin2d_inst = bp.Simple_bin_2d(np.array(df[subs.col_name]), x, y,
                                bin_equi2d, count_limit=self.count_limit)
         
-        vlims = kwargs.get('vlims')
-        if vlims is None: vlims = self.get_vlimit(subs, bin_attr)
+        vlims = kwargs.get('vlims', self.get_vlimit(subs, bin_attr))
         xlims = self.get_coord_lims(xcoord, 'x')
         ylims = self.get_coord_lims(ycoord, 'y')
         
@@ -867,7 +856,6 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         ax.set_ylabel(ycoord.label())
 
         ax.set_xlim(*xlims)
-        #TODO with count_limit > 1, might not have data in all bins - get dynamic bins?
         ax.set_ylim(ylims[0] - bin_obj.ybsize*1.5, ylims[1] + bin_obj.ybsize*1.5)
 
         ax.set_xticks(np.arange(-90, 90+30, 30)) # stop+30 to include stop
@@ -1137,6 +1125,12 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
                                 tropo_BinDict, strato_BinDict,
                                 bin_attr=bin_attr, 
                                 **kwargs)
+
+        print('Troposphere: '+f'{t_hcoord.label(coord_only=True)}'+r' $\times$ '\
+             +f'{t_zcoord.label(coord_only=True)}')
+
+        print('Stratosphere: '+f'{s_hcoord.label(coord_only=True)}'+r' $\times$ '\
+             +f'{s_zcoord.label(coord_only=True)}')
 
     def seasonal_2d_histograms(self, var, bin_attr='vstdv', **kwargs): 
         """ Comparison plot for tropopause definition substance histograms + lognorm fit. 
@@ -1460,7 +1454,91 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         self.plot_histogram_comparison(var, tropo_BinDict, strato_BinDict,
                                        bin_attr=bin_attr, **kwargs)
 
- 
+    def lognorm_stats_3d_seasonal(self, var, bin_attr='vstdv', **kwargs): 
+        """ Lognorm-fit stats for histograms of 3D-binned variable data. """
+        [xcoord] = self.get_coords(col_name = 'geometry.x') # longitude
+        [s_ycoord] = self.get_coords(hcoord = 'eql', model = 'ERA5')
+        [t_ycoord] = self.get_coords(col_name = 'geometry.y') # latitude
+        [s_zcoord] = self.get_coords(vcoord = 'pt', model = 'ERA5', tp_def = 'nan')
+        [t_zcoord] = self.get_coords(vcoord = 'z', model = 'ERA5', tp_def = 'nan', var='nan')
+
+        strato_Bin3Dseas_dict, tropo_Bin3Dseas_dict = {}, {}
+        for tp in kwargs.get('tps', self.tps):
+            strato_Bin3Dseas_dict[tp.col_name] = self.sel_strato(tp).bin_3d_seasonal(
+                var, xcoord, s_ycoord, s_zcoord, **kwargs)
+            tropo_Bin3Dseas_dict[tp.col_name] = self.sel_tropo(tp).bin_3d_seasonal(
+                var, xcoord, t_ycoord, t_zcoord, **kwargs)
+
+        fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=250)
+        axs[0].set_title('Troposphere (Lat' + r' $\times$ ' + 'Lon' + r' $\times$ ' \
+            +f'{t_zcoord.label(coord_only=True)})',
+                         size = 10, pad = 3)
+        axs[1].set_title('Stratosphere (Eq.Lat' + r' $\times$ ' + 'Lon' + r' $\times$ ' \
+            +f'{s_zcoord.label(coord_only=True)})',
+                         size = 10, pad = 3)
+
+        self.seasonal_lognorm_stats(strato_Bin3Dseas_dict, tropo_Bin3Dseas_dict, var, bin_attr, 
+                                    axs=axs, fig=fig, **kwargs)
+
+    def lognorm_stats_3d_all(self, var, bin_attr='vstdv', **kwargs): 
+        """ Lognorm-fit stats for histograms of 3D-binned variable data. """
+        [xcoord] = self.get_coords(col_name = 'geometry.x') # longitude
+        [s_ycoord] = self.get_coords(hcoord = 'eql', model = 'ERA5')
+        [t_ycoord] = self.get_coords(col_name = 'geometry.y') # latitude
+        [s_zcoord] = self.get_coords(vcoord = 'pt', model = 'ERA5', tp_def = 'nan')
+        [t_zcoord] = self.get_coords(vcoord = 'z', model = 'ERA5', tp_def = 'nan', var='nan')
+
+        strato_Bin3D_dict, tropo_Bin3D_dict = {}, {}
+        for tp in kwargs.get('tps', self.tps):
+            strato_Bin3D_dict[tp.col_name] = self.sel_strato(tp).bin_3d(
+                var, xcoord, s_ycoord, s_zcoord, **kwargs)
+            tropo_Bin3D_dict[tp.col_name] = self.sel_tropo(tp).bin_3d(
+                var, xcoord, t_ycoord, t_zcoord, **kwargs)
+
+        fig, axs = plt.subplots(1,2, figsize = (8,3), sharey=True, dpi=250)
+        axs[0].set_title('Troposphere (Lat' + r' $\times$ ' + 'Lon' + r' $\times$ ' \
+            +f'{t_zcoord.label(coord_only=True)})',
+                         size = 10, pad = 3)
+        axs[1].set_title('Stratosphere (Eq.Lat' + r' $\times$ ' + 'Lon' + r' $\times$ ' \
+            +f'{s_zcoord.label(coord_only=True)})',
+                         size = 10, pad = 3)
+
+        xlims = dcts.vlim_dict_per_substance(var.short_name)[bin_attr]
+
+        strato_stats = self.get_lognorm_stats_df(strato_Bin3D_dict, 
+                                                f'{bin_attr}_fit', 
+                                                prec = kwargs.get('prec', 1), 
+                                                use_percentage = var.detr)
+        tropo_stats = self.get_lognorm_stats_df(tropo_Bin3D_dict, 
+                                                f'{bin_attr}_fit', 
+                                                prec = kwargs.get('prec', 1),
+                                                use_percentage = var.detr)
+
+        for df, ax in zip([tropo_stats, strato_stats], axs):
+            self.plot_lognorm_stats(ax, df, None, xlims)
+
+        # y_arr =  [s*8+2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
+        # y_ticks = [dcts.dict_season()[f'name_{s}'] for s in seasons]# [dcts.get_coord(tp_col).label(filter_label = True).split('(')[0] for tp_col in df.columns]
+        # axs[0].set_yticks(y_arr, y_ticks)
+        axs[0].set_ylim(-0.5, len(df.columns)- 0.25)
+        axs[0].tick_params(labelleft=True if not kwargs.get('label')=='off' else False, 
+                           left=False)
+        axs[1].tick_params(left=False, labelleft=False)
+        
+        for ax in axs:
+            ax.set_xlim(ax.get_xlim()[0]-ax.get_xlim()[1]/5, ax.get_xlim()[1])
+            ax.set_xlabel(var.label(bin_attr=bin_attr))
+            ax.grid(axis='x', ls = 'dashed')
+
+        # axs[0].legend(handles = self.tp_legend_handles(filter_label=True, no_vc = True)[::-1], 
+        #         prop=dict(size = 6));
+
+        fig.subplots_adjust(bottom = 0.3, wspace = 0.05)
+        fig.legend(*self.lognorm_legend_handles(), loc = 'lower center', ncols = 3)
+
+
+
+
     def improved_fancy_histogram_plots_nested(self, subs, bin_attr='vstdv', 
                                      xscale = 'linear', show_stats = True, fig_kwargs = {}): 
         """ Comparison plot for tropopause definition substance histograms + lognorm fit. 
@@ -1909,6 +1987,8 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         fig.subplots_adjust(right = 0.75)
         fig.legend(*ax_s.get_legend_handles_labels(), 
                 loc = 'right', fontsize = 11)
+
+
 
     def z_crossection(self, subs, tp, bin_attr, 
                       save_gif_path=None, **kwargs): 
