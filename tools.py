@@ -425,13 +425,13 @@ def pre_flag(data_arr, ref_arr, crit='n2o', limit=0.97, **kwargs) -> pd.DataFram
     """ Sort data into strato / tropo based on difference to ground obs.
 
     Parameters:
-        data_arr (pd.Series) : msmt data to be sorted into stratr / trop air
+        data_arr (pd.Series) : msmt data to be sorted into strato / tropo air, index should be datetime
         ref_arr (pd.Series) : reference data to use for filtering (background)
         crit (str) : substance to use for flagging
         limit (float) : tracer mxr fraction below which air is classified
                         as stratospheric
 
-    Returns: dataframe containing index and strato/tropo/pre_flag columns
+    Returns: time-indexed dataframe with strato/tropo/pre_flag columns
     """
     data_arr.sort_index(inplace=True)
     df_flag = pd.DataFrame({f'strato_{data_arr.name}': np.nan,
@@ -652,7 +652,6 @@ class Bin2DFitted(bp.Simple_bin_2d):
                   ls = 'dashed', 
                   color = 'k', 
                   lw = 1)
-        
 
 class Bin3DFitted(bp.Simple_bin_3d): 
     """ Extending Bin3D class to hold lognorm fits for distributions. """
