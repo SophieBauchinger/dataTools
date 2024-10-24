@@ -151,9 +151,9 @@ class TropopausePlotterMixin:
         n2o_color = 'xkcd:violet'
 
         # Prepare the plot
-        ax = kwargs.get('ax') if 'ax' in kwargs else plt.subplots()
+        ax = kwargs.get('ax') if 'ax' in kwargs else plt.subplots()[1]
         ax.set_title(tp.label(filter_label=True))
-        ax.set_ylabel(tp.label(coord_only=True), 
+        ax.set_ylabel(tp.label(coord_only=True) + f' [{tp.unit}]', 
                       color=n2o_color if tp.crit=='n2o' else 'k')
         ax.set_xlabel(coord.label())
         ax.grid(True, ls='dotted')
@@ -200,6 +200,7 @@ class TropopausePlotterMixin:
         fig, axs = plt.subplots(3,2, figsize = (10, 10), sharex=True, 
                                 dpi=kwargs.pop('dpi', 150))
         ylims = kwargs.pop('ylims', None)
+        
         for tp, ax in zip(tps, axs.flat): 
             self.tp_height_seasonal_1D_binned(
                 tp, ax = ax, 
@@ -282,9 +283,9 @@ class TropopausePlotterMixin:
             key title (bool): Show figure title 
 
         """
-        fig, axs = plt.subplots(2, 2, figsize = (7,5), dpi=kwargs.get('dpi', 250))
+        fig, axs = plt.subplots(2, 2, figsize = (7,6), dpi=kwargs.get('dpi', 250))
         for s, ax in zip(range(1,5), axs.flat): 
-            self.sel_season(s).show_ratios(ax=ax, xlim = kwargs.get('xlim', (0, 2.0)))
+            self.sel_season(s).show_ratios(ax=ax, xlim = kwargs.get('xlim', (0, 2.15)))
             ax.set_ylabel('')
             ax.yaxis.set_visible(False)
             ax.set_title('')
@@ -576,7 +577,7 @@ class TropopausePlotterMixin:
                     bbox_to_anchor=[0.5, 0.94])
         plt.show()
 
-    def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis,  **kwargs): 
+    def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs): 
         """ Plot x over y data with coloring based on substance mixing ratios 
         Red / Black dots indicate S/T sorting per tp. 
         
@@ -590,7 +591,7 @@ class TropopausePlotterMixin:
         """
         tps = kwargs.get('tps', self.tps)
         
-        vlims = kwargs.get('vlims', c_axis.vlims())
+        vlims = kwargs.get('vlims') or c_axis.vlims()
         norm = Normalize(*vlims)#np.nanmin(df[o3_subs.col_name]), np.nanmax(df[o3_subs.col_name]))
         cmap = plt.cm.viridis_r
 
