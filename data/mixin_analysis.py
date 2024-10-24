@@ -301,7 +301,7 @@ class TropopauseSorterMixin:
     def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. 
         Args: 
-            save_n2o_baseline (bool): Create self.data['n2o_baseline']. Default False
+            save_n2o_baseline (bool): Create self.data['n2o_baseline']. Default True
         """
         data = self.df
 
@@ -313,14 +313,9 @@ class TropopauseSorterMixin:
             [n2o_coord] = [c for c in self.coordinates if c.crit == 'n2o']
 
         else:
-            default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', HIAPER='NWAS', EMAC='EMAC', TP='INT')
-            if self.source not in default_n2o_IDs.keys():
-                raise NotImplementedError(f'N2O sorting not available for {self.source}')
-
-            n2o_coord = dcts.get_coord(crit='n2o', ID=default_n2o_IDs[self.source])
-
-            if n2o_coord.col_name not in data.columns:
-                raise Warning(f'Could not find {n2o_coord.col_name} in {self.ID} data.')
+            default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', 
+                                   HIAPER='NWAS', EMAC='EMAC', TP='INT')
+            [n2o_coord] = self.get_substs(crit='n2o', ID=default_n2o_IDs[self.source])
 
         # Get reference dataset
         ref_years = np.arange(min(self.years) - 2, max(self.years) + 3)
@@ -382,7 +377,7 @@ class TropopauseSorterMixin:
         df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
         df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
 
-        if kwargs.get('save_n2o_baseline'):
+        if kwargs.get('save_n2o_baseline', True):
             # Add baseline stats to data dictionary 
             n2o_df = pd.DataFrame({
                 f'{n2o_column}' : mxr, 
@@ -393,7 +388,10 @@ class TropopauseSorterMixin:
                 n2o_df[f'd_{n2o_column}'] = d_mxr
             if 'n2o_baseline' not in self.data: 
                 self.data['n2o_baseline'] = pd.DataFrame()
-            self.data['n2o_baseline'] = self.data['n2o_baseline'].join(n2o_df, how = 'outer')
+            self.data['n2o_baseline'] = self.data['n2o_baseline'].combine_first(n2o_df)
+            self.df[f'{n2o_column}_residual'] = n2o_df[f'{n2o_column}_residual']
+            self.df[f'{n2o_column}_baseline'] = n2o_df[f'{n2o_column}_baseline']
+            
 
         df_sorted.drop(columns=[s for s in df_sorted.columns
                                 if not s.startswith(('Flight', 'tropo', 'strato'))],
