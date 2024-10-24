@@ -240,20 +240,21 @@ class Coordinate:
             limits_per_unit_RelToTp = {
                 'K' :  (-70, 70),
                 'km' : (-10, 5),
-                'hPa' : (-400, 600)
+                'hPa' : (-400, 600),
+                'ppb' : (-50, 50)
                 }
             if self.unit in limits_per_unit_RelToTp: 
                 return limits_per_unit_RelToTp[self.unit]
         else: 
             limits_per_unit = {
-                'K' :  (260, 400), # ignoring temperature here
+                'K' :  (260, 400), # potential temperature only
                 'PVU' : (-5, 10),
                 'km' : (5, 17.5),
                 'hPa' : (150, 700), 
                 'm' : (0, 15e3),
                 'mbar' : (150, 700), 
                 'm2s-2' : (0, 15e4),
-                'ppb' : (280, 350),
+                'ppb' : (320, 335),# (280, 350),
                 'year' : (0, 3.5),
                 }
             if self.unit in limits_per_unit: 
