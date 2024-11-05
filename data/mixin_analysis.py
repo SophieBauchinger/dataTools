@@ -145,9 +145,8 @@ class AnalysisMixin:
             elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
                 pass
             else:
-                raise NotImplementedError(f'Units do not match: \
-                                          {subs.unit} vs {ref_subs.unit} \n\
-                                              Solution not yet available. ')
+                raise NotImplementedError(
+                    f'Units do not match for detrending {subs.col_name}: \n subs: {subs.unit} vs. ref: {ref_subs.unit}')
 
         detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))
         c_obs_detr = c_obs - detrend_correction
@@ -200,7 +199,10 @@ class AnalysisMixin:
         substances = [s for s in self.substances if s.short_name in ref_substances]
         for subs in substances:
             if verbose: print(f'Detrending {subs}. ')
-            self.detrend_substance(subs, save=True)
+            try: 
+                self.detrend_substance(subs, save=True)
+            except NotImplementedError as err:
+                if verbose: print(err)
 
     # --- Filter for extreme events in tropospheric air ---
     def filter_extreme_events(self, plot_ol=False, **tp_kwargs):
@@ -448,8 +450,8 @@ class TropopauseSorterMixin:
         tps = self.get_tps()
 
         # N2O filter
-        for tp in [tp for tp in tps if tp.crit == 'n2o']:
-            # if self.source == 'MULTI': break
+        for tp in [tp for tp in tps if (tp.crit == 'n2o' and 
+                                        tp.col_name not in ['N2O_baseline', 'N2O_residual'])]:
             n2o_sorted = self.n2o_baseline_filter(coord=tp, **kwargs)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
@@ -662,7 +664,6 @@ class TropopauseSorterMixin:
             df.loc[i, 'rms_rvstd'] = np.sqrt(denom_rstd / nom) if not nom == 0 else np.nan
 
         return df
-
 
 # %% Mixin for adding binning methods to GlobalData objects
 

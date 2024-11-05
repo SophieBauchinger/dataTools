@@ -217,3 +217,5 @@ ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),k
 ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,2,,ERA5_HEIGHT_km,ERA5_HEIGHT_2_0
 ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,CLAMS_calc,Caribic,z,,,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_3_5
 H_TP,Ozone-based representative height of tropopause; [km] # derived from ozone sonde data collected at Hohenpeissenberg [Sprung and Zahn JGR 2010],km,MS_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,Altitude  ,H_rel_TP
+N2O_baseline,N2O mixing ratio of the statistical baseline value,ppb,GHG,Caribic,mxr,,,chem,FALSE,MSMT,,n2o,,
+N2O_residual,Difference between N2O measurement and the corresponding baseline value,ppb,GHG,Caribic,mxr,,,chem,TRUE,MSMT,,n2o,,

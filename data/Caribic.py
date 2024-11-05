@@ -20,7 +20,7 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 
 # Caribic
-class Caribic(GlobalData):
+class Caribic(GlobalData): 
     """ Stores all available information from Caribic datafiles and allows further analsis. 
     
     Attributes: 
@@ -57,7 +57,7 @@ class Caribic(GlobalData):
         if 'df' not in self.data: 
             self.create_df()
         self.set_tps(**tps_dict)
-
+        
         if 'met_data' not in self.data:
             try:
                 self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
@@ -70,6 +70,31 @@ class Caribic(GlobalData):
     data: {self.pfxs}
     years: {self.years}
     status: {self.status}"""
+
+    def _prepare_for_tp_comp(self):
+        """ Set default state for tropopause comparisons:
+            
+            select latitudes > 30°N
+            set tropopause coordinates 
+            remove non-shared timestamps
+            set count_limit to 3
+            (re)calculate N2O tropopause with ol_limit = 0.01
+        """
+        self.sel_latitude(30, 90, inplace=True)
+        self.count_limit = 3
+        
+        self.set_tps(rel_to_tp=True, vcoord='z', model = 'ERA5')
+        self.tps += self.get_coords(rel_to_tp=True, crit='o3')
+        self.tps += self.get_coords(crit='n2o', model = 'MSMT')
+        self.tps.sort(key=lambda x: x.tp_def)
+
+        self.remove_non_shared_indices(inplace=True)
+        
+        if any(tp.crit=='n2o' for tp in self.tps):
+            # Recalculate N2O tropopause with reduced data set
+            self.create_df_sorted(ol_limit = 0.01)
+        
+        return self
 
     def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> tuple[pd.DataFrame, dict]:
         """ Data import for a single year """

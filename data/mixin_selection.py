@@ -48,7 +48,7 @@ class SelectionMixin:
         
     """
 
-    def sel_subset(self, **kwargs):
+    def sel_subset(self, inplace:bool = False, **kwargs):
         """ Allows making multiple selections at once.
 
         Parameters:
@@ -82,9 +82,12 @@ class SelectionMixin:
             if isinstance(kwargs.get(selection), dict):
                 out = get_fctn(out, selection)(**kwargs.get(selection))
 
+        if inplace: 
+            self.__dict__.update(out.__dict__)
+
         return out
 
-    def sel_year(self, *years: int):
+    def sel_year(self, *years:int, inplace:bool=False):
         """ Returns GlobalData object containing only data for selected years. """
 
         # input validation, choose only years that are actually available
@@ -124,9 +127,12 @@ class SelectionMixin:
 
         yr_list.sort()
         out.years = yr_list
+        
+        if inplace: 
+            self.__dict__.update(out.__dict__)
         return out
 
-    def sel_latitude(self, lat_min: float, lat_max: float):
+    def sel_latitude(self, lat_min:float, lat_max:float, inplace:bool=False):
         """ Returns GlobalData object containing only data for selected latitudes """
         # copy everything over without changing the original class instance
         out = type(self).__new__(self.__class__)
@@ -188,9 +194,11 @@ class SelectionMixin:
         else:
             raise Warning(f'Not implemented for {self.source}')
 
+        if inplace: 
+            self.__dict__.update(out.__dict__)
         return out
 
-    def sel_eqlat(self, eql_min: float, eql_max: float, model='ERA5'):
+    def sel_eqlat(self, eql_min:float, eql_max:float, model='ERA5', inplace:bool=False):
         """ Returns GlobalData object containing only data for selected equivalent latitudes """
         # copy everything over without changing the original class instance
         out = type(self).__new__(self.__class__)
@@ -219,9 +227,11 @@ class SelectionMixin:
         else:
             out.status['eq_lat'] = (eql_min, eql_max)
 
+        if inplace: 
+            self.__dict__.update(out.__dict__)
         return out
 
-    def sel_season(self, *seasons):
+    def sel_season(self, *seasons, inplace:bool=False):
         """ Return GlobalData object containing only pd.DataFrames for the chosen season
 
         Parameters:
@@ -249,14 +259,12 @@ class SelectionMixin:
             out.data[k] = out.data[k].drop(columns=['season'])
             out.data[k].sort_index(inplace=True)
 
-        # if hasattr(out, 'flights'):
-        #     out.flights = list(set(out.data[df_list[-1]]['Flight number']))
-        #     out.flights.sort()
-
         out.status['season'] = [dcts.dict_season()[f'name_{s}'] for s in seasons]
+        if inplace: 
+            self.__dict__.update(out.__dict__)
         return out
 
-    def sel_flight(self, flights, verbose=False):
+    def sel_flight(self, flights, verbose=False, inplace:bool=False):
         """ Returns Caribic object containing only data for selected flights
             flight_list (int / list) """
         if not hasattr(self, 'flights'):
@@ -287,10 +295,12 @@ class SelectionMixin:
         out.years.sort()
         # out.flights.sort()
 
+        if inplace: 
+            self.__dict__.update(out.__dict__)
         return out
 
 # --- Make selections based on strato / tropo characteristics --- 
-    def sel_atm_layer(self, atm_layer: str, tp=None, **kwargs):
+    def sel_atm_layer(self, atm_layer: str, tp=None, inplace:bool=False, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
 
         Parameters:
@@ -344,19 +354,21 @@ class SelectionMixin:
         else:
             out.status['TP filter'] = atm_layer_col
 
+        if inplace: 
+            self.__dict__.update(out.__dict__)
         return out
 
-    def sel_tropo(self, tp=None, **kwargs):
+    def sel_tropo(self, tp=None, inplace:bool=False, **kwargs):
         """ Returns GlobalData object containing only tropospheric data points. """
-        return self.sel_atm_layer('tropo', tp, **kwargs)
+        return self.sel_atm_layer('tropo', tp, inplace=inplace, **kwargs)
 
-    def sel_strato(self, tp=None, **kwargs):
+    def sel_strato(self, tp=None, inplace:bool=False, **kwargs):
         """ Returns GlobalData object containing only tropospheric data points. """
-        return self.sel_atm_layer('strato', tp, **kwargs)
+        return self.sel_atm_layer('strato', tp, inplace=inplace, **kwargs)
 
-    def sel_LMS(self, tp=None, nr_of_bins = 3, **kwargs): #!!!
+    def sel_LMS(self, tp=None, nr_of_bins = 3, inplace:bool=False, **kwargs): #!!!
         """ Returns GlobalData object containing only lowermost stratospheric data points. """
-        strato_data = self.sel_strato(tp, **kwargs).df
+        strato_data = self.sel_strato(tp, inplace=inplace, **kwargs).df
         
         zbsize = tp.get_bsize() if not kwargs.get('zbsize') else kwargs.get('zbsize')
         
