@@ -123,7 +123,7 @@ class Coordinate:
 
         if self.vcoord is not np.nan:
             vcs = {'p': 'Pressure',
-                   'z': 'Geopotential height',
+                   'z': 'z',
                    'pt': '$\Theta$',
                    'eqpt': '$\Theta$(eq)',
                    'mxr': 'Mixing ratio',

@@ -16,10 +16,8 @@ from matplotlib.colors import Normalize, LogNorm
 from matplotlib.cm import ScalarMappable
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
-import matplotlib.patheffects as mpe
 import numpy as np
 import pandas as pd
-from shapely.geometry import Point
 from statistics import median 
 
 import toolpac.calc.binprocessor as bp # type: ignore
@@ -713,7 +711,7 @@ class TropopausePlotterMixin:
         if kwargs.get('heatmap') or kwargs.get('joint'): 
             # indicate points that are always tropospheric no matter the TP definition 
             print('Joint tropospheric points : {}\nJoint stratospheric points: {}'.format(
-                *[len(i) for i in self.shared_tropo_strato_indices(tps)] ) )
+                *[len(i) for i in self.unambiguously_sorted_indices(tps)] ) )
         
         if kwargs.get('joint'): 
             joint_ax = axs.flatten()[no_of_axs-1] # if not kwargs.get('heatmap') else no_of_axs-3]
@@ -747,7 +745,7 @@ class TropopausePlotterMixin:
 
     def add_consistently_sorted(self, subs, ycoord, tps, joint_ax, **kwargs): 
         """ Plot datapoints which are consistently sorted into tropo / strato onto given axis. """
-        shared_tropo, shared_strato = self.shared_tropo_strato_indices(tps)
+        shared_tropo, shared_strato = self.unambiguously_sorted_indices(tps)
         joint_ax.axis('on')
 
         marker_params = dict(
@@ -811,7 +809,7 @@ class TropopausePlotterMixin:
         
         
         data = self.df.dropna(subset = [subs.col_name])
-        shared_tropo, shared_strato = self.shared_tropo_strato_indices(tps)
+        shared_tropo, shared_strato = self.unambiguously_sorted_indices(tps)
         
         shared_tropo = shared_tropo[shared_tropo.isin(data.index)]
         shared_strato = shared_strato[shared_strato.isin(data.index)]

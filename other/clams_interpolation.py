@@ -8,7 +8,7 @@ import pandas as pd
 
 from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
 
-from dataTools.data._global import Era5ModelData
+from dataTools.data.Model import Era5ModelData
 
 def get_resampled_reanalysis(met_data: pd.DataFrame, msmt_times: pd.DataFrame):
     """ Import and interpolate / resample CLaMS data for aircraft campaigns. """

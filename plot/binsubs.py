@@ -615,6 +615,7 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         """
         Parameters:
             bin_attr (str): 'vmean', 'vstdv', 'vcount'
+            key v/x/ylims (tuple[float])
         """
         
         try: 
@@ -1206,7 +1207,7 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
             if len(df[(df.subs == str(subs)) & (df.zcoord == str(zcoord)) & (df.eql == str(eql))]) == 1: 
                 continue
 
-            strato_data, tropo_data = self.make_Bin3D_dict(
+            strato_data, tropo_data = self.make_Bin3D(
                 params.get('subs'), 
                 params.get('zcoord'), 
                 eql = params.get('eql'))
@@ -1221,7 +1222,7 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
 
         return self.Bin3D_df
 
-    def make_Bin3D_dict(self, subs, zcoord, eql, **kwargs):
+    def make_Bin3D(self, subs, zcoord, eql, **kwargs):
         """ Create Bin3DFitted instances for tropospheric data sorted with each tps. 
         
         Parameters: 
@@ -1236,16 +1237,20 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         """
         strato_Bin3D_dict, tropo_Bin3D_dict = {}, {}
         
-        
+        if eql: 
+            ycoord = self.get_coords(hcoord='lat', model = 'MSMT')[0]
+        else:
+            ycoord = self.get_coords(hcoord='lat', model = 'MSMT')[0]
+        xcoord = self.get_coords(hcoord='lon', model = 'MSMT')[0]
         
         for tp in self.tps:
             strato_plotter = self.sel_strato(tp)
             strato_Bin3D_dict[tp.col_name] = strato_plotter.bin_3d(
-                subs, zcoord, eql=eql, **kwargs)
+                subs, xcoord, ycoord, zcoord, **kwargs)
 
             tropo_plotter = self.sel_tropo(tp)
             tropo_Bin3D_dict[tp.col_name] = tropo_plotter.bin_3d(
-                subs, zcoord, eql=eql, **kwargs)
+                subs, xcoord, ycoord, zcoord, **kwargs)
         
         return strato_Bin3D_dict, tropo_Bin3D_dict 
 

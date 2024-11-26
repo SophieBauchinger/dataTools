@@ -296,7 +296,7 @@ class SelectionMixin:
         # out.flights.sort()
 
         if inplace: 
-            self.__dict__.update(out.__dict__)
+            self.__dict__.update(out.__dict__.copy())
         return out
 
 # --- Make selections based on strato / tropo characteristics --- 

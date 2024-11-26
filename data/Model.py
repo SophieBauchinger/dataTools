@@ -40,7 +40,8 @@ class Era5ModelData(AnalysisMixin, ModelDataMixin):
             'TACTS': 'HALO',
             'ATOM' : 'ATOM',
             'HIPPO': 'HIAPER', 
-            'CAR'  : 'Caribic'}
+            'CAR'  : 'Caribic',
+            'PHL' : 'HALO'}
         self.source = source_dict[campaign]
 
         self.data = {}

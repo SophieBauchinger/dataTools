@@ -33,7 +33,12 @@ class CampaignData(GlobalData):
     """
 
     def __init__(self, campaign, grid_size=5, tps_dict={}, **kwargs):
-        """ Initialise HALO_campaign object. """
+        """ Initialise HALO_campaign object. 
+    
+        Parameters 
+        ---
+        campaign (str): SHTR, WISE, PGS, TACTS, ATOM, HIPPO, PHL
+        """
         years = dcts.years_per_campaign(campaign)
         super().__init__(years, grid_size)
 
@@ -144,10 +149,15 @@ class CampaignData(GlobalData):
 
         else:
             if self.ID == 'PHL': 
-                print('Importing PHILEAS data from Flights 07 and 19.')
-                data_dict = get_phileas_data(time_res = kwargs.get('time_res', '10s'))
+                print('Importing all PHILEAS data from NetCDF files.')
+                data_dict = get_phileas_era5()
                 self.data = data_dict
                 return self.data
+
+                # print('Importing PHILEAS data')
+                # data_dict = get_phileas_data(time_res = kwargs.get('time_res', '10s'))
+                # self.data = data_dict
+                # return self.data
             
             print('Importing Campaign Data from SQL Database.')
 
@@ -248,7 +258,7 @@ class CampaignData(GlobalData):
 
     def get_met_data(self) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
-        if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
+        if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS', 'PHL']:
             return self.get_clams_data()
 
         elif self.ID in ['TACTS'] and 'df' in self.data.keys():
@@ -302,7 +312,76 @@ class CampaignData(GlobalData):
             return self.data['met_data']
         return self.get_met_data()
 
-def get_phileas_data(time_res = '10s'): 
+
+def get_phileas_era5():
+    """ Get ERA5, UMAQS and FAIRO data from TPChange .nc files"""
+    met_pdir = r'E:/TPChange/' + 'PhileasTPChange'
+    fnames = met_pdir + "/*.nc"
+
+    def process_ERA5_PHILEAS(ds): 
+        """ Preprocess datasets for ERA5 / CLaMS renalayis data for PHILEAS - include BAHAMAS. """
+        def flatten_TPdims(ds):
+            TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+            TP_qualifier_dict = {0 : '_Main', 1 : '_Second', 2 : '_Third'}
+            for variable in TP_vars: 
+                # get secondary dimension for the current multi-dimensional variable
+                [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+                for TP_value in ds[variable][TP_dim].values: 
+                    ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+                ds = ds.drop_vars(variable)
+            return ds
+        # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
+        ds = flatten_TPdims(ds)
+        
+        # Add flight number column (take everything after first string, then take stuff up until next ;)
+        fl_nr = ds.flight_info.split('Flightnumber: F')[1].split(';')[0]
+        fl_nr = float(fl_nr.replace('a', '').replace('b', ''))
+        
+        flight_arr = xr.DataArray(
+            fl_nr, 
+            coords=ds.coords,  # Use the same coordinates as the existing dataset
+            dims=ds.dims,  # Use the same dimension names as the existing dataset
+            )
+        ds['Flight number'] = flight_arr
+
+        vars = set(list(tools.ERA5_variables()) + ['Flight number']
+                   + ['Lat', 'Lon', 'PAlt', 'Pres', 'Theta'] # include Bahamas MET data   
+                   + ['PHILEAS_N2O', 'PHILEAS_O3', 'PHILEAS_CO']) # Include observations
+
+        return ds[[v for v in vars if v in ds.variables]]
+    
+    with xr.open_mfdataset(fnames, preprocess = process_ERA5_PHILEAS) as ds: 
+        df = ds.to_dataframe()
+    df.dropna(how = 'any', inplace = True)
+        
+    df.rename(columns = {
+        'Lat' : 'BAHAMAS_LAT',
+        'Lon' : 'BAHAMAS_LON',
+        'PAlt' : 'BAHAMAS_ALT',
+        'Pres' : 'BAHAMAS_PSTAT', # NB_PSIA
+        'Theta' : 'BAHAMAS_POT', # source Bahamas?
+        }, inplace = True)
+
+    geodata = [Point(lon, lat) for lon, lat in zip(
+        df['BAHAMAS_LON'], df['BAHAMAS_LAT'])]
+    df = geopandas.GeoDataFrame(df, geometry=geodata)
+    
+    met_df = df[[c for c in df.columns if not c.startswith('PHILEAS')]]
+
+    df.rename(columns = dict(
+        PHILEAS_CO = 'UMAQS_CO',
+        PHILEAS_N2O = 'UMAQS_N2O',
+        PHILEAS_O3 = 'FAIRO_O3'), 
+                inplace = True)
+
+    data_dictionary = {
+        'met_data' : met_df, 
+        'df' : df
+        }
+    return data_dictionary
+
+
+def get_phileas_data_fl07_fl19(time_res = '10s'): 
     """ Temporary function for creating merge files for the PHILEAS campaign. """  
     # GHOST_ECD
     fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07_Frankfurt_20230821_HALO_GHOST_ECD_v1.csv"

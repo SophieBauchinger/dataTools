@@ -305,7 +305,7 @@ class TropopauseSorterMixin:
         Args: 
             save_n2o_baseline (bool): Create self.data['n2o_baseline']. Default True
         """
-        data = self.df
+        data = self.df.copy()
 
         # Choose N2O data to use (Substance object)
         if 'coord' in kwargs:
@@ -317,7 +317,7 @@ class TropopauseSorterMixin:
         else:
             default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', 
                                    HIAPER='NWAS', EMAC='EMAC', TP='INT')
-            [n2o_coord] = self.get_substs(crit='n2o', ID=default_n2o_IDs[self.source])
+            [n2o_coord] = self.get_coords(crit='n2o', ID=default_n2o_IDs[self.source])
 
         # Get reference dataset
         ref_years = np.arange(min(self.years) - 2, max(self.years) + 3)
@@ -466,6 +466,7 @@ class TropopauseSorterMixin:
             if kwargs.get('verbose'): print(f'Sorting {tp}')
 
             tp_df = data.dropna(axis=0, subset=[tp.col_name])
+            tp_df = copy.deepcopy(tp_df)
 
             if tp.tp_def == 'dyn':  # dynamic TP only outside the tropics - latitude filter
                 tp_df = tp_df[np.array([(i > 30 or i < -30) for i in np.array(tp_df.geometry.y)])]
@@ -499,13 +500,14 @@ class TropopauseSorterMixin:
             o3_sorted, o3_subs = self.o3_filter_lt60()
             # rename O3_sorted columns to the corresponding O3 tropopause coord to update
             for tp in [tp for tp in tps if tp.crit == 'o3']:
-                o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
-                o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
+                o3_sorted.loc[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
+                o3_sorted.loc[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
                 df_sorted.update(o3_sorted, overwrite=False)
 
         df_sorted = df_sorted.convert_dtypes()
         if save:
             self.data['df_sorted'] = df_sorted
+
         return df_sorted
 
     @property
@@ -666,7 +668,6 @@ class TropopauseSorterMixin:
         return df
 
 # %% Mixin for adding binning methods to GlobalData objects
-
 class BinningMixin:
     """ Holds methods for binning global data in 1D/2D/3D in selected coordinates. 
     

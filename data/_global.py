@@ -43,14 +43,14 @@ class ModelDataMixin:
     @abstractmethod
     def get_met_data(self):
         """ Require existance of dataframe creation method for child classes. """
-        if self.ID in ['CAR', 'ATOM', 'HIPPO', 'SHTR', 'PGS', 'WISE']: 
+        if self.ID in ['CAR', 'ATOM', 'HIPPO', 'SHTR', 'PGS', 'WISE', 'PHL']: 
             return self.get_clams_data()
         else: 
             raise NotImplementedError(f'Subclass of GlobalData ( - {self.ID}): need to specifically implement .get_met_data()')
 
     def get_clams_data(self, met_pdir=None, save_ds=False, recalculate=False) -> pd.DataFrame:
         """ Creates dataframe for CLaMS data from netcdf files. """
-        if self.ID not in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS']:
+        if self.ID not in ['CAR', 'SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS', 'PHL']:
             raise KeyError(f'Cannot import CLaMS data for ID {self.ID}')
 
         alldata_fname = {
@@ -64,13 +64,13 @@ class ModelDataMixin:
         else: 
             print('Importing CLAMS data')
             campaign_dir_version_dict = { # campaign_pdir, version
-                'CAR'  : ('CaribicTPChange',    4),
-                'SHTR' : ('SouthtracTPChange',  2),
-                'WISE' : ('WiseTPChange',       2), #!!! 4
-                'ATOM' : ('AtomTPChange',       4),
-                'HIPPO': ('HippoTPChange',      2),
-                'PGS'  : ('PolstraccTPChange',  2),
-                'PHL' : ('PhileasTPChange',     4),
+                'CAR'  : ('CaribicTPChange',    5),
+                'SHTR' : ('SouthtracTPChange',  5),
+                'WISE' : ('WiseTPChange',       5),
+                'ATOM' : ('AtomTPChange',       5),
+                'HIPPO': ('HippoTPChange',      5),
+                'PGS'  : ('PolstraccTPChange',  5),
+                'PHL' : ('PhileasTPChange',     5),
                 }
             campaign_pdir, version = campaign_dir_version_dict[self.ID]
             met_pdir = r'E:/TPChange/' + campaign_pdir
@@ -80,7 +80,7 @@ class ModelDataMixin:
                 fnames = met_pdir + "/2*/*.nc"
                 
             drop_variables = {'CAR' : ['CARIBIC2_LocalTime'], 
-                                'ATOM' : ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']}
+                              'ATOM' : ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']}
                 
             # extract data, each file goes through preprocess first to filter variables & convert units
             with xr.open_mfdataset(fnames, 
