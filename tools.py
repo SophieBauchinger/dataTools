@@ -472,53 +472,66 @@ def conv_PartsPer_molarity(x, unit):
 
 class LognormFit: 
     """ Holds information on Lognorm Fits on distributions of the given dataset. """
-    def __init__(self, data_arr, bin_nr = 30, hist_kwargs = {}, **kwargs): 
+    def __init__(self, data_arr, **kwargs): 
         """ Get lognormal fit for 1D data array. 
         Parameters: 
             data_arr (array): Flattened array of v data
-            bin_nr (int): Number of bins for histogram to fit lognorm to
-            
-            hist_kwargs (dict): Kwargs to pass to np.histogram funtion (bins, range, density, weights)
+            bins (int or List[float]): Histogram bins to base lognorm fit onto
 
             key normalise (bool). Toggle normalising the histogram. Defaults to False 
-            key *(shape, loc, scale) (float): Initial guesses for lognorm fit. Optional       
+            # key *(shape, loc, scale) (float): Initial guesses for lognorm fit. Optional       
         """
+        self.x = data_arr[~np.isnan(data_arr)] 
+        self.normalise = kwargs.get('normalise', False)
+        self.bins = kwargs.get('fit_bins', 30)
+        self.counts, self.bin_edges = np.histogram(self.x, bins=self.bins)
+        self._get_fit()
         
-        self.x = data_arr[~np.isnan(data_arr)]
-        
-        self.hist_kwargs = hist_kwargs
-        if not 'bins' in hist_kwargs: 
-            hist_kwargs['bins'] = bin_nr
-        
-        self.counts, self.bins = np.histogram(self.x, **self.hist_kwargs)
-        self.normalise = False if not 'normalise' in kwargs else kwargs.get('normalise')
-
-        self._get_fit(**kwargs)
-        
-    def _get_fit(self, **kwargs) -> tuple[tuple, np.array]: 
+    def _get_fit(self) -> tuple[tuple, np.array]: 
         """ Get scipy lognorm fit for the given data. 
         
         Parameters: 
             key normalise (bool). Toggle normalising the histogram. Defaults to False 
             key *(shape, loc, scale) (float): Initial guesses for lognorm fit. Optional   
         """
-        fit_kwargs = {k:v for k,v in kwargs.items() \
-            if k in ['shape', 'loc', 'scale', 'floc']}
-        
-        bin_center = self.bins[:-1] + np.diff(self.bins) / 2
+        bin_center = self.bin_edges[:-1] + np.diff(self.bin_edges) / 2
         self.bin_center = bin_center
 
-        self.shape, self.loc, self.scale = stats.lognorm.fit(self.x, floc = 0, *fit_kwargs)
+        # need to fix loc to zero to be able to calculate the mode etc.  
+        self.shape, self.loc, self.scale = stats.lognorm.fit(self.x, floc = 0) 
         self.fit_params = (self.shape, self.loc, self.scale)
         normed_lognorm_fit = stats.lognorm.pdf(bin_center, *self.fit_params)
  
-        area = sum(np.diff(self.bins)*self.counts)
+        area = sum(np.diff(self.bin_edges)*self.counts)
         norm_factor = area if not self.normalise else 1
 
         lognorm_fit = normed_lognorm_fit * norm_factor
         self.lognorm_fit = lognorm_fit
         
         return self.fit_params, lognorm_fit
+
+    def show_fit(self, ax): 
+        """ PLot the data and the lognorm fit onto one axis. """
+        # Plot the pre-computed histogram (see ax.hist for documentation)
+        ax.hist(self.bin_edges[:-1],
+                self.bin_edges, 
+                weights = self.counts,
+                orientation = 'horizontal',
+                edgecolor = 'white', 
+                alpha = 0.7)
+        
+        # Plot the lognorm fit on the data       
+        ax.plot(self.lognorm_fit, self.bin_center, c = 'k')
+
+        # Indicate the mode and median of the fit
+        ax.hlines(self.mode, 0, max(self.lognorm_fit), color = 'k', ls = 'dashed',
+                label = 'Mode: {:.2f}'.format(self.mode))
+        ax.hlines(self.median, 0, max(self.counts), color = 'g', ls = 'dashed',
+                label = 'Median: {:.2f}'.format(self.median))
+
+        # Show sigma and mu of the fit
+        sigma_mu = '$\sigma$ = {:.2f}, '.format(self.sigma) + '$\mu$ = {:.2f}\n'.format(self.mu)
+        ax.legend(title = sigma_mu)
 
     @property
     def mu(self) -> float: 
@@ -557,37 +570,6 @@ class LognormFit:
         # return var, var_calc
         return stats.lognorm.var(*self.fit_params)
     
-    def show_fit(self, **fig_kwargs):
-        """ Plot the fit of the distribution to the data. """
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(**fig_kwargs)
-        
-        ax.hist(self.bins[:-1], self.bins, weights = self.counts, 
-            orientation = 'horizontal',
-            edgecolor = 'white', 
-            alpha=0.7, color='tab:blue')
-
-        # ax.hist(
-        #     self.x, 
-        #     bins = self.bins, 
-        #     orientation = 'horizontal',
-        #     edgecolor = 'white', 
-        #     alpha=0.7, color='tab:blue',
-        #     )
-
-        bin_center = self.bins[:-1] + np.diff(self.bins) / 2
-
-        ax.plot(self.lognorm_fit, bin_center, c = 'k')
-        ax.hlines(self.mode, 0, max(self.counts), color = 'k', ls = 'dashed',
-                label = 'Mode: {:.2f}'.format(self.mode))
-        ax.hlines(self.median, 0, max(self.counts), color = 'g', ls = 'dashed',
-                label = 'Median: {:.2f}'.format(self.median))
-
-        sigma_mu = '$\sigma$ = {:.2f}, '.format(self.sigma) + '$\mu$ = {:.2f}\n'.format(self.mu)
-        ax.legend(title = sigma_mu)
-
-        fig.show()
-
     def stats(self, prec=1) -> pd.Series: 
         """ Returns a pandas series containing the relevant lognorm fit parameters. """
 
@@ -609,99 +591,35 @@ class LognormFit:
 
 class Bin2DFitted(bp.Simple_bin_2d): 
     """ Extending Bin2D class to hold lognorm fits for distributions. """
-    
-    def __init__(self, v, x, y, binclassinstance, count_limit=1, bin_nr=50): 
+    def __init__(self, v, x, y, binclassinstance, count_limit=2, **fit_kwargs): 
         super().__init__(v, x, y, binclassinstance, count_limit)
-        self.bin_nr = bin_nr
-        self.calc_lognorm_fits(bin_nr)
+        print(fit_kwargs)
+        self.calc_lognorm_fits(**fit_kwargs)
     
-    def calc_lognorm_fits(self, bin_nr): 
+    def __repr__(self):
+        return f'Bin2DFitted. Bins: {self}'
+    
+    def calc_lognorm_fits(self, **fit_kwargs): 
         """ Add lognormal fits to distribution of values in 3D bins. """
-        self.vmean_fit = LognormFit(self.vmean, bins=self.xbinlimits)
-        self.vstdv_fit = LognormFit(self.vstdv, bins=self.xbinlimits)
-        self.rvstd_fit = LognormFit(self.rvstd, bins=self.xbinlimits)
+        self.vmean_fit = LognormFit(self.vmean, **fit_kwargs)
+        self.vstdv_fit = LognormFit(self.vstdv, **fit_kwargs)
+        self.rvstd_fit = LognormFit(self.rvstd, **fit_kwargs)
 
         return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
-
-    def plot_hist(self, ax, hist_range = None, color = None, bin_attr = 'vstdv'): 
-        """ Plots histogram with lognormal fit onto the given axis. 
-        
-        Args: 
-            ax (Axis)
-            hist_range (tuple[float]): Outer boundaries of the histogram
-            color (str): facecolor of the bins
-            bin_nr (int): Number of bins
-            bin_attr (str): Attribute of the binned data to show 
-        """
-        x_binned = getattr(self, bin_attr)
-        ax.hist(
-            x_binned[~np.isnan(x_binned)], 
-            # bins = self.bin_nr, range = hist_range, 
-            orientation = 'horizontal',
-            edgecolor = 'white', lw = 0.3, 
-            color = color,
-            )
-
-        lognorm_inst = getattr(self, f'{bin_attr}_fit')
-        lognorm_fit = lognorm_inst.lognorm_fit
-        bin_center = lognorm_inst.bin_center
-        ax.plot(lognorm_fit, bin_center,
-                c = 'k', lw = 1)
-        
-        ax.hlines(lognorm_inst.mode, 0, max(lognorm_fit),
-                  ls = 'dashed', 
-                  color = 'k', 
-                  lw = 1)
 
 class Bin3DFitted(bp.Simple_bin_3d): 
     """ Extending Bin3D class to hold lognorm fits for distributions. """
-    
-    def __init__(self, v, x, y, z, binclassinstance, count_limit=1, fit_bin_nr=50): 
+    def __init__(self, v, x, y, z, binclassinstance, count_limit=2, **fit_kwargs): 
         super().__init__(v, x, y, z, binclassinstance, count_limit)
-        
-        self.calc_lognorm_fits(fit_bin_nr)
+        self.calc_lognorm_fits(**fit_kwargs)
     
-    def calc_lognorm_fits(self, bin_nr): 
+    def calc_lognorm_fits(self, **kwargs): 
         """ Add lognormal fits to distribution of values in 3D bins. """
-        self.vmean_fit = LognormFit(self.vmean, bin_nr=bin_nr)
-        self.vstdv_fit = LognormFit(self.vstdv, bin_nr=bin_nr)
-        self.rvstd_fit = LognormFit(self.rvstd, bin_nr=bin_nr)
+        self.vmean_fit = LognormFit(self.vmean, **kwargs)
+        self.vstdv_fit = LognormFit(self.vstdv, **kwargs)
+        self.rvstd_fit = LognormFit(self.rvstd, **kwargs)
 
         return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
-
-    def plot_hist(self, ax, hist_range = None, color = None, bin_attr = 'vstdv', bin_nr = 50): 
-        """ Plots histogram with lognormal fit onto the given axis. 
-        
-        Args: 
-            ax (Axis)
-            hist_range (tuple[float]): Outer boundaries of the histogram
-            color (str): facecolor of the bins
-            bin_nr (int): Number of bins
-            bin_attr (str): Attribute of the binned data to show 
-        """
-        x = getattr(self, bin_attr)
-        # Plot data
-        ax.hist(x[~np.isnan(x)], 
-            bins = bin_nr, range = hist_range, 
-            orientation = 'horizontal',
-            edgecolor = 'white', lw = 0.3, 
-            color = color,
-            )
-
-        # Plot lognorm fit 
-        lognorm_inst = getattr(self, f'{bin_attr}_fit')
-        lognorm_fit = lognorm_inst.lognorm_fit
-        bin_center = lognorm_inst.bin_center
-        ax.plot(lognorm_fit, bin_center,
-                c = 'k', lw = 1)
-        
-        # Plot stats
-        ax.hlines(lognorm_inst.mode, 0, max(lognorm_fit),
-                  ls = 'dashed', 
-                  color = 'k', 
-                  lw = 1)
-        
-        return lognorm_inst
 
 def load_reload_Bin3D_df(action, pickle_obj = None, fname = None):
     """ Either saves Bin3D_df to file or reloads it from there. 
