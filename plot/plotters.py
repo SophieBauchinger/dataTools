@@ -105,7 +105,8 @@ class PlotterMixin(GlobalDataPlotterMixin,
         no_of_axs = len(tps) + extra_axes
 
         figsize = fig_kwargs.pop('figsize', (7, math.ceil(no_of_axs/2)*2))
-        fig = plt.figure(figsize=figsize, dpi=100, **fig_kwargs)
+        dpi = fig_kwargs.pop('dpi', 100)
+        fig = plt.figure(figsize=figsize, dpi=dpi, **fig_kwargs)
         
         gs = fig.add_gridspec(math.ceil(no_of_axs/2), 2)
         axs = gs.subplots(sharex=sharex, sharey=sharey)
