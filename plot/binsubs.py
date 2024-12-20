@@ -21,15 +21,14 @@ import matplotlib.gridspec as gridspec
 import matplotlib.lines as mlines
 import matplotlib.patheffects as mpe
 from matplotlib.patches import Patch
-import matplotlib.ticker as ticker
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.axes_grid1 import AxesGrid
-
 import numpy as np
 import pandas as pd
 from PIL import Image
 import io
 import itertools
+from scipy import stats
 import warnings
 
 import toolpac.calc.binprocessor as bp
@@ -118,6 +117,42 @@ class BinPlotterBaseMixin:
             raise KeyError('Could not generate colormap limits.')
         return vlims
 
+    # --- Lognorm fitted histograms and things --- # 
+
+    def get_lognorm_stats_df(self, data_dict: dict, lognorm_attr: str, prec:int = 1, use_percentage = False) -> pd.DataFrame: 
+        """ Create combined lognorm-fit statistics dataframe for all tps. 
+        Relative standard deviations are multiplied by 100 to return percentages instead of fractions. 
+        
+        Parameters: 
+            Bin3D_dict (dict[tools.Bin3DFitted]): Binned data incl. lognorm fits (all variables)
+            lognorm_attr (str): vmean_fit / vsdtv_fit / rvstd_fit
+        """
+        
+        if all(isinstance(v, np.ndarray) for v in data_dict.values()): 
+            # then we have a lognorm_attr extracted thing already! 
+            print('AAHHHHH')
+        
+        if not 'rvstd' in lognorm_attr and not use_percentage: 
+            if isinstance(list(data_dict.values())[0], dict): # seasonal
+                
+                pass # more complicated ahhhh
+                
+            return pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec) for k,v in data_dict.items()})
+
+        # else: need to multiple by 100 to get percentage 
+        # (and initially return values with increased precision)
+        stats_df = pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec+2) for k,v in data_dict.items()})
+        
+        
+        
+        df = stats_df.T.convert_dtypes()
+        non_float_cols = [c for c in df.columns if c not in df.select_dtypes([int, float]).columns]
+        for c in df.select_dtypes(float).columns: 
+            df[c] = df[c].apply(lambda x: round(100*x, prec+2))
+        for c in non_float_cols:
+            df[c] =  df[c].apply(lambda x: tuple([round(100*i, prec+2) for i in x]))
+        return df.T
+
     def plot_lognorm_stats(self, ax, df, s = None, xlims = None): 
         for i, tp_col in enumerate(df.columns): 
             tp = dcts.get_coord(tp_col)
@@ -202,7 +237,8 @@ class BinPlotterBaseMixin:
 
         return axs
 
-    def plot_histogram_comparison(self, var, tropo_BinDict, strato_BinDict, bin_attr='vstdv', 
+
+    def plot_histogram_comparison(self, var, strato_dict, tropo_dict, bin_attr='vstdv', 
                                   xscale = 'linear', show_stats = False, fig_kwargs = {}, **kwargs):
         """ Plot histogram with lognorm fit comparison between tropopauses. 
         
@@ -212,7 +248,7 @@ class BinPlotterBaseMixin:
             
             key season (int): If passed, add suptitle with current season
         """
-        tps = [self.get_coords(col_name = k)[0] for k in tropo_BinDict.keys()]
+        tps = [self.get_coords(col_name = k)[0] for k in tropo_dict.keys()]
 
         fig, main_axes, sub_ax_arr = self._nested_subplots_two_column_axs(tps, **fig_kwargs)
         self._adjust_labels_ticks(sub_ax_arr)
@@ -243,24 +279,28 @@ class BinPlotterBaseMixin:
             ax.set_xscale(xscale)
             
         # Add histograms and lognorm fits
-        for axes, data_dict in zip([tropo_axs, strato_axs], [tropo_BinDict, strato_BinDict]):     
+        for axes, data_dict in zip([tropo_axs, strato_axs], [tropo_dict, strato_dict]):     
             # Get overall tropo / strato bin limits
             hist_min, hist_max = np.nan, np.nan
-            for bin_fitted in data_dict.values(): 
-                hist_min = np.nanmin([hist_min] + list(getattr(bin_fitted, bin_attr).flatten()))
-                hist_max = np.nanmax([hist_max] + list(getattr(bin_fitted, bin_attr).flatten()))
+            for data in data_dict.values(): 
+                hist_min = np.nanmin([hist_min] + list(data.flatten()))
+                hist_max = np.nanmax([hist_max] + list(data.flatten()))
 
             for ax, tp_col in zip(axes, data_dict): 
-                bin_fitted = data_dict[tp_col]
+                data_flat = data_dict[tp_col].flatten() # fails if no bin_attr extracted
 
                 # Adding the histograms to the figure
-                lognorm_inst = bin_fitted.plot_hist(ax,
-                    hist_range = (hist_min, hist_max),
-                    color = dcts.get_coord(tp_col).get_color(),
-                    bin_attr = bin_attr)
+                # lognorm_inst = bin_fitted.plot_hist(ax,
+                #     hist_range = (hist_min, hist_max),
+                #     color = dcts.get_coord(tp_col).get_color(),
+                #     bin_attr = bin_attr)
+
+                lognorm_inst = self._hist_lognorm_fitted(data_flat, (hist_min, hist_max), ax, 
+                                                         dcts.get_coord(tp_col).get_color(),
+                                                         hist_kwargs = dict(range = (hist_min, hist_max)))
                 
+                # Show values of mode and sigma at the top of each subplot
                 if show_stats:
-                    # Show values of mode and sigma at the top of each subplot
                     ax.text(x = 0, y = 1.015, 
                         s = 'Mode = {:.1f} / $\sigma$ = {:.2f}'.format(
                         lognorm_inst.mode,
@@ -285,10 +325,11 @@ class BinPlotterBaseMixin:
                 ax.set_ylim(0, max_y)
 
         # Add tropopause definition text boxes and invert tropo x-axis
-        for ax, tp_col in zip(sub_ax_arr[:,:,0].flat, tropo_BinDict):
+        for ax, tp_col in zip(sub_ax_arr[:,:,0].flat, tropo_dict):
             ax.invert_xaxis()
             tp_title = dcts.get_coord(tp_col).label(filter_label=True).split("(")[0] # shorthand of tp label
             ax.text(**dcts.note_dict(ax, s = tp_title, x = 0.1, y = 0.85))
+        return fig, main_axes, sub_ax_arr
 
 class BinPlotter1DMixin(BinPlotterBaseMixin):
     """ Single dimensional binning & plotting. 
@@ -413,7 +454,7 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         elif bin_attr=='vstdv': 
             ax.set_xlabel('Relative variability of '+subs.label(name_only=True))
 
-        if coord.vcoord in ['mxr', 'p'] and not coord.rel_to_tp: 
+        if (coord.vcoord in ['mxr', 'p'] and not coord.rel_to_tp) or coord.col_name == 'N2O_residual': 
             ax.invert_yaxis()
         if coord.vcoord=='p': 
             ax.set_yscale('symlog' if coord.rel_to_tp else 'log')
@@ -1082,6 +1123,115 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
                      )
         plt.show()
 
+    def violin_boxplot_with_stats(self, var, xcoord, ycoord, 
+                                  bin_attr='vstdv', atm_layer = 'tropo',
+                                  **kwargs):
+        """ Make two figures with violin etc plots - one tropo, one strato.
+        Data is 2D binned (could theoretically extend to 3D binning)
+        
+        Parameters: 
+            var (dcts.Substance|dcts.Coordinate)
+            x/ycoord (dcts.Coordinate)
+            bin_attr (str)
+            
+            key x/ybsize (float). Size of x/y bins
+            key jitter (float). Extent of scatter jitter. Default 0.05
+        """
+        # Get data
+        tps = kwargs.pop('tps', self.tps)
+
+        COLOR_SCALE = [tp.get_color() for tp in tps]
+        LABELS = [tp.label(filter_label = True) for tp in tps]
+        POSITIONS = np.linspace(0, len(tps)-1, len(tps))
+        jitter = kwargs.pop('jitter', 0.05)
+        ylabel = var.label(bin_attr = bin_attr)
+        
+        # Boxplot parameters 
+        medianprops = dict(
+            linewidth=1.5, 
+            color="xkcd:dark grey",
+            solid_capstyle="butt")
+        boxprops = dict(
+            linewidth=1, 
+            color="xkcd:dark")
+        
+        data_set = []
+        for tp in tps:
+            bin2d = self.sel_atm_layer(atm_layer, tp).bin_2d(
+                var, xcoord, ycoord, **kwargs)
+            data = getattr(bin2d, bin_attr).flatten()
+            data = data[~np.isnan(data)]
+            data_set.append(data)
+
+        means = [y.mean() for y in data_set]
+        stds = [np.std(y) for y in data_set]
+        skews = [stats.skew(y) for y in data_set]
+        
+        # Create plot
+        fig, ax = plt.subplots(figsize= (8, 5))
+        ax.set_title({'tropo': 'Troposphere',
+                      'strato' : 'Stratosphere'}.get(atm_layer))
+
+        # Add violins 
+        violins = ax.violinplot(
+            data_set, 
+            positions=POSITIONS,
+            widths=0.6,
+            bw_method="silverman",
+            showmeans=False, 
+            showmedians=False,
+            showextrema=False)
+
+        for pc in violins["bodies"]:
+            pc.set_facecolor("none")
+            pc.set_edgecolor("k")
+            pc.set_linewidth(1.4)
+            pc.set_alpha(1)
+
+        # Add boxplot
+        ax.boxplot(
+            data_set,
+            widths = 0.25,
+            positions=POSITIONS, 
+            showfliers = False, # Do not show the outliers beyond the caps.
+            showcaps = False,   # Do not show the caps
+            medianprops = medianprops,
+            whiskerprops = boxprops,
+            boxprops = boxprops)
+
+        # Add data points
+        x_data = [np.array([i] * len(d)) for i, d in enumerate(data_set)]
+        x_jittered = [x + stats.t(df=6, scale=jitter).rvs(len(x)) for x in x_data]
+
+        for x, y, color, label in zip(x_jittered, data_set, COLOR_SCALE, LABELS):
+            ax.scatter(x, y, s = 80, color=color, alpha=0.3, label = label)
+    
+        # Add dot representing the mean
+        for i, mean in enumerate(means):
+            ax.scatter(i, mean, s=50, color="#850e00", edgecolor ='k', zorder=3)
+        ax.legend(handles = self.tp_legend_handles(),
+                ncols = 1 if atm_layer=='tropo' else 3,
+                fontsize = 9,
+                loc = 'upper left' if atm_layer=='tropo'
+                else 'upper center')
+        
+        y_stats = [f'$\mu$ = {m:.2f}\n $\sigma$ = {s:.2f}\n $\gamma$ = {y:.2f}\n' \
+            for m,s,y in zip(means, stds, skews)]
+
+        for x,y,s in zip(POSITIONS, 
+                        [max(y) for y in data_set], 
+                        y_stats):
+            ax.text(x = x, y = y, s = s, 
+                    ha = 'center', va = 'bottom')
+        ax.set_ylim(0, ax.get_ylim()[1]+(20 if atm_layer=='tropo'
+                                        else 150))
+        ax.tick_params(labelbottom=False, bottom=False)
+        ax.set_ylabel(ylabel)
+
+        fig.tight_layout()
+        plt.show()
+
+    # --- Lognorm Fits --- #
     def seasonal_2d_lognorm_stats(self, var, bin_attr='vstdv', **kwargs): 
         """ docstring """
         [s_zcoord] = self.get_coords(vcoord = 'pt', model = 'ERA5', tp_def = 'nan')
@@ -1188,130 +1338,8 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         matrix_plot_3d_stdev_subs(substance, note, tps, save_fig)
         matrix_plot_stdev(note, atm_layer, savefig)
     """
-    def add_to_Bin3D_df(self, *binning_params): 
-        """ Create dataframe containing all precalculated Bin3DFitted instances. 
-        
-        Parameters: 
-            arg binning_params (list[dcts.Substance, dcts.Coordinate, bool])
-        """
-        if not hasattr(self, 'Bin3D_df'): 
-            self.Bin3D_df = pd.DataFrame(columns = [
-                'subs', 'zcoord', 'eql', 'strato_Bin3D_dict', 'tropo_Bin3D_dict'])
 
-        for params in binning_params:
-            subs = params.get('subs')
-            zcoord = params.get('zcoord')
-            eql = params.get('eql')
 
-            df = self.Bin3D_df
-            if len(df[(df.subs == str(subs)) & (df.zcoord == str(zcoord)) & (df.eql == str(eql))]) == 1: 
-                continue
-
-            strato_data, tropo_data = self.make_Bin3D(
-                params.get('subs'), 
-                params.get('zcoord'), 
-                eql = params.get('eql'))
-
-            df_data = dict(subs = str(params.get('subs')), 
-                zcoord = str(params.get('zcoord')), 
-                eql = str(params.get('eql')), 
-                strato_Bin3D_dict = strato_data, 
-                tropo_Bin3D_dict = tropo_data)
-
-            self.Bin3D_df.loc[len(self.Bin3D_df)] = df_data
-
-        return self.Bin3D_df
-
-    def make_Bin3D(self, subs, zcoord, eql, **kwargs):
-        """ Create Bin3DFitted instances for tropospheric data sorted with each tps. 
-        
-        Parameters: 
-            subs (dcts.Substance)
-            zcoord (dcts.Coordinate): Vertical coordinate used for binning
-            eql (bool): Use equivalent latitude instead of latitude
-            
-            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
-            key *(xbsize, ybsize, zbsize) (float): Binsize for x/y/z dimensions. Optional
-
-        Returns stratospheric, tropospheric 3D-bin dictionaries keyed by tropopause definition.
-        """
-        strato_Bin3D_dict, tropo_Bin3D_dict = {}, {}
-        
-        if eql: 
-            ycoord = self.get_coords(hcoord='lat', model = 'MSMT')[0]
-        else:
-            ycoord = self.get_coords(hcoord='lat', model = 'MSMT')[0]
-        xcoord = self.get_coords(hcoord='lon', model = 'MSMT')[0]
-        
-        for tp in self.tps:
-            strato_plotter = self.sel_strato(tp)
-            strato_Bin3D_dict[tp.col_name] = strato_plotter.bin_3d(
-                subs, xcoord, ycoord, zcoord, **kwargs)
-
-            tropo_plotter = self.sel_tropo(tp)
-            tropo_Bin3D_dict[tp.col_name] = tropo_plotter.bin_3d(
-                subs, xcoord, ycoord, zcoord, **kwargs)
-        
-        return strato_Bin3D_dict, tropo_Bin3D_dict 
-
-    def get_Bin3D_dict(self, subs, zcoord, eql, **kwargs
-                         ) -> tuple[dict[tools.Bin3DFitted]]:
-        """ Returns tuple of Bin3DFitted instances for the given parameters. """
-
-        if not hasattr(self, 'Bin3D_df'):
-            self.add_to_Bin3D_df(dict(subs=subs, zcoord=zcoord, eql=eql))
-            
-        df = self.Bin3D_df
-        data = df.loc[(df.subs == str(subs)) 
-                      & (df.zcoord == str(zcoord)) 
-                      & (df.eql==str(eql))]
-        if len(data) == 0: 
-            df = self.add_to_Bin3D_df(dict(subs=subs, zcoord=zcoord, eql=eql))
-            data = df.loc[(df.subs == str(subs)) 
-                          & (df.zcoord == str(zcoord)) 
-                          & (df.eql==str(eql))]
-        
-        strato_Bin3D_dict = data['strato_Bin3D_dict'].values[0]
-        tropo_Bin3D_dict = data['tropo_Bin3D_dict'].values[0]
-
-        return strato_Bin3D_dict, tropo_Bin3D_dict
- 
-    def get_data_3d_dicts(self, subs, zcoord, eql, bin_attr) -> tuple[dict, dict]: 
-        """ Extract specific attributes from Bin3D dictionaries. 
-        Returns data dictionaries such that {tp_col : np.ndarray} """
-        strato_Bin3D_dict, tropo_Bin3D_dict = self.get_Bin3D_dict(subs, zcoord, eql)
-
-        strato_attr_dict = {k:getattr(v, bin_attr) for k,v in strato_Bin3D_dict.items()}
-        tropo_attr_dict = {k:getattr(v, bin_attr) for k,v in tropo_Bin3D_dict.items()}
-        
-        if bin_attr == 'rvstd': 
-            # Multiply everything by 100 to get spercentages
-            strato_attr_dict = {k:v*100 for k,v in strato_attr_dict.items()}
-            tropo_attr_dict = {k:v*100 for k,v in tropo_attr_dict.items()}
-        
-        return strato_attr_dict, tropo_attr_dict
-
-    def get_lognorm_stats_df(self, Bin3D_dict: dict, lognorm_attr: str, prec:int = 1, use_percentage = False) -> pd.DataFrame: 
-        """ Create combined lognorm-fit statistics dataframe for all tps. 
-        Relative standard deviations are multiplied by 100 to return percentages instead of fractions. 
-        
-        Parameters: 
-            Bin3D_dict (dict[tools.Bin3DFitted]): Binned data incl. lognorm fits
-            lognorm_attr (str): vmean_fit / vsdtv_fit / rvstd_fit
-        """
-        if not 'rvstd' in lognorm_attr and not use_percentage: 
-            return pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec) for k,v in Bin3D_dict.items()})
-
-        # else: need to multiple by 100 to get percentage 
-        # (and initially return values with increased precision)
-        stats_df = pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec+2) for k,v in Bin3D_dict.items()})
-        df = stats_df.T.convert_dtypes()
-        non_float_cols = [c for c in df.columns if c not in df.select_dtypes([int, float]).columns]
-        for c in df.select_dtypes(float).columns: 
-            df[c] = df[c].apply(lambda x: round(100*x, prec+2))
-        for c in non_float_cols:
-            df[c] =  df[c].apply(lambda x: tuple([round(100*i, prec+2) for i in x]))
-        return df.T
 
     def three_sideplots_3d_binned(self, subs, zcoord, eql=False, 
                            bin_attr = 'vmean', **kwargs): 
