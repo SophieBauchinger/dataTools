@@ -729,6 +729,14 @@ class BinningMixin:
                              ybmin, ybmax, ybsize,
                              zbmin, zbmax, zbsize)
 
+    def extract_attr(self, data_dict, bin_attr):
+        """ Returns data_dict with bin_attr dimension removed. """
+        if isinstance(list(data_dict.values())[0], dict): # seasonal
+            return {k: {s: getattr(v[s], bin_attr) for s in v.keys()
+                                  } for k,v in data_dict.items()}
+        return {k:getattr(v, bin_attr) for k,v in data_dict.items()}
+
+    # --- 1D binning -- 
     def bin_1d(self, var, xcoord, **kwargs) -> bp.Simple_bin_1d:
         """ Bin substance data in self.df onto 1D-bins of the given coordinate. 
         
@@ -753,6 +761,32 @@ class BinningMixin:
 
         return out
 
+    def bin_1d_seasonal(self, var, xcoord, **kwargs) -> dict[bp.Simple_bin_1d]:
+        """ Bin substance data onto the given coordinate for each season. 
+        Args: 
+            subs (dcts.Substance)
+            coord (dcts.Coordinate)
+            
+            key bci_1d (bp.Bin_equi1d, bp.Bin_notequi1d): 1D-binning structure
+            key xbsize (float)
+        
+        Returns dictionary of bp.Simple_bin_1d objects for each season. 
+        """
+
+        df = kwargs.get('df', self.df)
+        if 'season' not in df.columns:
+            df['season'] = tools.make_season(df.index.month)
+
+        bci_1d = self.make_bci(xcoord, **kwargs)
+
+        out_dict = {}
+        for s in set(self.df['season']): 
+            out_dict[s] = self.sel_season(s).bin_1d(var, xcoord, 
+                                                    bci_1d = bci_1d, 
+                                                    **kwargs)
+        return out_dict
+
+    # --- 2D binning -- 
     def bin_2d(self, var, xcoord, ycoord, **kwargs) -> bp.Simple_bin_2d:
         """ Bin substance data in self.df onto an x-y grid spanned by the given coordinates. 
 
@@ -776,7 +810,8 @@ class BinningMixin:
         if kwargs.get('lognorm_fit', True): 
             out = tools.Bin2DFitted(np.array(self.df[var.col_name]),
                                     x, y, bci_2d,
-                                    count_limit=self.count_limit)
+                                    count_limit=self.count_limit,
+                                    **kwargs)
         else: 
             out = bp.Simple_bin_2d(np.array(self.df[var.col_name]), 
                                    x, y, bci_2d, 
@@ -784,6 +819,83 @@ class BinningMixin:
 
         return out
 
+    def get_data_2d_dicts(self, var, xcoord, ycoord, bin_attr=None, **kwargs) -> tuple[dict, dict]:
+        """ Get strato/tropo dictionary with binned 2D variables bin_attr data using given coords for all tps. 
+        
+        Parameters: 
+            var (dcts.Substance|dcts.Coordinate): Data to be binned
+            x/ycoord (dcts.Coordinate): x- and y-coordinates for 2D binning
+            
+            bin_attr (str): e.g. vmean|vstdv|rvstd. Optional
+                if None, the dictionary contains data on all available variables
+            
+            key x/ybsize: Bin size of x/y-coordinate
+            
+        Returns two dictionaries of the form {tp : DATA}.
+                
+        """
+        strato_BinDict, tropo_BinDict = {}, {}
+
+        for tp in kwargs.get('tps', self.tps):
+            strato_BinDict[tp.col_name] = self.sel_strato(tp).bin_2d(
+                var, xcoord, ycoord, **kwargs)
+            tropo_BinDict[tp.col_name] = self.sel_tropo(tp).bin_2d(
+                var, xcoord, ycoord, **kwargs)
+
+        if bin_attr is None: 
+            return strato_BinDict, tropo_BinDict
+
+        strato_attr_dict = self.extract_attr(strato_BinDict, bin_attr)
+        tropo_attr_dict = self.extract_attr(tropo_BinDict, bin_attr)
+        return strato_attr_dict, tropo_attr_dict
+
+    def bin_2d_seasonal(self, var, xcoord, ycoord, **kwargs) -> dict[bp.Simple_bin_2d]: 
+        """ Seasonal binning of var along xyz coordinates. """
+        if 'season' not in self.df.columns:
+            self.df['season'] = tools.make_season(self.df.index.month)
+            
+        bci_2d = self.make_bci(xcoord, ycoord, **kwargs)
+
+        out_dict = {}
+        for s in set(self.df['season']): 
+            out_dict[s] = self.sel_season(s).bin_2d(var, xcoord, ycoord, 
+                                                    bci_2d = bci_2d, 
+                                                    **kwargs)
+        return out_dict
+
+    def get_seasonal_2d_dict(self, var, xcoord, ycoord, bin_attr=None, **kwargs) -> tuple[dict, dict]: 
+        """ Get seasonal 2D binned data for strato/tropo for all TPs. 
+        
+        Parameters: 
+            var (dcts.Substance|dcts.Coordinate): Data to be binned
+            x/ycoord (dcts.Coordinate): x- and y-coordinates for 2D binning
+
+            bin_attr (str): e.g. vmean|vstdv|rvstd. Optional
+                if None, the dictionary contains data on all available variables
+            
+            key x/ybsize: Bin size of x/y-coordinate
+        
+        Returns two dictionaries with bin_attr values in the form of {tp: {s : DATA}}.
+        """
+        strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict = {}, {}
+        
+        for tp in self.tps:
+            strato_Bin2Dseas_dict[tp.col_name] = self.sel_strato(tp).bin_2d_seasonal(
+                var, xcoord, ycoord, **kwargs)
+            tropo_Bin2Dseas_dict[tp.col_name] = self.sel_tropo(tp).bin_2d_seasonal(
+                var, xcoord, ycoord, **kwargs)
+        
+        if bin_attr is None: 
+            return strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict
+        
+        strato_2D_attr_seas = {k: {s: getattr(v[s], bin_attr) for s in v.keys()
+                                   } for k,v in strato_Bin2Dseas_dict.items()}
+        tropo_2D_attr_seas = {k: {s: getattr(v[s], bin_attr) for s in v.keys()
+                                  } for k,v in tropo_Bin2Dseas_dict.items()}
+        
+        return strato_2D_attr_seas, tropo_2D_attr_seas
+
+    # --- 3D binning -- 
     def bin_3d(self, var, xcoord, ycoord, zcoord, **kwargs) -> bp.Simple_bin_3d:
         """ Bin variable data onto a 3D-grid given by z-coordinate / (equivalent) latitude / longitude. 
 
@@ -811,18 +923,178 @@ class BinningMixin:
         if kwargs.get('lognorm_fit', True): 
             out = tools.Bin3DFitted(np.array(self.df[var.col_name]),
                                     x, y, z, bci_3d,
-                                    count_limit=self.count_limit)
+                                    count_limit=self.count_limit,
+                                    **kwargs)
         else: 
             out = bp.Simple_bin_3d(np.array(self.df[var.col_name]), 
                                    x, y, z, bci_3d, 
                                    count_limit=self.count_limit)
         return out
 
-    def bin_LMS(self, subs, tp, df=None, nr_of_bins=3, **kwargs) -> bp.Simple_bin_3d:
+    def add_to_Bin3D_df(self, *binning_params, **kwargs): 
+        """ Create dataframe containing all precalculated Bin3DFitted instances. 
+        
+        Parameters: 
+            arg binning_params (list[dcts.Substance, dcts.Coordinate, bool])
+        """
+        if not hasattr(self, 'Bin3D_df'): 
+            self.Bin3D_df = pd.DataFrame(columns = [
+                'subs', 'zcoord', 'eql', 'strato_Bin3D_dict', 'tropo_Bin3D_dict'])
+
+        for params in binning_params:
+            subs = params.get('subs')
+            zcoord = params.get('zcoord')
+            eql = params.get('eql')
+
+            df = self.Bin3D_df
+            if len(df[(df.subs == str(subs)) & (df.zcoord == str(zcoord)) & (df.eql == str(eql))]) == 1: 
+                continue
+
+            strato_data, tropo_data = self.make_Bin3D(
+                params.get('subs'), 
+                params.get('zcoord'), 
+                eql = params.get('eql'))
+
+            df_data = dict(subs = str(params.get('subs')), 
+                zcoord = str(params.get('zcoord')), 
+                eql = str(params.get('eql')), 
+                strato_Bin3D_dict = strato_data, 
+                tropo_Bin3D_dict = tropo_data)
+
+            self.Bin3D_df.loc[len(self.Bin3D_df)] = df_data
+
+        return self.Bin3D_df
+
+    def make_Bin3D(self, var, zcoord, eql, **kwargs):
+        """ Create Bin3DFitted instances for tropospheric data sorted with each tps. 
+        
+        Parameters: 
+            var (dcts.Substance)
+            zcoord (dcts.Coordinate): Vertical coordinate used for binning
+            eql (bool): Use equivalent latitude instead of latitude
+            
+            key bci_3d (bp.Bin_equi3d, bp.Bin_notequi3d): 3D-Binning structure
+            key *(xbsize, ybsize, zbsize) (float): Binsize for x/y/z dimensions. Optional
+
+        Returns stratospheric, tropospheric 3D-bin dictionaries keyed by tropopause definition.
+        """
+        strato_Bin3D_dict, tropo_Bin3D_dict = {}, {}
+        
+        if eql: 
+            ycoord = self.get_coords(hcoord='lat', model = 'MSMT')[0]
+        else:
+            ycoord = self.get_coords(hcoord='lat', model = 'MSMT')[0]
+        xcoord = self.get_coords(hcoord='lon', model = 'MSMT')[0]
+        
+        for tp in self.tps:
+            strato_plotter = self.sel_strato(tp)
+            strato_Bin3D_dict[tp.col_name] = strato_plotter.bin_3d(
+                var, xcoord, ycoord, zcoord, **kwargs)
+
+            tropo_plotter = self.sel_tropo(tp)
+            tropo_Bin3D_dict[tp.col_name] = tropo_plotter.bin_3d(
+                var, xcoord, ycoord, zcoord, **kwargs)
+        
+        return strato_Bin3D_dict, tropo_Bin3D_dict 
+
+    def get_Bin3D_dict(self, var, zcoord, eql, **kwargs) -> tuple[dict[tools.Bin3DFitted]]:
+        """ Returns tuple of Bin3DFitted instances for the given parameters. """
+
+        if not hasattr(self, 'Bin3D_df'):
+            self.add_to_Bin3D_df(dict(subs=var, zcoord=zcoord, eql=eql, **kwargs))
+            
+        df = self.Bin3D_dfs
+        data = df.loc[(df.subs == str(var)) 
+                      & (df.zcoord == str(zcoord)) 
+                      & (df.eql==str(eql))]
+        if len(data) == 0: 
+            df = self.add_to_Bin3D_df(dict(subs=var, zcoord=zcoord, eql=eql))
+            data = df.loc[(df.var == str(var)) 
+                          & (df.zcoord == str(zcoord)) 
+                          & (df.eql==str(eql))]
+        
+        strato_Bin3D_dict = data['strato_Bin3D_dict'].values[0]
+        tropo_Bin3D_dict = data['tropo_Bin3D_dict'].values[0]
+
+        return strato_Bin3D_dict, tropo_Bin3D_dict
+ 
+    def get_data_3d_dicts(self, var, zcoord, eql, bin_attr=None, **kwargs) -> tuple[dict, dict]: 
+        """ Extract specific attributes from Bin3D dictionaries. 
+        
+        Parameters:
+            var (dcts.Substance|dcts.Coordinate): Data to be binned
+            x/y/z coord (dcts.Coordinate): x/y/z-coordinates for 2D binning
+
+            bin_attr (str): e.g. vmean|vstdv|rvstd. Optional
+                if None, the dictionary contains data on all available variables
+        
+        Returns data dictionaries such that {tp_col : np.ndarray} 
+        """
+        strato_Bin3D_dict, tropo_Bin3D_dict = self.get_Bin3D_dict(var, zcoord, eql, **kwargs)
+        if bin_attr is None: 
+            return strato_Bin3D_dict, tropo_Bin3D_dict
+
+        strato_attr_dict = {k:getattr(v, bin_attr) for k,v in strato_Bin3D_dict.items()}
+        tropo_attr_dict = {k:getattr(v, bin_attr) for k,v in tropo_Bin3D_dict.items()}
+        
+        if bin_attr == 'rvstd': 
+            # Multiply everything by 100 to get spercentages
+            strato_attr_dict = {k:v*100 for k,v in strato_attr_dict.items()}
+            tropo_attr_dict = {k:v*100 for k,v in tropo_attr_dict.items()}
+        
+        return strato_attr_dict, tropo_attr_dict
+
+    def bin_3d_seasonal(self, var, xcoord, ycoord, zcoord, **kwargs) -> dict[bp.Simple_bin_3d]: 
+        """ Seasonal binning of var along xyz coordinates. """
+        if 'season' not in self.df.columns:
+            self.df['season'] = tools.make_season(self.df.index.month)
+            
+        bci_3d = self.make_bci(xcoord, ycoord, zcoord, **kwargs)
+        
+        out_dict = {}
+        for s in set(self.df['season']): 
+            out_dict[s] = self.sel_season(s).bin_3d(var, xcoord, ycoord, zcoord, 
+                                                    bci_3d = bci_3d, 
+                                                    **kwargs)
+        return out_dict
+
+    def get_seasonal_3d_dict(self, var, xcoord, ycoord, zcoord, bin_attr=None, **kwargs) -> tuple[dict, dict]: 
+        """ Get seasonal 3D binned data for strato/tropo for all TPs. 
+        
+        Parameters: 
+            var (dcts.Substance|dcts.Coordinate): Data to be binned
+            x/ycoord (dcts.Coordinate): x- and y-coordinates for 2D binning
+
+            bin_attr (str): e.g. vmean|vstdv|rvstd. Optional
+                if None, the dictionary contains data on all available variables
+            
+            key x/ybsize: Bin size of x/y-coordinate
+        
+        Returns two dictionaries with bin_attr values in the form of {tp: {s : DATA}}.
+        """
+        strato_Bin3Dseas_dict, tropo_Bin3Dseas_dict = {}, {}
+        
+        for tp in self.tps:
+            strato_Bin3Dseas_dict[tp.col_name] = self.sel_strato(tp).bin_3d_seasonal(
+                var, xcoord, ycoord, zcoord, **kwargs)
+            tropo_Bin3Dseas_dict[tp.col_name] = self.sel_tropo(tp).bin_3d_seasonal(
+                var, xcoord, ycoord, zcoord, **kwargs)
+        
+        if bin_attr is None: 
+            return strato_Bin3Dseas_dict, tropo_Bin3Dseas_dict
+        
+        strato_3D_attr_seas = {k: {s: getattr(v[s], bin_attr) for s in v.keys()
+                                   } for k,v in strato_Bin3Dseas_dict.items()}
+        tropo_3D_attr_seas = {k: {s: getattr(v[s], bin_attr) for s in v.keys()
+                                  } for k,v in tropo_Bin3Dseas_dict.items()}
+        
+        return strato_3D_attr_seas, tropo_3D_attr_seas
+
+    def bin_LMS(self, var, tp, df=None, nr_of_bins=3, **kwargs) -> bp.Simple_bin_3d:
         """ Bin data onto lon-lat-tp grid, then return only the lowermost stratospheric bins. 
         
         Args: 
-            subs (dcts.Substance): Substance data to bin
+            var (dcts.Substance|dcts.Coordinate): Variable data to bin
             tp (dcts.Coordinate): Tropopause Definition used to select LMS data
 
             df (pd.DataFrame): Stratospheric dataset (filtered using TP). Optional
@@ -858,67 +1130,8 @@ class BinningMixin:
         bci_3d = kwargs.get('bci_3d', bp.Bin_equi3d(xbmin, xbmax, xbsize,
                                                     ybmin, ybmax, ybsize,
                                                     zbmin, zbmax, zbsize))
-        out = bp.Simple_bin_3d(np.array(df[subs.col_name]),
+        out = bp.Simple_bin_3d(np.array(df[var.col_name]),
                                x, y, z, bci_3d,
                                count_limit=self.count_limit)
         return out
 
-    def bin_1d_seasonal(self, var, xcoord, **kwargs) -> dict[bp.Simple_bin_1d]:
-        """ Bin substance data onto the given coordinate for each season. 
-        Args: 
-            subs (dcts.Substance)
-            coord (dcts.Coordinate)
-            
-            key bci_1d (bp.Bin_equi1d, bp.Bin_notequi1d): 1D-binning structure
-            key xbsize (float)
-        
-        Returns dictionary of bp.Simple_bin_1d objects for each season. 
-        """
-
-        df = kwargs.get('df', self.df)
-        if 'season' not in df.columns:
-            df['season'] = tools.make_season(df.index.month)
-
-        bci_1d = self.make_bci(xcoord, **kwargs)
-
-        out_dict = {}
-        for s in set(self.df['season']): 
-            out_dict[s] = self.sel_season(s).bin_1d(var, xcoord, 
-                                                    bci_1d = bci_1d, 
-                                                    **kwargs)
-        return out_dict
-
-    def bin_2d_seasonal(self, var, xcoord, ycoord, **kwargs) -> dict[bp.Simple_bin_2d]: 
-        """ Seasonal binning of var along xyz coordinates. """
-        if 'season' not in self.df.columns:
-            self.df['season'] = tools.make_season(self.df.index.month)
-            
-        bci_2d = self.make_bci(xcoord, ycoord, **kwargs)
-
-        out_dict = {}
-        for s in set(self.df['season']): 
-            out_dict[s] = self.sel_season(s).bin_2d(var, xcoord, ycoord, 
-                                                    bci_2d = bci_2d, 
-                                                    **kwargs)
-        return out_dict
-
-    def bin_3d_seasonal(self, var, xcoord, ycoord, zcoord, **kwargs) -> dict[bp.Simple_bin_3d]: 
-        """ Seasonal binning of var along xyz coordinates. """
-        if 'season' not in self.df.columns:
-            self.df['season'] = tools.make_season(self.df.index.month)
-            
-        bci_3d = self.make_bci(xcoord, ycoord, zcoord, **kwargs)
-        
-        out_dict = {}
-        for s in set(self.df['season']): 
-            out_dict[s] = self.sel_season(s).bin_3d(var, xcoord, ycoord, zcoord, 
-                                                    bci_3d = bci_3d, 
-                                                    **kwargs)
-        return out_dict
-
-    # def reorder_seasonal_dicts(self, dictionary): 
-    #     """ From var - season get to season - var for nested dictionaries. """
-    #     seasonal_dict = {}
-    #     for s in set(self.df['season']):
-    #         seasonal_dict[s] = {k:v[s] for k,v in dictionary.items()}
-    #     return seasonal_dict
