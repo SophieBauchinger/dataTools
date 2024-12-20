@@ -834,7 +834,7 @@ def dict_season():
             # 'color_1': 'blue', 'color_2': 'orange',
             # 'color_3': 'green', 'color_4': 'red'}
 
-colors = [
+RSTD_colors = [
     '#E6E6E6', # 0.0 - 0.1
     '#D5D4E8', # 0.1 - 0.2
     '#A6BDDB', 
@@ -844,6 +844,20 @@ colors = [
     '#F86144', 
     '#E12D26', # 0.7 - 0.8
     '#CB181D', # 0.8 - 0.9
+]
+
+EQLAT_colors = [
+    '#9D1E37', # (-90,-75)
+    '#CD3A46',
+    '#E96F67',
+    '#F2A279',
+    '#F7D198',
+    '#F2EBB9', # 0
+    '#CFE7EF',
+    '#8AD1EB',
+    '#3ABBEC',
+    '#009ADB',
+    '#005EAD' # (75,90)
 ]
 
 def dict_colors():
@@ -864,7 +878,8 @@ def dict_colors():
         'always_stato' : 'c', # cyan
         # 'rvstd' : cmr.get_sub_cmap('hot_r', 0.1, 1),
         # 'vcount' : plt.cm.PuRd,
-        'rvstd' : lsc.from_list('RSTD_default', colors, N=9),
+        'eqlat' : lsc.from_list('EQLAT_default', EQLAT_colors, N=len(EQLAT_colors)),
+        'rvstd' : lsc.from_list('RSTD_default', RSTD_colors, N=9),
         'chem' : '#1f77b4',
         'therm' : '#ff7f0e',
         'dyn' : '#2ca02c',
