@@ -476,7 +476,7 @@ class LognormFit:
         """ Get lognormal fit for 1D data array. 
         Parameters: 
             data_arr (array): Flattened array of v data
-            bins (int or List[float]): Histogram bins to base lognorm fit onto
+            fit_bins (int or List[float]): Histogram bins to base lognorm fit onto
 
             key normalise (bool). Toggle normalising the histogram. Defaults to False 
             # key *(shape, loc, scale) (float): Initial guesses for lognorm fit. Optional       
@@ -593,11 +593,7 @@ class Bin2DFitted(bp.Simple_bin_2d):
     """ Extending Bin2D class to hold lognorm fits for distributions. """
     def __init__(self, v, x, y, binclassinstance, count_limit=2, **fit_kwargs): 
         super().__init__(v, x, y, binclassinstance, count_limit)
-        print(fit_kwargs)
         self.calc_lognorm_fits(**fit_kwargs)
-    
-    def __repr__(self):
-        return f'Bin2DFitted. Bins: {self}'
     
     def calc_lognorm_fits(self, **fit_kwargs): 
         """ Add lognormal fits to distribution of values in 3D bins. """
@@ -649,6 +645,33 @@ def load_reload_Bin3D_df(action, pickle_obj = None, fname = None):
                 v.calc_lognorm_fits(50)
 
     return output
+# %% Fun with stats
+def prep_x_n(x): 
+    """ Drop NaN values and get length"""
+    x = x.flatten()
+    x = x[~np.isnan(x)]
+    n = len(x)
+    return x,n
+
+def kth_moment(x, c, k):
+    """ Calculate a distribution's moments. """
+    x,n = prep_x_n(x)
+    sum_to_k = sum([(xi-c)**k for xi in x])
+    moment = 1/(n) * sum_to_k
+    return moment
+
+def mean(x):
+    """ raw 2st moment """
+    return kth_moment(x, c=0, k= 1)
+
+def variance(x):
+    """ Central 2nd moment """
+    return kth_moment(x, c = kth_moment(x, c=0, k= 1), k=2)
+
+def skewness(x):
+    """ Standardised 3rd moment"""
+    return kth_moment(x, c = kth_moment(x, c=0, k= 1), k=3) / kth_moment(x, c = kth_moment(x, c=0, k= 1), k=2)**(3/2)
+
 
 # %% Plotting tools
 def add_zero_line(ax, axis='y'):
