@@ -864,10 +864,10 @@ def dict_colors():
     """ Get colorbars and colors for various variables. """
     return {
         'vmean': plt.cm.viridis,
-        'vstdv': cmr.get_sub_cmap('hot_r', 0.1, 1),
-        'vstdv_tropo': cmr.get_sub_cmap('YlOrBr', 0, 0.75),
+        'vstdv': plt.cm.RdYlBu_r, # cmr.get_sub_cmap('hot_r', 0.1, 1),
+        'vstdv_tropo': plt.cm.RdYlBu_r, #cmr.get_sub_cmap('YlOrBr', 0, 0.75),
         'vstdv_strato': plt.cm.BuPu,
-        'rvstd_tropo': cmr.get_sub_cmap('YlOrBr', 0, 0.75),
+        'rvstd_tropo': plt.cm.RdYlBu_r, #cmr.get_sub_cmap('YlOrBr', 0, 0.75),
         'rvstd_strato': plt.cm.BuPu,
         'diff': plt.cm.PiYG,
         'vcount': cmr.get_sub_cmap('plasma_r', 0.1, 0.9),

@@ -283,20 +283,20 @@ class TropopausePlotterMixin:
         """
         fig, axs = plt.subplots(2, 2, figsize = (7,6), dpi=kwargs.get('dpi', 250))
         for s, ax in zip(range(1,5), axs.flat): 
-            self.sel_season(s).show_ratios(ax=ax, xlim = kwargs.get('xlim', (0, 2.15)))
+            self.sel_season(s).show_ratios(ax=ax, xlim = kwargs.pop('xlim', (0, 1.8)), **kwargs)
             ax.set_ylabel('')
             ax.yaxis.set_visible(False)
             ax.set_title('')
             # ax.set_title(dcts.dict_season()[f'name_{s}'])
             s = dcts.dict_season()[f'name_{s}'].split()[0] + '\n' + dcts.dict_season()[f'name_{s}'].split()[1]
-            ax.text(s = s, y = 0.85, x = 0.85, 
+            ax.text(s = s, y = 0.2, x = 0.85, 
                     transform = ax.transAxes, ha = 'center', va = 'center_baseline', 
                     bbox = dict(facecolor='white', edgecolor = 'grey'))
         fig.tight_layout()
         fig.subplots_adjust(top = 0.8)
         if kwargs.get('title'):
             fig.suptitle('Ratio of tropospheric / stratospheric data points per tropopause definition')
-        fig.legend(handles = self.tp_legend_handles(lw = 5, no_vc=True)[::-1], ncol = 3, 
+        fig.legend(handles = self.tp_legend_handles(lw = 5, no_vc=True), ncol = 3, 
                 loc='upper center', bbox_to_anchor=[0.5, 0.93]);
 
     def show_ratios(self, **kwargs):
@@ -317,7 +317,7 @@ class TropopausePlotterMixin:
         ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
         ax.set_axisbelow(True)
 
-        for tp in kwargs.get('tps', self.tps):
+        for tp in kwargs.get('tps', self.tps)[::-1]:
             color = tp.get_color()
             ratio = ratios[tp.col_name]
             n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
@@ -868,8 +868,8 @@ class TropopausePlotterMixin:
             if key in kwargs: 
                 marker_params.update({key: kwargs[key]})
 
-        tropos_c = dict(c = 'm')
-        stratos_c = dict(c = 'b')
+        tropos_c = dict(c = 'tab:red')
+        stratos_c = dict(c = 'tab:orange')
 
         ax.scatter(df_tropo[subs.col_name], 
                 df_tropo[ycoord.col_name], 

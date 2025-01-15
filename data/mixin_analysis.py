@@ -445,20 +445,18 @@ class TropopauseSorterMixin:
         # create df_sorted with flight number if available
         df_sorted = pd.DataFrame(data['Flight number'] if 'Flight number' in data.columns else None,
                                  index=data.index)
-
-        # Get tropopause coordinates
-        tps = self.get_tps()
+        rel_tps = self.get_tps(rel_to_tp = True)
 
         # N2O filter
-        for tp in [tp for tp in tps if (tp.crit == 'n2o' and 
-                                        tp.col_name not in ['N2O_baseline', 'N2O_residual'])]:
+        for tp in [tp for tp in self.get_tps(crit = 'n2o')
+                   if tp.col_name not in ['N2O_baseline', 'N2O_residual']]:
             n2o_sorted = self.n2o_baseline_filter(coord=tp, **kwargs)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
 
         # Dyn / Therm / CPT / Combo tropopauses
-        for tp in [tp for tp in tps if not tp.vcoord == 'mxr']:
+        for tp in [tp for tp in rel_tps]:
             if tp.col_name not in data.columns:
                 print(f'Note: {tp.col_name} not found, continuing.')
                 continue
@@ -496,12 +494,12 @@ class TropopauseSorterMixin:
             df_sorted[strato] = tp_sorted[strato]
 
         # Ozone: Flag O3 < 60 ppb as tropospheric
-        if any(tp.crit == 'o3' for tp in tps) and not self.source == 'MULTI':
+        if any(tp.crit == 'o3' for tp in rel_tps) and not self.source == 'MULTI':
             o3_sorted, o3_subs = self.o3_filter_lt60()
             # rename O3_sorted columns to the corresponding O3 tropopause coord to update
-            for tp in [tp for tp in tps if tp.crit == 'o3']:
-                o3_sorted.loc[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
-                o3_sorted.loc[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
+            for tp in [tp for tp in rel_tps if tp.crit == 'o3']:
+                o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
+                o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
                 df_sorted.update(o3_sorted, overwrite=False)
 
         df_sorted = df_sorted.convert_dtypes()

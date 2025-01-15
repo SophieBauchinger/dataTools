@@ -35,6 +35,7 @@ import toolpac.calc.binprocessor as bp
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
+from dataTools.data.BinnedData import extract_attr
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
 
@@ -279,7 +280,11 @@ class BinPlotterBaseMixin:
             ax.set_xscale(xscale)
             
         # Add histograms and lognorm fits
-        for axes, data_dict in zip([tropo_axs, strato_axs], [tropo_dict, strato_dict]):     
+        for axes, data_Bin_dict in zip([tropo_axs, strato_axs], [tropo_dict, strato_dict]): 
+            
+            # Extract bin_attr
+            data_dict = extract_attr(self, data_Bin_dict, bin_attr)
+             
             # Get overall tropo / strato bin limits
             hist_min, hist_max = np.nan, np.nan
             for data in data_dict.values(): 
@@ -704,39 +709,6 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         cbar.set_ticks(ticks = cbar_vals) #, labels=cbar_vals, ticklocation='bottom')
 
         plt.show()
-
-    # def plot_2d_mxr(self, subs, xcoord, ycoord, **kwargs):
-    #     """ Plot binned average mixing ratios on an x vs. y plot. """
-    #     bin_attr = 'vmean'
-    #     self.seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, **kwargs)
-
-    # def plot_2d_stdv(self, subs, xcoord, ycoord, averages=True, **kwargs):
-    #     """ Plot binned substance standard deviation on an x vs. y plot. """
-    #     bin_attr = 'vstdv'
-    #     self.seasonal_2d_plots(subs, xcoord, ycoord, bin_attr, averages=averages, **kwargs)
-
-    # def plot_mixing_ratios(self, **kwargs):
-    #     """ Plot all possible permutations of subs, xcoord, ycoord. """
-    #     permutations = list(itertools.product(self.substances,
-    #                                           # self.x_coordinates,
-    #                                           [dcts.get_coord(col_name='int_ERA5_EQLAT')],
-    #                                           # self.y_coordinates
-    #                                           tools.minimise_tps(dcts.get_coordinates(tp_def='not_nan'))
-    #                                           ))
-    #     for perm in permutations:
-    #         self.plot_2d_mxr(*perm, **kwargs)
-
-    # def plot_stdv_subset(self, **subs_kwargs):
-    #     """ Plot a small subset of standard deviation plots. """
-    #     # xcoords = [dcts.get_coord(col_name='geometry.y'), dcts.get_coord(col_name='int_ERA5_EQLAT')]
-    #     xcoords = [dcts.get_coord(col_name='int_ERA5_EQLAT')]
-    #     substances = [s for s in dcts.get_substances(ID='GHG', **subs_kwargs) if s.short_name.startswith('detr_')]
-
-    #     for subs in substances:
-    #         print(subs)
-    #         for tp in self.tps:
-    #             for xcoord in xcoords:
-    #                 self.plot_2d_stdv(subs, xcoord, tp)
 
     def plot_total_2d(self, subs, xcoord, ycoord, bin_attr='vstdv', **kwargs):
         """ Single 2D plot of varibility of given substance. """

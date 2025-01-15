@@ -83,9 +83,11 @@ class Caribic(GlobalData):
         self.sel_latitude(30, 90, inplace=True)
         self.count_limit = 3
         
+        self.create_df_sorted() # creates N2O_baseline
+        
         self.set_tps(rel_to_tp=True, vcoord='z', model = 'ERA5')
         self.tps += self.get_coords(rel_to_tp=True, crit='o3')
-        self.tps += self.get_coords(crit='n2o', model = 'MSMT')
+        self.tps += self.get_coords(col_name = 'N2O')
         self.tps.sort(key=lambda x: x.tp_def)
 
         self.remove_non_shared_indices(inplace=True)
