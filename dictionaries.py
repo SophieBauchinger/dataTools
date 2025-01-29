@@ -133,7 +133,7 @@ class Coordinate:
             vcoord = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
 
             if self.tp_def is not np.nan:
-                vcoord = f'$\Delta${vcoord}$_{{TP}}$' if self.rel_to_tp else vcoord
+                vcoord = (f'$\Delta${vcoord}'+'$_{{\\text{TP}}}$') if self.rel_to_tp else vcoord
 
                 pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
                 crit = '%s' % (', ' + ''.join(
@@ -152,9 +152,9 @@ class Coordinate:
             else:
                 label = f'{vcoord} [{self.unit}]'
 
-            if coord_only:
-                vcoord = f'$\Delta${self.vcoord}$_{{TP}}$' if self.rel_to_tp is True else f'{self.vcoord}'
-                if self.vcoord == 'pt': vcoord = '$\Delta\Theta_{{TP}}$' if self.rel_to_tp is True else '$\Theta$'
+            if coord_only:               
+                vcoord = (f'$\Delta${self.vcoord}$'+'_{{\\text{TP}}}$') if self.rel_to_tp is True else f'{self.vcoord}'
+                if self.vcoord == 'pt': vcoord = '$\Delta\Theta_{{\\text{TP}}}$' if self.rel_to_tp is True else '$\Theta$'
                 label = f'{vcoord}'
 
         elif self.hcoord is not np.nan:
@@ -827,10 +827,11 @@ def MS_variables(*args):
 #%% Misc for plotting
 def dict_season():
     """ Use to get name_s, color_s for season s"""
-    return {'name_1': 'Spring (MAM)', 'color_1': '#228833',  # blue
-            'name_2': 'Summer (JJA)', 'color_2': '#AA3377',  # yellow
-            'name_3': 'Autumn (SON)', 'color_3': '#CCBB44',  # red
-            'name_4': 'Winter (DJF)', 'color_4': '#4477AA'}  # green
+    return {'name_1': 'Spring (MAM)', 'color_1': '#D55E00', # '#228833',  # blue
+            'name_2': 'Summer (JJA)', 'color_2': '#E69F00', # '#AA3377',  # yellow
+            'name_3': 'Autumn (SON)', 'color_3': '#874199', # '#CCBB44',  # red
+            'name_4': 'Winter (DJF)', 'color_4': '#57B4E9', # '#4477AA',  # green
+            }  
             # 'color_1': 'blue', 'color_2': 'orange',
             # 'color_3': 'green', 'color_4': 'red'}
 
