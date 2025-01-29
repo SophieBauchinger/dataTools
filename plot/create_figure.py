@@ -99,7 +99,7 @@ def make_two_column_axs(tps, extra_axes=0, sharex=True, sharey=True, **fig_kwarg
     """ Create the necessary nr of subplots and hide superfluous axes. """
     no_of_axs = len(tps) + extra_axes
 
-    figsize = fig_kwargs.pop('figsize', (7, math.ceil(no_of_axs/2)*2))
+    figsize = fig_kwargs.pop('figsize', (8, math.ceil(no_of_axs/2)*2))
     dpi = fig_kwargs.pop('dpi', 100)
     fig = plt.figure(figsize=figsize, dpi=dpi, **fig_kwargs)
     
@@ -173,24 +173,15 @@ def adjust_labels_ticks(sub_ax_arr) -> np.ndarray[plt.Axes]:
     for ax in sub_ax_arr[:,:,0].flat:
         # Inner left plots
         ax.tick_params(axis = 'y',
-                    right=False, labelright=False, 
-                    left = True, labelleft = True)
+            right=False, labelright=False, 
+            left = True, labelleft = True)
 
     for ax in sub_ax_arr[:,:,-1].flat:
         # Inner right plots
         ax.tick_params(axis = 'y',
-                    right=True, labelright=True,
-                    left = False, labelleft = False)
-    
-    # --- Add outer axis descriptions and titles 
-    for ax in sub_ax_arr[:,0,0].flat: 
-        # Left column inner left
-        ax.yaxis.set_label_position('left')
-
-    for ax in sub_ax_arr[:,-1,-1].flat: 
-        # Right column inner right
-        ax.yaxis.set_label_position('right')
-        
+            right=True, labelright=True,
+            left = False, labelleft = False)
+            
     # --- Hide x- and y-axis labels for inner subplots
     for ax in list(sub_ax_arr[:,0,-1].flat) + list(sub_ax_arr[:,-1,0].flat): 
         # Left column inner right & right column inner left
@@ -199,6 +190,15 @@ def adjust_labels_ticks(sub_ax_arr) -> np.ndarray[plt.Axes]:
     for ax in sub_ax_arr[:-1,:,].flat: 
         # All plots not on the bottom row
         ax.xaxis.label.set_visible(False)
+        
+    # --- Add outer axis descriptions and titles 
+    for ax in sub_ax_arr[:,0,0].flat: 
+        # Left column inner left
+        ax.yaxis.set_label_position('left')
+
+    for ax in sub_ax_arr[:,-1,-1].flat: 
+        # Right column inner right
+        ax.yaxis.set_label_position('right')
     
     return sub_ax_arr
 
