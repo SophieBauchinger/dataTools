@@ -53,17 +53,17 @@ def plot_lognorm_stats(ax, df, s = None):
     for i, tp_col in enumerate(df.columns): 
         tp = dcts.get_coord(tp_col)
         if s is not None: 
-            y = s*8+i
+            y = -s*8+i
         else: 
             y = tp.label(filter_label = True).split('(')[0]
         # Lines
-        line_kw = dict(color = tp.get_color(), lw = 5)
-        ax.fill_betweenx([y]*2, *df[tp_col].int_68, **line_kw, alpha = 0.8) # avoids round edges
+        line_kw = dict(color = tp.get_color(), lw = 7)
+        ax.fill_betweenx([y]*2, *df[tp_col].int_68, **line_kw, alpha = 1) # avoids round edges
         ax.fill_betweenx([y]*2, *df[tp_col].int_95, **line_kw, alpha = 0.5)
 
         # Mode marker
-        kw_mode = dict(alpha = 1, zorder = 9, marker = 'o')
-        ax.scatter(df[tp_col].Mode, y, **kw_mode, color = 'k')
+        ax.scatter(df[tp_col].Mode, y, 
+                   alpha = 1, zorder = 9, marker = 'o', color = 'k', s = 50)
 
         # Numeric value of mode
         ax.annotate(
@@ -71,7 +71,7 @@ def plot_lognorm_stats(ax, df, s = None):
             xy = (df[tp_col].Mode, y),
             xytext = (0, y),
             ha = 'right', va = 'center', 
-            size = 7, fontweight = 'medium',
+            size = 9, fontweight = 'medium',
             )
 
 def seasonal_lognorm_stats(self, strato_Bin_seas_dict, tropo_Bin_seas_dict, 
@@ -115,7 +115,7 @@ def seasonal_lognorm_stats(self, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         for df, ax in zip([tropo_stats, strato_stats], axs):
             plot_lognorm_stats(ax, df, s)
     
-    y_arr =  [s*8+2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
+    y_arr =  [-s*8 + 2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
     y_ticks = [dcts.dict_season()[f'name_{s}'] for s in seasons]# [dcts.get_coord(tp_col).label(filter_label = True).split('(')[0] for tp_col in df.columns]
 
     axs[0].set_yticks(y_arr, y_ticks)
@@ -129,11 +129,30 @@ def seasonal_lognorm_stats(self, strato_Bin_seas_dict, tropo_Bin_seas_dict,
     axs[0].set_xlabel(tropo_var.label(bin_attr=bin_attr))
     axs[1].set_xlabel(strato_var.label(bin_attr=bin_attr))
 
-    axs[0].legend(handles = self.tp_legend_handles(filter_label=True, no_vc = True), 
-            prop=dict(size = 6));
-
     fig.subplots_adjust(bottom = 0.15, wspace = 0.05)
-    fig.legend(*self.lognorm_legend_handles(), loc = 'lower center', ncols = 3)
+    
+    if 'legend_loc' in kwargs: 
+        tps_leg = self.tp_legend_handles(filter_label=True, no_vc = True)
+        lognorm_leg = self.lognorm_legend_handles()
+        
+        fig.subplots_adjust(bottom = 0.2, wspace = 0.05)
+
+        fig.legend(
+            handles = tps_leg + lognorm_leg[0], 
+            labels = [i._label for i in tps_leg] + lognorm_leg[1],
+            ncols = kwargs.get('legend_ncols', 3), 
+            loc = kwargs.get('legend_loc', 'lower center'))
+        
+    else: 
+        axs[0].legend(
+            handles = self.tp_legend_handles(filter_label=True, no_vc = True), 
+            prop=dict(size = kwargs.get('legend_size', 6)),
+            loc = 'upper left', 
+            ncols = 1)
+        
+        fig.legend(*self.lognorm_legend_handles(), 
+                loc = 9, 
+                ncols = 3)
 
     return axs
 
@@ -168,28 +187,28 @@ def seasonal_2d_lognorm_stats(self, tropo_params, strato_params,
                 tropo_var, tropo_xcoord, tropo_ycoord, **tropo_params,
                 )
         
-    fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=250)
+    fig, axs = plt.subplots(1,2, figsize = (8,8), sharey=True, dpi=600)
     
     # Labels 
-    txcbs = tropo_params.get('xbsize', tropo_xcoord.get_bsize())
-    tycbs = tropo_params.get('ybsize', tropo_ycoord.get_bsize())
+    # txcbs = tropo_params.get('xbsize', tropo_xcoord.get_bsize())
+    # tycbs = tropo_params.get('ybsize', tropo_ycoord.get_bsize())
     
-    txc_label = tropo_xcoord.label(coord_only=True) + f' [{txcbs}]'
-    tyc_label = tropo_ycoord.label(coord_only=True) + f' [{tycbs}]'
+    # txc_label = tropo_xcoord.label(coord_only=True) + f' [{txcbs}]'
+    # tyc_label = tropo_ycoord.label(coord_only=True) + f' [{tycbs}]'
     
-    sxcbs = strato_params.get('xbsize', strato_xcoord.get_bsize())
-    sycbs = strato_params.get('ybsize', strato_ycoord.get_bsize())
+    # sxcbs = strato_params.get('xbsize', strato_xcoord.get_bsize())
+    # sycbs = strato_params.get('ybsize', strato_ycoord.get_bsize())
     
-    sxc_label = strato_xcoord.label() +f' - {sxcbs}'
-    syc_label = strato_ycoord.label() +f' - {sycbs}'
+    # sxc_label = strato_xcoord.label() +f' - {sxcbs}'
+    # syc_label = strato_ycoord.label() +f' - {sycbs}'
 
     # axs[0].set_title('Troposphere (' + txc_label + r' $\times$ ' + tyc_label + ')',
     #                  size = 10, pad = 3)
     # axs[1].set_title('Stratosphere (' + sxc_label + r' $\times$ ' + syc_label + ')',
     #                  size = 10, pad = 3)
 
-    axs[0].set_title('Troposphere')
-    axs[1].set_title('Stratosphere')
+    axs[0].set_title('(a) Troposphere')
+    axs[1].set_title('(b) Stratosphere')
     
 
     seasonal_lognorm_stats(self, strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict, 
@@ -208,15 +227,27 @@ def hist_lognorm_fitted(x, range, ax, c, hist_kwargs = {}, bin_nr = 50) -> tools
     c (str): color of the histogram bars
 
     """
-    print('Hier samma. Puntigamer.')
     x = x[~np.isnan(x)]
-    ax.hist(x, 
-        bins = bin_nr, range = range, 
-        orientation = 'horizontal',
-        edgecolor = 'white', lw = 0.3, 
-        color=c,
-        )
-    lognorm_inst = tools.LognormFit(x, bin_nr = bin_nr, hist_kwargs = hist_kwargs)
+    # ax.hist(x, 
+    #     bins = bin_nr, range = range, 
+    #     orientation = 'horizontal',
+    #     edgecolor = 'white', lw = 0.3, 
+    #     color=c,
+    #     )
+    lognorm_inst = tools.LognormFit(x, fit_bins = np.linspace(*range, bin_nr),
+                                    bin_nr = bin_nr, 
+                                    hist_kwargs = hist_kwargs)
+    
+    ax.hist(lognorm_inst.bin_edges[:-1],
+            lognorm_inst.bin_edges, 
+            weights = lognorm_inst.counts,
+            range = range, 
+            orientation = 'horizontal',
+            edgecolor = 'white', 
+            lw = 0.3,
+            color = c)
+    ax.set_ylim(*range)
+
     lognorm_fit = lognorm_inst.lognorm_fit
     bin_center = lognorm_inst.bin_center
     ax.plot(lognorm_fit, bin_center,
@@ -225,7 +256,7 @@ def hist_lognorm_fitted(x, range, ax, c, hist_kwargs = {}, bin_nr = 50) -> tools
     ax.hlines(lognorm_inst.mode, 0, max(lognorm_fit),
                 ls = 'dashed', 
                 color = 'k', 
-                lw = 1)- m 
+                lw = 1)
 
     return lognorm_inst
 
@@ -258,41 +289,46 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
     pad = 12 if show_stats else 5
     
     for ax in sub_ax_arr[0,:,0].flat: # Top row inner left
-        ax.set_title('Troposphere', style = 'oblique', pad = pad)
+        ax.set_title('O$_3$ Var.\nTroposphere', pad = pad)
     for ax in sub_ax_arr[0,:,-1].flat: # Top row inner right
-        ax.set_title('Stratosphere', style = 'oblique', pad = pad)
+        ax.set_title('CO Var.\nStratosphere', pad = pad)
 
     for ax in sub_ax_arr.flat: 
         # All subplots
         ax.set_xlabel('Frequency [#]')
         ax.grid(ls ='dotted', lw = 1, color='grey', zorder=0)
         ax.set_xscale(xscale)
-        
-    for ax in tropo_axs:
-        ax.set_ylabel(tropo_var.label(bin_attr=bin_attr), fontsize = 8)
-    for ax in strato_axs:
-        ax.set_ylabel(strato_var.label(bin_attr=bin_attr), fontsize = 8)
+    
+    for ax in sub_ax_arr.flat: 
+        ax.yaxis.label.set_visible(False)
+    
+    # --- Hide x- and y-axis labels for inner subplots
+    for ax in [sub_ax_arr[1,0,0], sub_ax_arr[1,-1,-1]]: 
+        # Left column inner middle right & right column inner middle left
+        ax.yaxis.label.set_visible(True)
 
+    output = []
     # Add histograms and lognorm fits
-    for axes, data_Bin_dict in zip([tropo_axs, strato_axs], [tropo_dict, strato_dict]): 
+    for axes, data_Bin_dict, var in zip([tropo_axs, strato_axs], 
+                                   [tropo_dict, strato_dict], 
+                                   [tropo_var, strato_var]): 
         # Extract bin_attr
         data_dict = extract_attr(self, data_Bin_dict, bin_attr)
-        print(data_dict)
-            
+        
         # Get overall tropo / strato bin limits
         hist_min, hist_max = np.nan, np.nan
         for data in data_dict.values(): 
             hist_min = np.nanmin([hist_min] + list(data.flatten()))
             hist_max = np.nanmax([hist_max] + list(data.flatten()))
-
-        for ax, tp_col in zip(axes, data_dict): 
+        
+        for ax, tp_col in zip(list(axes), list(data_dict.keys())): 
+            # print(type(ax), type(tp_col))
             data_flat = data_dict[tp_col].flatten() # fails if no bin_attr extracted
-            print(data_flat)
-            # Adding the histograms to the figure
+            # Adding the histograms to the figures
             lognorm_inst = hist_lognorm_fitted(data_flat, (hist_min, hist_max), ax, 
                                                dcts.get_coord(tp_col).get_color(),
                                                hist_kwargs = dict(range = (hist_min, hist_max)))
-            print(lognorm_inst)
+            output.append(lognorm_inst)
             # Show values of mode and sigma at the top of each subplot
             if show_stats:
                 ax.text(x = 0, y = 1.015, 
@@ -303,13 +339,14 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
                     transform = ax.transAxes,
                     style = 'italic'
                     )
+            ax.set_ylabel(var.label(bin_attr = bin_attr))
 
     # Set xlims to maximum xlim for each subplot in tropos / stratos
     tropo_xmax = max([max(ax.get_xlim()) for ax in sub_ax_arr[:,:,0].flat])
-    for ax in sub_ax_arr[:,:,0].flat: 
+    for ax in sub_ax_arr[:,:,0].flat: # Tropo axes
         ax.set_xlim(0 if xscale == 'linear' else 0.7, tropo_xmax)
     strato_xmax = max([max(ax.get_xlim()) for ax in sub_ax_arr[:,:,-1].flat])
-    for ax in sub_ax_arr[:,:,-1].flat: 
+    for ax in sub_ax_arr[:,:,-1].flat: # Strato axes
         ax.set_xlim(0 if xscale == 'linear' else 0.7, strato_xmax)
 
     if bin_attr == 'rvstd': 
@@ -323,7 +360,8 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
         ax.invert_xaxis()
         tp_title = dcts.get_coord(tp_col).label(filter_label=True).split("(")[0] # shorthand of tp label
         ax.text(**dcts.note_dict(ax, s = tp_title, x = 0.1, y = 0.85))
-    return fig, main_axes, sub_ax_arr
+    #return fig, main_axes, sub_ax_arr
+    return output
 
 def histogram_2d_comparison(self, tropo_params, strato_params, bin_attr='vstdv', **kwargs):
     """ 2D-binned data lognorm-fitted histograms. 
@@ -349,6 +387,8 @@ def histogram_2d_comparison(self, tropo_params, strato_params, bin_attr='vstdv',
         strato_BinDict[tp.col_name] = self.sel_strato(tp).bin_2d(
             strato_var, strato_xcoord, strato_ycoord, **strato_params)
 
-    plot_histogram_comparison(self, tropo_var, strato_var,
-                              tropo_BinDict, strato_BinDict,
-                              bin_attr=bin_attr, **kwargs)
+    output = plot_histogram_comparison(
+        self, tropo_var, strato_var,
+        tropo_BinDict, strato_BinDict,
+        bin_attr=bin_attr, **kwargs)
+    return output

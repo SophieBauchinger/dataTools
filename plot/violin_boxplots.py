@@ -10,6 +10,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 
+plt.rcParams.update({'font.size': 12})
 
 def violin_boxplot(self, var, xcoord, ycoord, atm_layer, **kwargs):
     """ 
@@ -23,31 +24,36 @@ def violin_boxplot(self, var, xcoord, ycoord, atm_layer, **kwargs):
     """
     # Prep the data -------------------------------------------------
     filtered_data = []
-    for tp in self.tps:
+    tps = kwargs.get('tps', self.tps)
+    for tp in tps:
         bin2d = self.sel_atm_layer(
             atm_layer, tp).bin_2d(
                 var, xcoord, ycoord, 
                 xbsize = kwargs.pop('xbsize', 5), 
                 ybsize = kwargs.pop('ybsize', 0.5),
                 **kwargs)
-        data = bin2d.vstdv.flatten()
+        
+        data = getattr(bin2d, kwargs.get('bin_attr', 'vstdv')).flatten()    
+        # data = bin2d.vstdv.flatten()
         data = data[~np.isnan(data)]
         
         filtered_data.append(data)
-    ax_label = var.label(bin_attr = 'vstdv')
+    ax_label = var.label(bin_attr = kwargs.get('bin_attr', 'vstdv'))
 
     # Prep stats and helpers 
     means = [y.mean() for y in filtered_data]
     stds = [np.std(y) for y in filtered_data]
     skews = [stats.skew(y) for y in filtered_data]
 
-    COLOR_SCALE = [tp.get_color() for tp in self.tps]
-    LABELS = [tp.label(filter_label = True) for tp in self.tps]
-    POSITIONS = np.linspace(0, len(self.tps)-1, len(self.tps))
+    COLOR_SCALE = [tp.get_color() for tp in tps]
+    LABELS = [tp.label(filter_label = True) for tp in tps]
+    POSITIONS = np.linspace(0, len(tps)-1, len(tps))
 
 
     # Make the figure 
-    fig, ax = plt.subplots(figsize= (8, 5))
+    if 'figax' in kwargs: 
+        fig, ax = kwargs.get('figax')
+    else: plt.subplots(figsize= (8, 5), dpi = 300)
 
     # Add violins ----------------------------------------------------
     # bw_method="silverman" is the bandwidth of the kernel density
@@ -58,15 +64,15 @@ def violin_boxplot(self, var, xcoord, ycoord, atm_layer, **kwargs):
         bw_method="silverman",
         showmeans=False, 
         showmedians=False,
-        showextrema=False
+        showextrema=False,
     )
 
     # Customize violins (remove fill, customize line, etc.)
-    for pc in violins["bodies"]:
-        pc.set_facecolor("none")
-        pc.set_edgecolor("k")
-        pc.set_linewidth(1.4)
-        pc.set_alpha(1)
+    for pc, c in zip(violins["bodies"], COLOR_SCALE):
+        pc.set_facecolor(c)
+        pc.set_edgecolor('k')
+        pc.set_linewidth(0.8)
+        pc.set_alpha(0.9)
         
     # Add boxplots 
     medianprops = dict(
@@ -82,7 +88,7 @@ def violin_boxplot(self, var, xcoord, ycoord, atm_layer, **kwargs):
         filtered_data,
         widths = 0.25,
         positions=POSITIONS, 
-        showfliers = False, # Do not show the outliers beyond the caps.
+        showfliers = True, # Do not show the outliers beyond the caps.
         showcaps = False,   # Do not show the caps
         medianprops = medianprops,
         whiskerprops = boxprops,
@@ -90,22 +96,25 @@ def violin_boxplot(self, var, xcoord, ycoord, atm_layer, **kwargs):
     )
 
     # Add jittered dots ----------------------------------------------
-    jitter = 0.05
-    x_data = [np.array([i] * len(d)) for i, d in enumerate(filtered_data)]
-    x_jittered = [x + stats.t(df=6, scale=jitter).rvs(len(x)) for x in x_data]
+    # jitter = 0.05
+    # x_data = [np.array([i] * len(d)) for i, d in enumerate(filtered_data)]
+    # x_jittered = [x + stats.t(df=6, scale=jitter).rvs(len(x)) for x in x_data]
 
-    for x, y, color, label in zip(x_jittered, filtered_data, COLOR_SCALE, LABELS):
-        ax.scatter(x, y, s = 80, color=color, alpha=0.3, label = label)
+    # for x, y, color, label in zip(x_jittered, filtered_data, COLOR_SCALE, LABELS):
+    #     ax.scatter(x, y, s = 80, color=color, alpha=0.3, label = label)
         
     # Add statistics labels ------------------------------------------
     for i, mean in enumerate(means):
         # Add dot representing the mean
-        ax.scatter(i, mean, s=50, color="#850e00", edgecolor ='k', zorder=3)
+        ax.scatter(i, mean, s=50, 
+                   color="#850e00", 
+                   edgecolor ='k', zorder=3,
+                   label = 'Mean' if i==0 else '')
 
     y_stats = [
-    f'$\mu$ = {m:.2f}\n\
-$\sigma$ = {s:.2f}\n\
-$\gamma$ = {y:.2f}\n\
+    f'$\mu$ = {m:.1f}\n\
+$\sigma$ = {s:.1f}\n\
+$\gamma$ = {y:.1f}\n\
     ' for m,s,y in zip(means, stds, skews)]
 
     for x,y,s in zip(POSITIONS, 
@@ -114,7 +123,9 @@ $\gamma$ = {y:.2f}\n\
         ax.text(x = x, y = y, s = s, 
                 ha = 'center', va = 'bottom')
 
-    ax.set_ylim(0, ax.get_ylim()[1]+23)
+    # ax.set_ylim(0, ax.get_ylim()[1]+23)
+    ax.set_ylim(max([0, ax.get_ylim()[0]]), 
+                ax.get_ylim()[1]*kwargs.get('vspace', 1.2))
 
     ax.tick_params(labelbottom=False, bottom=False)
     ax.set_ylabel(ax_label)
@@ -123,16 +134,13 @@ $\gamma$ = {y:.2f}\n\
     # Add legend
     fig.subplots_adjust(bottom = 0.15)
     
-    if 'legend_loc' in kwargs: 
-        ax.legend(handles = self.tp_legend_handles(no_vc = True), 
-                ncols = kwargs.get('legend_ncols', 3),
-                loc = kwargs.get('legend_loc', 'lower center'))
-    else: 
-        fig.legend(handles = self.tp_legend_handles(no_vc = True), 
-                ncols = kwargs.get('legend_ncols', 3),
-                loc = kwargs.get('legend_loc', 'lower center')) 
+    ax.legend(loc = 'upper left')
+    
+    fig.legend(handles = self.tp_legend_handles(no_vc = True), 
+              ncols = kwargs.get('legend_ncols', 3),
+              loc = kwargs.get('legend_loc', 'lower center'))
     ax.set_title('Troposphere' if atm_layer =='tropo' else 'Stratosphere')
-
+    
 
 def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, atm_layer, **kwargs):
     """ 
@@ -170,8 +178,10 @@ def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, atm_layer, **kwarg
 
 
     # Make the figure 
-    fig, ax = plt.subplots(figsize= (8, 5))
-
+    if 'figax' in kwargs: 
+        fig, ax = kwargs.get('figax')
+    else: plt.subplots(figsize= (8, 5), dpi = 300)
+    
     # Add violins ----------------------------------------------------
     # bw_method="silverman" is the bandwidth of the kernel density
     violins = ax.violinplot(
@@ -181,15 +191,15 @@ def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, atm_layer, **kwarg
         bw_method="silverman",
         showmeans=False, 
         showmedians=False,
-        showextrema=False
+        showextrema=False,
     )
 
     # Customize violins (remove fill, customize line, etc.)
-    for pc in violins["bodies"]:
-        pc.set_facecolor("none")
-        pc.set_edgecolor("k")
-        pc.set_linewidth(1.4)
-        pc.set_alpha(1)
+    for pc, c in zip(violins["bodies"], COLOR_SCALE):
+        pc.set_facecolor(c)
+        pc.set_edgecolor('k')
+        pc.set_linewidth(0.8)
+        pc.set_alpha(0.9)
         
     # Add boxplots 
     medianprops = dict(
@@ -205,7 +215,7 @@ def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, atm_layer, **kwarg
         filtered_data,
         widths = 0.25,
         positions=POSITIONS, 
-        showfliers = False, # Do not show the outliers beyond the caps.
+        showfliers = True, # Do not show the outliers beyond the caps.
         showcaps = False,   # Do not show the caps
         medianprops = medianprops,
         whiskerprops = boxprops,
@@ -213,22 +223,25 @@ def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, atm_layer, **kwarg
     )
 
     # Add jittered dots ----------------------------------------------
-    jitter = 0.05
-    x_data = [np.array([i] * len(d)) for i, d in enumerate(filtered_data)]
-    x_jittered = [x + stats.t(df=6, scale=jitter).rvs(len(x)) for x in x_data]
+    # jitter = 0.05
+    # x_data = [np.array([i] * len(d)) for i, d in enumerate(filtered_data)]
+    # x_jittered = [x + stats.t(df=6, scale=jitter).rvs(len(x)) for x in x_data]
 
-    for x, y, color, label in zip(x_jittered, filtered_data, COLOR_SCALE, LABELS):
-        ax.scatter(x, y, s = 80, color=color, alpha=0.3, label = label)
+    # for x, y, color, label in zip(x_jittered, filtered_data, COLOR_SCALE, LABELS):
+    #     ax.scatter(x, y, s = 80, color=color, alpha=0.3, label = label)
         
     # Add statistics labels ------------------------------------------
     for i, mean in enumerate(means):
         # Add dot representing the mean
-        ax.scatter(i, mean, s=50, color="#850e00", edgecolor ='k', zorder=3)
+        ax.scatter(i, mean, s=50, 
+                   color="#850e00", 
+                   edgecolor ='k', zorder=3,
+                   label = 'Mean' if i==0 else '')
 
     y_stats = [
-    f'$\mu$ = {m:.2f}\n\
-$\sigma$ = {s:.2f}\n\
-$\gamma$ = {y:.2f}\n\
+    f'$\mu$ = {m:.1f}\n\
+$\sigma$ = {s:.1f}\n\
+$\gamma$ = {y:.1f}\n\
     ' for m,s,y in zip(means, stds, skews)]
 
     for x,y,s in zip(POSITIONS, 
@@ -237,7 +250,9 @@ $\gamma$ = {y:.2f}\n\
         ax.text(x = x, y = y, s = s, 
                 ha = 'center', va = 'bottom')
 
-    ax.set_ylim(0, ax.get_ylim()[1]+20)
+    # ax.set_ylim(0, ax.get_ylim()[1]+23)
+    ax.set_ylim(max([0, ax.get_ylim()[0]]), 
+                ax.get_ylim()[1]*kwargs.get('vspace', 1.2))
 
     ax.tick_params(labelbottom=False, bottom=False)
     ax.set_ylabel(ax_label)
@@ -245,6 +260,12 @@ $\gamma$ = {y:.2f}\n\
 
     # Add legend
     fig.subplots_adjust(bottom = 0.15)
+    
+    ax.legend(loc = 'upper left') # mean
+    # fig.legend(handles = self.tp_legend_handles(no_vc = True), 
+    #           ncols = kwargs.get('legend_ncols', 3),
+    #           loc = kwargs.get('legend_loc', 'lower center'))
+    # ax.set_title('Troposphere' if atm_layer =='tropo' else 'Stratosphere')
     
     if 'legend_loc' in kwargs: 
         ax.legend(handles = self.tp_legend_handles(tps=tps, no_vc = True), 
@@ -255,4 +276,3 @@ $\gamma$ = {y:.2f}\n\
                    ncols = kwargs.get('legend_ncols', 3),
                    loc = kwargs.get('legend_loc', 'lower center')) 
     ax.set_title('Troposphere' if atm_layer =='tropo' else 'Stratosphere')
-
