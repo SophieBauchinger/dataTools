@@ -283,7 +283,7 @@ class BinPlotterBaseMixin:
         for axes, data_Bin_dict in zip([tropo_axs, strato_axs], [tropo_dict, strato_dict]): 
             
             # Extract bin_attr
-            data_dict = extract_attr(self, data_Bin_dict, bin_attr)
+            data_dict = extract_attr(data_Bin_dict, bin_attr)
              
             # Get overall tropo / strato bin limits
             hist_min, hist_max = np.nan, np.nan

@@ -8,16 +8,14 @@
 """
 import pandas as pd
 import numpy as np
+import matplotlib.patheffects as mpe
 
 import toolpac.calc.binprocessor as bp 
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
 
-#!!! self.get_var_lims()
-#!!! self.get_var_data()
-
-# help for getting DATA and LIMS
+# Getting DATA and LIMS
 def get_var_data(df, var) -> np.array: 
     """ Returns variable data including from geometry columns. 
     Args: 
@@ -109,8 +107,8 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
                             ybmin, ybmax, ybsize,
                             zbmin, zbmax, zbsize)
 
-# actually now BINNING
-def foo_binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=None, **kwargs):
+# BINNING
+def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=None, **kwargs):
     """ From values in df, bin the given variable onto the available coordinates. 
     Parameters: 
         df (pd.DataFrame): Hold the variable and coordinate data. 
@@ -141,30 +139,105 @@ def foo_binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=None, **k
 
 def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None, 
                      count_limit=None, **kwargs): 
-    """ Do foo_binning for all available seasons. """
+    """ Do binning for all available seasons. 
+
+    Parameters: 
+        df (pd.DataFrame): Hold the variable and coordinate data. 
+        var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
+        count_limit (int): Bins with fewer data points are excluded from the output. 
+
+        key bci (bp.Bin_**d): Binclassinstance
+        key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
+
+    Returns a dictionary of {season : Simple_bin_*d object}. 
+    """
     if 'season' not in df.columns:
         df['season'] = tools.make_season(df.index.month)
-    
+
     # Want the same binclassinstance across all seasons
     bci = make_bci(xcoord, ycoord, zcoord, **kwargs)
-    
+
     seasonal_dict = {}
     for s in set(df['season'].values): 
-        bin_s_out = foo_binning(df, var, xcoord, ycoord, zcoord, 
-                                count_limit=count_limit, bci = bci, **kwargs)
+        bin_s_out = binning(df, var, xcoord, ycoord, zcoord, 
+                            count_limit=count_limit, bci = bci, **kwargs)
         seasonal_dict[s] = bin_s_out
 
     return seasonal_dict
 
-def stratospheric_binning(df, tps):
-    pass
-    #TODO: This is where TropopauseMixin needs to be decoupled from GlobalData !!!
+def make_ST_bins(GlobalObj, tropo_params, strato_params, **kwargs):
+    """ Create tropo_BinDict and strato_BinDict. 
+    Data is first sorted into troposphere and stratosphere, then binned according to 
+    the given params. 
+    
+    Parameters:
+        GlobalObj (GlobalData instance)
+        tropo/strato_params (dict['var', 'xcoord', 'ycoord']):
+            Specify which parameters to use as variable and coordinates for binning.
+            Additional parameters: bci, 
+        
+        key tps (list[dcts.Coordinate]): Tropopause definitions for sorting. Default GlobalObj.tps
+    """
+    tropo_var = tropo_params.pop('var')
+    tropo_xcoord = tropo_params.pop('xcoord')
+    tropo_ycoord = tropo_params.pop('ycoord')
 
+    strato_var = strato_params.pop('var')
+    strato_xcoord = strato_params.pop('xcoord')
+    strato_ycoord = strato_params.pop('ycoord')
+
+    tropo_BinDict, strato_BinDict = {}, {}
+
+    for tp in kwargs.get('tps', GlobalObj.tps):
+        tropo_df = GlobalObj.sel_tropo(tp).df
+        tropo_BinDict[tp.col_name] = binning(
+            tropo_df, tropo_var, tropo_xcoord, tropo_ycoord, 
+            **tropo_params)
+        strato_df = GlobalObj.sel_strato(tp).df
+        strato_BinDict[tp.col_name] = binning(
+            strato_df, strato_var, strato_xcoord, strato_ycoord, 
+            **strato_params)
+
+    return tropo_BinDict, strato_BinDict
 
 #%% Now dealing with the OUTPUT 
-def extract_attr(self, data_dict, bin_attr):
+def extract_attr(data_dict, bin_attr):
     """ Returns data_dict with bin_attr dimension removed. """
     if isinstance(list(data_dict.values())[0], dict): # seasonal
         return {k: {s: getattr(v[s], bin_attr) for s in v.keys()
                                 } for k,v in data_dict.items()}
     return {k:getattr(v, bin_attr) for k,v in data_dict.items()}
+
+#%%
+# self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
+outline = mpe.withStroke(linewidth=2, foreground='white')
+
+# --- Lognorm fitted histograms and things --- # 
+def get_lognorm_stats_df(data_dict: dict, lognorm_attr: str, prec:int = 1, use_percentage = False) -> pd.DataFrame: 
+    """ Create combined lognorm-fit statistics dataframe for all tps when given binned data. 
+    Relative standard deviations are multiplied by 100 to return percentages instead of fractions. 
+    
+    Parameters: 
+        data_dict (dict[tools.Bin*DFitted]): Binned data incl. lognorm fits (all variables)
+        lognorm_attr (str): vmean_fit / vsdtv_fit / rvstd_fit
+    """
+    
+    if all(isinstance(v, np.ndarray) for v in data_dict.values()): 
+        return data_dict
+    
+    if not 'rvstd' in lognorm_attr and not use_percentage: 
+        if isinstance(list(data_dict.values())[0], dict): # seasonal
+            raise NotImplementedError('Cannot yet do this for seasonal data_dicts.')
+        return pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec) for k,v in data_dict.items()})
+
+    # else: need to multiple by 100 to get percentage 
+    # (and initially return values with increased precision)
+    stats_df = pd.DataFrame({k:getattr(v, lognorm_attr).stats(prec=prec+2) for k,v in data_dict.items()})
+    
+    df = stats_df.T.convert_dtypes()
+    non_float_cols = [c for c in df.columns if c not in df.select_dtypes([int, float]).columns]
+    for c in df.select_dtypes(float).columns: 
+        df[c] = df[c].apply(lambda x: round(100*x, prec+2))
+    for c in non_float_cols:
+        df[c] =  df[c].apply(lambda x: tuple([round(100*i, prec+2) for i in x]))
+    return df.T
