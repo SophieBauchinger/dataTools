@@ -17,6 +17,8 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 from dataTools.data.local import MaunaLoa
 
+import dataTools.data.tropopause as tp_tools
+
 
 # %% Mixin for implementing data analysis
 class AnalysisMixin:
@@ -402,29 +404,6 @@ class TropopauseSorterMixin:
         """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
         raise NotImplementedError('O3 Baseline filter has not yet been implemented')
 
-    def o3_filter_lt60(self) -> pd.DataFrame:
-        """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
-        o3_substs = self.get_substs(short_name='o3')
-
-        if len(o3_substs) == 1:
-            [o3_subs] = o3_substs
-
-        elif self.source == 'Caribic':
-            if any(s.ID == 'INT' for s in o3_substs):
-                [o3_subs] = [s for s in o3_substs if s.ID == 'INT']
-            elif any(s.ID == 'MS' for s in o3_substs):
-                [o3_subs] = [s for s in o3_substs if s.ID == 'MS']
-            else:
-                [o3_subs] = o3_substs[0]
-                print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
-        else:
-            raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
-
-        o3_sorted = pd.DataFrame(index=self.df.index)
-        o3_sorted.loc[self.df[o3_subs.col_name].lt(60),
-        (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
-        return o3_sorted, o3_subs
-
     def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
         """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
         If no kwargs are specified, df_sorted is calculated for all possible definitions
@@ -491,7 +470,22 @@ class TropopauseSorterMixin:
 
         # Ozone: Flag O3 < 60 ppb as tropospheric
         if any(tp.crit == 'o3' for tp in rel_tps) and not self.source == 'MULTI':
-            o3_sorted, o3_subs = self.o3_filter_lt60()
+            # Choose o3_subs for filtering
+            o3_substs = self.get_substs(short_name='o3')
+            if len(o3_substs) == 1:
+                [o3_subs] = o3_substs
+            elif self.source == 'Caribic':
+                if any(s.ID == 'INT' for s in o3_substs):
+                    [o3_subs] = [s for s in o3_substs if s.ID == 'INT']
+                elif any(s.ID == 'MS' for s in o3_substs):
+                    [o3_subs] = [s for s in o3_substs if s.ID == 'MS']
+                else:
+                    [o3_subs] = o3_substs[0]
+                    print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
+            else:
+                raise KeyError('Need to be more specific which Ozone values should be used for <60 ppb sorting. ')
+            o3_sorted = tp_tools.o3_filter_lt60(self.df, o3_subs)
+            
             # rename O3_sorted columns to the corresponding O3 tropopause coord to update
             for tp in [tp for tp in rel_tps if tp.crit == 'o3']:
                 o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']

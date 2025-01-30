@@ -4,7 +4,6 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Fri Dec 20 17:43:00 2024
 """
-import copy
 import numpy as np
 import pandas as pd
 
@@ -125,8 +124,6 @@ def o3_filter_lt60(df, o3_subs) -> pd.DataFrame:
     o3_sorted.loc[df[o3_subs.col_name].lt(60),
     (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
     return o3_sorted
-
-# def total_o3_df(df, o3_substances)
 
 
 #TODO 
