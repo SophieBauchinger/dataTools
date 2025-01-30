@@ -11,7 +11,8 @@ import numpy as np
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-import dataTools.data.BinnedData as bin
+import dataTools.data.BinnedData as bin_data
+import dataTools.plot.create_figure as cfig
 
 def tp_height_seasonal_1D_binned(self, tp, **kwargs): 
     """ Plot the average tropopause height (or delta) per season binned over latitude. 
@@ -23,7 +24,8 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
     """
     df = kwargs.get('df', self.df)
     coord = kwargs.get('coord', dcts.get_coord(col_name = 'geometry.y'))
-    bci = bin.make_bci(coord, xbsize = kwargs.get('bsize', coord.get_bsize()))
+    xbsize = kwargs.get('bsize', coord.get_bsize())
+    bci = bin_data.make_bci(coord, xbsize=xbsize, gdf = self.df)
     n2o_color = 'g'
 
     # Prepare the plot
@@ -37,9 +39,10 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
     # Add data for each season and the average 
     for s in ['av',1,2,3,4]:
         data = df if s=='av' else df.query(f'season == {s}')
-        bin1d = bin.binning(tp, xcoord = coord, df = data, bci_1d = bci)
+        bin1d = bin_data.binning(data, tp, xcoord = coord, bci = bci, 
+                                 count_limit = self.count_limit)
 
-        plot_kwargs = dict(lw=3, path_effects = [self.outline])
+        plot_kwargs = dict(lw=3, path_effects = [cfig.outline()])
         if s=='av': 
             plot_kwargs.update(dict(
                 label = 'Average', 
@@ -148,8 +151,9 @@ def plot_1d_seasonal_gradient(self, subs, coord,
                                 **kwargs):
     """ Plot gradient per season onto one plot. """
     big = kwargs.pop('big') if 'big' in kwargs else False
-    bin_dict = bin.binning_seasonal(subs, xcoord = coord, **kwargs)
-    
+    bin_dict = bin_data.binning_seasonal(subs, xcoord = coord,
+                                         count_limit = self.count_limit,
+                                         **kwargs)
     if 'figax' in kwargs: 
         _, ax = kwargs.get('figax')
     else: 

@@ -8,14 +8,11 @@
 """
 import pandas as pd
 import numpy as np
-import matplotlib.patheffects as mpe
 
 import toolpac.calc.binprocessor as bp 
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-# import dataTools.plot.create_figure as cfig
-# path_effects = [cfig.outline()]
 
 # Getting DATA and LIMS
 def get_var_data(df, var) -> np.array: 
@@ -49,17 +46,19 @@ def get_var_lims(var, bsize=None, gdf = None, **kwargs) -> tuple[float]:
             return var.get_lims()
         except ValueError: 
             pass
-    
-    v_data = get_var_data(gdf, var)
-    vmin = np.nanmin(v_data)
-    vmax = np.nanmax(v_data)
-    
-    if bsize is None: 
-        return vmin, vmax
+    if gdf is not None:
+        v_data = get_var_data(gdf, var)
+        vmin = np.nanmin(v_data)
+        vmax = np.nanmax(v_data)
+        
+        if bsize is None: 
+            return vmin, vmax
 
-    vbmin = (vmin // bsize) * bsize
-    vbmax = ((vmax // bsize) + 1) * bsize
-    return vbmin, vbmax
+        vbmin = (vmin // bsize) * bsize
+        vbmax = ((vmax // bsize) + 1) * bsize
+        return vbmin, vbmax
+    else: 
+        raise ValueError('Could not generate variable limits.')
 
 # BINCLASSINSTANCE
 def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs): 
@@ -110,7 +109,7 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
                             zbmin, zbmax, zbsize)
 
 # BINNING
-def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=None, **kwargs):
+def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
     """ From values in df, bin the given variable onto the available coordinates. 
     Parameters: 
         df (pd.DataFrame): Hold the variable and coordinate data. 
@@ -139,9 +138,43 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=None, **kwarg
 
     return out 
 
+def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs): 
+    """ Create binned data dicts for strato / tropo with specified parameters.
+    Parameters: 
+        tropo/strato_params (dict): Required var, xcoord, (y/zcoord Optional).
+            Optional keys: xbsize, ybsize, ...
+        bin_attr (str): Bin attribute to base statistics on
+        
+        key tps (list[dcts.Coordinate]): Tropopause definitions. Defaults to GlobalObj.tps
+    """
+    for params in [tropo_params, strato_params]:
+        if not all(i in params for i in ['var', 'xcoord']):
+            raise Exception('Need to supply at least `var` and `xcoord` as parameters.')
+    
+    strato_Bin_dict, tropo_Bin_dict = {}, {}
+    
+    for tp in kwargs.get('tps', GlobalObj.tps):
+        strato_df = GlobalObj.sel_strato(tp).df
+        strato_Bin_dict[tp.col_name] = binning(
+            strato_df, **strato_params)
+
+        tropo_df = GlobalObj.sel_tropo(tp).df
+        tropo_Bin_dict[tp.col_name] = binning(
+            tropo_df, **tropo_params)
+    
+    if 'bin_attr' not in kwargs: 
+        return strato_Bin_dict, tropo_Bin_dict
+    
+    strato_attr = extract_attr(
+        strato_Bin_dict, kwargs.get('bin_attr'))
+    tropo_attr = extract_attr(
+        tropo_Bin_dict, kwargs.get('bin_attr'))
+    
+    return strato_attr, tropo_attr
+
 def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None, 
                      count_limit=None, **kwargs): 
-    """ Do binning for all available seasons. 
+    """ Bin the given dataframe for all available seasons. 
 
     Parameters: 
         df (pd.DataFrame): Hold the variable and coordinate data. 
@@ -166,6 +199,41 @@ def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
         seasonal_dict[s] = bin_s_out
 
     return seasonal_dict
+
+def get_ST_seass_binDict(GlobalObj, strato_params, tropo_params, **kwargs): 
+    """ Create seasonal binned data dicts for strato / tropo with specified parameters.
+    Parameters: 
+        tropo/strato_params (dict): Required var, xcoord, (y/zcoord Optional).
+            Optional keys: xbsize, ybsize, ...
+        bin_attr (str): Bin attribute to base statistics on
+        
+        key tps (list[dcts.Coordinate]): Tropopause definitions. Defaults to GlobalObj.tps
+    """
+    
+    for params in [tropo_params, strato_params]:
+        if not all(i in params for i in ['var', 'xcoord']):
+            raise Exception('Need to supply at least `var` and `xcoord` as parameters.')
+    
+    strato_Binseas_dict, tropo_Binseas_dict = {}, {}
+    
+    for tp in kwargs.get('tps', GlobalObj.tps):
+        strato_df = GlobalObj.sel_strato(tp).df
+        strato_Binseas_dict[tp.col_name] = seasonal_binning(
+            strato_df, *strato_params)
+
+        tropo_df = GlobalObj.sel_tropo(tp).df
+        tropo_Binseas_dict[tp.col_name] = seasonal_binning(
+            tropo_df, *tropo_params)
+    
+    if 'bin_attr' not in kwargs: 
+        return strato_Binseas_dict, tropo_Binseas_dict
+    
+    strato_3D_attr_seas = {k: {s: getattr(v[s], kwargs.get('bin_attr')) for s in v.keys()
+                                } for k,v in strato_Binseas_dict.items()}
+    tropo_3D_attr_seas = {k: {s: getattr(v[s], kwargs.get('bin_attr')) for s in v.keys()
+                                } for k,v in tropo_Binseas_dict.items()}
+    
+    return strato_3D_attr_seas, tropo_3D_attr_seas
 
 def make_ST_bins(GlobalObj, tropo_params, strato_params, **kwargs):
     """ Create tropo_BinDict and strato_BinDict. 
@@ -211,9 +279,6 @@ def extract_attr(data_dict, bin_attr):
     return {k:getattr(v, bin_attr) for k,v in data_dict.items()}
 
 #%%
-# self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
-
-
 # --- Lognorm fitted histograms and things --- # 
 def get_lognorm_stats_df(data_dict: dict, lognorm_attr: str, prec:int = 1, use_percentage = False) -> pd.DataFrame: 
     """ Create combined lognorm-fit statistics dataframe for all tps when given binned data. 

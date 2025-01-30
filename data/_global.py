@@ -176,7 +176,7 @@ class ModelDataMixin:
 
 
 # %% Global data
-class GlobalData(SelectionMixin, BinningMixin, TropopauseSorterMixin, AnalysisMixin, ModelDataMixin):
+class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin, ModelDataMixin):
     """ Contains global datasets with longitude/latitude for each datapoint.
 
     Attributes:
