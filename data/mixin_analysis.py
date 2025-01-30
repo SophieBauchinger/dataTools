@@ -298,11 +298,6 @@ class TropopauseSorterMixin:
     def calculate_average_distange_to_tropopause(self, tps): # TODO: implement
         """ Calculate the average distance of measurements around the tropopause. """
 
-    # TODO: implement o3_baseline_filter
-    def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
-        """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
-        raise NotImplementedError('O3 Baseline filter has not yet been implemented')
-
     def create_df_sorted(self, save=True, **kwargs) -> pd.DataFrame:
         """ Create basis for strato / tropo sorting with any TP definitions fitting the criteria.
         If no kwargs are specified, df_sorted is calculated for all possible definitions
@@ -330,11 +325,15 @@ class TropopauseSorterMixin:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
 
-        # --- Dyn / Therm / CPT / Combo tropopauses ---
+        # --- Dyn / Therm / CPT / N2O_residual / ... tropopauses ---
         for tp in [tp for tp in rel_tps]:
             if tp.col_name not in data.columns:
                 print(f'Note: {tp.col_name} not found, continuing.')
                 continue
+
+            inverse_zero = False
+            if (tp.vcoord == 'p' or tp.crit == 'n2o'):
+                inverse_zero = True
 
             if kwargs.get('verbose'): print(f'Sorting {tp}')
 
@@ -353,14 +352,13 @@ class TropopauseSorterMixin:
             tp_sorted = pd.DataFrame({strato: pd.Series(np.nan, dtype=object),
                                       tropo: pd.Series(np.nan, dtype=object)},
                                      index=tp_df.index)
-
-            # tropo: high p (gt 0), low everything else (lt 0)
-            tp_sorted.loc[tp_df[tp.col_name].gt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].lt(0),
-                (strato, tropo)] = (False, True)
-
-            # strato: low p (lt 0), high everything else (gt 0)
-            tp_sorted.loc[tp_df[tp.col_name].lt(0) if tp.vcoord == 'p' else tp_df[tp.col_name].gt(0),
-                (strato, tropo)] = (True, False)
+            
+            if not inverse_zero: # Tropo < 0, Strato > 0
+                tp_sorted.loc[tp_df[tp.col_name].lt(0), (strato, tropo)] = (False, True)
+                tp_sorted.loc[tp_df[tp.col_name].gt(0), (strato, tropo)] = (True, False)
+            else: # Tropo < 0, Strato > 0 - applies for rel. Pressure and N2O_residual
+                tp_sorted.loc[tp_df[tp.col_name].lt(0), (strato, tropo)] = (True, False)
+                tp_sorted.loc[tp_df[tp.col_name].gt(0), (strato, tropo)] = (False, True)
 
             # # add data for current tp def to df_sorted
             tp_sorted = tp_sorted.convert_dtypes()

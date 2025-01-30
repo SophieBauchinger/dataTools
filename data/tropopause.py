@@ -125,7 +125,7 @@ def o3_filter_lt60(df, o3_subs) -> pd.DataFrame:
     (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
     return o3_sorted
 
-
-#TODO 
-# o3_baseline_filter()
-#   Use climatology of Ozone and use as TP filter - if curtain data, give location of the O3 tropopause 
+# TODO: implement o3_baseline_filter
+def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
+    """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
+    raise NotImplementedError('O3 Baseline filter has not yet been implemented')
