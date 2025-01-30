@@ -298,107 +298,6 @@ class TropopauseSorterMixin:
     def calculate_average_distange_to_tropopause(self, tps): # TODO: implement
         """ Calculate the average distance of measurements around the tropopause. """
 
-    def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
-        """ Filter strato / tropo data based on specific column of N2O mixing ratios. 
-        Args: 
-            save_n2o_baseline (bool): Create self.data['n2o_baseline']. Default True
-        """
-        data = self.df.copy()
-
-        # Choose N2O data to use (Substance object)
-        if 'coord' in kwargs:
-            n2o_coord = kwargs.get('coord')
-
-        elif len([c for c in self.coordinates if c.crit == 'n2o']) == 1:
-            [n2o_coord] = [c for c in self.coordinates if c.crit == 'n2o']
-
-        else:
-            default_n2o_IDs = dict(Caribic='GHG', ATOM='GCECD', HALO='UMAQS', 
-                                   HIAPER='NWAS', EMAC='EMAC', TP='INT')
-            [n2o_coord] = self.get_coords(crit='n2o', ID=default_n2o_IDs[self.source])
-
-        # Get reference dataset
-        ref_years = np.arange(min(self.years) - 2, max(self.years) + 3)
-        loc_obj = MaunaLoa(ref_years) if not kwargs.get('loc_obj') else kwargs.get('loc_obj')
-        ref_subs = dcts.get_subs(substance='n2o', ID=loc_obj.ID)  # dcts.get_col_name(subs, loc_obj.source)
-
-        if kwargs.get('verbose'):
-            print(f'N2O sorting: {n2o_coord} ')
-
-        n2o_column = n2o_coord.col_name
-
-        df_sorted = pd.DataFrame(index=data.index)
-        if 'Flight number' in data.columns: df_sorted['Flight number'] = data['Flight number']
-        df_sorted[n2o_column] = data[n2o_column]
-
-        if f'd_{n2o_column}' in data.columns:
-            df_sorted[f'd_{n2o_column}'] = data[f'd_{n2o_column}']
-        if f'detr_{n2o_column}' in data.columns:
-            df_sorted[f'detr_{n2o_column}'] = data[f'detr_{n2o_column}']
-
-        df_sorted.sort_index(inplace=True)
-        df_sorted.dropna(subset=[n2o_column], inplace=True)
-
-        mxr = df_sorted[n2o_column]  # measured mixing ratios
-        d_mxr = None if f'd_{n2o_column}' not in df_sorted.columns else df_sorted[f'd_{n2o_column}']
-        t_obs_tot = np.array(dt_to_fy(df_sorted.index, method='exact'))
-
-        # Check if units of data and reference data match, if not change data
-        if str(n2o_coord.unit) != str(ref_subs.unit):
-            if kwargs.get('verbose'): print(f'Note units do not match: {n2o_coord.unit} vs {ref_subs.unit}')
-
-            if n2o_coord.unit == 'mol mol-1':
-                mxr = tools.conv_molarity_PartsPer(mxr, ref_subs.unit)
-                if d_mxr is not None: d_mxr = tools.conv_molarity_PartsPer(d_mxr, ref_subs.unit)
-            elif n2o_coord.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
-                pass
-            else:
-                raise NotImplementedError(f'No conversion between {n2o_coord.unit} and {ref_subs.unit}')
-
-        # Calculate simple pre-flag
-        ref_mxr = loc_obj.df.dropna(subset=[ref_subs.col_name])[ref_subs.col_name]
-        df_flag = tools.pre_flag(mxr, ref_mxr, 'n2o', **kwargs)
-        flag = df_flag['flag_n2o'].values if 'flag_n2o' in df_flag.columns else None
-
-        strato = f'strato_{n2o_column}'
-        tropo = f'tropo_{n2o_column}'
-
-        fit_function = dcts.lookup_fit_function('n2o')
-
-        ol = outliers.find_ol(fit_function, t_obs_tot, mxr, d_mxr,
-                              flag=flag, 
-                              verbose=kwargs.get('verbose', False), 
-                              plot=kwargs.get('plot', False), 
-                              ctrl_plots=False,
-                              limit=kwargs.get('ol_limit', 0.1), 
-                              direction='n')
-        # ^tuple, 1st is list of OL == 1/2/3 - if not outlier then OL==0
-        # flag, residual, warning, popt1, baseline
-        df_sorted.loc[(flag != 0 for flag in ol[0]), (tropo, strato)] = (False, True)
-        df_sorted.loc[(flag == 0 for flag in ol[0]), (tropo, strato)] = (True, False)
-
-        if kwargs.get('save_n2o_baseline', True):
-            # Add baseline stats to data dictionary 
-            n2o_df = pd.DataFrame({
-                f'{n2o_column}' : mxr, 
-                f'{n2o_column}_flag' : ol[0], 
-                f'{n2o_column}_residual' : ol[1],
-                f'{n2o_column}_baseline' : ol[4]})
-            if d_mxr is not None: 
-                n2o_df[f'd_{n2o_column}'] = d_mxr
-            if 'n2o_baseline' not in self.data: 
-                self.data['n2o_baseline'] = pd.DataFrame()
-            self.data['n2o_baseline'] = self.data['n2o_baseline'].combine_first(n2o_df)
-            self.df[f'{n2o_column}_residual'] = n2o_df[f'{n2o_column}_residual']
-            self.df[f'{n2o_column}_baseline'] = n2o_df[f'{n2o_column}_baseline']
-            
-
-        df_sorted.drop(columns=[s for s in df_sorted.columns
-                                if not s.startswith(('Flight', 'tropo', 'strato'))],
-                       inplace=True)
-        df_sorted = df_sorted.convert_dtypes()
-        return df_sorted
-
     # TODO: implement o3_baseline_filter
     def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
         """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
@@ -422,15 +321,16 @@ class TropopauseSorterMixin:
                                  index=data.index)
         rel_tps = self.get_tps(rel_to_tp = True)
 
-        # N2O filter
+        # --- N2O filter ---
         for tp in [tp for tp in self.get_tps(crit = 'n2o')
                    if tp.col_name not in ['N2O_baseline', 'N2O_residual']]:
-            n2o_sorted = self.n2o_baseline_filter(coord=tp, **kwargs)
+            n2o_sorted, n2o_df = tp_tools.n2o_baseline_filter(
+                data, n2o_coord = tp, **kwargs)
             if 'Flight number' in n2o_sorted.columns:
                 n2o_sorted.drop(columns=['Flight number'], inplace=True)  # del duplicate col
             df_sorted = pd.concat([df_sorted, n2o_sorted], axis=1)
 
-        # Dyn / Therm / CPT / Combo tropopauses
+        # --- Dyn / Therm / CPT / Combo tropopauses ---
         for tp in [tp for tp in rel_tps]:
             if tp.col_name not in data.columns:
                 print(f'Note: {tp.col_name} not found, continuing.')
@@ -468,7 +368,7 @@ class TropopauseSorterMixin:
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
 
-        # Ozone: Flag O3 < 60 ppb as tropospheric
+        # --- Ozone: Flag O3 < 60 ppb as tropospheric ---
         if any(tp.crit == 'o3' for tp in rel_tps) and not self.source == 'MULTI':
             # Choose o3_subs for filtering
             o3_substs = self.get_substs(short_name='o3')
