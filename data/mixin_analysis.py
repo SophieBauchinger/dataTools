@@ -4,9 +4,6 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Wed Jun 12 13:16:00 2024
 
-TODO: Implement .identify_bins_relative_to_tropopause()
-    identifying the lowest stratospheric bins (according to bin size ? )
-
 """
 import copy
 import matplotlib.pyplot as plt

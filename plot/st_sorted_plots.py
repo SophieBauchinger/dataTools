@@ -12,6 +12,7 @@ from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 
 import dataTools.dictionaries as dcts
+import dataTools.data.BinnedData as bin_data
 
 
 def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
@@ -350,7 +351,7 @@ def seasonal_2d_plots(self, subs, xcoord, ycoord, bin_attr, **kwargs):
     except: 
         cmap = plt.cm.viridis
 
-    binned_seasonal = self.bin_2d_seasonal(subs, xcoord, ycoord, **kwargs)
+    binned_seasonal = bin_data.seasonal_binning(self.df, subs, xcoord, ycoord, **kwargs)
 
     if not any(bin_attr in bin2d_inst.__dict__ for bin2d_inst in binned_seasonal.values()):
         raise KeyError(f'\'{bin_attr}\' is not a valid attribute of Bin2D objects.')

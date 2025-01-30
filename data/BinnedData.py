@@ -14,6 +14,8 @@ import toolpac.calc.binprocessor as bp
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
+# import dataTools.plot.create_figure as cfig
+# path_effects = [cfig.outline()]
 
 # Getting DATA and LIMS
 def get_var_data(df, var) -> np.array: 
@@ -210,7 +212,7 @@ def extract_attr(data_dict, bin_attr):
 
 #%%
 # self.data['df']['season'] = tools.make_season(self.data['df'].index.month)
-outline = mpe.withStroke(linewidth=2, foreground='white')
+
 
 # --- Lognorm fitted histograms and things --- # 
 def get_lognorm_stats_df(data_dict: dict, lognorm_attr: str, prec:int = 1, use_percentage = False) -> pd.DataFrame: 

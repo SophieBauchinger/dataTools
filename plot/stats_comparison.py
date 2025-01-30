@@ -13,7 +13,7 @@ import pandas as pd
 import dataTools.dictionaries as dcts
 from dataTools import tools
 import dataTools.plot.create_figure as cfig
-import dataTools.data.BinnedData as bin
+import dataTools.data.BinnedData as bin_data
 
 #%% Lognorm stats as lines with dots
 
@@ -71,14 +71,14 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         strato_BinDict = {k:v[s] for k,v in strato_Bin_seas_dict.items()}
         tropo_BinDict = {k:v[s] for k,v in tropo_Bin_seas_dict.items()}
 
-        strato_stats = bin.get_lognorm_stats_df(strato_BinDict, 
-                                                f'{bin_attr}_fit', 
-                                                prec = kwargs.get('prec', 1), 
-                                                use_percentage = strato_var.detr)
-        tropo_stats = bin.get_lognorm_stats_df(tropo_BinDict, 
-                                                f'{bin_attr}_fit', 
-                                                prec = kwargs.get('prec', 1),
-                                                use_percentage = tropo_var.detr)
+        strato_stats = bin_data.get_lognorm_stats_df(strato_BinDict,
+                                                f'{bin_attr}_fit',
+                                                     prec = kwargs.get('prec', 1),
+                                                     use_percentage = strato_var.detr)
+        tropo_stats = bin_data.get_lognorm_stats_df(tropo_BinDict,
+                                                f'{bin_attr}_fit',
+                                                    prec = kwargs.get('prec', 1),
+                                                    use_percentage = tropo_var.detr)
 
         for df, ax in zip([tropo_stats, strato_stats], axs):
             plot_lognorm_stats(ax, df, s)
@@ -146,39 +146,20 @@ def seasonal_2d_lognorm_stats(self, tropo_params, strato_params,
 
     strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict = {}, {}
     for tp in self.tps[::-1]:
-        strato_Bin2Dseas_dict[tp.col_name] = self.sel_strato(
-            tp).bin_2d_seasonal(
-                strato_var, strato_xcoord, strato_ycoord, **strato_params
-                )
-        tropo_Bin2Dseas_dict[tp.col_name] = self.sel_tropo(
-            tp).bin_2d_seasonal(
-                tropo_var, tropo_xcoord, tropo_ycoord, **tropo_params,
-                )
+        strato_df = self.sel_strato(tp).df
+        strato_Bin2Dseas_dict[tp.col_name] = bin_data.seasonal_binning(
+            strato_df, strato_var, strato_xcoord, strato_ycoord, **strato_params)
+
+        tropo_df = self.sel_tropo(tp).df
+        tropo_Bin2Dseas_dict[tp.col_name] = bin_data.seasonal_binning(
+            tropo_df, tropo_var, tropo_xcoord, tropo_ycoord, **tropo_params)
         
     fig, axs = plt.subplots(1,2, figsize = (8,8), sharey=True, dpi=600)
     
     # Labels 
-    # txcbs = tropo_params.get('xbsize', tropo_xcoord.get_bsize())
-    # tycbs = tropo_params.get('ybsize', tropo_ycoord.get_bsize())
-    
-    # txc_label = tropo_xcoord.label(coord_only=True) + f' [{txcbs}]'
-    # tyc_label = tropo_ycoord.label(coord_only=True) + f' [{tycbs}]'
-    
-    # sxcbs = strato_params.get('xbsize', strato_xcoord.get_bsize())
-    # sycbs = strato_params.get('ybsize', strato_ycoord.get_bsize())
-    
-    # sxc_label = strato_xcoord.label() +f' - {sxcbs}'
-    # syc_label = strato_ycoord.label() +f' - {sycbs}'
-
-    # axs[0].set_title('Troposphere (' + txc_label + r' $\times$ ' + tyc_label + ')',
-    #                  size = 10, pad = 3)
-    # axs[1].set_title('Stratosphere (' + sxc_label + r' $\times$ ' + syc_label + ')',
-    #                  size = 10, pad = 3)
-
     axs[0].set_title('(a) Troposphere')
     axs[1].set_title('(b) Stratosphere')
     
-
     seasonal_lognorm_stats(self, strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict, 
                            strato_var, tropo_var, 
                            bin_attr, axs=axs, fig=fig, **kwargs)
@@ -235,14 +216,14 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         strato_BinDict = {k:v[s] for k,v in strato_Bin_seas_dict.items()}
         tropo_BinDict = {k:v[s] for k,v in tropo_Bin_seas_dict.items()}
 
-        strato_stats = bin.get_lognorm_stats_df(strato_BinDict, 
-                                                f'{bin_attr}_fit', 
-                                                prec = kwargs.get('prec', 1), 
-                                                use_percentage = var.detr)
-        tropo_stats = bin.get_lognorm_stats_df(tropo_BinDict, 
-                                                f'{bin_attr}_fit', 
-                                                prec = kwargs.get('prec', 1),
-                                                use_percentage = var.detr)
+        strato_stats = bin_data.get_lognorm_stats_df(strato_BinDict,
+                                                f'{bin_attr}_fit',
+                                                     prec = kwargs.get('prec', 1),
+                                                     use_percentage = var.detr)
+        tropo_stats = bin_data.get_lognorm_stats_df(tropo_BinDict,
+                                                f'{bin_attr}_fit',
+                                                    prec = kwargs.get('prec', 1),
+                                                    use_percentage = var.detr)
 
         for df, ax in zip([tropo_stats, strato_stats], axs):
             plot_lognorm_stats(ax, df, s, xlims)
@@ -368,7 +349,7 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
                                    [tropo_dict, strato_dict], 
                                    [tropo_var, strato_var]): 
         # Extract bin_attr
-        data_dict = bin.extract_attr(data_Bin_dict, bin_attr)
+        data_dict = bin_data.extract_attr(data_Bin_dict, bin_attr)
         
         # Get overall tropo / strato bin limits
         hist_min, hist_max = np.nan, np.nan

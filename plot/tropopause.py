@@ -25,6 +25,7 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ig
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
+import dataTools.data.BinnedData as bin_data
 
 # Coordinate vlimits (for e.g. tropopause height colormaps)
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}
@@ -90,23 +91,19 @@ class TropopausePlotterMixin:
             [lon_coord] = self.get_coords(col_name = 'geometry.x')
             [lat_coord] = self.get_coords(col_name = 'geometry.y')
             
-            bin2d_dict = self.bin_2d_seasonal(
-                var = tp,
-                xcoord = lon_coord, 
-                ycoord = lat_coord, 
-                xbsize = self.grid_size, 
-                ybsize = self.grid_size)
+            bin2d_dict = bin_data.seasonal_binning(
+                self.df, tp, lon_coord, lat_coord, 
+                xbsize = self.grid_size, ybsize = self.grid_size)
 
             if year: 
                 fig.text(0.9, 0.95, f'{year}',
                          bbox = dict(boxstyle='round', facecolor='white',
                                      edgecolor='grey', alpha=0.5, pad=0.25))
-                bin2d_dict = self.sel_year(year).bin_2d_seasonal(
-                    var = tp,
-                    xcoord = lon_coord, 
-                    ycoord = lat_coord, 
-                    xbsize = self.grid_size, 
-                    ybsize = self.grid_size)
+                
+                bin2d_dict = bin_data.seasonal_binning(
+                    self.sel_year(year).df, 
+                    tp, lon_coord, lat_coord, 
+                    xbsize = self.grid_size, ybsize = self.grid_size)
             
             for s,ax in zip([1,2,3,4], axs.flatten()):
                 bin2d = bin2d_dict[s]
