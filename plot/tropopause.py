@@ -25,7 +25,8 @@ from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ig
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-import dataTools.data.BinnedData as bin_data
+import dataTools.data.BinnedData as bin_tools
+import dataTools.data.tropopause as tp_tools
 
 # Coordinate vlimits (for e.g. tropopause height colormaps)
 vlims = {'p':(100,500), 'pt':(300, 350), 'z':(6.5,14), 'mxr': (290, 330)}
@@ -91,7 +92,7 @@ class TropopausePlotterMixin:
             [lon_coord] = self.get_coords(col_name = 'geometry.x')
             [lat_coord] = self.get_coords(col_name = 'geometry.y')
             
-            bin2d_dict = bin_data.seasonal_binning(
+            bin2d_dict = bin_tools.seasonal_binning(
                 self.df, tp, lon_coord, lat_coord, 
                 xbsize = self.grid_size, ybsize = self.grid_size)
 
@@ -100,7 +101,7 @@ class TropopausePlotterMixin:
                          bbox = dict(boxstyle='round', facecolor='white',
                                      edgecolor='grey', alpha=0.5, pad=0.25))
                 
-                bin2d_dict = bin_data.seasonal_binning(
+                bin2d_dict = bin_tools.seasonal_binning(
                     self.sel_year(year).df, 
                     tp, lon_coord, lat_coord, 
                     xbsize = self.grid_size, ybsize = self.grid_size)
@@ -142,7 +143,7 @@ class TropopausePlotterMixin:
         """
         df = kwargs.get('df', self.df)
         coord = kwargs.get('coord', dcts.get_coord(col_name = 'geometry.y'))
-        bci = self.make_bci(coord, xbsize = kwargs.get('bsize', coord.get_bsize()))
+        bci = bin_tools.make_bci(coord, xbsize = kwargs.get('bsize', coord.get_bsize()))
         n2o_color = 'xkcd:violet'
 
         # Prepare the plot
@@ -156,7 +157,7 @@ class TropopausePlotterMixin:
         # Add data for each season and the average 
         for s in ['av',1,2,3,4]:
             data = df if s=='av' else df.query(f'season == {s}')
-            bin1d = self.bin_1d(tp, coord, df = data, bci_1d = bci)
+            bin1d = bin_tools.binning(data, tp, coord, bci = bci)
 
             plot_kwargs = dict(lw=3, path_effects = [self.outline])
             if s=='av': 
@@ -279,8 +280,12 @@ class TropopausePlotterMixin:
 
         """
         fig, axs = plt.subplots(2, 2, figsize = (7,6), dpi=kwargs.get('dpi', 250))
+        tps = kwargs.pop('tps', self.tps)[::-1]
         for s, ax in zip(range(1,5), axs.flat): 
-            self.sel_season(s).show_ratios(ax=ax, xlim = kwargs.pop('xlim', (0, 1.8)), **kwargs)
+            self.sel_season(s).show_ratios(
+                ax=ax, tps = tps, 
+                xlim = kwargs.pop('xlim', (0, 1.8)), 
+                **kwargs)
             ax.set_ylabel('')
             ax.yaxis.set_visible(False)
             ax.set_title('')
@@ -293,10 +298,13 @@ class TropopausePlotterMixin:
         fig.subplots_adjust(top = 0.8)
         if kwargs.get('title'):
             fig.suptitle('Ratio of tropospheric / stratospheric data points per tropopause definition')
-        fig.legend(handles = self.tp_legend_handles(lw = 5, no_vc=True), ncol = 3, 
-                loc='upper center', bbox_to_anchor=[0.5, 0.93]);
+        # fig.legend(handles = cfig.tp_legend_handles(
+        #                 tps = tps, 
+        #                 lw = 5, no_vc=True), 
+        #            ncol = 3, loc='upper center', 
+        #            bbox_to_anchor=[0.5, 0.93]);
 
-    def show_ratios(self, **kwargs):
+    def show_ratios(self, tps, **kwargs):
         """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
         
         Args: 
@@ -307,14 +315,15 @@ class TropopausePlotterMixin:
         if not 'ax' in kwargs: fig, ax = plt.subplots(figsize = (5,3))
         else: ax = kwargs.pop('ax')
         
-        tropo_counts, ratio_df = self.tropo_strato_ratios(**kwargs)
+        tropo_counts, ratio_df = tp_tools.tropo_strato_ratios(
+            self.df_sorted, tps, **kwargs)
         ratios = ratio_df.loc['ratios']
 
         ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {self.source}')
         ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
         ax.set_axisbelow(True)
 
-        for tp in kwargs.get('tps', self.tps)[::-1]:
+        for tp in tps:
             color = tp.get_color()
             ratio = ratios[tp.col_name]
             n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
@@ -355,7 +364,7 @@ class TropopausePlotterMixin:
 
         bin_dict = {}
         for xcoord in xcoords: 
-            bci_1d = self.make_bci(xcoord, **bci_kwargs)
+            bci_1d = bin_tools.make_bci(xcoord, **bci_kwargs)
             x = self.df[xcoord.col_name]
             bp1d = bp.Simple_bin_1d(v, x, bci_1d)
             bin_dict[xcoord] = bp1d

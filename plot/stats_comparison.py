@@ -164,7 +164,6 @@ def seasonal_2d_lognorm_stats(self, tropo_params, strato_params,
                            strato_var, tropo_var, 
                            bin_attr, axs=axs, fig=fig, **kwargs)
 
-
 def plot_lognorm_stats(ax, lognorm_stats_df, s = None): 
     """ Plot lognorm statistics as fill_betweenx plots with mode indicated. """
     for i, tp_col in enumerate(lognorm_stats_df.columns): 

@@ -43,7 +43,7 @@ def get_var_lims(var, bsize=None, gdf=None, **kwargs) -> tuple[float]:
         key databased (bool): Toggle calculating limits from available data. 
             Default True for everything but Lon/Lat. 
     """
-    if isinstance(var, dcts.Coordinate) and not kwargs.get('databased', True):
+    if not kwargs.get('databased', False):
         try:
             return var.get_lims()
         except ValueError:
