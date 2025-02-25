@@ -126,6 +126,38 @@ def o3_filter_lt60(df, o3_subs) -> pd.DataFrame:
     return o3_sorted
 
 # TODO: implement o3_baseline_filter
-def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
+def o3_baseline_filter(df, o3_coord, **kwargs) -> pd.DataFrame:
     """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
     raise NotImplementedError('O3 Baseline filter has not yet been implemented')
+
+def tropo_strato_ratios(df_sorted, tps, **kwargs) -> tuple[pd.DataFrame]: 
+    """ Calculates the ratio of tropospheric / stratospheric datapoints for the given tropopause definitions.
+    
+    Args: 
+        df_sorted (pd.DataFrame): Dataframe with tropo/strato bool values. 
+        tps (list[dcts.Coordinate]): Tropopause definitions to calculate ratios for
+    
+    Returns a dataframe with tropospheric (True) and stratospheric (False) flags per TP definition. 
+    """
+    # Select data 
+    tropo_cols = ['tropo_' + tp.col_name for tp in tps
+                  if 'tropo_' + tp.col_name in df_sorted]
+
+    df = df_sorted[tropo_cols]
+    shared_indices = tools.get_shared_indices(df, tps)
+    df = df[df.index.isin(shared_indices)]
+
+    # Get counts 
+    tropo_counts = df[df == True].count(axis=0)
+    strato_counts = df[df == False].count(axis=0)
+
+    count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
+    count_df.dropna(axis=1, inplace=True)
+    count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
+
+    # Calculate ratios 
+    ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
+    ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
+    ratio_df.loc['ratios'] = ratios  # set col
+
+    return count_df, ratio_df
