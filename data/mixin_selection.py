@@ -299,6 +299,34 @@ class SelectionMixin:
             self.__dict__.update(out.__dict__.copy())
         return out
 
+# --- Make selection based on availability of parameters ---
+    def remove_non_shared_indices(self, inplace=True, **kwargs):
+        """ Returns a class instances with all non-shared indices of the given tps filtered out. 
+        Prarameters: 
+            inplace (bool)
+            
+            key tps: Tropopause definitions to filter with 
+        """
+        tps = kwargs.get('tps', self.tps)
+        shared_indices = tools.get_shared_indices(self.df, tps)
+
+        out = type(self).__new__(self.__class__)  # new class instance
+        for attribute_key in self.__dict__:  # copy attributes
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+
+        out.data = {}
+        df_list = [k for k in self.data
+                   if isinstance(self.data[k], pd.DataFrame)]  # includes geodataframes
+        for k in df_list:  # only take data from chosen years
+            out.data[k] = self.data[k][self.data[k].index.isin(shared_indices)]
+
+        out.status['shared_i_coords'] = tps
+
+        if inplace:
+            self.data = out.data
+
+        return out
+
 # --- Make selections based on strato / tropo characteristics --- 
     def sel_atm_layer(self, atm_layer: str, tp=None, inplace:bool=False, **kwargs):
         """ Create GlobalData object with strato / tropo sorting.
@@ -375,4 +403,5 @@ class SelectionMixin:
         LMS_data = strato_data[strato_data[tp.col_name] <= zbsize * nr_of_bins]
         
         return LMS_data
+
 

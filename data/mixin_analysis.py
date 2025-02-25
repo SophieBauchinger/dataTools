@@ -38,64 +38,6 @@ class AnalysisMixin:
     """
 
     # --- Helper for comparing datasets properly ---
-    def get_shared_indices(self, tps=None, df=False):
-        """ Make reference for shared indices of chosen tropopause definitions. """
-        if 'df_sorted' not in self.data:
-            self.create_df_sorted()
-
-        data = self.df_sorted if not df else self.df
-        prefix = 'tropo_' if not df else ''
-
-        tps = self.tps if tps is None else tps
-
-        if self.source != 'MULTI':
-            tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
-            indices = data.dropna(subset=tropo_cols, how='any').index
-
-        else:
-            # Cannot do this without mashing together all the n2o / o3 tropopauses!
-            tps_non_chem = [tp for tp in tps if not tp.tp_def == 'chem']
-            tropo_cols_non_chem = [prefix + tp.col_name for tp in tps_non_chem if prefix + tp.col_name in data]
-            indices_non_chem = data.dropna(subset=tropo_cols_non_chem,
-                                           how='any').index
-            # Combine N2O tropopauses. (ignore Caribic O3 tropopause bc only one source)
-            tps_n2o = [tp for tp in tps if tp.crit == 'n2o']
-            tropo_cols_n2o = [prefix + tp.col_name for tp in tps_n2o if prefix + tp.col_name in data]
-            n2o_indices = data.dropna(subset=tropo_cols_n2o,
-                                      how='all').index
-
-            print('Getting shared indices using\nN2O measurements: {} and dropping O3 TPs: {}'.format(
-                [str(tp) + '\n' for tp in tps_non_chem],
-                [tp for tp in tps if tp not in tps_n2o + tps_non_chem]))
-
-            indices = indices_non_chem[[i in n2o_indices for i in indices_non_chem]]
-
-            # indices = [i for i in indices_non_chem if i in n2o_indices]
-
-        return indices
-
-    def remove_non_shared_indices(self, inplace=True, **kwargs):
-        """ Returns a class instances with all non-shared indices of the given tps filtered out. """
-        tps = kwargs.get('tps', self.tps)
-        shared_indices = self.get_shared_indices(tps)
-
-        out = type(self).__new__(self.__class__)  # new class instance
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
-        out.data = {}
-        df_list = [k for k in self.data
-                   if isinstance(self.data[k], pd.DataFrame)]  # includes geodataframes
-        for k in df_list:  # only take data from chosen years
-            out.data[k] = self.data[k][self.data[k].index.isin(shared_indices)]
-
-        out.status['shared_i_coords'] = tps
-
-        if inplace:
-            self.data = out.data
-
-        return out
-
     def detrend_substance(self, subs, **kwargs) -> tuple[pd.DataFrame, np.ndarray]:
         """
         Remove multi-year linear trend from substance wrt. free troposphere measurements from main dataframe.
@@ -402,42 +344,6 @@ class TropopauseSorterMixin:
         if 'df_sorted' not in self.data:
             self.create_df_sorted(save=True)
         return self.data['df_sorted']
-
-    def tropo_strato_ratios(self, filter='only_shared', **kwargs) -> tuple[pd.DataFrame]: 
-        """ Calculates the ratio of tropospheric / stratospheric datapoints for the given tropopause definitions.
-        
-        Args: 
-            tps (list[dcts.Coordinate]): Tropopause definitions to calculate ratios for
-            filter (str): only_shared | only_non_shared | None
-        
-        Returns a dataframe with tropospheric (True) and stratospheric (False) flags per TP definition. 
-        """
-        # Select data 
-        tps = kwargs.get('tps', self.tps)
-        tropo_cols = ['tropo_' + tp.col_name for tp in tps
-                      if 'tropo_' + tp.col_name in self.df_sorted]
-
-        shared_indices = self.get_shared_indices(tps)
-        df = self.df_sorted[tropo_cols]
-        if filter == 'only_shared': 
-            df = df[df.index.isin(shared_indices)]
-        elif filter == 'only_non_shared': 
-            df = df[~df.index.isin(shared_indices)]
-
-        # Get counts 
-        tropo_counts = df[df == True].count(axis=0)
-        strato_counts = df[df == False].count(axis=0)
-
-        count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
-        count_df.dropna(axis=1, inplace=True)
-        count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
-
-        # Calculate ratios 
-        ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
-        ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
-        ratio_df.loc['ratios'] = ratios  # set col
-
-        return count_df, ratio_df
 
     def unambiguously_sorted_indices(self, tps) -> tuple[pd.Index, pd.Index]:
         """ Get indices of datapoints that are identified consistently as tropospheric / stratospheric. """
