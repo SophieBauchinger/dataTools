@@ -380,7 +380,6 @@ def get_phileas_era5():
         }
     return data_dictionary
 
-
 def get_phileas_data_fl07_fl19(time_res = '10s'): 
     """ Temporary function for creating merge files for the PHILEAS campaign. """  
     # GHOST_ECD
@@ -496,3 +495,24 @@ def get_phileas_data_fl07_fl19(time_res = '10s'):
         'df' : df,
     }
     return data_dictionary
+
+def get_HrelTP_fl07_fl19_from_file(): 
+    """ """
+    fnames = [
+        r"data\PHILEAS_FAIRO-UV_w_HrelTP\PHILEAS_F07a_2023-08-21_HALO_FAIRO_O3_V02.csv",
+        r"data\PHILEAS_FAIRO-UV_w_HrelTP\PHILEAS_F07b_2023-08-21_HALO_FAIRO_O3_V02.csv",
+        r"data\PHILEAS_FAIRO-UV_w_HrelTP\PHILEAS_F19_2023-09-22_HALO_FAIRO_O3_V02.csv"
+        ]
+    
+    paths = [dcts.get_path() + fname for fname in fnames]
+    
+    df = pd.DataFrame()
+    
+    for path in paths: 
+        df_flight = pd.read_csv(path, sep = ';')
+        df = pd.concat([df, df_flight])
+    df.rename(columns = {"Unnamed: 0": 'Datetime'}, inplace = True)
+    df['Datetime'] = pd.to_datetime(df['Datetime'], format = 'ISO8601')
+    df.set_index('Datetime', inplace = True)
+    df.index = df.index.round('s')
+    return df
