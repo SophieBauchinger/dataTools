@@ -25,6 +25,7 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 from dataTools.data.local import MaunaLoa
 from dataTools.data.mixin_selection import SelectionMixin
+import dataTools.data.tropopause as tp_tools
 
 def outline(): 
     """ Helper function to add outline to lines in plots. """
@@ -451,9 +452,6 @@ class TropopauseSorterMixin:
             Remove trend wrt. 2005 Mauna Loa from substance, then add to data
     """
 
-    def calculate_average_distange_to_tropopause(self, tps): # TODO: implement
-        """ Calculate the average distance of measurements around the tropopause. """
-
     def n2o_baseline_filter(self, **kwargs) -> pd.DataFrame:
         """ Filter strato / tropo data based on specific column of N2O mixing ratios. 
         Args: 
@@ -555,6 +553,23 @@ class TropopauseSorterMixin:
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
+    def calculate_O3_HrelTP(self) -> tuple[pd.DataFrame]:
+        """ Calculate relative height of O3 tropopause based on O3 climatology from Hohenpeissenberg. 
+        Returns: 
+            hreltp (pd.DataFrame): Height relative to the O3 tropopause (Sprung & Zahn 2010)
+            df_sorted (pd.DataFrame): Tropos/Stratos filter based on O3 tropopause (Sprung & Zahn 2010)
+        """
+        o3_substs = self.get_substs(short_name='o3', model='MSMT')
+        if len(o3_substs) == 1:
+            [o3_subs] = o3_substs
+        else:
+            [o3_subs] = o3_substs[0]
+            print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
+        
+        hreltp, df_sorted,_ = tp_tools.calc_HrelTP(self.df, o3_subs)
+        self.df['H_rel_TP'] = hreltp
+        return hreltp, df_sorted
+
     # TODO: implement o3_baseline_filter
     def o3_baseline_filter(self, **kwargs) -> pd.DataFrame:
         """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
@@ -562,24 +577,18 @@ class TropopauseSorterMixin:
 
     def o3_filter_lt60(self) -> pd.DataFrame:
         """ Flag ozone mixing ratios below 60 ppb as tropospheric. """
-        o3_substs = self.get_substs(short_name='o3')
+        o3_substs = self.get_substs(short_name='o3', model = 'MSMT')
 
         if len(o3_substs) == 1:
             [o3_subs] = o3_substs
-
-        elif self.source == 'Caribic':
-            if any(s.ID == 'INT' for s in o3_substs):
-                [o3_subs] = [s for s in o3_substs if s.ID == 'INT']
-            elif any(s.ID == 'MS' for s in o3_substs):
-                [o3_subs] = [s for s in o3_substs if s.ID == 'MS']
-            else:
-                [o3_subs] = o3_substs[0]
-                print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
+        elif len(o3_substs) == 0: 
+            raise Exception('No O3 data available to filter O3 < 60ppb values')
         else:
-            raise KeyError('Need to be more specific in which Ozone values should be used for sorting. ')
+            [o3_subs] = o3_substs[0]
+            print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
 
         o3_sorted = pd.DataFrame(index=self.df.index)
-        o3_sorted.loc[self.df[o3_subs.col_name].lt(60),
+        o3_sorted.loc[self.df[o3_subs.col_name].le(60),
         (f'strato_{o3_subs.col_name}', f'tropo_{o3_subs.col_name}')] = (False, True)
         return o3_sorted, o3_subs
 
@@ -655,6 +664,11 @@ class TropopauseSorterMixin:
                 o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
                 o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
                 df_sorted.update(o3_sorted, overwrite=False)
+
+        # Homemade O3 TP sorting
+        # if not any(['h_rel_tp' in c.lower() for c in df_sorted.columns]):
+        _, h_rel_tp_sorted = self.calculate_O3_HrelTP()
+        df_sorted = pd.concat([df_sorted, h_rel_tp_sorted], axis=1)
 
         df_sorted = df_sorted.convert_dtypes()
         if save:
