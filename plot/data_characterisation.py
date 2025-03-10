@@ -98,6 +98,17 @@ def tps_height_comparison_seasonal_1D(self, **kwargs):
                 ncol = 3, loc='upper center', 
                 bbox_to_anchor=[0.5, 0.95])
 
+def percentage_within_delta_of_tp(self, rel_tps, max_delta=2): # TODO: implement
+    """ Calculate the average distance of measurements around the tropopause. """
+    df = self.df
+    for tp in rel_tps:
+        print(tp)
+        lt_abs = len(df[abs(df[tp.col_name]) <= 2])
+        gt_abs = len(df[abs(df[tp.col_name]) > 2])
+        gt_rel = len(df[df[tp.col_name] > 2])
+        # df[df[tp.col_name] <= 2]
+        print(lt_abs/(gt_abs + lt_abs), gt_abs,(gt_abs + lt_abs), gt_rel, '\n')
+
 
 #%% 1D seasonal gradients
 
