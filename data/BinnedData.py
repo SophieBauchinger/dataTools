@@ -185,7 +185,7 @@ def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
 
 
 def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
-                     count_limit=None, **kwargs):
+                     count_limit=5, **kwargs):
     """ Bin the given dataframe for all available seasons. 
 
     Parameters: 
@@ -206,7 +206,8 @@ def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
 
     seasonal_dict = {}
     for s in set(df['season'].values):
-        bin_s_out = binning(df, var, xcoord, ycoord, zcoord,
+        df_season = df[df['season'] == s]
+        bin_s_out = binning(df_season, var, xcoord, ycoord, zcoord,
                             count_limit=count_limit, bci=bci, **kwargs)
         seasonal_dict[s] = bin_s_out
 

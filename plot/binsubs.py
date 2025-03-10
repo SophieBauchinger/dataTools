@@ -238,7 +238,6 @@ class BinPlotterBaseMixin:
 
         return axs
 
-
     def plot_histogram_comparison(self, var, strato_dict, tropo_dict, bin_attr='vstdv', 
                                   xscale = 'linear', show_stats = False, fig_kwargs = {}, **kwargs):
         """ Plot histogram with lognorm fit comparison between tropopauses. 
@@ -441,7 +440,9 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
                                   **kwargs):
         """ Plot gradient per season onto one plot. """
         big = kwargs.pop('big') if 'big' in kwargs else False
-        bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
+        
+        bin_dict = bin_data.seasonal_binning(self.df, subs, coord, **kwargs)
+        # bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
         
         fig, ax = plt.subplots(dpi=500, figsize= (6,4) if not big else (3,4))
     
