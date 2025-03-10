@@ -112,7 +112,7 @@ class Coordinate:
     def __repr__(self) -> str:
         return f'Coordinate: {self.col_name} [{self.unit}] from {self.ID}'
 
-    def label(self, filter_label=False, coord_only=False, no_vc=False) -> str:
+    def label(self, filter_label=False, coord_only=False, no_vc=False, bsize=None) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
         tp_defs = {'chem': 'Chemical',
@@ -715,7 +715,7 @@ def campaign_definitions(campaign: str) -> dict:
     """  Returns parameters needed for client_data_choice per campaign.
 
     Parameters:
-        ghost_campaign (str): Name of the campaign, e.g. SOUTHTRAC
+        campaign (str): Name of the campaign, e.g. SOUTHTRAC
     """
 
     campaign_dicts = {
@@ -921,3 +921,12 @@ def note_dict(fig_or_ax, s = None, bbox_kwargs=dict(), **kwargs):
     if s: note_dict.update(dict(s=s))
 
     return note_dict
+
+def label_strs(shortcut: str): 
+    return {
+        'DzTP' : '$\\Delta$z$_{{\\text{TP}}}$',
+        'DptTP' : '$\\Delta\Theta_{{\\text{TP}}}$',
+        'times' : '$\\times$',
+        'vstdv' : 'Variability of ',
+        'rvstd' : 'Relative variability of ',
+        }[shortcut]

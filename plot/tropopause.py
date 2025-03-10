@@ -1366,5 +1366,3 @@ class TropopausePlotterMixin:
         for ix in range(binned_3d.nx): 
             for iz in range(binned_3d.nz):
                 datapoint = zonal_mean[ix, iz]
-
-# %%
