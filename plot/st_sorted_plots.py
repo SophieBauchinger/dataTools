@@ -12,7 +12,7 @@ from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 
 import dataTools.dictionaries as dcts
-import dataTools.data.BinnedData as bin_data
+import dataTools.data.BinnedData as bin_tools
 
 
 def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
@@ -137,13 +137,10 @@ def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):
         ax = cax, fraction = 0.6, aspect = 30,  
         orientation = 'horizontal', 
         label = c_axis.label())
-    
-    lines, labels = deepcopy(axs.flatten()[0].get_legend_handles_labels())
-    for line in lines: 
-        line.__dict__.update(_sizes = [30])
-    
-    fig.legend(lines[::-1], labels[::-1], loc='upper center', ncol=2,
-                bbox_to_anchor=[0.5, 0.94])
+
+    handles, labels = axs.flatten()[0].get_legend_handles_labels()
+    fig.legend(handles[::-1], labels[::-1], loc='upper center', ncol=2,
+                bbox_to_anchor=[0.5, 0.94], markerscale=4)
     plt.show()
 
 
@@ -184,7 +181,7 @@ def st_sorted_with_gradient(self, subs, coord, **kwargs):
                        alpha = 0.8, zorder = 1)
             
             # Plot gradient
-            bin_obj = tp_subset.bin_1d(subs, coord, **kwargs)
+            bin_obj = bin_tools.binning()# tp_subset.bin_1d(subs, coord, **kwargs)
             vmean = getattr(bin_obj, 'vmean')
             y = bin_obj.xintm
             
@@ -351,7 +348,7 @@ def seasonal_2d_plots(self, subs, xcoord, ycoord, bin_attr, **kwargs):
     except: 
         cmap = plt.cm.viridis
 
-    binned_seasonal = bin_data.seasonal_binning(self.df, subs, xcoord, ycoord, **kwargs)
+    binned_seasonal = bin_tools.seasonal_binning(self.df, subs, xcoord, ycoord, **kwargs)
 
     if not any(bin_attr in bin2d_inst.__dict__ for bin2d_inst in binned_seasonal.values()):
         raise KeyError(f'\'{bin_attr}\' is not a valid attribute of Bin2D objects.')

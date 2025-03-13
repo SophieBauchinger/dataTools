@@ -11,7 +11,7 @@ import numpy as np
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-import dataTools.data.BinnedData as bin_data
+import dataTools.data.BinnedData as bin_tools
 import dataTools.plot.create_figure as cfig
 
 def tp_height_seasonal_1D_binned(self, tp, **kwargs): 
@@ -25,7 +25,7 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
     df = kwargs.get('df', self.df)
     coord = kwargs.get('coord', dcts.get_coord(col_name = 'geometry.y'))
     xbsize = kwargs.get('bsize', coord.get_bsize())
-    bci = bin_data.make_bci(coord, xbsize=xbsize, gdf = self.df)
+    bci = bin_tools.make_bci(coord, xbsize=xbsize, gdf = self.df)
     n2o_color = 'g'
 
     # Prepare the plot
@@ -39,7 +39,7 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
     # Add data for each season and the average 
     for s in ['av',1,2,3,4]:
         data = df if s=='av' else df.query(f'season == {s}')
-        bin1d = bin_data.binning(data, tp, xcoord = coord, bci = bci, 
+        bin1d = bin_tools.binning(data, tp, xcoord = coord, bci = bci, 
                                  count_limit = self.count_limit)
 
         plot_kwargs = dict(lw=3, path_effects = [cfig.outline()])
@@ -162,7 +162,7 @@ def plot_1d_seasonal_gradient(self, subs, coord,
                                 **kwargs):
     """ Plot gradient per season onto one plot. """
     big = kwargs.pop('big') if 'big' in kwargs else False
-    bin_dict = bin_data.binning_seasonal(subs, xcoord = coord,
+    bin_dict = bin_tools.binning_seasonal(subs, xcoord = coord,
                                          count_limit = self.count_limit,
                                          **kwargs)
     if 'figax' in kwargs: 

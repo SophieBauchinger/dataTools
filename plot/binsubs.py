@@ -35,7 +35,7 @@ import toolpac.calc.binprocessor as bp
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-import dataTools.data.BinnedData as bin_data
+import dataTools.data.BinnedData as bin_tools
 
 warnings.filterwarnings(action='ignore', message='Mean of empty slice')
 
@@ -282,7 +282,7 @@ class BinPlotterBaseMixin:
         for axes, data_Bin_dict in zip([tropo_axs, strato_axs], [tropo_dict, strato_dict]): 
             
             # Extract bin_attr
-            data_dict = bin_data.extract_attr(data_Bin_dict, bin_attr)
+            data_dict = bin_tools.extract_attr(data_Bin_dict, bin_attr)
              
             # Get overall tropo / strato bin limits
             hist_min, hist_max = np.nan, np.nan
@@ -441,7 +441,7 @@ class BinPlotter1DMixin(BinPlotterBaseMixin):
         """ Plot gradient per season onto one plot. """
         big = kwargs.pop('big') if 'big' in kwargs else False
         
-        bin_dict = bin_data.seasonal_binning(self.df, subs, coord, **kwargs)
+        bin_dict = bin_tools.seasonal_binning(self.df, subs, coord, **kwargs)
         # bin_dict = self.bin_1d_seasonal(subs, coord, **kwargs)
         
         fig, ax = plt.subplots(dpi=500, figsize= (6,4) if not big else (3,4))
@@ -670,7 +670,7 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
         except: 
             cmap = plt.cm.viridis
 
-        binned_seasonal = bin_data.seasonal_binning(self.df, subs, xcoord, ycoord, **kwargs)
+        binned_seasonal = bin_tools.seasonal_binning(self.df, subs, xcoord, ycoord, **kwargs)
 
         if not any(bin_attr in bin2d_inst.__dict__ for bin2d_inst in binned_seasonal.values()):
             raise KeyError(f'\'{bin_attr}\' is not a valid attribute of Bin2D objects.')
@@ -790,8 +790,8 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
                                    np.nanmax(self.df[ycoord1.col_name]),
                                    ybsize)
 
-        binned_seasonal_1 = bin_data.seasonal_binning(self.df, *params_1, bci=bin_equi2d)
-        binned_seasonal_2 = bin_data.seasonal_binning(self.df, *params_2, bci=bin_equi2d)
+        binned_seasonal_1 = bin_tools.seasonal_binning(self.df, *params_1, bci=bin_equi2d)
+        binned_seasonal_2 = bin_tools.seasonal_binning(self.df, *params_2, bci=bin_equi2d)
 
         # vlims = self.get_vlimit(subs1, 'vmean')
         xlims = self.get_coord_lims(xcoord1, 'x')
@@ -1217,9 +1217,9 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
 
         for tp in self.tps:
             strato_df = self.sel_strato(tp).df
-            strato_Bin2Dseas_dict[tp.col_name] = bin_data.seasonal_binning(strato_df, var, s_hcoord, s_zcoord)
+            strato_Bin2Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(strato_df, var, s_hcoord, s_zcoord)
             tropo_df = self.sel_tropo(tp).df
-            tropo_Bin2Dseas_dict[tp.col_name] = bin_data.seasonal_binning(tropo_df, var, t_hcoord, t_zcoord)
+            tropo_Bin2Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(tropo_df, var, t_hcoord, t_zcoord)
             
         fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=250)
         axs[0].set_title(f'Troposphere ({t_hcoord.label(coord_only=True)}'+r' $\times$ '\
@@ -1292,9 +1292,9 @@ class BinPlotter2DMixin(BinPlotterBaseMixin):
 
         for tp in kwargs.get('tps', self.tps):
             strato_df = self.sel_strato(tp).df
-            strato_Bin2Dseas_dict[tp.col_name] = bin_data.seasonal_binning(strato_df, var, s_hcoord, s_zcoord)
+            strato_Bin2Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(strato_df, var, s_hcoord, s_zcoord)
             tropo_df = self.sel_tropo(tp).df
-            tropo_Bin2Dseas_dict[tp.col_name] = bin_data.seasonal_binning(tropo_df, var, t_hcoord, t_zcoord)
+            tropo_Bin2Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(tropo_df, var, t_hcoord, t_zcoord)
         
         # Create the figure 
         for s in set(self.df['season']):
@@ -1473,10 +1473,10 @@ class BinPlotter3DMixin(BinPlotterBaseMixin):
         strato_Bin3Dseas_dict, tropo_Bin3Dseas_dict = {}, {}
         for tp in kwargs.get('tps', self.tps):
             strato_df = self.sel_strato(tp).df
-            strato_Bin3Dseas_dict[tp.col_name] = bin_data.seasonal_binning(
+            strato_Bin3Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(
                 strato_df, var, xcoord, s_ycoord, s_zcoord, **kwargs)
             tropo_df = self.sel_tropo(tp).df
-            tropo_Bin3Dseas_dict[tp.col_name] = bin_data.seasonal_binning(
+            tropo_Bin3Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(
                 tropo_df, var, xcoord, t_ycoord, t_zcoord, **kwargs)
 
         fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=250)
