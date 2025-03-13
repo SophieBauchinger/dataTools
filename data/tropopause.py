@@ -17,8 +17,6 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 from dataTools.data.local import MaunaLoa
 
-# What do I need for the N2O baseline filter? 
-# 1. the right data
 
 #%% N2O statistical filter
 def n2o_baseline_filter(df, n2o_coord, **kwargs) -> tuple[pd.DataFrame]:
@@ -132,38 +130,6 @@ def o3_filter_lt60(df, o3_subs) -> pd.DataFrame:
 def o3_baseline_filter(df, o3_coord, **kwargs) -> pd.DataFrame:
     """ Use climatology of Ozone from somewhere (?) - seasonality? - and use as TP filter. """
     raise NotImplementedError('O3 Baseline filter has not yet been implemented')
-
-def tropo_strato_ratios(df_sorted, tps, **kwargs) -> tuple[pd.DataFrame]: 
-    """ Calculates the ratio of tropospheric / stratospheric datapoints for the given tropopause definitions.
-    
-    Args: 
-        df_sorted (pd.DataFrame): Dataframe with tropo/strato bool values. 
-        tps (list[dcts.Coordinate]): Tropopause definitions to calculate ratios for
-    
-    Returns a dataframe with tropospheric (True) and stratospheric (False) flags per TP definition. 
-    """
-    # Select data 
-    tropo_cols = ['tropo_' + tp.col_name for tp in tps
-                  if 'tropo_' + tp.col_name in df_sorted]
-
-    df = df_sorted[tropo_cols]
-    shared_indices = tools.get_shared_indices(df, tps)
-    df = df[df.index.isin(shared_indices)]
-
-    # Get counts 
-    tropo_counts = df[df == True].count(axis=0)
-    strato_counts = df[df == False].count(axis=0)
-
-    count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
-    count_df.dropna(axis=1, inplace=True)
-    count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
-
-    # Calculate ratios 
-    ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
-    ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
-    ratio_df.loc['ratios'] = ratios  # set col
-
-    return count_df, ratio_df
 
 # --- KIT Ozone tropopause calculation
 # ------------------------------------------------------------------------------
@@ -350,3 +316,48 @@ if __name__=='__main__':
     caribic = Caribic()
     [o3_subs] = caribic.get_substs(col_name = 'int_O3')
     hreltp, df_sorted, v_ozone = calc_HrelTP(caribic.df, o3_subs)
+
+#%% Various tropopause-related tools  
+def tropo_strato_ratios(df_sorted, tps, **kwargs) -> tuple[pd.DataFrame]: 
+    """ Calculates the ratio of tropospheric / stratospheric datapoints for the given tropopause definitions.
+    
+    Args: 
+        df_sorted (pd.DataFrame): Dataframe with tropo/strato bool values. 
+        tps (list[dcts.Coordinate]): Tropopause definitions to calculate ratios for
+    
+    Returns a dataframe with tropospheric (True) and stratospheric (False) flags per TP definition. 
+    """
+    # Select data 
+    tropo_cols = ['tropo_' + tp.col_name for tp in tps
+                  if 'tropo_' + tp.col_name in df_sorted]
+
+    df = df_sorted[tropo_cols]
+    shared_indices = tools.get_shared_indices(df, tps)
+    df = df[df.index.isin(shared_indices)]
+
+    # Get counts 
+    tropo_counts = df[df == True].count(axis=0)
+    strato_counts = df[df == False].count(axis=0)
+
+    count_df = pd.DataFrame({True: tropo_counts, False: strato_counts}).transpose()
+    count_df.dropna(axis=1, inplace=True)
+    count_df.rename(columns={c: c[6:] for c in count_df.columns}, inplace=True)
+
+    # Calculate ratios 
+    ratio_df = pd.DataFrame(columns=count_df.columns, index=['ratios'])
+    ratios = [count_df[c][True] / count_df[c][False] for c in count_df.columns]
+    ratio_df.loc['ratios'] = ratios  # set col
+
+    return count_df, ratio_df
+
+def seasonal_tropospheric_average(GlobalObject, subs, tps) -> dict[dict]:
+    """ Returns seasonal average values of `subs`
+    for the given tropopause definitions as a nested dictionary. """
+    out_dict = {}
+    for tp in tps:
+        out_dict[tp.col_name] = {}
+        for s in set(GlobalObject.df.season.values):
+            df = GlobalObject.sel_season(s).sel_tropo(tp).df
+            mean_tp_s = df[subs.col_name].mean()
+            out_dict[tp.col_name][s] = mean_tp_s
+    return out_dict
