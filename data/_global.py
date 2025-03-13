@@ -665,9 +665,11 @@ class TropopauseSorterMixin:
                 o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
                 df_sorted.update(o3_sorted, overwrite=False)
 
-        # Homemade O3 TP sorting
+        # Homemade O3 TP sorting - overwrite previous `H_rel_TP`
         # if not any(['h_rel_tp' in c.lower() for c in df_sorted.columns]):
         _, h_rel_tp_sorted = self.calculate_O3_HrelTP()
+        if any(['H_rel_TP' in c for c in df_sorted.columns]):
+            df_sorted.drop(columns = [c for c in df_sorted.columns if 'H_rel_TP' in c], inplace=True)
         df_sorted = pd.concat([df_sorted, h_rel_tp_sorted], axis=1)
 
         df_sorted = df_sorted.convert_dtypes()
