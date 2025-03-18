@@ -162,9 +162,10 @@ def plot_1d_seasonal_gradient(self, subs, coord,
                                 **kwargs):
     """ Plot gradient per season onto one plot. """
     big = kwargs.pop('big') if 'big' in kwargs else False
-    bin_dict = bin_tools.binning_seasonal(subs, xcoord = coord,
-                                         count_limit = self.count_limit,
-                                         **kwargs)
+    bin_dict = bin_tools.seasonal_binning(self.df, 
+                                          subs, xcoord = coord,
+                                          count_limit = self.count_limit,
+                                          **kwargs)
     if 'figax' in kwargs: 
         _, ax = kwargs.get('figax')
     else: 
@@ -195,7 +196,7 @@ def plot_1d_seasonal_gradient(self, subs, coord,
     ax.grid('both', ls='dashed', lw=0.5)
     ax.set_axisbelow(True)
     
-    if coord.rel_to_tp is True: 
+    if coord.rel_to_tp is True and not coord.crit=='n2o': 
         tools.add_zero_line(ax)
 
     return bin_dict
