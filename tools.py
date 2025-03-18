@@ -373,6 +373,44 @@ def minimise_tps(tps, vcoord=None) -> list:
     tps.sort(key=lambda x: x.tp_def)
     return tps
 
+# ---------------
+def get_shared_indices(self, tps=None, df=False):
+    """ Make reference for shared indices of chosen tropopause definitions. """
+    if 'df_sorted' not in self.data:
+        self.create_df_sorted()
+
+    data = self.df_sorted if not df else self.df
+    prefix = 'tropo_' if not df else ''
+
+    tps = self.tps if tps is None else tps
+
+    if self.source != 'MULTI':
+        tropo_cols = [prefix + tp.col_name for tp in tps if prefix + tp.col_name in data]
+        indices = data.dropna(subset=tropo_cols, how='any').index
+
+    else:
+        # Cannot do this without mashing together all the n2o / o3 tropopauses!
+        tps_non_chem = [tp for tp in tps if not tp.tp_def == 'chem']
+        tropo_cols_non_chem = [prefix + tp.col_name for tp in tps_non_chem if prefix + tp.col_name in data]
+        indices_non_chem = data.dropna(subset=tropo_cols_non_chem,
+                                        how='any').index
+        # Combine N2O tropopauses. (ignore Caribic O3 tropopause bc only one source)
+        tps_n2o = [tp for tp in tps if tp.crit == 'n2o']
+        tropo_cols_n2o = [prefix + tp.col_name for tp in tps_n2o if prefix + tp.col_name in data]
+        n2o_indices = data.dropna(subset=tropo_cols_n2o,
+                                    how='all').index
+
+        print('Getting shared indices using\nN2O measurements: {} and dropping O3 TPs: {}'.format(
+            [str(tp) + '\n' for tp in tps_non_chem],
+            [tp for tp in tps if tp not in tps_n2o + tps_non_chem]))
+
+        indices = indices_non_chem[[i in n2o_indices for i in indices_non_chem]]
+
+        # indices = [i for i in indices_non_chem if i in n2o_indices]
+
+    return indices
+# ---------------
+
 def get_shared_indices(data, variables):
     """ Make reference for shared indices of chosen variables / tps. 
     Parameters: 

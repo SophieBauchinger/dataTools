@@ -32,12 +32,12 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
     l_dict = dict(tropo = 'Troposphere', strato = 'Stratosphere') # Labels
 
     fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=500,
-                            figsize=(7, math.ceil(len(tps)/2)*2),
+                            figsize=(6, math.ceil(len(tps)/2)*2),
                             sharey=True, sharex=True)
-    if len(tps)%2: axs.flatten()[-1].axis('off')
+    if len(tps)%2: axs.flat[-1].axis('off')
 
     for tp, ax in zip(tps, axs.flatten()):
-        ax.set_title(tp.label(filter_label=True), fontsize=8)
+        ax.set_title(tp.label(filter_label=True))
         ax.grid('both', ls = 'dashed', color = 'grey', lw = 0.5, zorder=0)
         
         for atm_layer in ('strato', 'tropo'): 
@@ -62,13 +62,13 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
     fig.tight_layout()
     fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
     
-    lines, labels = deepcopy(axs.flatten()[0].get_legend_handles_labels())
+    lines, labels = deepcopy(axs.flat[0].get_legend_handles_labels())
     for line in lines: 
         line.__dict__.update(_sizes = [30])
     
     fig.legend(lines[::-1], labels[::-1], loc='upper center', ncol=2,
                 bbox_to_anchor=[0.5, 0.94])
-    plt.show()    
+
 
 def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):  
     """ Plot x over y data with coloring based on substance mixing ratios 
@@ -150,19 +150,15 @@ def st_sorted_with_gradient(self, subs, coord, **kwargs):
     """ Plot mixing ratios in background and gradient with vstdv on top. """
     tps = kwargs.get('tps', self.tps)
     
-    c_dict = dict(tropo = 'm', 
-                  strato='xkcd:charcoal grey') # color of atm_layer indicators
-    
-    c_scatter_dict = dict(tropo = 'xkcd:pink',
-                          strato = 'xkcd:grey')
-    
+    c_dict = dict(tropo = 'm', strato='xkcd:charcoal grey') # color of atm_layer indicators
+    c_scatter_dict = dict(tropo = 'xkcd:pink', strato = 'xkcd:grey')
     l_dict = dict(tropo = 'Troposphere', strato = 'Stratosphere') # Labels
 
     # Make figure
     fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=500,
                             figsize=(6, math.ceil(len(tps)/2)*2),
                             sharey=True, sharex=True)
-    if len(tps)%2: axs.flatten()[-1].axis('off')
+    if len(tps)%2: axs.flat[-1].axis('off')
 
     for tp, ax in zip(tps, axs.flatten()):
         ax.set_title(tp.label(filter_label=True))
@@ -181,7 +177,8 @@ def st_sorted_with_gradient(self, subs, coord, **kwargs):
                        alpha = 0.8, zorder = 1)
             
             # Plot gradient
-            bin_obj = bin_tools.binning()# tp_subset.bin_1d(subs, coord, **kwargs)
+            bin_obj = bin_tools.binning(
+                tp_subset.df, subs, coord, **kwargs)
             vmean = getattr(bin_obj, 'vmean')
             y = bin_obj.xintm
             
@@ -207,12 +204,6 @@ def st_sorted_with_gradient(self, subs, coord, **kwargs):
                 linewidth=1,
                 label = l_dict[atm_layer],
                 zorder = 2)
-
-            # # Scatter
-            # ax.scatter(vmean, y, 
-            #     marker=marker,  s = kwargs.get('diamond_s', 20), 
-            #     label = l_dict[atm_layer],
-            #     c = color, zorder = 3)
     
     # Set axis labels 
     for ax in [axs.flat[0], axs[-1,0]]: 
@@ -278,60 +269,6 @@ def plot_1d_gradient(ax, s, bin_obj,
             marker=marker,
             c = color, zorder = 3)
 
-def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
-    """ Plot x over y data
-    Grey / Pink dots indicate S/T sorting per tp. 
-    
-    Parameters: 
-        x_axis (dcts.Coordinate or dcts.Substance)
-        y_axis (dcts.Coordinate or dcts.Substance)
-    
-        key tps (list[dcts.Coordinates]): TP defs for sorting
-        key ylims (tuple[float]): Colormap limits
-    """
-    tps = kwargs.get('tps', self.tps)
-    
-    c_dict = dict(tropo = 'm', strato='xkcd:charcoal grey') # color of atm_layer indicators
-    l_dict = dict(tropo = 'Troposphere', strato = 'Stratosphere') # Labels
-
-    fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=500,
-                            figsize=(7, math.ceil(len(tps)/2)*2),
-                            sharey=True, sharex=True)
-    if len(tps)%2: axs.flatten()[-1].axis('off')
-
-    for tp, ax in zip(tps, axs.flatten()):
-        ax.set_title(tp.label(filter_label=True), fontsize=8)
-        ax.grid('both', ls = 'dashed', color = 'grey', lw = 0.5, zorder=0)
-        
-        for atm_layer in ('strato', 'tropo'): 
-            tp_df = self.sel_atm_layer(atm_layer, tp).df
-            
-            x = tp_df.index if x_axis == 'time' else tp_df[x_axis.col_name]
-            y = tp_df[y_axis.col_name]
-
-            ax.scatter(x, y, c = c_dict[atm_layer],
-                       marker = '.', s = kwargs.get('s', 2), 
-                       label = l_dict[atm_layer])
-
-    for ax in [axs.flat[0], axs[-1,0]]: 
-        ax.set_ylabel(y_axis.label())
-    for ax in axs[-1, :]:
-        ax.set_xlabel('Time' if x_axis == 'time' else x_axis.label())
-
-    if tp.vcoord=='p': 
-        ax.invert_yaxis()
-    if x_axis == 'time': 
-        fig.autofmt_xdate()
-    fig.tight_layout()
-    fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
-    
-    lines, labels = deepcopy(axs.flatten()[0].get_legend_handles_labels())
-    for line in lines: 
-        line.__dict__.update(_sizes = [30])
-    
-    fig.legend(lines[::-1], labels[::-1], loc='upper center', ncol=2,
-                bbox_to_anchor=[0.5, 0.94])
-    plt.show()    
 
 
 #%% 2D binning warum auch immer ich das jetzt hier rein packe
