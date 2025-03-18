@@ -86,7 +86,10 @@ class Caribic(GlobalData):
         self.create_df_sorted() # creates N2O_baseline
         
         self.set_tps(rel_to_tp=True, vcoord='z', model = 'ERA5')
-        self.tps += self.get_coords(rel_to_tp=True, crit='o3')
+        o3_tps = self.get_coords(rel_to_tp=True, crit='o3')
+        if len(o3_tps) > 1 and all([tp.model=='MSMT' for tp in o3_tps]): 
+            o3_tps.sort(key=lambda x:x.ID); o3_tps.pop(0)
+        self.tps += o3_tps
         self.tps += self.get_coords(col_name = 'N2O')
         self.tps.sort(key=lambda x: x.tp_def)
 
