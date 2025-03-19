@@ -295,8 +295,9 @@ def hist_lognorm_fitted(x, range, ax, c, hist_kwargs = {}, bin_nr = 50) -> tools
 
     return lognorm_inst
 
-def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_dict, bin_attr='vstdv', 
-                                xscale = 'linear', show_stats = False, fig_kwargs = {}, **kwargs):
+def plot_ST_histogram_comparison(self, tropo_params, strato_params, 
+                              bin_attr='vstdv', xscale = 'linear', 
+                              show_stats = False, fig_kwargs = {}, **kwargs):
     """ Plot histogram with lognorm fit comparison between tropopauses. 
     
     Args: 
@@ -305,6 +306,11 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
         
         key season (int): If passed, add suptitle with current season
     """
+    tropo_var = tropo_params['var']
+    strato_var = strato_params['var']
+    strato_dict, tropo_dict = bin_tools.get_ST_binDict(
+        self, strato_params, tropo_params, **kwargs)
+    
     tps = [self.get_coords(col_name = k)[0] for k in tropo_dict.keys()]
 
     fig, main_axes, sub_ax_arr = cfig.nested_subplots_two_column_axs(tps, **fig_kwargs)
@@ -324,9 +330,9 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
     pad = 12 if show_stats else 5
     
     for ax in sub_ax_arr[0,:,0].flat: # Top row inner left
-        ax.set_title('O$_3$ Var.\nTroposphere', pad = pad)
+        ax.set_title(f'{tropo_var.label(name_only=True)} Var.\nTroposphere', pad = pad)
     for ax in sub_ax_arr[0,:,-1].flat: # Top row inner right
-        ax.set_title('CO Var.\nStratosphere', pad = pad)
+        ax.set_title(f'{strato_var.label(name_only=True)} Var.\nStratosphere', pad = pad)
 
     for ax in sub_ax_arr.flat: 
         # All subplots
@@ -398,32 +404,18 @@ def plot_histogram_comparison(self, tropo_var, strato_var, tropo_dict, strato_di
     #return fig, main_axes, sub_ax_arr
     return output
 
-def histogram_2d_comparison(self, tropo_params, strato_params, bin_attr='vstdv', **kwargs):
-    """ 2D-binned data lognorm-fitted histograms. 
+# def histogram_2d_comparison(self, tropo_params, strato_params, bin_attr='vstdv', **kwargs):
+#     """ 2D-binned data lognorm-fitted histograms. 
 
-    Parameters: 
-        var (dcts.Substance|dcts.Coordinate)
-        bin_attr (str)
-    """
+#     Parameters: 
+#         var (dcts.Substance|dcts.Coordinate)
+#         bin_attr (str)
+#     """
+#     tropo_BinDict, strato_BinDict = bin_tools.get_ST_binDict(
+#         self, strato_params, tropo_params) 
 
-    tropo_var = tropo_params.pop('var')
-    tropo_xcoord = tropo_params.pop('xcoord')
-    tropo_ycoord = tropo_params.pop('ycoord')
-
-    strato_var = strato_params.pop('var')
-    strato_xcoord = strato_params.pop('xcoord')
-    strato_ycoord = strato_params.pop('ycoord')
-
-    tropo_BinDict, strato_BinDict = {}, {}
-
-    for tp in kwargs.get('tps', self.tps):
-        tropo_BinDict[tp.col_name] = self.sel_tropo(tp).bin_2d(
-            tropo_var, tropo_xcoord, tropo_ycoord, **tropo_params)
-        strato_BinDict[tp.col_name] = self.sel_strato(tp).bin_2d(
-            strato_var, strato_xcoord, strato_ycoord, **strato_params)
-
-    output = plot_histogram_comparison(
-        self, tropo_var, strato_var,
-        tropo_BinDict, strato_BinDict,
-        bin_attr=bin_attr, **kwargs)
-    return output
+#     output = plot_ST_histogram_comparison(
+#         self, tropo_params['var'], strato_params['var'],
+#         tropo_BinDict, strato_BinDict,
+#         bin_attr=bin_attr, **kwargs)
+#     return output

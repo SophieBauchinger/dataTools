@@ -13,7 +13,7 @@ from matplotlib.cm import ScalarMappable
 
 import dataTools.dictionaries as dcts
 import dataTools.data.BinnedData as bin_tools
-
+import dataTools.plot.create_figure as cfig
 
 def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
     """ Plot x over y data
@@ -27,14 +27,11 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
         key ylims (tuple[float]): Colormap limits
     """
     tps = kwargs.get('tps', self.tps)
-    
+
     c_dict = dict(tropo = 'm', strato='xkcd:charcoal grey') # color of atm_layer indicators
     l_dict = dict(tropo = 'Troposphere', strato = 'Stratosphere') # Labels
 
-    fig, axs = plt.subplots(math.ceil(len(tps)/2), 2, dpi=500,
-                            figsize=(6, math.ceil(len(tps)/2)*2),
-                            sharey=True, sharex=True)
-    if len(tps)%2: axs.flat[-1].axis('off')
+    fig, axs = cfig.tp_comp_plot(tps, **kwargs)
 
     for tp, ax in zip(tps, axs.flatten()):
         ax.set_title(tp.label(filter_label=True))
@@ -62,13 +59,12 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
     fig.tight_layout()
     fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
     
-    lines, labels = deepcopy(axs.flat[0].get_legend_handles_labels())
-    for line in lines: 
-        line.__dict__.update(_sizes = [30])
-    
-    fig.legend(lines[::-1], labels[::-1], loc='upper center', ncol=2,
-                bbox_to_anchor=[0.5, 0.94])
-
+    lines, labels = axs.flat[0].get_legend_handles_labels()    
+    fig.legend(lines[::-1], labels[::-1], 
+               loc='upper center', ncol=2,
+               bbox_to_anchor=[0.5, 0.94], 
+               markerscale=6)
+    return fig, axs
 
 def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):  
     """ Plot x over y data with coloring based on substance mixing ratios 
@@ -143,9 +139,7 @@ def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):
                 bbox_to_anchor=[0.5, 0.94], markerscale=4)
     plt.show()
 
-
 #%% subs ST sorted with binned profiles shown on top 
-
 def st_sorted_with_gradient(self, subs, coord, **kwargs): 
     """ Plot mixing ratios in background and gradient with vstdv on top. """
     tps = kwargs.get('tps', self.tps)
@@ -215,16 +209,15 @@ def st_sorted_with_gradient(self, subs, coord, **kwargs):
     fig.subplots_adjust(top = 0.8 + math.ceil(len(tps))/150)
     
     # Make legend
-    lines, labels = axs.flatten()[0].get_legend_handles_labels()
+    lines, labels = axs.flat[0].get_legend_handles_labels()
     
     fig.legend(
         lines[::-1], labels[::-1], 
         loc='upper center', ncol=2,
         bbox_to_anchor=[0.5, 0.94])
-    plt.show()
+    return fig, axs
 
 #%% 
-
 def plot_1d_gradient(ax, s, bin_obj,
                     bin_attr: str = 'vmean', 
                     add_stdv: bool = False):
@@ -269,10 +262,7 @@ def plot_1d_gradient(ax, s, bin_obj,
             marker=marker,
             c = color, zorder = 3)
 
-
-
 #%% 2D binning warum auch immer ich das jetzt hier rein packe
-
 def seasonal_2d_plots(self, subs, xcoord, ycoord, bin_attr, **kwargs):
     """
     Parameters:

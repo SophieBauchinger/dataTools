@@ -14,7 +14,8 @@ import dataTools.data.BinnedData as bin_tools
 
 plt.rcParams.update({'font.size': 12})
 
-def violin_boxplot(self, var, xcoord, ycoord, atm_layer, **kwargs):
+def violin_boxplot(self, var, xcoord, ycoord, 
+                   atm_layer, **kwargs):
     """ 
     Create violin and boxplots. 
 
@@ -145,7 +146,8 @@ $\gamma$ = {y:.1f}\n\
     ax.set_title('Troposphere' if atm_layer =='tropo' else 'Stratosphere')
     
 
-def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, atm_layer, **kwargs):
+def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, 
+                               atm_layer, **kwargs):
     """ 
     Create violin and boxplots. 
 
