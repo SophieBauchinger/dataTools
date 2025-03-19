@@ -93,12 +93,14 @@ class Caribic(GlobalData):
         self.tps += self.get_coords(col_name = 'N2O')
         self.tps.sort(key=lambda x: x.tp_def)
 
-        self.remove_non_shared_indices(inplace=True)
+        self.sel_shared_indices(inplace=True) # only tps in df_sorted
         
         if any(tp.crit=='n2o' for tp in self.tps):
             # Recalculate N2O tropopause with reduced data set
             self.create_df_sorted(ol_limit = 0.01)
-        
+        if 'season' not in self.df.columns:
+            self.df['season'] = tools.make_season(self.df.index.month)
+
         return self
 
     def get_year_data(self, pfx: str, yr: int, parent_dir: str, verbose: bool) -> tuple[pd.DataFrame, dict]:
