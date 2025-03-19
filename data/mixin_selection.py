@@ -38,14 +38,15 @@ class SelectionMixin:
         sel_flight(flights)
             Remove all data that is not from the chosen flight numbers
         
+        sel_shared_indinces(inplace, **kwargs)
+            Remove all non-shared indices of either self.tps or given coords in df_sorted
+        
         sel_atm_layer(atm_layer, **kwargs)
             Remove all data not in the chosen atmospheric layer (tropo/strato)
         sel_tropo()
             Remove all stratospheric datapoints
         sel_strato()
             Remove all tropospheric datapoints
-            
-        
     """
 
     def sel_subset(self, inplace:bool = False, **kwargs):
@@ -300,7 +301,7 @@ class SelectionMixin:
         return out
 
 # --- Make selection based on availability of parameters ---
-    def remove_non_shared_indices(self, inplace=True, **kwargs):
+    def sel_shared_indices(self, inplace=False, **kwargs):
         """ Returns a class instances with all non-shared indices of the given tps filtered out. 
         Prarameters: 
             inplace (bool)
@@ -308,7 +309,9 @@ class SelectionMixin:
             key tps: Tropopause definitions to filter with 
         """
         tps = kwargs.get('tps', self.tps)
-        shared_indices = tools.get_shared_indices(self.df, tps)
+        index_origin = kwargs.get('index_origin', 'df_sorted')
+        
+        shared_indices = tools.get_shared_indices(self.data[index_origin], tps)
 
         out = type(self).__new__(self.__class__)  # new class instance
         for attribute_key in self.__dict__:  # copy attributes
@@ -324,6 +327,7 @@ class SelectionMixin:
 
         if inplace:
             self.data = out.data
+            self.status['shared_indices'] = (index_origin, len(tps))
 
         return out
 
