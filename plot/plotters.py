@@ -14,6 +14,10 @@ import matplotlib.lines as mlines
 from matplotlib.patches import Patch
 import numpy as np
 
+import dataTools.plot.data as plot_data
+import dataTools.plot.binsubs as plot_bins
+import dataTools.plot.tropopause as plot_tp
+
 from dataTools.plot.data import GlobalDataPlotterMixin
 from dataTools.plot.binsubs import BinPlotterMixin
 from dataTools.plot.tropopause import TropopausePlotterMixin
@@ -26,6 +30,7 @@ import dataTools.dictionaries as dcts
 class PlotterMixin(GlobalDataPlotterMixin,
                    BinPlotterMixin, 
                    TropopausePlotterMixin):
+    print('PlotterMixin deprecated. Replaced by dataTools.plot.create_figure')
     """ Combination of all available plotting modules for global datasets + figure structures. """
     def __repr__(self): 
         return f"""Plotter {self.base_class}
