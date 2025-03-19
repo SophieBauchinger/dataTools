@@ -12,6 +12,7 @@ import numpy as np
 import dataTools.dictionaries as dcts
 from dataTools import tools
 import dataTools.data.BinnedData as bin_tools
+import dataTools.data.tropopause as tp_tools
 import dataTools.plot.create_figure as cfig
 
 def tp_height_seasonal_1D_binned(self, tp, **kwargs): 
@@ -32,9 +33,11 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
     ax = kwargs.get('ax') if 'ax' in kwargs else plt.subplots()[1]
     ax.set_title(tp.label(filter_label=True))
     ax.set_ylabel(tp.label(coord_only=True) + f' [{tp.unit}]', 
-                    color=n2o_color if tp.crit=='n2o' else 'k')
+                  color=n2o_color if tp.crit=='n2o' else 'k')
     ax.set_xlabel(coord.label())
     ax.grid(True, ls='dotted')
+    # if tp.rel_to_tp: 
+    #     tools.add_zero_line(ax)
 
     # Add data for each season and the average 
     for s in ['av',1,2,3,4]:
@@ -53,7 +56,6 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
                             bin1d.vmean - bin1d.vstdv, 
                             bin1d.vmean + bin1d.vstdv,
                             alpha=0.13, color=plot_kwargs['color'])
-
         else: 
             plot_kwargs.update(dict(
                 label = dcts.dict_season()[f'name_{s}'], 
@@ -70,14 +72,14 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
         ax.set_xlim(*kwargs.get('xlims'))
     if kwargs.get('invert_yaxis'):
         ax.invert_yaxis()
-    if tp.rel_to_tp: 
-        tools.add_zero_line(ax)
 
 def tps_height_comparison_seasonal_1D(self, **kwargs): 
     """ Default plot for comparing Tropopause heights in latitude bins. """ 
     tps = kwargs.pop('tps', self.tps)
-    fig, axs = plt.subplots(3,2, figsize = (8, 8), sharex=True, 
-                            dpi=kwargs.pop('dpi', 150))
+    self = self.sel_shared_indices(
+        index_origin='df', tps=tps)
+    fig, axs = cfig.tp_comp_plot(tps, sharey=False,
+                                 figsize = (7,7))
     ylims = kwargs.pop('ylims', None)
     
     for tp, ax in zip(tps, axs.flat): 
@@ -91,12 +93,13 @@ def tps_height_comparison_seasonal_1D(self, **kwargs):
             ax.tick_params(axis='y', color=n2o_color, labelcolor=n2o_color)
             ax.spines['right'].set_color(n2o_color)
             ax.spines['left'].set_color(n2o_color)
-    fig.suptitle('Vertical extent of tropopauses')
+    # fig.suptitle('Vertical extent of tropopauses')
     fig.tight_layout()
-    fig.subplots_adjust(top = 0.85)
-    fig.legend(handles = self.season_legend_handles(av=True), 
-                ncol = 3, loc='upper center', 
-                bbox_to_anchor=[0.5, 0.95])
+    fig.subplots_adjust(top = 0.825)
+    fig.legend(handles = cfig.season_legend_handles(av=True), 
+               ncol = 3, loc='upper center', 
+               bbox_to_anchor=[0.5, 0.95])
+    return fig, axs
 
 def percentage_within_delta_of_tp(self, rel_tps, max_delta=2): # TODO: implement
     """ Calculate the average distance of measurements around the tropopause. """
@@ -108,6 +111,75 @@ def percentage_within_delta_of_tp(self, rel_tps, max_delta=2): # TODO: implement
         gt_rel = len(df[df[tp.col_name] > 2])
         # df[df[tp.col_name] <= 2]
         print(lt_abs/(gt_abs + lt_abs), gt_abs,(gt_abs + lt_abs), gt_rel, '\n')
+
+
+def seasonal_ratio_comparison(self, **kwargs): 
+    """ Show tropospheric / stratospheric ratio of data points per season per TP def. 
+    Parameters: 
+        key dpi (int): Figure resolution
+        key title (bool): Show figure title 
+
+    """
+    fig, axs = plt.subplots(2, 2, figsize = (7,6), dpi=kwargs.get('dpi', 250))
+    tps = kwargs.pop('tps', self.tps)[::-1]
+    for s, ax in zip(range(1,5), axs.flat): 
+        show_ratios(self.sel_season(s),
+            ax=ax, tps = tps, 
+            xlim = kwargs.pop('xlim', (0, 1.8)), 
+            **kwargs)
+        ax.set_ylabel('')
+        ax.yaxis.set_visible(False)
+        ax.set_title('')
+        # ax.set_title(dcts.dict_season()[f'name_{s}'])
+        s = dcts.dict_season()[f'name_{s}'].split()[0] + '\n' + dcts.dict_season()[f'name_{s}'].split()[1]
+        ax.text(s = s, y = 0.2, x = 0.85, 
+                transform = ax.transAxes, ha = 'center', va = 'center_baseline', 
+                bbox = dict(facecolor='white', edgecolor = 'grey'))
+    fig.tight_layout()
+    fig.subplots_adjust(top = 0.8)
+    if kwargs.get('title'):
+        fig.suptitle('Ratio of tropospheric / stratospheric data points per tropopause definition')
+    # fig.legend(handles = cfig.tp_legend_handles(
+    #                 tps = tps, 
+    #                 lw = 5, no_vc=True), 
+    #            ncol = 3, loc='upper center', 
+    #            bbox_to_anchor=[0.5, 0.93]);
+
+def show_ratios(self, tps, **kwargs):
+    """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
+    
+    Args: 
+        key ax (Axis): Axis to draw the figure onto
+        key tps (list[dcts.Coordinate]): Tropopause definitions to compare
+        key filter (str)
+    """
+    if not 'ax' in kwargs: fig, ax = plt.subplots(figsize = (5,3))
+    else: ax = kwargs.pop('ax')
+    
+    tropo_counts, ratio_df = tp_tools.tropo_strato_ratios(
+        self.df_sorted, tps, **kwargs)
+    ratios = ratio_df.loc['ratios']
+
+    ax.set_title(f'Ratio of tropospheric / stratospheric datapoints in {self.source}')
+    ax.axvline(1, linestyle='--', color='k', alpha=0.3, zorder=0, lw=1) # vertical lines
+    ax.set_axisbelow(True)
+
+    for tp in tps:
+        color = tp.get_color()
+        ratio = ratios[tp.col_name]
+        n_value = tropo_counts[tp.col_name].loc[True] + tropo_counts[tp.col_name].loc[False] 
+        label = tp.label(filter_label = True, no_vc = True)
+        
+        bars = ax.barh(label, ratio, rasterized=True, color=color, alpha=0.9)
+        if kwargs.get('n_values'):
+            bar_labels = ['{:.2f} (n={:.0f})'.format(r,n) for r,n in zip([ratio], [n_value])]
+        else: 
+            bar_labels = ['{:.2f}'.format(ratio)]
+
+        ax.bar_label(bars, bar_labels, fmt='%.3g', padding=1)
+        ax.set_xlim(kwargs.get('xlim', (0,2)))
+
+    if 'fig' in locals(): fig.tight_layout()
 
 
 #%% 1D seasonal gradients
