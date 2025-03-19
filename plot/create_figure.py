@@ -23,7 +23,7 @@ def outline():
     """ Helper function to add outline to lines in plots. """
     return mpe.withStroke(linewidth=2, foreground='white')
 
-# Figures and axes
+# Figures and axes creation
 def three_sideplot_structure() -> tuple[plt.Figure, tuple[plt.Axes]]: 
     """ Create Figure with central + upper/right additional plots + space on top right. """
     fig,ax_fig = plt.subplots()
@@ -94,6 +94,24 @@ def three_sideplot_labels(fig, axs, zcoord: dcts.Coordinate, eql_coord: dcts.Coo
     axs = (ax_fig, ax_main, ax_upper, ax_right, ax_cube)
     
     return fig, (axs)
+
+def tp_comp_plot(tps, **kwargs):
+    """ Default structure for tropopause definition comparisons. """
+    fig, axs = plt.subplots(
+        math.ceil(len(tps)/2), 2, 
+        dpi=kwargs.get('dpi', 500),
+        figsize=kwargs.get('figsize', (6, math.ceil(len(tps)/2)*2)),
+        sharex=kwargs.get('sharex', True), 
+        sharey=kwargs.get('sharey', True),
+        )
+    if len(tps)%2: axs.flat[-1].axis('off')
+    if not kwargs.get('sharey', True): 
+        [ax.tick_params(labelright=True, right=True, 
+                        labelleft=False, left=False)
+         for ax in axs[:,-1].flat]
+        [ax.yaxis.set_label_position("right") 
+         for ax in axs[:,-1].flat]
+    return fig, axs
 
 def make_two_column_axs(tps, extra_axes=0, sharex=True, sharey=True, **fig_kwargs) -> tuple[plt.Figure, tuple[plt.Axes]]: 
     """ Create the necessary nr of subplots and hide superfluous axes. """
