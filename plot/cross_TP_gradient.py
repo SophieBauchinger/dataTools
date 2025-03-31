@@ -19,6 +19,38 @@ import dataTools.data.tropopause as tp_tools
 import dataTools.data.BinnedData as bin_tools
 
 
+# Heatmap for plotting gradients per tropopause defintion and season
+def gradient_heatmap(df, **kwargs):
+    """ Heatmap for plotting gradients per tropopause defintion and season.
+    Parameters: 
+        df (pd.DataFrame): 
+            (Normalised) gradients per season & av. per TP def.
+    """
+    if 'figax' in kwargs: 
+        fig, ax = kwargs.get('figax')
+    else: 
+        fig, ax = plt.figure(figsize=(6, 3), dpi=200)
+    sns.heatmap(
+        df.T, annot=True, cmap=kwargs.get('cmap', 'YlGnBu'), #cmr.get_sub_cmap('PRGn', 0.1, 0.9), # 'PRGn',# 'YlGnBu', 
+        norm = Normalize(*kwargs.get('vlims')) if 'vlims' in kwargs else None,
+        cbar_kws={'label': kwargs.get('cbar_label', ('Gradient [fraction/km]'))}, 
+        yticklabels=[dcts.get_coord(c).label(filter_label=True, no_vc=True) for c in df.columns], 
+        xticklabels=['Spring', 'Summer', 'Autumn', 'Winter', 'Average'],
+        fmt='.2f', ax = ax,
+        linewidths=1, linecolor='white',
+        )
+
+    # Highlight the "Average" row with a separate color (light gray)    
+    av_values = df.loc['Average']
+    norm = Normalize(av_values.min(), av_values.max())
+    cmap = cmr.get_sub_cmap('binary', 0.35, 0.7)
+    facecolors = cmap([norm(v) for v in av_values])
+    for i in range(len(df)):
+        ax.add_patch(plt.Rectangle((len(df.columns)-1, i), 1, 1, 
+                                    facecolor = facecolors[i], 
+                                    lw=2, edgecolor='white'))
+    return fig, ax
+
 def seasonal_gradient_comparison(GlobalObject, subs, tps, **kwargs):
     """ Calculate and show normalised seasonal cross-tropopause gradients. 
 
@@ -34,8 +66,12 @@ def seasonal_gradient_comparison(GlobalObject, subs, tps, **kwargs):
     for tp in tps:
         bin_dict = bin_tools.seasonal_binning(
             GlobalObject.df, subs, tp, xbsize=xbsize, **kwargs)
+        # This is an insane way to do it and I know it
+        bin_dict_for_TP_av = bin_tools.seasonal_binning(
+            GlobalObject.df, subs, tp, xbsize=xbsize/2, **kwargs)
         for s in bin_dict.keys():
             i_pos = next(x for x, val in enumerate(bin_dict[s].xintm) if val > 0) 
+            i_pos_TP_av = next(x for x, val in enumerate(bin_dict_for_TP_av[s].xintm) if val > 0) 
             continue
         norm_gradients, gradients = {}, {}
         param_dict[tp.col_name] = {}
@@ -44,7 +80,9 @@ def seasonal_gradient_comparison(GlobalObject, subs, tps, **kwargs):
             pos_val = bin_dict[s].vmean[i_pos_gradient]
             neg_val = bin_dict[s].vmean[i_pos_gradient-1]
             gradient = (pos_val - neg_val) / bin_dict[s].xbsize
-            TP_average = np.mean(list(bin_dict[s].vbindata[i_pos]) + list(bin_dict[s].vbindata[i_pos-1]))
+            TP_average = np.mean( # pls forgive me
+                list(bin_dict_for_TP_av[s].vbindata[i_pos_TP_av]) 
+                + list(bin_dict_for_TP_av[s].vbindata[i_pos_TP_av-1]))
             norm_gradients[s] = gradient / TP_average
             gradients[s] = gradient
         
@@ -56,6 +94,7 @@ def seasonal_gradient_comparison(GlobalObject, subs, tps, **kwargs):
                     norm_gradient = gradient / TP_average
                 ))
         gradient_df[tp.col_name] = norm_gradients if kwargs.get('norm', True) else gradients
+ 
         
     gradient_df.loc['Average'] = gradient_df.mean(axis=0)
     seasons = [dcts.dict_season()[f'name_{s}'].split()[0] for s in bin_dict.keys()]
@@ -66,34 +105,8 @@ def seasonal_gradient_comparison(GlobalObject, subs, tps, **kwargs):
         for j in param_dict[i].keys()},
         orient='index')
 
-    # Show the gradient fractions as heatmap
-    if 'figax' in kwargs: 
-        fig, ax = kwargs.get('figax')
-    else: 
-        fig, ax = plt.subplots(figsize=(6, 3), dpi=500)
-    sns.heatmap(
-        gradient_df.T, 
-        annot=True, cmap='YlGnBu', #cmr.get_sub_cmap('PRGn', 0.1, 0.9), # 'PRGn',# 'YlGnBu', 
-        cbar_kws={'label': 'Gradient [fraction/km]'}, 
-        yticklabels=[dcts.get_coord(c).label(filter_label=True) 
-                     for c in gradient_df.columns], 
-        
-        xticklabels=seasons + ['Average'],
-        
-        # xticklabels=['Spring', 'Summer', 'Autumn', 'Winter', 'Average'],
-        fmt='.2f', ax=ax,
-        linewidths=1.5, linecolor='white',
-        )
-    df = gradient_df.T
-    # Highlight the "Average" row with a separate color (light gray)    
-    av_values = df['Average']
-    norm = Normalize(av_values.min(), av_values.max())
-    cmap = cmr.get_sub_cmap('binary', 0.35, 0.7)
-    facecolors = cmap([norm(v) for v in av_values])
-    for i in range(len(df)):
-        ax.add_patch(plt.Rectangle((len(df.columns)-1, i), 1, 1, # xy, width, height
-                                   facecolor = facecolors[i],# 'lightgrey', 
-                                   lw=2, edgecolor='white'))
+    fig, ax = gradient_heatmap(gradient_df, **kwargs)
+    
     if 'figax' in kwargs:
         return fig, ax
     else:
@@ -107,6 +120,7 @@ def format_gradient_params_LATEX(gradient_params):
     param_df['level_1']  = seasons
     param_df.set_index('level_1', inplace=True)
     print(param_df.to_latex(header=False, float_format="%.2f"))
+
 
 def plot_1d_gradient(ax, s, bin_obj,
                      bin_attr: str = 'vmean', 
