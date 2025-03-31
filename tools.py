@@ -58,7 +58,6 @@ from shapely.geometry import Point
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
-from toolpac.conv.times import secofday_to_datetime, datetime_to_secofday # type: ignore
 
 import dataTools.dictionaries as dcts
 
@@ -464,6 +463,16 @@ def pre_flag(data_arr, ref_arr, crit='n2o', limit=0.97, **kwargs) -> pd.DataFram
         print('Result of pre-flagging: \n',
               df_flag[f'flag_{crit}'].value_counts())
     return df_flag
+
+def ratio_to_fraction(ratio):
+    """ Black magic but it works - thank you Matthew. 
+    Calc: ratio = a/b. fraction = a/(a+b)
+        (a/b)^-1 = b/a
+        b/a + 1 = (a+b)/a
+        ((a+b)/a)^-1 = a/(a+b)
+    <3
+    """
+    return ((ratio)**-1 + 1)**-1
 
 def conv_molarity_PartsPer(x, unit):
     """ Convert molarity (mol/mol) to given unit (eg. ppb). """

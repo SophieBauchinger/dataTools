@@ -112,7 +112,6 @@ def percentage_within_delta_of_tp(self, rel_tps, max_delta=2): # TODO: implement
         # df[df[tp.col_name] <= 2]
         print(lt_abs/(gt_abs + lt_abs), gt_abs,(gt_abs + lt_abs), gt_rel, '\n')
 
-
 def seasonal_ratio_comparison(self, **kwargs): 
     """ Show tropospheric / stratospheric ratio of data points per season per TP def. 
     Parameters: 
@@ -132,18 +131,18 @@ def seasonal_ratio_comparison(self, **kwargs):
         ax.set_title('')
         # ax.set_title(dcts.dict_season()[f'name_{s}'])
         s = dcts.dict_season()[f'name_{s}'].split()[0] + '\n' + dcts.dict_season()[f'name_{s}'].split()[1]
-        ax.text(s = s, y = 0.2, x = 0.85, 
+        ax.text(s = s, y = 0.15, x = 0.875, 
                 transform = ax.transAxes, ha = 'center', va = 'center_baseline', 
                 bbox = dict(facecolor='white', edgecolor = 'grey'))
     fig.tight_layout()
-    fig.subplots_adjust(top = 0.8)
+    fig.subplots_adjust(top = 0.825)
     if kwargs.get('title'):
         fig.suptitle('Ratio of tropospheric / stratospheric data points per tropopause definition')
-    # fig.legend(handles = cfig.tp_legend_handles(
-    #                 tps = tps, 
-    #                 lw = 5, no_vc=True), 
-    #            ncol = 3, loc='upper center', 
-    #            bbox_to_anchor=[0.5, 0.93]);
+    fig.legend(handles = cfig.tp_legend_handles(
+                    tps = tps, 
+                    lw = 5, no_vc=True)[::-1], 
+               ncol = 3, loc='upper center', 
+               bbox_to_anchor=[0.5, 0.93]);
 
 def show_ratios(self, tps, **kwargs):
     """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
@@ -268,7 +267,7 @@ def plot_1d_seasonal_gradient(self, subs, coord,
     ax.grid('both', ls='dashed', lw=0.5)
     ax.set_axisbelow(True)
     
-    if coord.rel_to_tp is True and not coord.crit=='n2o': 
-        tools.add_zero_line(ax)
+    # if coord.rel_to_tp is True and not coord.crit=='n2o': 
+    #     tools.add_zero_line(ax)
 
     return bin_dict

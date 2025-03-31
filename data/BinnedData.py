@@ -124,7 +124,8 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
         count_limit (int): Bins with fewer data points are excluded from the output. 
 
         key bci (bp.Bin_**d): Binclassinstance
-        key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
+        key *bsize (float): if bci is not specified, controls the size of the *d-bins.
+        key lognorm (bool): Returns Bin Obj with Lognorm fit of vmean/vstdv/rvstd 
 
     Returns a single Simple_bin_*d object. 
     """
@@ -138,10 +139,14 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
     elif dims == 2:
         bci_2d = make_bci(xcoord, ycoord, **kwargs)
         out = bp.Simple_bin_2d(v, x, y, bci_2d, count_limit=count_limit)
+        if kwargs.get('lognorm'): 
+            out = tools.Bin2DFitted(v, x, y, bci_2d, count_limit=count_limit)
 
     elif dims == 3:
         bci_3d = make_bci(xcoord, ycoord, zcoord, **kwargs)
         out = bp.Simple_bin_3d(v, x, y, z, bci_3d, count_limit=count_limit)
+        if kwargs.get('lognorm'): 
+            out = tools.Bin3DFitted(v, x, y, z, bci_3d, count_limit=count_limit)
 
     else:
         raise Exception(f'Invalid dimensions. Found dims = {dims}')
@@ -167,11 +172,14 @@ def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
     for tp in kwargs.get('tps', GlobalObj.tps):
         strato_df = GlobalObj.sel_strato(tp).df
         strato_Bin_dict[tp.col_name] = binning(
-            strato_df, **strato_params)
+            strato_df, lognorm = kwargs.get('lognorm', False), 
+            **strato_params)
 
         tropo_df = GlobalObj.sel_tropo(tp).df
         tropo_Bin_dict[tp.col_name] = binning(
-            tropo_df, **tropo_params)
+            tropo_df, 
+            lognorm = kwargs.get('lognorm', False), 
+            **tropo_params)
 
     if 'bin_attr' not in kwargs:
         return strato_Bin_dict, tropo_Bin_dict
@@ -231,14 +239,16 @@ def get_ST_seass_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
 
     strato_Binseas_dict, tropo_Binseas_dict = {}, {}
 
-    for tp in kwargs.get('tps', GlobalObj.tps):
+    for tp in kwargs.get('tps', GlobalObj.tps)[::-1]:
         strato_df = GlobalObj.sel_strato(tp).df
         strato_Binseas_dict[tp.col_name] = seasonal_binning(
-            strato_df, *strato_params)
+            strato_df, **strato_params,
+            lognorm = kwargs.get('lognorm', False))
 
         tropo_df = GlobalObj.sel_tropo(tp).df
         tropo_Binseas_dict[tp.col_name] = seasonal_binning(
-            tropo_df, *tropo_params)
+            tropo_df, **tropo_params,
+            lognorm = kwargs.get('lognorm', False))
 
     if 'bin_attr' not in kwargs:
         return strato_Binseas_dict, tropo_Binseas_dict

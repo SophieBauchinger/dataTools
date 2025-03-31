@@ -35,7 +35,9 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
 
     for tp, ax in zip(tps, axs.flatten()):
         ax.set_title(tp.label(filter_label=True))
-        ax.grid('both', ls = 'dashed', color = 'grey', lw = 0.5, zorder=0)
+        ax.grid('both', ls = 'dashed', #TODO: increase frequency
+                color = 'grey', lw = 0.5, 
+                zorder=0)
         
         for atm_layer in ('strato', 'tropo'): 
             tp_df = self.sel_atm_layer(atm_layer, tp).df
@@ -45,7 +47,7 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
 
             ax.scatter(x, y, c = c_dict[atm_layer],
                        marker = '.', s = kwargs.get('s', 2), 
-                       label = l_dict[atm_layer])
+                       label = l_dict[atm_layer], zorder=5)
 
     for ax in [axs.flat[0], axs[-1,0]]: 
         ax.set_ylabel(y_axis.label())

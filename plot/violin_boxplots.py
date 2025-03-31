@@ -11,8 +11,9 @@ from scipy import stats
 import matplotlib.pyplot as plt
 
 import dataTools.data.BinnedData as bin_tools
+import dataTools.plot.create_figure as cfig
 
-plt.rcParams.update({'font.size': 12})
+# plt.rcParams.update({'font.size': 12})
 
 def violin_boxplot(self, var, xcoord, ycoord, 
                    atm_layer, **kwargs):
@@ -99,14 +100,6 @@ def violin_boxplot(self, var, xcoord, ycoord,
         boxprops = boxprops
     )
 
-    # Add jittered dots ----------------------------------------------
-    # jitter = 0.05
-    # x_data = [np.array([i] * len(d)) for i, d in enumerate(filtered_data)]
-    # x_jittered = [x + stats.t(df=6, scale=jitter).rvs(len(x)) for x in x_data]
-
-    # for x, y, color, label in zip(x_jittered, filtered_data, COLOR_SCALE, LABELS):
-    #     ax.scatter(x, y, s = 80, color=color, alpha=0.3, label = label)
-        
     # Add statistics labels ------------------------------------------
     for i, mean in enumerate(means):
         # Add dot representing the mean
@@ -140,11 +133,11 @@ $\gamma$ = {y:.1f}\n\
     
     ax.legend(loc = 'upper left')
     
-    fig.legend(handles = self.tp_legend_handles(no_vc = True), 
+    fig.legend(handles = cfig.tp_legend_handles(self.tps, no_vc = True), 
               ncols = kwargs.get('legend_ncols', 3),
               loc = kwargs.get('legend_loc', 'lower center'))
     ax.set_title('Troposphere' if atm_layer =='tropo' else 'Stratosphere')
-    
+
 
 def rel_binning_violin_boxplot(self, var, rel_coords, ycoord, 
                                atm_layer, **kwargs):
