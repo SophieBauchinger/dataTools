@@ -16,34 +16,7 @@ import dataTools.plot.create_figure as cfig
 import dataTools.data.BinnedData as bin_tools
 
 #%% Lognorm stats as lines with dots
-
-def plot_lognorm_stats(ax, df, s = None): 
-    for i, tp_col in enumerate(df.columns): 
-        tp = dcts.get_coord(tp_col)
-        if s is not None: 
-            y = -s*8+i
-        else: 
-            y = tp.label(filter_label = True).split('(')[0]
-        # Lines
-        line_kw = dict(color = tp.get_color(), lw = 7)
-        ax.fill_betweenx([y]*2, *df[tp_col].int_68, **line_kw, alpha = 1) # avoids round edges
-        ax.fill_betweenx([y]*2, *df[tp_col].int_95, **line_kw, alpha = 0.5)
-
-        # Mode marker
-        ax.scatter(df[tp_col].Mode, y, 
-                   alpha = 1, zorder = 9, marker = 'o', color = 'k', s = 50)
-
-        # Numeric value of mode
-        ax.annotate(
-            text = f'{df[tp_col].Mode}  ', 
-            xy = (df[tp_col].Mode, y),
-            xytext = (0, y),
-            ha = 'right', va = 'center', 
-            size = 9, fontweight = 'medium',
-            )
-
-def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict, 
-                           strato_var, tropo_var = None, bin_attr = 'vstdv', **kwargs): 
+def OLD_seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params, bin_attr = 'vstdv', **kwargs): 
     """ Create plot of lognormal stats for each tropopause in troposphere / stratosphere. 
     Args: 
         axs (tuple[plt.Axes]): Tuple of tropos_axis, stratos_axis
@@ -54,6 +27,9 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         tropo_var: Optional. Defaults to strato_var
     
     """
+    strato_Bin_seas_dict, tropo_Bin_seas_dict = bin_tools.get_ST_seass_binDict(
+        GlobalObj, strato_params, tropo_params, lognorm=True, **kwargs)
+    
     if not all(i in kwargs for i in ['axs', 'fig']): 
         fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=250)
         axs[0].set_title(f'Troposphere', size = 10, pad = 3)
@@ -62,8 +38,8 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         fig = kwargs.get('fig')
         axs = kwargs.get('axs')
 
-    if tropo_var is None:
-        tropo_var = strato_var
+    strato_var = strato_params['var']
+    tropo_var = tropo_params['var']
 
     seasons = set(next(iter(strato_Bin_seas_dict.values())))
     
@@ -71,21 +47,19 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         strato_BinDict = {k:v[s] for k,v in strato_Bin_seas_dict.items()}
         tropo_BinDict = {k:v[s] for k,v in tropo_Bin_seas_dict.items()}
 
-        strato_stats = bin_tools.get_lognorm_stats_df(strato_BinDict,
-                                                f'{bin_attr}_fit',
-                                                     prec = kwargs.get('prec', 1),
-                                                     use_percentage = strato_var.detr)
-        tropo_stats = bin_tools.get_lognorm_stats_df(tropo_BinDict,
-                                                f'{bin_attr}_fit',
-                                                    prec = kwargs.get('prec', 1),
-                                                    use_percentage = tropo_var.detr)
+        strato_stats = bin_tools.get_lognorm_stats_df(
+            strato_BinDict, f'{bin_attr}_fit',
+            prec = kwargs.get('prec', 1), use_percentage = strato_var.detr)
+        tropo_stats = bin_tools.get_lognorm_stats_df(
+            tropo_BinDict, f'{bin_attr}_fit',
+            prec = kwargs.get('prec', 1), use_percentage = tropo_var.detr)
 
         for df, ax in zip([tropo_stats, strato_stats], axs):
             plot_lognorm_stats(ax, df, s)
     
     y_arr =  [-s*8 + 2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
     y_ticks = [dcts.dict_season()[f'name_{s}'] for s in seasons]# [dcts.get_coord(tp_col).label(filter_label = True).split('(')[0] for tp_col in df.columns]
-
+    print(y_arr)
     axs[0].set_yticks(y_arr, y_ticks)
     axs[0].tick_params(labelleft=True if not kwargs.get('label')=='off' else False, 
                         left=False)
@@ -100,8 +74,9 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
     fig.subplots_adjust(bottom = 0.15, wspace = 0.05)
     
     if 'legend_loc' in kwargs: 
-        tps_leg = GlobalObj.tp_legend_handles(filter_label=True, no_vc = True)
-        lognorm_leg = GlobalObj.lognorm_legend_handles()
+        tps_leg = cfig.tp_legend_handles(
+            GlobalObj.tps, filter_label=True, no_vc = True)
+        lognorm_leg = cfig.lognorm_legend_handles()
         
         fig.subplots_adjust(bottom = 0.2, wspace = 0.05)
 
@@ -113,12 +88,13 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
         
     else: 
         axs[0].legend(
-            handles = GlobalObj.tp_legend_handles(filter_label=True, no_vc = True), 
+            handles = cfig.tp_legend_handles(
+                GlobalObj.tps, filter_label=True, no_vc = True), 
             prop=dict(size = kwargs.get('legend_size', 6)),
             loc = 'upper left', 
             ncols = 1)
         
-        fig.legend(*GlobalObj.lognorm_legend_handles(), 
+        fig.legend(*cfig.lognorm_legend_handles(), 
                 loc = 9, 
                 ncols = 3)
 
@@ -136,40 +112,26 @@ def seasonal_2d_lognorm_stats(self, tropo_params, strato_params,
            
     """
     
-    strato_var = strato_params.pop('var')
-    strato_xcoord = strato_params.pop('xcoord')
-    strato_ycoord = strato_params.pop('ycoord')
+    tropo_var = tropo_params['var']
+    strato_var = strato_params['var']
+    strato_Bindict, tropo_Bindict = bin_tools.get_ST_seass_binDict(
+        self, strato_params, tropo_params, lognorm=True, **kwargs)
     
-    tropo_var = tropo_params.pop('var')
-    tropo_xcoord = tropo_params.pop('xcoord')
-    tropo_ycoord = tropo_params.pop('ycoord')
-
-    strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict = {}, {}
-    for tp in self.tps[::-1]:
-        strato_df = self.sel_strato(tp).df
-        strato_Bin2Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(
-            strato_df, strato_var, strato_xcoord, strato_ycoord, **strato_params)
-
-        tropo_df = self.sel_tropo(tp).df
-        tropo_Bin2Dseas_dict[tp.col_name] = bin_tools.seasonal_binning(
-            tropo_df, tropo_var, tropo_xcoord, tropo_ycoord, **tropo_params)
-        
-    fig, axs = plt.subplots(1,2, figsize = (8,8), sharey=True, dpi=600)
+    fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=600)
     
     # Labels 
     axs[0].set_title('(a) Troposphere')
     axs[1].set_title('(b) Stratosphere')
     
-    seasonal_lognorm_stats(self, strato_Bin2Dseas_dict, tropo_Bin2Dseas_dict, 
-                           strato_var, tropo_var, 
-                           bin_attr, axs=axs, fig=fig, **kwargs)
+    seasonal_lognorm_stats(self, strato_Bindict, tropo_Bindict, 
+                           strato_var, bin_attr, axs=axs, fig=fig, **kwargs)
 
-def plot_lognorm_stats(ax, lognorm_stats_df, s = None): 
+def plot_lognorm_stats(ax, lognorm_stats_df, s = None, prec=1): 
     """ Plot lognorm statistics as fill_betweenx plots with mode indicated. """
     for i, tp_col in enumerate(lognorm_stats_df.columns): 
         tp = dcts.get_coord(tp_col)
         if s is not None: 
-            y = s*8+i
+            y = -s*8+i
         else: 
             y = tp.label(filter_label = True).split('(')[0]
         # Lines
@@ -183,15 +145,15 @@ def plot_lognorm_stats(ax, lognorm_stats_df, s = None):
 
         # Numeric value of mode
         ax.annotate(
-            text = f'{lognorm_stats_df[tp_col].Mode}  ', 
+            text = f'{lognorm_stats_df[tp_col].Mode}  ' if not prec==0 else f'{int(lognorm_stats_df[tp_col].Mode)}  ', 
             xy = (lognorm_stats_df[tp_col].Mode, y),
             xytext = (0, y),
             ha = 'right', va = 'center', 
             size = 7, fontweight = 'medium',
             )
 
-def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict, 
-                            var, bin_attr = 'vstdv', **kwargs): 
+def seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params, 
+                           bin_attr = 'vstdv', **kwargs): 
     """ Create plot of lognormal stats for each tropopause in troposphere / stratosphere. 
     Args: 
         axs (tuple[plt.Axes]): Tuple of tropos_axis, stratos_axis
@@ -202,11 +164,15 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
     
     """
     if not 'axs' in kwargs: 
-        fig, axs = plt.subplots(1,2, figsize = (8,5), sharey=True, dpi=250)
-        axs[0].set_title(f'Troposphere', size = 10, pad = 3)
-        axs[1].set_title(f'Stratosphere', size = 10, pad = 3)
+        fig, axs = plt.subplots(1,2, figsize = (6,6), sharey=True, dpi=500)
+        axs[0].set_title('(a) Troposphere', size = 10, pad = 3)
+        axs[1].set_title('(b) Stratosphere', size = 10, pad = 3)
     else: 
         axs = kwargs.get('axs')
+
+    strato_Bin_seas_dict, tropo_Bin_seas_dict = bin_tools.get_ST_seass_binDict(
+        GlobalObj, strato_params, tropo_params, lognorm=True, **kwargs)
+    var = strato_params.get('var')
 
     seasons = set(next(iter(strato_Bin_seas_dict.values())))
     xlims = dcts.vlim_dict_per_substance(var.short_name)[bin_attr]
@@ -225,9 +191,9 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
                                                     use_percentage = var.detr)
 
         for df, ax in zip([tropo_stats, strato_stats], axs):
-            plot_lognorm_stats(ax, df, s, xlims)
+            plot_lognorm_stats(ax, df, s, prec = kwargs.get('prec', 1))
     
-    y_arr =  [s*8+2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
+    y_arr =  [-s*8+2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
     y_ticks = [dcts.dict_season()[f'name_{s}'] for s in seasons]# [dcts.get_coord(tp_col).label(filter_label = True).split('(')[0] for tp_col in df.columns]
 
     axs[0].set_yticks(y_arr, y_ticks)
@@ -235,17 +201,38 @@ def seasonal_lognorm_stats(GlobalObj, strato_Bin_seas_dict, tropo_Bin_seas_dict,
                         left=False)
     axs[1].tick_params(left=False, labelleft=False)
     
+    axs[0].set_xlim(axs[0].get_xlim()[0]-axs[0].get_xlim()[1]/7, 
+                    axs[0].get_xlim()[1])
+    axs[1].set_xlim(axs[1].get_xlim()[0]-axs[1].get_xlim()[1]/5, 
+                    axs[1].get_xlim()[1])
     for ax in axs:
-        ax.set_xlim(ax.get_xlim()[0]-ax.get_xlim()[1]/8, ax.get_xlim()[1])
         ax.set_xlabel(var.label(bin_attr=bin_attr))
         ax.grid(axis='x', ls = 'dashed')
 
-    axs[0].legend(handles = GlobalObj.tp_legend_handles(filter_label=True, no_vc = True)[::-1], 
-            prop=dict(size = 6));
+    if 'legend_loc' in kwargs: 
+        tps_leg = cfig.tp_legend_handles(
+            GlobalObj.tps, filter_label=True, no_vc = True)
+        lognorm_leg = cfig.lognorm_legend_handles()
+        
+        fig.subplots_adjust(bottom = 0.2, wspace = 0.05)
 
-    if 'fig' in locals(): 
-        fig.subplots_adjust(bottom = 0.15, wspace = 0.05)
-        fig.legend(*GlobalObj.lognorm_legend_handles(), loc = 'lower center', ncols = 3)
+        fig.legend(
+            handles = tps_leg + lognorm_leg[0], 
+            labels = [i._label for i in tps_leg] + lognorm_leg[1],
+            ncols = kwargs.get('legend_ncols', 3), 
+            loc = kwargs.get('legend_loc', 'lower center'))
+        
+    else: 
+        axs[0].legend(
+            handles = cfig.tp_legend_handles(
+                GlobalObj.tps, filter_label=True, no_vc = True), 
+            prop=dict(size = kwargs.get('legend_size', 6)),
+            loc = 'upper left', 
+            ncols = 1)
+        
+        fig.legend(*cfig.lognorm_legend_handles(), 
+                loc = 9, 
+                ncols = 3)
 
     return axs
 
@@ -330,9 +317,11 @@ def plot_ST_histogram_comparison(self, tropo_params, strato_params,
     pad = 12 if show_stats else 5
     
     for ax in sub_ax_arr[0,:,0].flat: # Top row inner left
-        ax.set_title(f'{tropo_var.label(name_only=True)} Var.\nTroposphere', pad = pad)
+        ax.set_title(f'{tropo_var.label(name_only=True)} Var.\n ' if not tropo_var.col_name==strato_var.col_name else '' 
+            +'Troposphere', pad = pad)
     for ax in sub_ax_arr[0,:,-1].flat: # Top row inner right
-        ax.set_title(f'{strato_var.label(name_only=True)} Var.\nStratosphere', pad = pad)
+        ax.set_title(f'{strato_var.label(name_only=True)} Var.\n ' if not tropo_var.col_name==strato_var.col_name else '' 
+            + 'Stratosphere', pad = pad)
 
     for ax in sub_ax_arr.flat: 
         # All subplots
