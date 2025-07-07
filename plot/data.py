@@ -8,21 +8,23 @@ or LocalData as defined in data_classes
 
 """
 from calendar import monthrange
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import datetime as dt
 import geopandas
 import math
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-import matplotlib.patheffects as mpe
 from matplotlib.colors import Normalize, BoundaryNorm
 from matplotlib.cm import ScalarMappable as sm
 from matplotlib.colors import ListedColormap as lcm
+import matplotlib.gridspec as gridspec
 from matplotlib.patches import Patch, Rectangle
+import matplotlib.patheffects as mpe
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as np
 import plotly.graph_objs as go
 import plotly.express as px
-
-from mpl_toolkits.axes_grid1 import AxesGrid
 
 import toolpac.calc.binprocessor as bp # type: ignore
 
@@ -217,6 +219,7 @@ def plot_binned_2d(GlobalObject, bin_attr='vmean', hide_lats=False, substances=N
         
         cbar = plt.colorbar(img, ax=ax, extend='neither' if not bin_attr=='vcount' else 'max')
         cbar.ax.set_xlabel(f'[{subs.unit}]' if bin_attr!='vcount' else '[# Points]')
+    return fig, ax
 
 def yearly_plot_binned_2d(GlobalObject, bin_attr='vmean', **subs_kwargs):
     # GlobalObject, subs, single_yr=None, c_pfx=None, years=None, detr=False):
@@ -438,9 +441,62 @@ def make_3d_scatter(GlobalObject, vcoord, color_var, eql=False, **plot_kwargs):
             eye = dict(x=0, y=-0.75, z=1.25))
     )
     fig.update_layout(showlegend=False) 
-    # fig.show()
-    return fig
+    fig.show()
 
+# Functions for plotting curtain and flight track
+def curtain_plot(fig, ax, curtain_ds, var='pv'):
+    """ Flight track curtain data on pressure after lon / lat interpolation. """
+    # Variables
+    data = curtain_ds[var]
+    times = curtain_ds.time.values
+    pressure = curtain_ds.isobaricInhPa.values
+    
+    # --- Upper: Curtain plot ---
+    cf = ax.contourf(times, pressure, data.T, levels=20, cmap="coolwarm")
+    ax.invert_yaxis()
+    ax.set_title(f"{var.upper()} Curtain")
+    ax.set_ylabel("Pressure (hPa)")
+    ax.set_xlabel("Time")
+
+    fig.colorbar(cf, ax=ax, label=f"{var.upper()} ({data.units})")
+    return fig, ax
+
+def flight_track_map(fig, ax, gdf):
+    """ Add geographical context: Map of the flight track with colour for times. """
+    times = gdf.index
+    lon = gdf.geometry.x
+    lat = gdf.geometry.y
+    
+    ax.set_title("Flight Path")
+    ax.add_feature(cfeature.COASTLINE, color = '#505050')
+    ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha = 0.5)
+    ax.gridlines(draw_labels=True)
+    ax.set_ylim(30, 90)
+    ax.set_xlim(-180, 30)
+
+    sc = ax.scatter(lon, lat, c=np.arange(len(times)), cmap="plasma", s=10, transform=ccrs.PlateCarree())
+    ax.plot(lon, lat, 'k-', transform=ccrs.PlateCarree(), linewidth=0.8)
+    cbar = fig.colorbar(sc, ax=ax, pad=0.05, label="Time Index")
+    return fig, ax
+
+def curtain_overview(curtain_ds, flight_gdf, variables= ['pv', 't', 'o3', 'r', 'z', 'theta']):
+    """ Create curtain plots with flight track map for the given variables """
+    fig = plt.figure(figsize=(8, (len(vars)+1)*4))
+    gs = gridspec.GridSpec(len(variables)+1, 1, hspace=0.5)
+
+    for i, var in enumerate(variables): 
+        ax = fig.add_subplot(gs[i])
+        curtain_plot(fig, ax, curtain_ds, var)
+        fig.autofmt_xdate()
+
+        # Add flight pressure
+        ax.plot(flight_gdf.index, flight_gdf['ERA5_PRESS'], 'k--', label='Flight level')
+        ax.legend(loc='lower right')
+
+    ax0 = fig.add_subplot(gs[-1], projection=ccrs.PlateCarree())
+    flight_track_map(fig, ax0, flight_gdf)
+
+    plt.show()
 
 # %% GlobalData plotting
 class GlobalDataPlotterMixin: 
