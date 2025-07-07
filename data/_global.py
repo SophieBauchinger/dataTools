@@ -20,6 +20,7 @@ import xarray as xr
 
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy  # type: ignore
 from toolpac.outliers import outliers  # type: ignore
+from toolpac.readwrite import find
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
@@ -144,7 +145,7 @@ class ModelDataMixin:
                 
             # extract data, each file goes through preprocess first to filter variables & convert units
             with xr.open_mfdataset(fnames, 
-                                    preprocess = tools.process_TPC if not version==2 else tools.process_TPC_V02,
+                                    preprocess = tools.process_TPC, # if not version==2 else tools.process_TPC_V02,
                                     drop_variables = drop_variables.get(self.ID),
                                     ) as ds:
                 ds = ds
@@ -923,7 +924,7 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin, ModelData
         
         with open(pdir + fname, 'wb') as f:
             dill.dump(self.data, f)
-            print(f'{self.ID} Data dictionary saved to {pdir}\{fname}')
+            print(f'{self.ID} Data dictionary saved as {pdir}\{fname}')
 
 # --- Instance variables (substances / coordinates) ---
     def get_variables(self, category):
@@ -1145,3 +1146,37 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin, ModelData
         out.data['df'] = df
         out.data['ID_per_timestamp'] = combined_df.reset_index().set_index('DATETIME')['ID']
         return out
+
+    def copy(self):
+        """ Create a deep copy the GlobalData instance. """
+        return copy.deepcopy(self)
+
+class DataCollection(GlobalData):
+    """ Combined data sets incl. Sonde and Aircraft data. 
+    Needs to contain geoinformation for each point. """ 
+    def __init__(self, dataframe, **kwargs): 
+        """ Initialise data collection object with a datetime-indexed dataframe. """
+        if not 'Datetime' in str(type(dataframe.index)): 
+            raise Warning("Given dataframe needs to be datetime-indexed.")
+        years = set(dataframe.index.year)
+        super().__init__(years, **kwargs)
+
+        self.data['df'] = dataframe
+        self.df.sort_index()
+
+    def dropna(self, cols=None):
+        """ Remove NaN values from the dataframe. """
+        self.df.dropna(subset = cols, how='all', inplace=True)
+        
+
+class SondeData(GlobalData):
+    def __init__(self, pdir:str=None, years:list=None, **kwargs):
+        """ Initialise sonde data set for the given years. """
+        self.get_data(pdir=pdir)
+        
+    def get_data(self, pdir, pattern=None, format='nc'): 
+        """ Import data from the given directory. """
+        if not os.path.exists(pdir): 
+            raise Warning(f'Directory {pdir} does not exist. Please check your input')
+        fnames = find.find_file(path = pdir, 
+                        pattern = "*sans_val_aberantes*")
