@@ -34,8 +34,8 @@ def subs_ST_sorted(self, x_axis, y_axis, **kwargs):
     fig, axs = cfig.tp_comp_plot(tps, **kwargs)
 
     for tp, ax in zip(tps, axs.flatten()):
-        ax.set_title(tp.label(filter_label=True))
-        ax.grid('both', ls = 'dashed', #TODO: increase frequency
+        ax.set_title(tp.label(filter_label=True, no_vc=True))
+        ax.grid('both', ls = 'dashed', 
                 color = 'grey', lw = 0.5, 
                 zorder=0)
         
@@ -100,13 +100,13 @@ def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):
         ax.grid('both', ls = 'dashed', color = 'grey', lw = 0.5, zorder=0)
         
         for atm_layer in ('strato', 'tropo'): 
-            tp_df = self.sel_atm_layer(atm_layer, tp).df
-            tp_df.dropna(subset = [c_axis.col_name], inplace = True)
+            tp_obj = self.sel_atm_layer(atm_layer, tp)
+            tp_obj.df.dropna(subset = [c_axis.col_name], inplace = True)
             
-            x = tp_df.index if x_axis == 'time' else tp_df[x_axis.col_name]
-            y = tp_df[y_axis.col_name]
-            c = tp_df[c_axis.col_name]
-            
+            x = self.get_var_data(x_axis)
+            y = self.get_var_data(y_axis)
+            c = self.get_var_data(c_axis)
+                        
             ax.scatter(x, y , c = c, 
                        marker = '.', alpha = 0.6,
                        cmap = cmap, norm = norm, 
@@ -120,7 +120,7 @@ def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):
         ax.set_ylabel(y_axis.label())
     axs[-1, 0].set_xlabel('Time' if x_axis == 'time' else x_axis.label())
 
-    if tp.vcoord=='p': 
+    if getattr(y_axis, 'vcoord', None)=='p': 
         ax.invert_yaxis()
     if x_axis == 'time': 
         fig.autofmt_xdate()
@@ -139,7 +139,8 @@ def subs_coloring_ST_sorted(self, x_axis, y_axis, c_axis, **kwargs):
     handles, labels = axs.flatten()[0].get_legend_handles_labels()
     fig.legend(handles[::-1], labels[::-1], loc='upper center', ncol=2,
                 bbox_to_anchor=[0.5, 0.94], markerscale=4)
-    plt.show()
+    return fig, axs
+    # plt.show()
 
 #%% subs ST sorted with binned profiles shown on top 
 def st_sorted_with_gradient(self, subs, coord, **kwargs): 
@@ -157,7 +158,7 @@ def st_sorted_with_gradient(self, subs, coord, **kwargs):
     if len(tps)%2: axs.flat[-1].axis('off')
 
     for tp, ax in zip(tps, axs.flatten()):
-        ax.set_title(tp.label(filter_label=True))
+        ax.set_title(tp.label(filter_label=True, no_vc=True, no_model=True))
         ax.grid('both', ls = 'dashed', color = 'grey', lw = 0.5, zorder=0)
         
         for atm_layer in ('strato', 'tropo'): 

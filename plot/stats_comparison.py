@@ -144,13 +144,13 @@ def plot_lognorm_stats(ax, lognorm_stats_df, s = None, prec=1):
         ax.scatter(lognorm_stats_df[tp_col].Mode, y, **kw_mode, color = 'k')
 
         # Numeric value of mode
-        ax.annotate(
-            text = f'{lognorm_stats_df[tp_col].Mode}  ' if not prec==0 else f'{int(lognorm_stats_df[tp_col].Mode)}  ', 
-            xy = (lognorm_stats_df[tp_col].Mode, y),
-            xytext = (0, y),
-            ha = 'right', va = 'center', 
-            size = 7, fontweight = 'medium',
-            )
+        # ax.annotate(
+        #     text = f'{lognorm_stats_df[tp_col].Mode}  ' if not prec==0 else f'{int(lognorm_stats_df[tp_col].Mode)}  ', 
+        #     xy = (lognorm_stats_df[tp_col].Mode, y),
+        #     xytext = (0, y),
+        #     ha = 'right', va = 'center', 
+        #     size = 7, fontweight = 'medium',
+        #     )
 
 def seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params, 
                            bin_attr = 'vstdv', **kwargs): 
@@ -168,6 +168,7 @@ def seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params,
         axs[0].set_title('(a) Troposphere', size = 10, pad = 3)
         axs[1].set_title('(b) Stratosphere', size = 10, pad = 3)
     else: 
+        fig = plt.gca()
         axs = kwargs.get('axs')
 
     strato_Bin_seas_dict, tropo_Bin_seas_dict = bin_tools.get_ST_seass_binDict(
@@ -194,7 +195,7 @@ def seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params,
             plot_lognorm_stats(ax, df, s, prec = kwargs.get('prec', 1))
     
     y_arr =  [-s*8+2.5 for s in seasons]# [i*8+s for i in range(len(df.columns)) for s in seasons]
-    y_ticks = [dcts.dict_season()[f'name_{s}'] for s in seasons]# [dcts.get_coord(tp_col).label(filter_label = True).split('(')[0] for tp_col in df.columns]
+    y_ticks = [dcts.dict_season()[f'name_{s}'].split(' ')[0] for s in seasons]# [dcts.get_coord(tp_col).label(filter_label = True).split('(')[0] for tp_col in df.columns]
 
     axs[0].set_yticks(y_arr, y_ticks)
     axs[0].tick_params(labelleft=True if not kwargs.get('label')=='off' else False, 
@@ -214,13 +215,16 @@ def seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params,
             GlobalObj.tps, filter_label=True, no_vc = True)
         lognorm_leg = cfig.lognorm_legend_handles()
         
-        fig.subplots_adjust(bottom = 0.2, wspace = 0.05)
+        fig.subplots_adjust(bottom = 0.21, wspace = 0.05)
 
         fig.legend(
             handles = tps_leg + lognorm_leg[0], 
             labels = [i._label for i in tps_leg] + lognorm_leg[1],
             ncols = kwargs.get('legend_ncols', 3), 
-            loc = kwargs.get('legend_loc', 'lower center'))
+            loc = kwargs.get('legend_loc', 'lower center'), 
+            bbox_to_anchor = kwargs.get('legend_anchor',
+                [(axs[0].get_position().x1 + axs[-1].get_position().x0)/2, 0])
+            )
         
     else: 
         axs[0].legend(
@@ -234,7 +238,7 @@ def seasonal_lognorm_stats(GlobalObj, strato_params, tropo_params,
                 loc = 9, 
                 ncols = 3)
 
-    return axs
+    return fig, axs
 
 
 
@@ -390,8 +394,8 @@ def plot_ST_histogram_comparison(self, tropo_params, strato_params,
         ax.invert_xaxis()
         tp_title = dcts.get_coord(tp_col).label(filter_label=True).split("(")[0] # shorthand of tp label
         ax.text(**dcts.note_dict(ax, s = tp_title, x = 0.1, y = 0.85))
-    #return fig, main_axes, sub_ax_arr
-    return output
+    return fig, main_axes, sub_ax_arr
+    # return output
 
 # def histogram_2d_comparison(self, tropo_params, strato_params, bin_attr='vstdv', **kwargs):
 #     """ 2D-binned data lognorm-fitted histograms. 

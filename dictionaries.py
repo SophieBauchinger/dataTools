@@ -103,7 +103,8 @@ class Coordinate:
         """
         self.col_name, self.long_name, self.unit, self.ID = [None] * 4
         self.vcoord, self.hcoord, self.var = [None] * 3
-        self.tp_def, self.rel_to_tp, self.model, self.pvu, self.crit = [None] * 5
+        self.tp_def, self.rel_to_tp, self.model, self.crit = [None] * 4
+        self.pvu = np.nan
 
         self.__dict__.update(kwargs)
         if self.pvu is not np.nan:
@@ -112,7 +113,7 @@ class Coordinate:
     def __repr__(self) -> str:
         return f'Coordinate: {self.col_name} [{self.unit}] from {self.ID}'
 
-    def label(self, filter_label=False, coord_only=False, no_vc=False, bsize=None) -> str:
+    def label(self, filter_label=False, coord_only=False, no_vc=False, bsize=None, no_model=True) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
         tp_defs = {'chem': 'Chemical',
@@ -142,6 +143,8 @@ class Coordinate:
                 tp = '%s' % (self.tp_def if self.tp_def is not np.nan else '')
 
                 label = f'{vcoord} ({model}, {tp + pv + crit}) [{self.unit}]'
+                if no_model: 
+                    label = f'{vcoord} ({tp + pv + crit}) [{self.unit}]'
 
                 if filter_label:
                     tp = tp_defs[tp]
@@ -149,6 +152,7 @@ class Coordinate:
                     if self.rel_to_tp: vc = '$\Delta\,$' + vc
                     label = f'{tp + pv + crit} ({model}, {vc})'
                     if no_vc: label = f'{tp + pv + crit} ({model})'
+                    if no_vc and no_model: label = f'{tp + pv + crit}'
             else:
                 label = f'{vcoord} [{self.unit}]'
 
@@ -329,7 +333,7 @@ class Substance:
     def __repr__(self):
         return f'Substance : {self.short_name} [{self.unit}] - \'{self.col_name}\' from {self.ID}'
 
-    def label(self, name_only:bool=False, bin_attr:str=None):
+    def label(self, name_only:bool=False, bin_attr:str=None, no_ID:bool=False):
         """ Returns string to be used as axis label. """
         detr_qualifier = 'rel. to BGD ' if self.detr else ''
 
@@ -356,17 +360,18 @@ class Substance:
         
         # Get data source identifier
         if self.model == 'MSMT':
-            identifier = self.source if not self.source=='HALO' else self.ID
+            identifier = self.source if not self.source=='HALO' else self.ID.strip()
         elif self.model == 'CLAMS':
             identifier = 'CLaMS'
         else:
             identifier = self.model
-        if self.source!='HALO' and len(get_substances(
-                short_name=self.short_name, source=self.source, model=self.model)) > 1:
-            identifier += f' - {self.ID}'
+        # if self.source!='HALO' and len(get_substances(
+        #         short_name=self.short_name, source=self.source, model=self.model)) > 1:
+        #     identifier += f' - {self.ID}'.strip()
+        
 
         # Get the appropriate unit label
-        unit = self.unit if not self.unit in special_names else special_names[self.unit]
+        unit = special_names.get(self.unit, self.unit) # self.unit if not self.unit in special_names else special_names[self.unit]
 
         # Special labels for binned data
         bin_attr_qualifiers = {
@@ -382,6 +387,8 @@ class Substance:
             bin_attr_unit = bin_attr_units[bin_attr]
             return f'{qualifier}{subs_abbr} {detr_qualifier}[{bin_attr_unit}]'
 
+        if no_ID is True: 
+            return f'{subs_abbr} {detr_qualifier}[{unit}]'
 
         return f'{subs_abbr} {detr_qualifier}[{unit}]' + (f' ({identifier})' if not self.detr else '')
 
@@ -910,7 +917,7 @@ def note_dict(fig_or_ax, s = None, bbox_kwargs=dict(), **kwargs):
     note_kwargs.update(**kwargs)
     
     bbox_defaults = dict(edgecolor='lightgrey',
-                        facecolor='lightcyan',
+                        facecolor='#E6E6E6',
                         boxstyle='round')
     bbox_defaults.update(**bbox_kwargs)
     

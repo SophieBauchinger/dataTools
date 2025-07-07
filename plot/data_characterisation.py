@@ -31,13 +31,12 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
 
     # Prepare the plot
     ax = kwargs.get('ax') if 'ax' in kwargs else plt.subplots()[1]
-    ax.set_title(tp.label(filter_label=True))
+    ax.set_title(tp.label(filter_label=True, no_vc=True))
     ax.set_ylabel(tp.label(coord_only=True) + f' [{tp.unit}]', 
                   color=n2o_color if tp.crit=='n2o' else 'k')
-    ax.set_xlabel(coord.label())
+    if kwargs.get('xlabel'): 
+        ax.set_xlabel(coord.label())
     ax.grid(True, ls='dotted')
-    # if tp.rel_to_tp: 
-    #     tools.add_zero_line(ax)
 
     # Add data for each season and the average 
     for s in ['av',1,2,3,4]:
@@ -73,6 +72,7 @@ def tp_height_seasonal_1D_binned(self, tp, **kwargs):
     if kwargs.get('invert_yaxis'):
         ax.invert_yaxis()
 
+
 def tps_height_comparison_seasonal_1D(self, **kwargs): 
     """ Default plot for comparing Tropopause heights in latitude bins. """ 
     tps = kwargs.pop('tps', self.tps)
@@ -87,16 +87,19 @@ def tps_height_comparison_seasonal_1D(self, **kwargs):
             tp, ax = ax, 
             invert_yaxis = True if tp.vcoord =='mxr' else False,
             ylims = ylims if not (tp.vcoord=='mxr' or ylims is None) else tp.get_lims(), 
+            xlabel=True if ax in axs[-1] else False,
             **kwargs)
         if tp.crit == 'n2o': 
             n2o_color = 'g'
             ax.tick_params(axis='y', color=n2o_color, labelcolor=n2o_color)
             ax.spines['right'].set_color(n2o_color)
             ax.spines['left'].set_color(n2o_color)
+        if tp.rel_to_tp: 
+            tools.add_zero_line(ax)
     # fig.suptitle('Vertical extent of tropopauses')
     fig.tight_layout()
     fig.subplots_adjust(top = 0.825)
-    fig.legend(handles = cfig.season_legend_handles(av=True), 
+    fig.legend(handles = cfig.season_legend_handles(av=True, av_std=True), 
                ncol = 3, loc='upper center', 
                bbox_to_anchor=[0.5, 0.95])
     return fig, axs
@@ -143,6 +146,7 @@ def seasonal_ratio_comparison(self, **kwargs):
                     lw = 5, no_vc=True)[::-1], 
                ncol = 3, loc='upper center', 
                bbox_to_anchor=[0.5, 0.93]);
+    return fig, axs
 
 def show_ratios(self, tps, **kwargs):
     """ Plot ratio of tropo / strato datapoints on a horizontal bar plot 
