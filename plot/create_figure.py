@@ -251,7 +251,7 @@ def hist_lognorm_fitted(x, range, ax, c, hist_kwargs = {}, bin_nr = 50) -> tools
     return lognorm_inst
 
 #%% Legends 
-def season_legend_handles(av = False, **kwargs) -> list[Line2D]:
+def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
     """ Create a legend for the default season-color scale. 
     
     Args: 
@@ -274,9 +274,13 @@ def season_legend_handles(av = False, **kwargs) -> list[Line2D]:
         lines.append(Line2D([0], [0], label='Average',
                             color='dimgrey', ls = 'dashed', lw = 3, 
                             path_effects = [outline()]))
+    if av_std: 
+        lines.append(Line2D([0], [0], label='$\sigma$ (Av.)',
+                    color='dimgrey', lw = 6, 
+                    alpha=0.3))
     return lines
 
-def tp_legend_handles(tps, filter_label=True, coord_only=False, no_vc=False, **kwargs) -> list[Line2D]: 
+def tp_legend_handles(tps, filter_label=True, coord_only=False, no_vc=True, no_model=True, **kwargs) -> list[Line2D]: 
     """ Create a legend for all tropopause definitions in self.tps (or tps if given).         
     Args: 
         key tps (list[dcts.Coordinate]): Tropopause definition coordinates
@@ -289,7 +293,8 @@ def tp_legend_handles(tps, filter_label=True, coord_only=False, no_vc=False, **k
     lines = [Line2D([0], [0], 
                     label=tp.label(filter_label=filter_label, 
                                         coord_only=coord_only,
-                                        no_vc=no_vc), 
+                                        no_vc=no_vc,
+                                        no_model=no_model), 
                     color=tp.get_color(), 
                     lw = lw,
                     **kwargs)
@@ -308,3 +313,24 @@ def lognorm_legend_handles() -> tuple[list[str], list[Line2D, Patch, Patch]]:
     h = [h_Mode, h_68, h_95]
 
     return h, l
+
+# %% from TOOLS
+
+def add_zero_line(ax):
+    """ Highlight the gridline at 0 for the chosen axis on the given Axes object.
+
+    NB! Call when everything else has been plotted and adjusted already, otherwise the limits will be messy 
+    (and it may highlight the wrong line).
+    """
+    zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks() != 0)
+    for l in zero_lines:
+        l.set_color('k')
+        l.set_linestyle('-.')
+
+    if len(zero_lines) == 0:
+        xlims = ax.get_xlim()
+        ax.hlines(0, *xlims, color='k', ls='-.', lw=.5)
+        ax.set_xlim(*xlims)
+
+
+# %%

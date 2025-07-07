@@ -232,7 +232,14 @@ def ERA5_variables():
                for pvu in ['1_5', '2_0', '3_5'] 
                for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
 
+    dyn_tps_Second = [f'ERA5_dynTP_{vcoord}_{pvu}_Second' 
+               for pvu in ['1_5', '2_0', '3_5'] 
+               for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
+
     therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
+               for vcoord in ['Z', 'THETA', 'PRESS']]
+
+    therm_tps_Second = [f'ERA5_thermTP_{vcoord}_Second' 
                for vcoord in ['Z', 'THETA', 'PRESS']]
     
     therm_tps_V02 = [f'ERA5_TROP1_{vcoord}' 
@@ -240,11 +247,7 @@ def ERA5_variables():
     
     other_vars = ['ERA5_O3']
     
-    return set(met_vars + dyn_tps + therm_tps + therm_tps_V02 + other_vars)
-
-def process_TPC_V02(ds): # up to V02
-    """ Preprocess datasets for ERA5 / CLaMS renalayis data up to version 2. """
-    return ds[[v for v in ERA5_variables() if v in ds.variables]]
+    return set(met_vars + dyn_tps + dyn_tps_Second + therm_tps + therm_tps_Second + therm_tps_V02 + other_vars)
 
 def process_TPC(ds): # from V04
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
@@ -275,6 +278,10 @@ def process_TPC(ds): # from V04
     
     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
     ds = flatten_TPdims(ds)
+    return ds[[v for v in ERA5_variables() if v in ds.variables]]
+
+def process_TPC_V02(ds): # up to V02
+    """ Preprocess datasets for ERA5 / CLaMS renalayis data up to version 2. """
     return ds[[v for v in ERA5_variables() if v in ds.variables]]
 
 # Interpolation

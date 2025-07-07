@@ -352,7 +352,7 @@ def get_phileas_era5():
     
     with xr.open_mfdataset(fnames, preprocess = process_ERA5_PHILEAS) as ds: 
         df = ds.to_dataframe()
-    df.dropna(how = 'any', inplace = True)
+    df.dropna(subset = [c for c in df.columns if not c.endswith('_Second')], how = 'any', inplace = True)
         
     df.rename(columns = {
         'Lat' : 'BAHAMAS_LAT',
