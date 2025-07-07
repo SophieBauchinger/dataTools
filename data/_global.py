@@ -31,6 +31,64 @@ def outline():
     """ Helper function to add outline to lines in plots. """
     return mpe.withStroke(linewidth=2, foreground='white')
 
+#%% Curtain data
+def add_theta(ds, t_var = "t", p_var = "isobaricInhPa"): 
+    """ Calculate ERA5 potential temperature from pressure and temperature.
+    Unless specified, assumes variables 'isobaricInhPa' and 't' to be present in ds. 
+    """
+    pressure = ds[p_var] * units.hPa
+    temperature = ds[t_var].values * units.kelvin
+
+    # Make sure pressure info is available for all temperature points
+    p_broadcasted = np.broadcast_to(pressure, temperature.shape)
+    p_broadcasted = p_broadcasted * units.hPa
+
+    # Calculate potential temperature
+    theta = calc.potential_temperature(p_broadcasted, temperature)
+
+    # Add to dataset
+    ds["theta"] = (ds[t_var].dims, theta.magnitude)
+    ds["theta"].attrs["units"] = "K"
+    ds["theta"].attrs["long_name"] = "Potential Temperature"
+    return ds
+
+def get_curtain_ds(gdf, model_ds, time_interval = "10min", calc_theta=True): 
+    """ Create an interpolated curtain dataset on the specified time resolution. 
+    Args: 
+        model_ds (ERA5 dataset): Assumes variables 'time', 'latitude' and 'longitude'
+        gdf (gpd.GeoDataFrame): Time-indexed, geometry-column  
+    
+    """
+   
+    # 1. Resample the flight data to specified intervals
+    gdf_resampled = gdf.resample(time_interval).first().dropna(subset=["geometry"])
+
+    # Extract coordinates and time
+    res_times = gdf_resampled.index
+    res_lons = gdf_resampled.geometry.x.values
+    res_lats = gdf_resampled.geometry.y.values
+
+    # era_times = model_ds.time.values
+    curtain_profiles = []
+
+    for i in range(len(res_times)):
+        t = res_times[i]
+        lon = res_lons[i]
+        lat = res_lats[i]
+
+        profile = model_ds.interp(time=t, longitude=lon, latitude=lat)
+        profile = profile.expand_dims(time=[t])
+        curtain_profiles.append(profile)
+
+    # Combine into single Dataset
+    curtain_ds = xr.concat(curtain_profiles, dim="time")
+    
+    if calc_theta: 
+        curtain_ds = add_theta(curtain_ds)
+    
+    return curtain_ds
+
+
 # %% Mixin for model data
 class ModelDataMixin:
     """ Import / Calculate new dataframes  
