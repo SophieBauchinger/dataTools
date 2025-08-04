@@ -30,6 +30,8 @@ import toolpac.calc.binprocessor as bp # type: ignore
 
 from dataTools import tools
 import dataTools.dictionaries as dcts
+import dataTools.plot.create_figure as cfig
+import dataTools.data.BinnedData as bin_tools
 
 def timeseries_global(GlobalObject, substances=None, colorful=True, note=''):
     """ Scatter plots of timeseries data incl. monthly averages of chosen substances. """
@@ -443,6 +445,53 @@ def make_3d_scatter(GlobalObject, vcoord, color_var, eql=False, **plot_kwargs):
     fig.update_layout(showlegend=False) 
     fig.show()
 
+# Some more processed stuff for publications
+def typical_profiles_n2o_o3(GlobalObject, subs1, subs2, vcoord, tp_col): 
+    """ Show seasonal average msmts and mean tropopause height on raw data background. """
+    # Get seasonal mean tropopause height
+    mean_tp_height = dict()
+    for s in [1,2,3,4]:
+        mean_tp_height[s] = GlobalObject.sel_season(s).df[tp_col].mean()
+        
+    # Plot seasonal mean vertical profiles
+    fig, axs = plt.subplots(1,2, figsize=(6,4), dpi=300, sharey=True)
+    for subs, ax in zip([subs1, subs2], axs):
+        bin_dict = bin_tools.seasonal_binning(
+            GlobalObject.df, subs, vcoord, xbsize=0.5)
+        ax.set_xlabel(subs.label())
+        ax.scatter(GlobalObject.get_var_data(subs), GlobalObject.df[vcoord.col_name], color='xkcd:light grey')
+        for s in bin_dict.keys():
+            ax.errorbar(bin_dict[s].vmean, bin_dict[s].xintm, xerr = bin_dict[s].vstdv, 
+                        color = dcts.dict_season()[f"color_{s}"])
+        xlims = ax.get_xlim()
+        
+        for s in bin_dict.keys():
+            ax.hlines(mean_tp_height[s], *xlims,
+                    color = dcts.dict_season()[f"color_{s}"],
+                    ls='dashed', zorder=0,
+                    label = dcts.dict_season()[f"name_{s}"].split(' ')[0])
+
+            ax.hlines(mean_tp_height[s], *xlims,
+                    color = dcts.dict_season()[f"color_{s}"],
+                    zorder=1, lw=0.5, ls=(0, (5, 10)))
+        ax.set_xlim(*xlims)
+        ax.grid(axis='x', ls='dotted', c='xkcd:light gray')
+
+    axs[0].set_ylabel(vcoord.label(coord_only=True) + f" [{vcoord.unit}]")
+    axs[1].tick_params(left=False, labelleft=False, right=True, labelright=True)
+
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.85)
+
+    handles = cfig.typical_profile_legend_handles()
+    axs[1].legend(handles = handles[:2], 
+                  bbox_to_anchor = (0,0,1,0.35), 
+                  loc = 'center left')
+    axs[0].legend(handles = handles[2:], 
+                  bbox_to_anchor = (0,0,1,1))
+    
+    return None
+
 # Functions for plotting curtain and flight track
 def curtain_plot(fig, ax, curtain_ds, var='pv'):
     """ Flight track curtain data on pressure after lon / lat interpolation. """
@@ -458,25 +507,29 @@ def curtain_plot(fig, ax, curtain_ds, var='pv'):
     ax.set_ylabel("Pressure (hPa)")
     ax.set_xlabel("Time")
 
-    fig.colorbar(cf, ax=ax, label=f"{var.upper()} ({data.units})")
+    cbar = fig.colorbar(cf, ax=ax, label=f"{var.upper()} ({data.units})")
+    cbar.set_ticks(np.linspace(cf.norm.vmin, cf.norm.vmax, 5))
     return fig, ax
 
-def flight_track_map(fig, ax, gdf):
+def flight_track_map(fig, ax, gdf, fl_ID=''):
     """ Add geographical context: Map of the flight track with colour for times. """
     times = gdf.index
     lon = gdf.geometry.x
     lat = gdf.geometry.y
     
-    ax.set_title("Flight Path")
-    ax.add_feature(cfeature.COASTLINE, color = '#505050')
+    ax.set_title(f"Flight Path {fl_ID}")
+    ax.add_feature(cfeature.COASTLINE, edgecolor = '#505050')
     ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha = 0.5)
-    ax.gridlines(draw_labels=True)
-    ax.set_ylim(30, 90)
-    ax.set_xlim(-180, 30)
+    ax.set_ylim(10, 90)
+    ax.set_xlim(-180, 40)
+    gridliner = ax.gridlines(draw_labels=True)
+    gridliner.right_labels = False
+    gridliner.top_labels = False
 
     sc = ax.scatter(lon, lat, c=np.arange(len(times)), cmap="plasma", s=10, transform=ccrs.PlateCarree())
     ax.plot(lon, lat, 'k-', transform=ccrs.PlateCarree(), linewidth=0.8)
-    cbar = fig.colorbar(sc, ax=ax, pad=0.05, label="Time Index")
+    cbar = plt.colorbar(sc, ax=ax, pad=0.05, label="Time Index")
+    ax.tick_params(labelright=False)
     return fig, ax
 
 def curtain_overview(curtain_ds, flight_gdf, variables= ['pv', 't', 'o3', 'r', 'z', 'theta']):
