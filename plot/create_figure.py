@@ -23,6 +23,15 @@ def outline():
     """ Helper function to add outline to lines in plots. """
     return mpe.withStroke(linewidth=2, foreground='white')
 
+def save(fig, fname, path=None):
+    """ Save figures as pdf with 300dpi and tight bbox_inches -> default path """
+    if not path: 
+        path = 'C:\\Users\\sophie_bauchinger\\Documents\\tropopause paper\\FIGURES_pdf\\'
+    if not len(fname.split('.'))==2: 
+        fname = fname+".pdf"
+    fig.savefig(path+fname, dpi=300, bbox_inches='tight')
+    print(f"Saved figure as {path+fname}")
+
 # Figures and axes creation
 def three_sideplot_structure() -> tuple[plt.Figure, tuple[plt.Axes]]: 
     """ Create Figure with central + upper/right additional plots + space on top right. """
@@ -186,7 +195,8 @@ def nested_subplots_two_column_axs(tps, nsubcol=2, **fig_kwargs
     return fig, main_axes, sub_ax_arr
 
 def adjust_labels_ticks(sub_ax_arr) -> np.ndarray[plt.Axes]: 
-    """ Move axis labels and ticks to the outside of subsubplots and axes. """
+    """ Additional helper for nested_subplots_two_column_axs;
+    Move axis labels and ticks to the outside of subsubplots and axes. """
     # --- Move tick marks to the outside 
     for ax in sub_ax_arr[:,:,0].flat:
         # Inner left plots
@@ -249,6 +259,19 @@ def hist_lognorm_fitted(x, range, ax, c, hist_kwargs = {}, bin_nr = 50) -> tools
                 lw = 1)
 
     return lognorm_inst
+
+def highlight_axis(ax, color='g', axis='y'):
+    """ Highlight an axis that does not conform to the rest of the plot. """
+    ax.tick_params(axis=axis, color=color, labelcolor=color)
+    if axis=='y':
+        ax.spines['right'].set_color(color)
+        ax.spines['left'].set_color(color)
+        ax.yaxis.label.set_color(color)
+    elif axis=='x': 
+        ax.spines['top'].set_color(color)
+        ax.spines['bottom'].set_color(color)
+        ax.xaxis.label.set_color(color)
+    return ax
 
 #%% Legends 
 def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
@@ -313,6 +336,26 @@ def lognorm_legend_handles() -> tuple[list[str], list[Line2D, Patch, Patch]]:
     h = [h_Mode, h_68, h_95]
 
     return h, l
+
+def typical_profile_legend_handles(**kwargs): 
+    """ Show season color as circles, binned ver. profiles as line and mean thermal TP as dashed line. """
+    seasons = kwargs.pop('seasons', range(1,5))
+    actual_lines = []
+    lines = [Line2D([0], [0], marker = 'o',
+                    markersize=6,
+                    label=dcts.dict_season()[f'name_{s}'], 
+                    color='w', 
+                    markerfacecolor=dcts.dict_season()[f'color_{s}'], 
+                    )
+            for s in seasons]
+    
+    actual_lines.append(Line2D([0], [0], label='Binned profile',
+                    color='dimgrey', lw = 2))
+    
+    actual_lines.append(Line2D([0], [0], label='Mean thermal TP',
+                    color='dimgrey', lw = 2, ls='dashed'))
+    actual_lines = actual_lines + lines
+    return actual_lines
 
 # %% from TOOLS
 
