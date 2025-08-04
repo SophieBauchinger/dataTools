@@ -103,7 +103,7 @@ class SelectionMixin:
             out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
         out.data = self.data.copy()  # stops self.data being overwritten
 
-        if self.source == 'MULTI': 
+        if self.source == 'MULTI': # TODO: why differentiate here?
             out.data['df'] = out.data['df'][out.data['df'].index.year.isin(yr_list)]
 
         elif self.source in ['Caribic', 'EMAC', 'TP']:
@@ -125,6 +125,9 @@ class SelectionMixin:
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)].sort_index()
             for k in [k for k in self.data if isinstance(self.data[k], xr.Dataset)]:
                 out.data[k] = out.data[k].sel(time=yr_list)
+        
+        else: 
+            raise Warning(r"Data source unknown, cannot proceed with default data types. ")
 
         yr_list.sort()
         out.years = yr_list

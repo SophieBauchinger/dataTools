@@ -1154,15 +1154,21 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin, ModelData
 class DataCollection(GlobalData):
     """ Combined data sets incl. Sonde and Aircraft data. 
     Needs to contain geoinformation for each point. """ 
-    def __init__(self, dataframe, **kwargs): 
+    def __init__(self, dataframe:pd.DataFrame, **kwargs): 
         """ Initialise data collection object with a datetime-indexed dataframe. """
         if not 'Datetime' in str(type(dataframe.index)): 
             raise Warning("Given dataframe needs to be datetime-indexed.")
         years = set(dataframe.index.year)
         super().__init__(years, **kwargs)
+        self.source = self.ID = "MULTI"
 
         self.data['df'] = dataframe
         self.df.sort_index()
+
+    def __repr__(self):
+        return f"""{self.__class__}
+    years: {self.years}
+    status: {self.status}"""
 
     def dropna(self, cols=None):
         """ Remove NaN values from the dataframe. """

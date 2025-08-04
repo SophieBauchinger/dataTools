@@ -720,11 +720,11 @@ def add_zero_line(ax):
         ax.set_xlim(*xlims)
 
 def world(fname = \
-    'c:/Users/sophie_bauchinger/Documents/GitHub/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 
+    'c:/Users/sophie_bauchinger/Documents/GitHub/libraries/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 
     return geopandas.read_file(fname)
 
 def add_world(axs, fname = \
-    'c:/Users/sophie_bauchinger/Documents/GitHub/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 
+    'c:/Users/sophie_bauchinger/Documents/GitHub/libraries/110m_cultural_511/ne_110m_admin_0_map_units.shp'): 
 
     """ Adds country outlines to the given axis with zorder 0 as thin grey lines. """
     world = geopandas.read_file(fname)
