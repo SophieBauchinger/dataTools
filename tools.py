@@ -500,6 +500,10 @@ def conv_PartsPer_molarity(x, unit):
               }
     return x * factor[unit]
 
+def conv_pPress_PartsPer(pPress, airPress): 
+    """ Converts partial pressure 'pPress' (mPa) using airPress (hPa) to mxr (ppb) """
+    return pPress / airPress * 1.656e4
+
 class LognormFit: 
     """ Holds information on Lognorm Fits on distributions of the given dataset. """
     def __init__(self, data_arr, **kwargs): 
