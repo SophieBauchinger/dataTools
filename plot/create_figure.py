@@ -6,6 +6,8 @@
 Templates for complex figure layouts and legends. 
 
 """
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import math
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -14,6 +16,8 @@ import matplotlib.lines as mlines
 from matplotlib.patches import Patch
 import matplotlib.patheffects as mpe
 import numpy as np
+import plotly.graph_objs as go
+from plotly_resampler import FigureResampler
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
@@ -273,6 +277,31 @@ def highlight_axis(ax, color='g', axis='y'):
         ax.xaxis.label.set_color(color)
     return ax
 
+#%% Big data
+def big_data_go_resample(df, x_cols, y_cols): 
+    """ Use plotly figure resampler to display big datasets. """
+    # Prep data (x needs to increase monotonically)
+    if type(y_cols)==str: 
+        y_cols = [y_cols]
+    if type(x_cols)==str:
+        x_cols = [x_cols]
+    fig = FigureResampler(go.Figure())
+    for x_c in set(x_cols):
+        df_sorted = df.dropna(subset=x_c).sort_values(x_c)
+        if len(df_sorted.dropna(subset = [x_c]))==0: continue
+        for y_c in set(y_cols).difference({x_c}):
+            if len(df_sorted.dropna(subset = [y_c]))==0: continue
+            note = '' if not 'STN' in x_c else f"/ {x_c.split('_STN')[1]}"
+            fig.add_trace(
+                go.Scattergl(name = f"{y_c.split('_S')[0]} / {x_c.split('_S')[0]} {note}",
+                             mode='markers', showlegend=True),
+                hf_x=df_sorted[x_c], 
+                hf_y=df_sorted[y_c],
+        )
+    fig.update_yaxes(type="log")
+    return fig
+
+    
 #%% Legends 
 def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
     """ Create a legend for the default season-color scale. 
@@ -298,7 +327,7 @@ def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
                             color='dimgrey', ls = 'dashed', lw = 3, 
                             path_effects = [outline()]))
     if av_std: 
-        lines.append(Line2D([0], [0], label='$\sigma$ (Av.)',
+        lines.append(Line2D([0], [0], label=r'$\sigma$ (Av.)',
                     color='dimgrey', lw = 6, 
                     alpha=0.3))
     return lines
@@ -332,7 +361,7 @@ def lognorm_legend_handles() -> tuple[list[str], list[Line2D, Patch, Patch]]:
     h_68 = Patch(color = 'grey', alpha = 0.8)
     h_95 = Patch(color = 'grey', alpha = 0.5)
     
-    l = ['Mode', '68$\,$% Interval', '95$\,$% Interval']
+    l = ['Mode', r'68$\,$% Interval', r'95$\,$% Interval']
     h = [h_Mode, h_68, h_95]
 
     return h, l
@@ -375,5 +404,22 @@ def add_zero_line(ax):
         ax.hlines(0, *xlims, color='k', ls='-.', lw=.5)
         ax.set_xlim(*xlims)
 
+# %% Basic helper maps
+def world_map():
+    """ Basic PlateCarree map of the world with land and ocean. """
+    fig = plt.figure(dpi=250)
+    gs = gridspec.GridSpec(1, 1, hspace=0.5)
+    ax = fig.add_subplot(gs[-1], projection=ccrs.PlateCarree())
+
+    ax.add_feature(cfeature.COASTLINE, edgecolor = '#505050', lw = 0.5)
+    ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha = 0.5)
+
+    ax.set_ylim(-90, 90)
+    ax.set_xlim(-180, 180)
+
+    gridliner = ax.gridlines(draw_labels=True, ls='dotted')
+    gridliner.right_labels = False
+    gridliner.top_labels = False
+    return fig, ax
 
 # %%
