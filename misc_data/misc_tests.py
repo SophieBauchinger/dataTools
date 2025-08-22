@@ -5,7 +5,10 @@
 
 Test functions on miscellaneous data 
 """
+import datetime as dt
+import geopandas
 import numpy as np
+from shapely.geometry import Point
 import xarray as xr
 
 from toolpac.readwrite import find # type: ignore
@@ -54,6 +57,82 @@ with xr.open_dataset(fl547_nc, drop_variables = ['CARIBIC2_LocalTime']) as ds:
 c5 = FFI1001DataReader(fl547_V05, sep_variables=';', df=True, xtype='secofday')
 
 
+#%% Test newly integrated CARIBIC-files (08/25)
+
+# AMES -> DATAFRAME
+def get_single_df(path, flight_nr): # AMES files
+    f_data = FFI1001DataReader(path, df=True, xtype='secofday',
+                                sep_variables=';')
+    df_flight = f_data.df  # index = Datetime
+    df_flight.insert(0, 'Flight number',
+                        [flight_nr] * df_flight.shape[0])
+
+    rename_dict = tools.rename_columns(f_data.VNAME)
+    # set names to their short version
+    df_flight.rename(columns=rename_dict, inplace=True)
+    return df_flight
+
+test_fl344 = "E:/CARIBIC/Caribic2data/Flight344_20110517/INTtpc_20110517_344_YVR_FRA_V06.txt"
+fl344_df = get_single_df(test_fl344, 344)
+
+
+# netCDF -> DATASET -> DATAFRAME 
+def ds_to_gdf(ds) -> pd.DataFrame:
+    """ Convert xarray Dataset to GeoPandas GeoDataFrame """
+    df = ds.to_dataframe()
+    df.index = df.index.floor("s")  # remove micro/nanoseconds
+
+    # drop rows without geodata and extract geodata
+    if 'longitude' in df.columns and 'latitude' in df.columns:
+        df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
+        geodata = [Point(lat, lon) for lat, lon in zip(
+            df['latitude'], df['longitude'])]
+    elif "Lon" in df.columns and "Lat" in df.columns: 
+        df.dropna(subset=['Lon', 'Lat'], how='any', inplace=True)
+        geodata = [Point(lat, lon) for lat, lon in zip(
+            df['Lat'], df['Lon'])]
+    else:
+        geodata = [Point(lat, lon) for lon, lat in zip(
+            df.index.to_frame()['longitude'], df.index.to_frame()['latitude'])]
+
+    # create geodataframe using lat and lon data from indices
+    for drop_col in ['longitude', 'latitude', 'scalar', 'P0', 'Lon', 'Lat']:  # drop as unnecessary
+        if drop_col in df.columns: df.drop([drop_col], axis=1, inplace=True)
+    gdf = geopandas.GeoDataFrame(df, geometry=geodata)
+
+    # # MZT, check if time is not in datetime format
+    # df.reset_index(inplace=True)
+    # if not gdf.time.dtype == '<M8[ns]':  
+    #     index_time = [dt.datetime(y, 1, 1) for y in gdf.time]
+    #     gdf['time'] = index_time
+    # gdf.set_index('time', inplace=True)
+
+    return gdf
+
+def flatten_TPdims(ds):
+    """ Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+    Used for ERA5 / CLaMS reanalysis datasets from version .03
+    """
+    TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+    TP_qualifier_dict = {0 : '_Main', 
+                        1 : '_Second', 
+                        2 : '_Third'}    
+    for variable in TP_vars: 
+        # get secondary dimension for the current multi-dimensional variable
+        [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+        for TP_value in ds[variable][TP_dim].values: 
+            ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+        ds = ds.drop_vars(variable)
+    return ds
+
+def get_single_TPC_df(path): 
+    """ Returns data from a single netCDF TPChange file as DataFrame. """
+    # path = r"E:\TPChange\CaribicTPChange\2011\CARIBIC2_20110517_344_TPC_V05.nc"
+    with xr.open_dataset(path, drop_variables = ['CARIBIC2_LocalTime']) as ds: 
+        ds = ds
+    ds = flatten_TPdims(ds)
+    df = ds_to_gdf(ds)
+    return df
 
 #%%
 from data import GlobalData, Caribic
@@ -62,8 +141,6 @@ import tools
 import dictionaries as dcts
 import geopandas
 from shapely.geometry import Point
-import os
-import dill
 import xarray as xr
 """
 
@@ -71,9 +148,7 @@ import xarray as xr
 def process_caribic(ds): 
     # ds = ds.drop_dims([d for d in ds.dims if 'header_lines' in d])
     variables = [v for v in ds.variables if ds[v].dims == ('time',)]
-    
     ds['time'] = pd.to_datetime(ds['time'])
-    
     return ds[variables]
 
 class CaribicNetCDF(Caribic):
@@ -101,7 +176,8 @@ class CaribicNetCDF(Caribic):
     def get_data(self, **kwargs):
         """ """
         if not ('ds' in locals()): 
-            with xr.open_mfdataset('misc_data/WSM_output_20240110/WSM*.nc', parallel=True, preprocess = process_caribic) as ds: 
+            with xr.open_mfdataset('misc_data/WSM_output_20240110/WSM*.nc', 
+                                   parallel=True, preprocess = process_caribic) as ds: 
                 ds = ds
 
         self.data['ds'] = ds
