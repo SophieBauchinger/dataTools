@@ -153,7 +153,55 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
 
     return out
 
+def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
+                     count_limit=5, **kwargs):
+    """ Bin the given dataframe for all available seasons. 
 
+    Parameters: 
+        df (pd.DataFrame): Hold the variable and coordinate data. 
+        var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
+        count_limit (int): Bins with fewer data points are excluded from the output. 
+
+        key bci (bp.Bin_**d): Binclassinstance
+        key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
+
+    Returns a dictionary of {season : Simple_bin_*d object}. 
+    """
+    if 'season' not in df.columns:
+        df['season'] = tools.make_season(df.index.month)
+
+    # Want the same binclassinstance across all seasons
+    bci = make_bci(xcoord, ycoord, zcoord, **kwargs)
+
+    seasonal_dict = {}
+    for s in set(df['season'].values):
+        df_season = df[df['season'] == s]
+        bin_s_out = binning(df_season, var, xcoord, ycoord, zcoord,
+                            count_limit=count_limit, bci=bci, **kwargs)
+        seasonal_dict[s] = bin_s_out
+
+    return seasonal_dict
+
+def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs): 
+    """ Separate into months and bin data on the given grid.     Parameters: 
+    
+    Parameters:    
+        df (pd.DataFrame): Hold the variable and coordinate data. 
+        var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
+        count_limit (int): Bins with fewer data points are excluded from the output. 
+
+        key bci (bp.Bin_**d): Binclassinstance
+        key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
+
+    Returns a dictionary of {month : Simple_bin_*d object}. 
+    """
+    raise NotImplementedError("Tough cookie.")
+    monthly_dfs = {m: df[df.month == m] for m in np.arange(1,13)}
+    for month in np.arange(1,13): 
+        m_df = monthly_dfs[month]
+
+
+#%% Stratosphere / Troposphere binning
 def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
     """ Create binned data dicts for strato / tropo with specified parameters.
     Parameters: 
@@ -190,36 +238,6 @@ def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
         tropo_Bin_dict, kwargs.get('bin_attr'))
 
     return strato_attr, tropo_attr
-
-
-def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
-                     count_limit=5, **kwargs):
-    """ Bin the given dataframe for all available seasons. 
-
-    Parameters: 
-        df (pd.DataFrame): Hold the variable and coordinate data. 
-        var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
-        count_limit (int): Bins with fewer data points are excluded from the output. 
-
-        key bci (bp.Bin_**d): Binclassinstance
-        key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
-
-    Returns a dictionary of {season : Simple_bin_*d object}. 
-    """
-    if 'season' not in df.columns:
-        df['season'] = tools.make_season(df.index.month)
-
-    # Want the same binclassinstance across all seasons
-    bci = make_bci(xcoord, ycoord, zcoord, **kwargs)
-
-    seasonal_dict = {}
-    for s in set(df['season'].values):
-        df_season = df[df['season'] == s]
-        bin_s_out = binning(df_season, var, xcoord, ycoord, zcoord,
-                            count_limit=count_limit, bci=bci, **kwargs)
-        seasonal_dict[s] = bin_s_out
-
-    return seasonal_dict
 
 
 def get_ST_seass_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
