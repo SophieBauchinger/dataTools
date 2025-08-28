@@ -285,7 +285,7 @@ def calc_HrelTP(df, o3_coord, dropna=False):
         df (pd.DataFrame)
         o3_coord (dcts.Substance | dcst.Coordinate)
     """
-    tpdata = load_tp_hght_data(path = dcts.get_path() + r"data\O3_climatology_Hohenpeissenberg_for_H_rel_TP.csv")
+    tpdata = load_tp_hght_data(path = dcts.get_path() + r"misc_data\reference_data\O3_climatology_Hohenpeissenberg_for_H_rel_TP.csv")
     v_ozone = df[o3_coord.col_name]
     months = df.index.month
     o3tp_relheight = [calc_o3tp_relhght(tpdata, v, m) for v,m in zip(v_ozone.values, months)]
