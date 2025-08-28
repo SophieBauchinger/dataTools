@@ -278,6 +278,12 @@ def process_TPC(ds): # from V04
     
     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
     ds = flatten_TPdims(ds)
+    if "Time" in ds.variables:
+        ds = ds.sortby("Time")
+        ds = ds.dropna(dim="Time", how = "all")
+        ds = ds.dropna(dim="Time", subset = ["Time"])
+    else: 
+        print("sth is fishy")
     return ds[[v for v in ERA5_variables() if v in ds.variables]]
 
 def process_TPC_V02(ds): # up to V02
@@ -843,7 +849,7 @@ def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
 
     return out_lat_list, out_lon_list
 
-def bin_2d(glob_obj, subs, **kwargs) -> list:
+def bin_2d(glob_obj, subs, **kwargs) -> list: # Lat-Lon binning
     """
     Returns 2D binned object for each year as a list
 
@@ -883,6 +889,10 @@ def bin_2d(glob_obj, subs, **kwargs) -> list:
 
         out_list.append(out)
     return out_list
+
+def bin_z_lat(glob_obj, subs, vcoord, **kwargs) -> list:
+    """ Bin on a grid of vertical coordinate and latitude. """
+    
 
 #%% Miscellaneous
 def make_gif(pdir=None, fnames=None): # Animate changes over years
