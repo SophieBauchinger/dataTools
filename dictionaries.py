@@ -125,8 +125,8 @@ class Coordinate:
         if self.vcoord is not np.nan:
             vcs = {'p': 'Pressure',
                    'z': 'z',
-                   'pt': '$\Theta$',
-                   'eqpt': '$\Theta$(eq)',
+                   'pt': r'$\Theta$',
+                   'eqpt': r'$\Theta$(eq)',
                    'mxr': 'Mixing ratio',
                    'pv': 'Potential vorticity',
                    'lev': 'Level'}
@@ -134,7 +134,7 @@ class Coordinate:
             vcoord = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
 
             if self.tp_def is not np.nan:
-                vcoord = (f'$\Delta${vcoord}'+'$_{{\\text{TP}}}$') if self.rel_to_tp else vcoord
+                vcoord = (r'$\Delta$'+f'{vcoord}'+'$_{{\\text{TP}}}$') if self.rel_to_tp else vcoord
 
                 pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
                 crit = '%s' % (', ' + ''.join(
@@ -148,8 +148,8 @@ class Coordinate:
 
                 if filter_label:
                     tp = tp_defs[tp]
-                    vc = self.vcoord if not self.vcoord == 'pt' else '$\Theta$'
-                    if self.rel_to_tp: vc = '$\Delta\,$' + vc
+                    vc = self.vcoord if not self.vcoord == 'pt' else r'$\Theta$'
+                    if self.rel_to_tp: vc = r'$\Delta\,$' + vc
                     label = f'{tp + pv + crit} ({model}, {vc})'
                     if no_vc: label = f'{tp + pv + crit} ({model})'
                     if no_vc and no_model: label = f'{tp + pv + crit}'
@@ -157,8 +157,8 @@ class Coordinate:
                 label = f'{vcoord} [{self.unit}]'
 
             if coord_only:               
-                vcoord = (f'$\Delta${self.vcoord}$'+'_{{\\text{TP}}}$') if self.rel_to_tp is True else f'{self.vcoord}'
-                if self.vcoord == 'pt': vcoord = '$\Delta\Theta_{{\\text{TP}}}$' if self.rel_to_tp is True else '$\Theta$'
+                vcoord = (r'$\Delta$'+f'{self.vcoord}$'+'_{{\\text{TP}}}$') if self.rel_to_tp is True else f'{self.vcoord}'
+                if self.vcoord == 'pt': vcoord = r'$\Delta\Theta_{{\\text{TP}}}$' if self.rel_to_tp is True else r'$\Theta$'
                 label = f'{vcoord}'
 
         elif self.hcoord is not np.nan:
@@ -268,7 +268,7 @@ class Coordinate:
 def coordinate_df() -> pd.DataFrame:
     """ Get dataframe containing all info about all coordinate variables """
     with open(get_path() + 'coordinates.csv', 'rb') as f:
-        coord_df = pd.read_csv(f, sep="\s*,\s*", engine='python')
+        coord_df = pd.read_csv(f, sep=r"\s*,\s*", engine='python')
         if 'pvu' in coord_df.columns:
             coord_df['pvu'] = coord_df['pvu'].astype(object)  # allow comparison with np.nan
     return coord_df
@@ -831,6 +831,39 @@ def MS_variables(*args):
         [variables.append(i) for i in modelled_ECMWF]     
     return variables
 
+def TPChange_variables(): 
+    """ All variables for TPChange ERA5 reanalysis datasets. """
+    met_vars = [
+        'ERA5_PV',
+        'ERA5_EQLAT',
+        'ERA5_TEMP',
+        'ERA5_PRESS',
+        'ERA5_THETA',
+        'ERA5_PHI', 
+        'ERA5_GPH',
+        ]
+
+    dyn_tps = [
+        f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
+            for pvu in ['1_5', '2_0', '3_5'] 
+            for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']] + [
+        f'ERA5_dynTP_{vcoord}_{pvu}_Second' 
+            for pvu in ['1_5', '2_0', '3_5'] 
+            for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
+
+    therm_tps = [
+        f'ERA5_thermTP_{vcoord}_Main' 
+            for vcoord in ['Z', 'THETA', 'PRESS']] + [
+        f'ERA5_thermTP_{vcoord}_Second' 
+            for vcoord in ['Z', 'THETA', 'PRESS']]
+    
+    substances = ["ERA5_O3", 
+                  "CLaMS_N2O",
+                  "CLaMS_ST", # stratospheric air mass tracer
+                  ]
+
+    return met_vars + dyn_tps + therm_tps + substances
+
 #%% Misc for plotting
 def dict_season():
     """ Use to get name_s, color_s for season s"""
@@ -931,9 +964,9 @@ def note_dict(fig_or_ax, s = None, bbox_kwargs=dict(), **kwargs):
 
 def label_strs(shortcut: str): 
     return {
-        'DzTP' : '$\\Delta$z$_{{\\text{TP}}}$',
-        'DptTP' : '$\\Delta\Theta_{{\\text{TP}}}$',
-        'times' : '$\\times$',
+        'DzTP' : r'$\\Delta$z$_{{\\text{TP}}}$',
+        'DptTP' : r'$\\Delta\Theta_{{\\text{TP}}}$',
+        'times' : r'$\\times$',
         'vstdv' : 'Variability of ',
         'rvstd' : 'Relative variability of ',
         }[shortcut]
