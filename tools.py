@@ -50,11 +50,15 @@ import geopandas
 import glob
 from metpy.units import units
 import numpy as np
+from pathlib import Path
 import pandas as pd
 from PIL import Image
 from scipy import stats
 from scipy.ndimage import zoom, gaussian_filter
 from shapely.geometry import Point
+import traceback
+import warnings
+import xarray as xr
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -123,13 +127,17 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
         geodata = [Point(lat, lon) for lat, lon in zip(
             df['latitude'], df['longitude'])]
+    elif "Lon" in df.columns and "Lat" in df.columns: 
+        df.dropna(subset=['Lon', 'Lat'], how='any', inplace=True)
+        geodata = [Point(lat, lon) for lat, lon in zip(
+            df['Lat'], df['Lon'])]
     else:
         geodata = [Point(lat, lon) for lon, lat in zip(
             df.index.to_frame()['longitude'], df.index.to_frame()['latitude'])]
 
     # create geodataframe using lat and lon data from indices
     df.reset_index(inplace=True)
-    for drop_col in ['longitude', 'latitude', 'scalar', 'P0']:  # drop as unnecessary
+    for drop_col in ['longitude', 'latitude', 'scalar', 'P0', 'Lon', 'Lat']:  # drop as unnecessary
         if drop_col in df.columns: df.drop([drop_col], axis=1, inplace=True)
     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
 
@@ -216,39 +224,6 @@ def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
     return ds[variables]
 
 # TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
-def ERA5_variables(): 
-    """ All variables for TPChange ERA5 reanalysis datasets. """
-    met_vars = [
-        'ERA5_PV',
-        'ERA5_EQLAT',
-        'ERA5_TEMP',
-        'ERA5_PRESS',
-        'ERA5_THETA',
-        'ERA5_PHI', 
-        'ERA5_GPH',
-        ]
-
-    dyn_tps = [f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
-               for pvu in ['1_5', '2_0', '3_5'] 
-               for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
-
-    dyn_tps_Second = [f'ERA5_dynTP_{vcoord}_{pvu}_Second' 
-               for pvu in ['1_5', '2_0', '3_5'] 
-               for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
-
-    therm_tps = [f'ERA5_thermTP_{vcoord}_Main' 
-               for vcoord in ['Z', 'THETA', 'PRESS']]
-
-    therm_tps_Second = [f'ERA5_thermTP_{vcoord}_Second' 
-               for vcoord in ['Z', 'THETA', 'PRESS']]
-    
-    therm_tps_V02 = [f'ERA5_TROP1_{vcoord}' 
-            for vcoord in ['Z', 'THETA', 'PRESS']]
-    
-    other_vars = ['ERA5_O3']
-    
-    return set(met_vars + dyn_tps + dyn_tps_Second + therm_tps + therm_tps_Second + therm_tps_V02 + other_vars)
-
 def process_TPC(ds): # from V04
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
     
@@ -257,23 +232,19 @@ def process_TPC(ds): # from V04
 
     """
     def flatten_TPdims(ds):
-        """ Deals with Tropopause variables having additional dimensions indicating Main / Second / ... 
+        """ Flatten additional dimensions corresponding to Main / Second / ... Tropopauses.  
         Used for ERA5 / CLaMS reanalysis datasets from version .03
         """
         TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
         TP_qualifier_dict = {0 : '_Main', 
                             1 : '_Second', 
                             2 : '_Third'}
-        
         for variable in TP_vars: 
             # get secondary dimension for the current multi-dimensional variable
             [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-            
             for TP_value in ds[variable][TP_dim].values: 
                 ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-            
             ds = ds.drop_vars(variable)
-        
         return ds
     
     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
@@ -283,12 +254,28 @@ def process_TPC(ds): # from V04
         ds = ds.dropna(dim="Time", how = "all")
         ds = ds.dropna(dim="Time", subset = ["Time"])
     else: 
-        print("sth is fishy")
-    return ds[[v for v in ERA5_variables() if v in ds.variables]]
+        print("Cannot find variable `Time`, please check the data files. ")
 
-def process_TPC_V02(ds): # up to V02
-    """ Preprocess datasets for ERA5 / CLaMS renalayis data up to version 2. """
-    return ds[[v for v in ERA5_variables() if v in ds.variables]]
+    variables = dcts.TPChange_variables() + [v for v in ds.variables if "N2O" in v]
+    return ds[[v for v in variables if v in ds.variables]]
+
+def get_TPChange_gdf(fname_or_pdir): 
+    """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). """
+    if Path(fname_or_pdir).is_dir(): 
+        fnames = [f for f in fname_or_pdir.glob("*.nc")]
+        with xr.open_mfdataset(fnames, preprocess = process_TPC) as ds: 
+            ds = ds
+    elif Path(fname_or_pdir).is_file(): 
+        with xr.open_dataset(fname_or_pdir) as ds: 
+            ds = process_TPC(ds)
+    else: 
+        raise ValueError(f"Not a valid filepath or parent directory: {fname_or_pdir}")
+
+    try: 
+        return ds_to_gdf(ds)
+    except Exception: 
+        warnings.warn("Could not generate geodata, check your input!" + traceback.format_exc())
+        return ds.to_dataframe()
 
 # Interpolation
 def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
@@ -570,7 +557,7 @@ class LognormFit:
                 label = 'Median: {:.2f}'.format(self.median))
 
         # Show sigma and mu of the fit
-        sigma_mu = '$\sigma$ = {:.2f}, '.format(self.sigma) + '$\mu$ = {:.2f}\n'.format(self.mu)
+        sigma_mu = r'$\sigma$ = {:.2f}, '.format(self.sigma) + r'$\mu$ = {:.2f}\n'.format(self.mu)
         ax.legend(title = sigma_mu)
 
     @property
@@ -889,10 +876,6 @@ def bin_2d(glob_obj, subs, **kwargs) -> list: # Lat-Lon binning
 
         out_list.append(out)
     return out_list
-
-def bin_z_lat(glob_obj, subs, vcoord, **kwargs) -> list:
-    """ Bin on a grid of vertical coordinate and latitude. """
-    
 
 #%% Miscellaneous
 def make_gif(pdir=None, fnames=None): # Animate changes over years
