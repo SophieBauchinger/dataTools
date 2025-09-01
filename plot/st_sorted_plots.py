@@ -5,11 +5,11 @@
 @Date Fri Jan 15 15:00:00 2025
 
 """
-from copy import deepcopy
 import math
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
+import matplotlib.patheffects as mpe
 
 import dataTools.dictionaries as dcts
 import dataTools.data.BinnedData as bin_tools
