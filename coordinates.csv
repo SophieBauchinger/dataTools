@@ -51,7 +51,9 @@ int_ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),
 int_ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,TRUE,ERA5,1.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_1_5,0
 int_ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,TRUE,ERA5,2,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_2_0,0
 int_ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,int_calc,CLAMS,z,,,dyn,TRUE,ERA5,3.5,,int_ERA5_HEIGHT,int_ERA5_HEIGHT_3_5,0
+int_CARIBIC2_H_rel_TP,Geopotential height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,,0
 int_h_rel_TP,Geopotential height above O3 tropopause according to Zahn et al. (2003),km,INT,Caribic,z,,,chem,TRUE,MSMT,,o3,,,0
+int_CARIBIC2_h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,int_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_CARIBIC2_H_rel_TP,0
 int_h_TP,Geopotential height of O3 tropopause according to Zahn et al. (2003),km,int_calc,Caribic,z,,,chem,FALSE,MSMT,,o3,int_z_km,int_h_rel_TP,0
 int_p_dtrop_hpa,Pressure of dynamical (PV=3.5PVU) tropopause (ECMWF) ,hPa,int_calc,Caribic,p,,,dyn,FALSE,ECMWF,3.5,,p,int_dp_dtrop_hpa,0
 int_p_strop_hpa,Pressure of thermal tropopause (ECMWF),hPa,int_calc,Caribic,p,,,therm,FALSE,ECMWF,,,p,int_dp_strop_hpa,0

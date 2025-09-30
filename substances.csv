@@ -102,3 +102,13 @@ MS_CO,Carbon monoxide mixing ratio [ppbV],co,ppbV,MS,Caribic,MSMT,,FALSE
 MS_CO2,Carbon dioxide dry air mole fraction [ppmV] # since container Mod.C: measured by Picarro instrument,co2,ppmV,MS,Caribic,MSMT,,FALSE
 MS_CH4,Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,ch4,ppbV,MS,Caribic,MSMT,,FALSE
 MS_CH4_Err,Error of Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,d_ch4,ppbV,MS,Caribic,MSMT,,FALSE
+int_CARIBIC2_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INTtpc,Caribic,MSMT,h,FALSE
+int_CARIBIC2_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INTtpc,Caribic,MSMT,h,FALSE
+int_CARIBIC2_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INTtpc,Caribic,MSMT,h,FALSE
+detr_int_CARIBIC2_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_ch4,ppb / ppb,INTtpc,Caribic,MSMT,h,TRUE
+detr_int_CARIBIC2_CO,CO integrated over flask sampling time from 1s resolution measurements - detrended wrt. Mauna Loa 2005,detr_co,ppb / ppb,INTtpc,Caribic,MSMT,h,TRUE
+detr_int_CARIBIC2_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_co2,ppm / ppm,INTtpc,Caribic,MSMT,h,TRUE
+int_CARIBIC2_H2Ogas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INTtpc,Caribic,MSMT,,FALSE
+int_CARIBIC2_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INTtpc,Caribic,MSMT,,FALSE
+int_CARIBIC2_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INTtpc,Caribic,MSMT,,FALSE
+int_CARIBIC2_Ozone,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INTtpc,Caribic,MSMT,,FALSE
