@@ -139,9 +139,13 @@ class CampaignData(GlobalData):
         """
         fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
         dict_path = tools.get_path() + 'misc_data\\pickled_dicts\\' + fname
-        if not kwargs.get('recalculate') and os.path.exists(dict_path):
-            with open(dict_path, 'rb') as f:
+        
+        from pathlib import Path
+        path = Path(dict_path) if not kwargs.get('path') else Path(kwargs.get('path'))
+        if not kwargs.get('recalculate') and path.exists():
+            with open(path, 'rb') as f:
                 self.data = dill.load(f)
+            self.status.update(dict(path = self.status.get('path', []) + [path]))
 
             if not 'df' in self.data:
                 if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
@@ -150,6 +154,11 @@ class CampaignData(GlobalData):
         else:
             if self.ID == 'PHL': 
                 print('Importing all PHILEAS data from NetCDF files.')
+                
+                met_pdir = r'E:/TPChange/' + 'PhileasTPChange'
+                fnames = met_pdir + "/*.nc"
+                dataframe = tools.get_TPChange_gdf()
+                
                 data_dict = get_phileas_era5()
                 self.data = data_dict
                 return self.data

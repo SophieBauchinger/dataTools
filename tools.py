@@ -119,33 +119,39 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
     return df_mean
 
 def ds_to_gdf(ds) -> pd.DataFrame:
-    """ Convert xarray Dataset to GeoPandas GeoDataFrame """
+    """ Convert xarray Dataset to GeoPandas GeoDataFrame: Mostly for TPChange .nc files currently. Can be generalised """
     df = ds.to_dataframe()
+    df.reset_index(inplace = True)
+    df.rename(columns = {
+        "Lat" : "latitude_degN", "latitude" : "latitude_degN",
+        "Lon" : "longitude_degE", "longitude" : "longitude_degE",
+        "time" : "Datetime", "Time" : 'Datetime',
+        "Pres" : "pressure_hPa",
+        "Temp" : "temperature_K",
+        "Theta" : "theta_K",
+        "PAlt" : "barometric_altitude_m",
+        }, inplace = True)
 
-    if 'longitude' in df.columns and 'latitude' in df.columns:
-        # drop rows without geodata
-        df.dropna(subset=['longitude', 'latitude'], how='any', inplace=True)
-        geodata = [Point(lat, lon) for lat, lon in zip(
-            df['latitude'], df['longitude'])]
-    elif "Lon" in df.columns and "Lat" in df.columns: 
-        df.dropna(subset=['Lon', 'Lat'], how='any', inplace=True)
-        geodata = [Point(lat, lon) for lat, lon in zip(
-            df['Lat'], df['Lon'])]
-    else:
-        geodata = [Point(lat, lon) for lon, lat in zip(
-            df.index.to_frame()['longitude'], df.index.to_frame()['latitude'])]
+    df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
+    geodata = [Point(lat, lon) for lat, lon in zip(
+        df['latitude_degN'], df['longitude_degE'])]
+    #     geodata = [Point(lat, lon) for lon, lat in zip(
+    #         df.index.to_frame()['longitude_degE'], df.index.to_frame()['latitude'])]
 
     # create geodataframe using lat and lon data from indices
-    df.reset_index(inplace=True)
-    for drop_col in ['longitude', 'latitude', 'scalar', 'P0', 'Lon', 'Lat']:  # drop as unnecessary
-        if drop_col in df.columns: df.drop([drop_col], axis=1, inplace=True)
+    df.drop([c for c in ['scale', 'P0'] if c in df.columns], axis=1, inplace=True)
     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
 
-    if not gdf.time.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format
-        index_time = [dt.datetime(y, 1, 1) for y in gdf.time]
-        gdf['time'] = index_time
-    gdf.set_index('time', inplace=True)
-    gdf.index = gdf.index.floor('S')  # remove micro/nanoseconds
+    if not gdf.Datetime.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format
+        index_time = [dt.datetime(y, 1, 1) for y in gdf.Datetime]
+        gdf['Datetime'] = index_time
+    gdf.set_index('Datetime', inplace=True)
+    gdf.index = gdf.index.floor('s')  # remove micro/nanoseconds
+    
+    # Convert CLaMS N2O to ppb
+    if "CLaMS_N2O" in gdf.columns: 
+        gdf["CLaMS_N2O_ppb"] = conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
+        gdf.drop(columns = ["CLaMS_N2O"], inplace = True)
 
     return gdf
 
@@ -256,7 +262,9 @@ def process_TPC(ds): # from V04
     else: 
         print("Cannot find variable `Time`, please check the data files. ")
 
-    variables = dcts.TPChange_variables() + [v for v in ds.variables if "N2O" in v]
+    variables = [v for v in ds.variables if (
+        "N2O" in v or v in ["Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
+        ] + dcts.TPChange_variables()
     return ds[[v for v in variables if v in ds.variables]]
 
 def get_TPChange_gdf(fname_or_pdir): 
@@ -270,7 +278,6 @@ def get_TPChange_gdf(fname_or_pdir):
             ds = process_TPC(ds)
     else: 
         raise ValueError(f"Not a valid filepath or parent directory: {fname_or_pdir}")
-
     try: 
         return ds_to_gdf(ds)
     except Exception: 
