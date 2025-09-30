@@ -142,7 +142,7 @@ def scatter_lat_lon_binned(GlobalObject, substances=None, bin_attr='vmean'):
 
         # fig.colorbar(sm(norm=norm, cmap=cmap), aspect=50, ax = axs[1])
 
-        for out_x, out_y, grid, year in zip(out_x_list, out_y_list, outer_grid, self.years):
+        for out_x, out_y, grid, year in zip(out_x_list, out_y_list, outer_grid, GlobalObject.years):
             inner_grid = grid.subgridspec(1, 2)
             axs = inner_grid.subplots(sharey=True)
             axs[0].text(**dcts.note_dict(axs[0], x=0.25, y=0.9, s=year))

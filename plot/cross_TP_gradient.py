@@ -515,7 +515,7 @@ def get_max_curvature(offset_curv, offset_vals=None):
         cmap='RdBu_r', vlims = (-700, 700));
 
 # Very specific: Two-panel plot for paper 
-def plot_curvature_profile_heatmap(GlobalObject, subs, tps, lim=2): 
+def plot_curvature_profile_heatmap(GlobalObject, subs, tps, linestyles, lim=2): 
     """ For the paper: Two-panel nicely formatted and adjusted showing curvature over Δz and at TP. """
     _, fit_curvature, _, _ = seasonal_binned_curvature(
         GlobalObject, subs, tps, plot=False, lim=lim, normalise=True)
@@ -540,7 +540,8 @@ def plot_curvature_profile_heatmap(GlobalObject, subs, tps, lim=2):
         for tp in offset_curv[s].keys(): 
             ax.plot(offset_curv[s][tp], x_vals, 
                     color = dcts.get_coord(col_name=tp).get_color(), 
-                    ls='-' if not tp=="N2O_residual" else '--', 
+                    ls = linestyles[tp],
+                    # ls='-' if not tp=="N2O_residual" else '--', 
                     path_effects = [cfig.outline()])
             
         ax.set_title(f"({id}) "+dcts.dict_season()[f"name_{s}"])
@@ -571,7 +572,7 @@ def plot_curvature_profile_heatmap(GlobalObject, subs, tps, lim=2):
         cbar_kws={'pad': 0.02, 'shrink': 0.7, 'location': 'right'})
 
 
-    fig.legend(handles = cfig.tp_legend_handles(tps), 
+    fig.legend(handles = cfig.tp_legend_handles(tps, linestyle_dict = linestyles, lw=2), 
             ncols=3, loc='upper center')
     fig.subplots_adjust(top=0.9)
     

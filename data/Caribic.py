@@ -9,6 +9,7 @@ import geopandas
 import numpy as np
 import os
 import pandas as pd
+from pathlib import Path
 from shapely.geometry import Point
 import traceback
 
@@ -18,6 +19,14 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 from dataTools.data._global import GlobalData
 import dataTools.dictionaries as dcts
 from dataTools import tools
+
+# cols = list(self.df.columns)
+# cols.sort()
+# coord_cols = ['Flight number', 'p', 'alt', 'int_Theta'] # ... ['geometry']
+# ghg_cols = ['CH4', 'd_CH4', 'CO2', 'd_CO2', 'SF6', 'd_SF6', 'N2O', 'd_N2O']
+
+# my_cols = coord_cols + ghg_cols + [c for c in cols if c not in coord_cols+ghg_cols+['geometry']] + ['geometry']
+# len(my_cols), len(cols)
 
 # Caribic
 class Caribic(GlobalData): 
@@ -35,8 +44,8 @@ class Caribic(GlobalData):
             Combine met_data with all substance info, optionally incl. detrended
     """
 
-    def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INT', 'INTtpc'),
-                 grid_size=5, verbose=False, recalculate=False, fname=None, tps_dict = {}, **kwargs):
+    def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INTtpc'),
+                 grid_size=5, verbose=False, recalculate=False, path="None", tps_dict = {}):
         """ Constructs attributes for Caribic object and creates data dictionary.
         
         Parameters:
@@ -53,15 +62,15 @@ class Caribic(GlobalData):
         self.ID = 'CAR'
         self.pfxs = pfxs
         # self.flights = ()
-        self.get_data(verbose=verbose, recalculate=recalculate, fname=fname)  # creates self.data dictionary
+        self.get_data(verbose=verbose, recalculate=recalculate, path=Path(path))  # creates self.data dictionary
         if 'df' not in self.data: 
             self.create_df()
         self.set_tps(**tps_dict)
         
         if 'met_data' not in self.data:
             try:
-                self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
                 self.create_tp_coords()
+                self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
             except Exception:
                 traceback.print_exc()
 
@@ -192,7 +201,7 @@ class Caribic(GlobalData):
 
         return gdf_pfx
 
-    def get_data(self, verbose=False, recalculate=False, fname=None, pdir=None) -> dict:
+    def get_data(self, verbose=False, recalculate=False, path:Path="None", pdir=None) -> dict:
         """ Imports Caribic data in the form of geopandas dataframes.
     
         Returns data dictionary containing dataframes for each file source and
@@ -205,25 +214,39 @@ class Caribic(GlobalData):
             verbose (bool): Makes function more talkative.
         """
         self.data = {}  # easiest way of keeping info which file the data comes from
+        data_dict = {}
         
         if not recalculate: 
-            # Check if data is already available in compact form
-            lowres_fname = tools.get_path() + "misc_data\\pickled_dicts\\caribic_data_dict.pkl"
-            highres_fname = tools.get_path() + "misc_data\\pickled_dicts\\caribic_10s_data.pkl"
-            
-            data_dict = {}
-            
-            if any(pfx in self.pfxs for pfx in ['MS']) \
-                and os.path.exists(highres_fname): 
-                    with open(highres_fname, 'rb') as f:
-                        data_dict.update(dill.load(f))
+            # If given specific path to data_dict 
+            if path.exists():
+                with open(path, 'rb') as f:
+                    data_dict.update(dill.load(f))
+                self.status.update(dict(path = [path.name]))
 
-            if any(pfx in self.pfxs for pfx in ['GHG', 'INT', 'INTtpc']) \
-                and os.path.exists(lowres_fname): 
-                    with open(lowres_fname, 'rb') as f:
-                        data_dict.update(dill.load(f))
-            
-            # check if loaded data contains given pfxs and vice versa
+            if not all(pfx in data_dict.keys() for pfx in self.pfxs):
+                # Check if remaining data is already available
+                dict_path = Path(tools.get_path()) / "misc_data/pickled_dicts"
+
+                names = [i.name for i in dict_path.iterdir() if 'caribic' in i.name]
+                highres_names = [i for i in names if "10s" in i]
+                lowres_names = [i for i in names if i not in highres_names]
+                lowres_names.sort(); highres_names.sort()
+                lowres_fname = lowres_names[-1] if not len(lowres_names)==0 else None
+                highres_fname = highres_names[-1] if not len(highres_names)==0 else None
+
+                if any(pfx in self.pfxs for pfx in ['MS']) \
+                    and (dict_path/highres_fname).exists(): 
+                        with open(dict_path/highres_fname, 'rb') as f:
+                            data_dict.update(dill.load(f))
+                        self.status.update(dict(path = self.status.get('path', []) + [highres_fname]))
+
+                if any(pfx in self.pfxs for pfx in ['GHG', 'INT', 'INTtpc']) \
+                    and (dict_path/lowres_fname).exists():
+                        with open(dict_path/lowres_fname, 'rb') as f:
+                            data_dict.update(dill.load(f))
+                        self.status.update(dict(path = self.status.get('path', []) + [lowres_fname]))
+
+            # Check if loaded data contains given pfxs and vice versa
             if all(pfx in data_dict.keys() for pfx in self.pfxs):
                 self.data = {k:data_dict[k] for k in self.pfxs} # choose only pfxs as specified
                 self.data = self.sel_year(*self.years).data

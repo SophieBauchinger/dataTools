@@ -94,8 +94,8 @@ def tps_height_comparison_seasonal_1D(self, **kwargs):
             ax.tick_params(axis='y', color=n2o_color, labelcolor=n2o_color)
             ax.spines['right'].set_color(n2o_color)
             ax.spines['left'].set_color(n2o_color)
-        if tp.rel_to_tp: 
-            tools.add_zero_line(ax)
+        # if tp.rel_to_tp: 
+        #     tools.add_zero_line(ax)
     # fig.suptitle('Vertical extent of tropopauses')
     fig.tight_layout()
     fig.subplots_adjust(top = 0.825)

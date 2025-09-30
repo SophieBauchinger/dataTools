@@ -563,7 +563,7 @@ class TropopauseSorterMixin:
         if len(o3_substs) == 1:
             [o3_subs] = o3_substs
         else:
-            [o3_subs] = o3_substs[0]
+            o3_subs = o3_substs[0]
             print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
         
         hreltp, df_sorted,_ = tp_tools.calc_HrelTP(self.df, o3_subs)
@@ -584,7 +584,7 @@ class TropopauseSorterMixin:
         elif len(o3_substs) == 0: 
             raise Exception('No O3 data available to filter O3 < 60ppb values')
         else:
-            [o3_subs] = o3_substs[0]
+            o3_subs = o3_substs[0]
             print(f'Using {o3_subs} to filter for <60 ppb as defaults not available.')
 
         o3_sorted = pd.DataFrame(index=self.df.index)
@@ -924,7 +924,7 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin, ModelData
         
         with open(pdir + fname, 'wb') as f:
             dill.dump(self.data, f)
-            print(f'{self.ID} Data dictionary saved as {pdir}\{fname}')
+            print(f'{self.ID} Data dictionary saved as {pdir}/{fname}')
 
 # --- Instance variables (substances / coordinates) ---
     def get_variables(self, category):
