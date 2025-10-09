@@ -136,17 +136,7 @@ misc_data/emac_ds.nc
 .idea/iau-caribic.iml
 .idea/modules.xml
 .idea/other.xml
-misc_data/all_data_dict.pkl
-misc_data/caribic_MS_data.pkl
-misc_data/caribic_10s_data.pkl
-misc_data/caribic_clams_V03.nc
-misc_data/caribic_MS_data.nc
-misc_data/caribic_clams_V03.nc
-misc_data/EMAC/emac_ds_s.nc
-misc_data/EMAC/emac_ds.nc
-misc_data/pickled_dicts/all_data_dict.pkl
-misc_data/pickled_dicts/caribic_10s_data.pkl
-misc_data/cache/caribic_10s_Bin3D_df.pkl
-misc_data/cache
-misc_data/pickled_dicts/phl_data_dict.pkl
-/misc_data
+
+# Locally stored data 
+misc_data
+data/store
