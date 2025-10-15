@@ -49,12 +49,16 @@ Functions:
     note_dict(fig_or_ax, x, y, s, ha)
 
 """
-import numpy as np
-import pandas as pd
+import calendar
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap as lsc
-import cmasher as cmr
+from matplotlib.colors import Normalize
+import numpy as np
 import os
+import pandas as pd
+
+import cmasher as cmr
+from cmcrameri import cm # scientific colormaps 
 
 from toolpac.outliers import ol_fit_functions as fct # type: ignore
 
@@ -207,7 +211,7 @@ class Coordinate:
     def get_color(self) -> str: 
         """ Allows harmonisation of color usage across plots comparing tropopause definitions. """
         colors_20c = plt.cm.tab20c.colors       
-        chem_colors = colors_20c[:4] # blue
+        chem_colors = colors_20c[:4] # blue 
         dyn_colors = colors_20c[4:8] # red
         therm_colors = colors_20c[8:12] # green
        
@@ -286,7 +290,12 @@ def get_coordinates(**kwargs) -> list[Coordinate]:
             df = df[df[cond].astype(float) == kwargs[cond]]
         # keep only rows where all conditions are fulfilled
         elif not str(val).startswith('not_') and not str(val) == 'nan':
-            df = df[df[cond] == kwargs[cond]]
+            df = df[(df[cond] == kwargs[cond])
+                    | ('int_'+df[cond] == kwargs[cond]) 
+                    | (df[cond] == kwargs[cond]+'_Main')
+                    | ('int_'+df[cond] == kwargs[cond]+'_Main')
+                    ]
+            # above makes sure integrated coords return valid non-int coord object
         elif str(val) == 'nan':
             df = df[df[cond].isna()]
         # also take out coords that are specifically excluded
@@ -299,8 +308,8 @@ def get_coordinates(**kwargs) -> list[Coordinate]:
         raise KeyError('No data found using the given specifications')
     # df.set_index('col_name', inplace=True)
     coord_dict = df.to_dict(orient='index')
-    coord = [Coordinate(**v) for k, v in coord_dict.items()]
-    return coord
+    coords = [Coordinate(**v) for k, v in coord_dict.items()]
+    return coords
 
 def get_coord(*args, **kwargs) -> Coordinate:
     for i, arg in enumerate(args):  # col_name, ID
@@ -309,7 +318,11 @@ def get_coord(*args, **kwargs) -> Coordinate:
     coordinates = get_coordinates(**kwargs)  # dict i:Coordinate
     if len(coordinates) > 1:
         raise ValueError(f'Multiple columns fulfill the conditions: {[i.col_name for i in coordinates]}')
-    return coordinates[0]
+    
+    [coord] = coordinates
+    # Overwrite col_name if the chosen coordinate did some stuff with 'int_' or '_Main':
+    coord.col_name = kwargs.get('col_name')
+    return coord
 
 # %% Substances
 class Substance:
@@ -326,7 +339,7 @@ class Substance:
         self.col_name = col_name
         self.long_name, self.short_name, self.unit = [None] * 3
         self.ID, self.source, self.model = [None] * 3
-        self.function, self.detr = [None] * 2
+        self.function, self.detr = None, False
 
         self.__dict__.update(kwargs)
 
@@ -418,6 +431,27 @@ class Substance:
         vlims = vlim_dict[bin_attr] # if not atm_layer else vlim_dict[f'{bin_attr}_{atm_layer}']
 
         return vlims 
+
+    @property
+    def get_detr(self): 
+        """ Returns a Substance object representing the detrended version. """
+        if self.detr: 
+            return self
+        return get_detr_subs(self)
+
+def get_detr_subs(subs): 
+    """ Return Substance object for detrended version. """
+    subs_dict = subs.__dict__
+    col_name = subs_dict.pop('col_name')
+    subs_dict.update({
+        'long_name' : 'Detrended '+subs.long_name,
+        'short_name' : 'detr_'+subs.short_name,
+        'unit' : "{} / {}".format(subs.unit, subs.unit),
+        'detr' : True,
+        })
+    detr_subs = Substance(col_name = 'detr_'+col_name,
+                          **subs_dict)
+    return detr_subs
 
 def vlim_dict_per_substance(short_name) -> dict[tuple]: 
     """ Returns dictionary for colormap normalisation limits for the given substance (str). 
@@ -560,6 +594,8 @@ def get_substances(**kwargs) -> list['Substance']:
     for cond in kwargs:
         if cond not in df.columns:
             print(f'{cond} not recognised as valid substance qualifier.')
+        elif str(kwargs[cond]).startswith('detr_'):
+            df = df[df[cond] == kwargs[cond][5:]]
         else:
             df = df[df[cond] == kwargs[cond]]
     if len(df) == 0:
@@ -577,18 +613,23 @@ def get_subs(*args, **kwargs) -> Substance:
         2. ID (str)
         3. clams (bool)
     """
-    for i, arg in enumerate(args):  # substance, ID, clams
-        pot_args = ['col_name', 'ID', 'clams']
+    for i, arg in enumerate(args):  # substance, ID
+        pot_args = ['col_name', 'ID']
         kwargs.update({pot_args[i]: arg})
     if 'short_name' not in kwargs and 'substance' in kwargs:
         kwargs.update({'short_name': kwargs.pop('substance')})
-    if 'model' not in kwargs and 'clams' in kwargs:
-        kwargs.update({'model': 'CLAMS' if kwargs.pop('clams') else 'MSMT'})
 
+    detr = False
+    if any([str(v).startswith('detr_') for v in kwargs.values()]):
+        kwargs.update({k:v[5:] for k,v in kwargs.items() if str(v).startswith('detr_')})
+        detr=True
     substances = get_substances(**kwargs)
     if len(substances) > 1:
         raise Warning(f'Multiple columns fulfill the conditions: {substances}')
-    return substances[0]
+    [subs] = substances
+    if detr: 
+        return subs.get_detr
+    return subs
 
 def lookup_fit_function(short_name):
     """ Get appropriate fit function for the given substance. """
@@ -845,10 +886,10 @@ def TPChange_variables():
 
     dyn_tps = [
         f'ERA5_dynTP_{vcoord}_{pvu}_Main' 
-            for pvu in ['1_5', '2_0', '3_5'] 
+            for pvu in ['3_5'] # '1_5', '2_0', 
             for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']] + [
         f'ERA5_dynTP_{vcoord}_{pvu}_Second' 
-            for pvu in ['1_5', '2_0', '3_5'] 
+            for pvu in ['3_5'] # '1_5', '2_0', 
             for vcoord in ['PHI', 'THETA', 'PRESS', 'GPH']]
 
     therm_tps = [
@@ -864,16 +905,46 @@ def TPChange_variables():
 
     return met_vars + dyn_tps + therm_tps + substances
 
+def remove_from_CARIBIC_variables():
+    """ Irrelevant variables in CARIBIC-INTtpc/GHG/MS that should be excluded. """
+    return [
+        'int_acetone', 
+        'int_acetonitrile',
+        'int_CARIBIC2_Ac', 
+        'int_CARIBIC2_AN', 
+        'int_CARIBIC2_ACE', 
+        'int_CARIBIC2_ACN',
+        'int_ERA5_dynTP_PHI_4_0', 
+        'int_ERA5_dynTP_PRESS_4_0',
+        'int_ERA5_dynTP_THETA_4_0',
+        'int_AgeSpec_BA',
+        'int_AgeSpec_NF_01',
+        'int_AgeSpec_SF_01',
+        'int_AgeSpec_TF_01',
+        ]
+
 #%% Misc for plotting
 def dict_season():
-    """ Use to get name_s, color_s for season s"""
+    """ Use to get name_s, color_s for meteorological season s (1 = Spring / MAM). """
     return {'name_1': 'Spring (MAM)', 'color_1': '#D55E00', # '#228833',  # blue
             'name_2': 'Summer (JJA)', 'color_2': '#E69F00', # '#AA3377',  # yellow
             'name_3': 'Autumn (SON)', 'color_3': '#874199', # '#CCBB44',  # red
             'name_4': 'Winter (DJF)', 'color_4': '#57B4E9', # '#4477AA',  # green
-            }  
-            # 'color_1': 'blue', 'color_2': 'orange',
-            # 'color_3': 'green', 'color_4': 'red'}
+            } 
+
+def dict_month(month=None, abbr = True): 
+    """ Assigns color and name (abbreviated if abbr) to each numeric month of the year (1=Jan). """
+    norm = Normalize(1,13)
+    dict_month = {
+        f'name_{m}':(calendar.month_abbr[m] if abbr else calendar.month_name[m])
+            for m in range(1,13)}
+    dict_month.update({
+        f'color_{m}':cm.managua(norm(m)) 
+            for m in range(1,13)}) 
+    if isinstance(month, int): 
+        return {'color':dict_month[f'color_{month}'], 
+                'name': dict_month[f'name_{month}']}
+    return dict_month
 
 RSTD_colors = [
     '#E6E6E6', # 0.0 - 0.1

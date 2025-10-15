@@ -1,114 +1,167 @@
-﻿col_name,long_name,short_name,unit,ID,source,model,function,detr
-GCECD_CH4,CH4 dry mole fraction mixing ratio (ppb),ch4,ppb,GCECD,ATOM,MSMT,h,FALSE
-CH4,CH4 mixing ratio,ch4,ppb,GHG,Caribic,MSMT,h,FALSE
-int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h,FALSE
-int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INTtpc,Caribic,CLAMS,h,FALSE
-tracer_gp_CH4_at_fl,tracer GP CH4,ch4,mol mol-1,EMAC,EMAC,EMAC,h,FALSE
-TRIHOP_CH4,Methane [ppb - inferred],ch4,ppb,TRIHOP,HALO,MSMT,h,FALSE
-UMAQS_CH4,Methane [ppb - inferred],ch4,ppb,UMAQS,HALO,MSMT,h,FALSE
-awas_CH4,awas Methane from flask / FID (CH4) - U. Miami ,ch4,ppbv,AWAS ,HIAPER,MSMT,h,FALSE
-nwas_CH4,nwas Methane from flask / MAGICC(CH4) - noaa,ch4,ppb,NWAS,HIAPER,MSMT,h,FALSE
-ch4_MLO,measured_mole_fraction_of_ch4_in_dry_air,ch4,ppb,MLO,Mauna_Loa,MSMT,h,FALSE
-int_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INT,Caribic,MSMT,h,FALSE
-int_CLaMS_CO,CO (CLaMS),co,ppb,INTtpc,Caribic,CLAMS,h,FALSE
-TRIHOP_CO,Carbon monoxide,co,ppb,TRIHOP,HALO,MSMT,h,FALSE
-awas_CO,awas Carbon monoxide from flask / RGD (CO) - U. Miami ,co,ppbv,AWAS ,HIAPER,MSMT,h,FALSE
-nwas_CO,nwas Carbon monoxide from flask / MAGICC (CO) - noaa,co,ppb,NWAS,HIAPER,MSMT,h,FALSE
-co_MLO,CO CCGG (Individual Flasks),co,ppb,MLO,Mauna_Loa,MSMT,h,FALSE
-UMAQS_CO,CO volume mixing ratio,co,ppbv,UMAQS,HALO,MSMT,h,FALSE
-CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h,FALSE
-int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h,FALSE
-int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INTtpc,Caribic,CLAMS,h,FALSE
-tracer_gp_CO2_at_fl,tracer GP CO2,co2,mol mol-1,EMAC,EMAC,EMAC,h,FALSE
-HAGAR_CO2,Carbon dioxide [ppm - inferred],co2,ppm,HAGAR,HALO,MSMT,h,FALSE
-TRIHOP_CO2,Carbon dioxide,co2,ppm,TRIHOP,HALO,MSMT,h,FALSE
-UMAQS_CO2,Carbon dioxide [ppm - inferred],co2,ppm,UMAQS,HALO,MSMT,h,FALSE
-medusa_CO2,medusa Carbon dioxide from flask (CO2) - Scripps,co2,ppm,MEDUSA ,HIAPER,MSMT,h,FALSE
-nwas_CO2,nwas Carbon dioxide from flask / MAGICC (CO2)  - noaa,co2,ppm,NWAS,HIAPER,MSMT,h,FALSE
-co2_MLO,measured_mole_fraction_of_co2_in_dry_air,co2,ppm,MLO,Mauna_Loa,MSMT,h,FALSE
-GCECD_d_CH4,CH4 dry mole fraction mixing ratio error 1-s (ppb),d_ch4,ppb,GCECD,ATOM,MSMT,,FALSE
-d_CH4,absolute precision of CH4,d_ch4,ppb,GHG,Caribic,MSMT,,FALSE
-ch4_std_dev_MLO,standard_deviation_in_reported_ch4_value,d_ch4,ppb,MLO,Mauna_Loa,MSMT,,FALSE
-d_CO2,absolute precision of CO2,d_co2,ppm,GHG,Caribic,MSMT,,FALSE
-HAGAR_d_CO2,Carbon dioxide error [ppm - inferred],d_co2,ppm,HAGAR,HALO,MSMT,,FALSE
-co2_std_dev_MLO,standard_deviation_in_reported_co2_value,d_co2,ppm,MLO,Mauna_Loa,MSMT,,FALSE
-GCECD_d_N2O,N2O dry mole fraction mixing ratio error 1-s (ppb),d_n2o,ppb,GCECD,ATOM,MSMT,,FALSE
-d_N2O,absolute precision of N2O,d_n2o,ppb,GHG,Caribic,MSMT,,FALSE
-N2OcatsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_n2o,ppb,MLO,Mauna_Loa,MSMT,,FALSE
-N2OcatsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_n2o,ppb,MLO,Mauna_Loa,MSMT,,FALSE
-GCECD_d_SF6,SF6 dry mole fraction mixing ratio error 1-s (ppt),d_sf6,ppt,GCECD,ATOM,MSMT,,FALSE
-d_SF6,absolute precision of SF6,d_sf6,ppt,GHG,Caribic,MSMT,,FALSE
-SF6catsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_sf6,ppt,MLO,Mauna_Loa,MSMT,,FALSE
-SF6catsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_sf6,ppt,MLO,Mauna_Loa,MSMT,,FALSE
-detr_GCECD_CH4,CH4 dry mole fraction mixing ratio error 1-s (ppt),detr_ch4,ppt / ppt,GCECD,ATOM,MSMT,h,TRUE
-detr_CH4,CH4 mixing ratio - detrended wrt. Mauna Loa 2005,detr_ch4,ppb / ppb,GHG,Caribic,MSMT,h,TRUE
-detr_int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_ch4,ppb / ppb,INT,Caribic,MSMT,h,TRUE
-detr_int_CLaMS_CH4,CH4 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_ch4,ppb / ppb,INTtpc,Caribic,CLAMS,h,TRUE
-detr_tracer_gp_CH4_at_fl,tracer GP CH4 - detrended wrt. Mauna Loa 2005,detr_ch4,mol mol-1 / mol mol-1,EMAC,EMAC,EMAC,h,TRUE
-detr_int_CO,CO integrated over flask sampling time from 1s resolution measurements - detrended wrt. Mauna Loa 2005,detr_co,ppb / ppb,INT,Caribic,MSMT,h,TRUE
-detr_int_CLaMS_CO,CO (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co,ppb / ppb,INTtpc,Caribic,CLAMS,h,TRUE
-detr_CO2,CO2 mixing ratio - detrended wrt. Mauna Loa 2005,detr_co2,ppm / ppm,GHG,Caribic,MSMT,h,TRUE
-detr_int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_co2,ppm / ppm,INT,Caribic,MSMT,h,TRUE
-detr_int_CLaMS_CO2,CO2 (CLaMS) - detrended wrt. Mauna Loa 2005,detr_co2,ppm / ppm,INTtpc,Caribic,CLAMS,h,TRUE
-detr_tracer_gp_CO2_at_fl,tracer GP CO2 - detrended wrt. Mauna Loa 2005,detr_co2,mol mol-1 / mol mol-1,EMAC,EMAC,EMAC,h,TRUE
-detr_GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),detr_n2o,ppb / ppb,GCECD,ATOM,MSMT,s,TRUE
-detr_N2O,N2O mixing ratio - detrended wrt. Mauna Loa 2005,detr_n2o,ppb / ppb,GHG,Caribic,MSMT,s,TRUE
-detr_int_CLaMS_N2O,N2O (CLaMS) - detrended wrt. Mauna Loa 2005,detr_n2o,ppb / ppb,INTtpc,Caribic,CLAMS,s,TRUE
-detr_tracer_gp_N2O_at_fl,tracer GP N2O - detrended wrt. Mauna Loa 2005,detr_n2o,mol mol-1 / mol mol-1,EMAC,EMAC,EMAC,s,TRUE
-detr_GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),detr_sf6,ppt / ppt,GCECD,ATOM,MSMT,q,TRUE
-detr_SF6,SF6 mixing ratio - detrended wrt. Mauna Loa 2005,detr_sf6,ppt / ppt,GHG,Caribic,MSMT,q,TRUE
-detr_tracer_gp_SF6_at_fl,tracer GP SF6 - detrended wrt. Mauna Loa 2005,detr_sf6,mol mol-1 / mol mol-1,EMAC,EMAC,EMAC,q,TRUE
-detr_SF6_MZT,Annual mean SF6 dry air mole fraction - detrended wrt. Mauna Loa 2005 (pmol/mol = ppt),detr_sf6,pmol mol-1 / pmol mol-1,MZT,Mozart,MOZART,q,TRUE
-int_CLaMS_F11,F11 (CLaMS),f11,ppt,INTtpc,Caribic,CLAMS,,FALSE
-awas_CFC11,awas CFC-11 from flask (CCl3F) - U. Miami ,f11,pptv,AWAS ,HIAPER,MSMT,,FALSE
-nwas_CFC11,naws CFC-11 from flask (CCl3F) - noaa,f11,ppt,NWAS,HIAPER,MSMT,,FALSE
-int_CLaMS_F12,F12 (CLaMS),f12,ppt,INTtpc,Caribic,CLAMS,,FALSE
-awas_CFC12,awas CFC-12 from flask (CCl2F2) - U. Miami ,f12,pptv,AWAS ,HIAPER,MSMT,,FALSE
-nwas_CFC12,nwas CFC-12 from flask (CCl2F2) - noaa,f12,ppt,NWAS,HIAPER,MSMT,,FALSE
-int_H2O_gas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INT,Caribic,MSMT,,FALSE
-int_CLaMS_H2O,H2O  (CLaMS),h2o,ppm,INTtpc,Caribic,CLAMS,,FALSE
-GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),n2o,ppb,GCECD,ATOM,MSMT,s,FALSE
-N2O,N2O mixing ratio,n2o,ppb,GHG,Caribic,MSMT,s,FALSE
-int_CLaMS_N2O,N2O (CLaMS),n2o,ppb,INTtpc,Caribic,CLAMS,s,FALSE
-tracer_gp_N2O_at_fl,tracer GP N2O,n2o,mol mol-1,EMAC,EMAC,EMAC,s,FALSE
-TRIHOP_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,TRIHOP,HALO,MSMT,s,FALSE
-UMAQS_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,UMAQS,HALO,MSMT,s,FALSE
-detr_UMAQS_N2O,Detrended Nitrous oxide [ppb - inferred],detr_n2o,ppb / ppb,UMAQS,HALO,MSMT,s,FALSE
-awas_N2O,awas Nitrous oxide  from flask / ECD (N2O) - U. Miami ,n2o,ppbv,AWAS ,HIAPER,MSMT,s,FALSE
-nwas_N2O,nwas Nitrous oxide from flask / MAGICC (N2O) - noaa,n2o,ppb,NWAS,HIAPER,MSMT,s,FALSE
-N2OcatsMLOm,"Nitrous Oxide (N2O) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: NOAA 2006A",n2o,ppb,MLO,Mauna_Loa,MSMT,s,FALSE
-int_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INT,Caribic,MSMT,,FALSE
-int_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INT,Caribic,MSMT,,FALSE
-int_O3,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INT,Caribic,MSMT,,FALSE
-int_CLaMS_O3,O3 (CLaMS),o3,ppb,INTtpc,Caribic,CLAMS,,FALSE
-tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,,FALSE
-FAIRO_O3,"Ozone, volume mixing ratio (ppbv)",o3,ppbv,FAIRO ,HALO,MSMT,,FALSE
-FAIRO_d_O3,standard_error_of_mole_fraction_of_ozone_in_air [ppb],d_o3,ppbv,FAIRO ,HALO,MSMT,,FALSE
-HIPPO_O3,Ozone (O3) ???????????? ,o3,,HIPPO,HIAPER,MSMT,,FALSE
-GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q,FALSE
-SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q,FALSE
-tracer_gp_SF6_at_fl,tracer GP SF6,sf6,mol mol-1,EMAC,EMAC,EMAC,q,FALSE
-GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt]",sf6,ppt,GHOST,HALO,MSMT,q,FALSE
-detr_GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt] detrended",detr_sf6,ppt / ppt,GHOST,HALO,MSMT,q,TRUE
-awas_SF6,awas Sulfur hexafluoride from flask (SF6) - U. Miami ,sf6,pptv,AWAS ,HIAPER,MSMT,q,FALSE
-nwas_SF6,nwas Sulfur hexafluoride  from flask (SF6) - noaa,sf6,ppt,NWAS,HIAPER,MSMT,q,FALSE
-panther_SF6,Sulfur hexafluoride ECD (SF6) - noaa,sf6,pptv,PANTHER,HIAPER,MSMT,q,FALSE
-SF6_MHD,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q,FALSE
-SF6catsMLOm,"Sulfur hexaflouride (SF6) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: WMO X2014",sf6,ppt,MLO,Mauna_Loa,MSMT,q,FALSE
-SF6_MZT,Annual mean SF6 dry air mole fraction (pmol/mol = ppt),sf6,pmol mol-1,MZT,Mozart,MOZART,q,FALSE
-int_ERA5_O3,O3 (ERA5),o3,ppb,INTtpc,Caribic,ERA5,,FALSE
-Ozone,Ozone volume mixing ratio,o3,ppbV,MS,Caribic,MSMT,,FALSE
-MS_CO,Carbon monoxide mixing ratio [ppbV],co,ppbV,MS,Caribic,MSMT,,FALSE
-MS_CO2,Carbon dioxide dry air mole fraction [ppmV] # since container Mod.C: measured by Picarro instrument,co2,ppmV,MS,Caribic,MSMT,,FALSE
-MS_CH4,Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,ch4,ppbV,MS,Caribic,MSMT,,FALSE
-MS_CH4_Err,Error of Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,d_ch4,ppbV,MS,Caribic,MSMT,,FALSE
-int_CARIBIC2_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INTtpc,Caribic,MSMT,h,FALSE
-int_CARIBIC2_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INTtpc,Caribic,MSMT,h,FALSE
-int_CARIBIC2_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INTtpc,Caribic,MSMT,h,FALSE
-detr_int_CARIBIC2_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_ch4,ppb / ppb,INTtpc,Caribic,MSMT,h,TRUE
-detr_int_CARIBIC2_CO,CO integrated over flask sampling time from 1s resolution measurements - detrended wrt. Mauna Loa 2005,detr_co,ppb / ppb,INTtpc,Caribic,MSMT,h,TRUE
-detr_int_CARIBIC2_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval - detrended wrt. Mauna Loa 2005,detr_co2,ppm / ppm,INTtpc,Caribic,MSMT,h,TRUE
-int_CARIBIC2_H2Ogas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INTtpc,Caribic,MSMT,,FALSE
-int_CARIBIC2_Ozone,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INTtpc,Caribic,MSMT,,FALSE
+﻿col_name,long_name,short_name,unit,ID,source,model,function
+GCECD_CH4,CH4 dry mole fraction mixing ratio (ppb),ch4,ppb,GCECD,ATOM,MSMT,h
+CH4,CH4 mixing ratio,ch4,ppb,GHG,Caribic,MSMT,h
+int_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INT,Caribic,MSMT,h
+int_CLaMS_CH4,CH4 (CLaMS),ch4,ppb,INTtpc,Caribic,CLAMS,h
+tracer_gp_CH4_at_fl,tracer GP CH4,ch4,mol mol-1,EMAC,EMAC,EMAC,h
+TRIHOP_CH4,Methane [ppb - inferred],ch4,ppb,TRIHOP,HALO,MSMT,h
+UMAQS_CH4,Methane [ppb - inferred],ch4,ppb,UMAQS,HALO,MSMT,h
+awas_CH4,awas Methane from flask / FID (CH4) - U. Miami ,ch4,ppbv,AWAS ,HIAPER,MSMT,h
+nwas_CH4,nwas Methane from flask / MAGICC(CH4) - noaa,ch4,ppb,NWAS,HIAPER,MSMT,h
+ch4_MLO,measured_mole_fraction_of_ch4_in_dry_air,ch4,ppb,MLO,Mauna_Loa,MSMT,h
+int_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INT,Caribic,MSMT,h
+int_CLaMS_CO,CO (CLaMS),co,ppb,INTtpc,Caribic,CLAMS,h
+TRIHOP_CO,Carbon monoxide,co,ppb,TRIHOP,HALO,MSMT,h
+awas_CO,awas Carbon monoxide from flask / RGD (CO) - U. Miami ,co,ppbv,AWAS ,HIAPER,MSMT,h
+nwas_CO,nwas Carbon monoxide from flask / MAGICC (CO) - noaa,co,ppb,NWAS,HIAPER,MSMT,h
+co_MLO,CO CCGG (Individual Flasks),co,ppb,MLO,Mauna_Loa,MSMT,h
+UMAQS_CO,CO volume mixing ratio,co,ppbv,UMAQS,HALO,MSMT,h
+CO2,CO2 mixing ratio,co2,ppm,GHG,Caribic,MSMT,h
+int_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INT,Caribic,MSMT,h
+int_CLaMS_CO2,CO2 (CLaMS),co2,ppm,INTtpc,Caribic,CLAMS,h
+tracer_gp_CO2_at_fl,tracer GP CO2,co2,mol mol-1,EMAC,EMAC,EMAC,h
+HAGAR_CO2,Carbon dioxide [ppm - inferred],co2,ppm,HAGAR,HALO,MSMT,h
+TRIHOP_CO2,Carbon dioxide,co2,ppm,TRIHOP,HALO,MSMT,h
+UMAQS_CO2,Carbon dioxide [ppm - inferred],co2,ppm,UMAQS,HALO,MSMT,h
+medusa_CO2,medusa Carbon dioxide from flask (CO2) - Scripps,co2,ppm,MEDUSA ,HIAPER,MSMT,h
+nwas_CO2,nwas Carbon dioxide from flask / MAGICC (CO2)  - noaa,co2,ppm,NWAS,HIAPER,MSMT,h
+co2_MLO,measured_mole_fraction_of_co2_in_dry_air,co2,ppm,MLO,Mauna_Loa,MSMT,h
+GCECD_d_CH4,CH4 dry mole fraction mixing ratio error 1-s (ppb),d_ch4,ppb,GCECD,ATOM,MSMT,
+d_CH4,absolute precision of CH4,d_ch4,ppb,GHG,Caribic,MSMT,
+ch4_std_dev_MLO,standard_deviation_in_reported_ch4_value,d_ch4,ppb,MLO,Mauna_Loa,MSMT,
+d_CO2,absolute precision of CO2,d_co2,ppm,GHG,Caribic,MSMT,
+HAGAR_d_CO2,Carbon dioxide error [ppm - inferred],d_co2,ppm,HAGAR,HALO,MSMT,
+co2_std_dev_MLO,standard_deviation_in_reported_co2_value,d_co2,ppm,MLO,Mauna_Loa,MSMT,
+GCECD_d_N2O,N2O dry mole fraction mixing ratio error 1-s (ppb),d_n2o,ppb,GCECD,ATOM,MSMT,
+d_N2O,absolute precision of N2O,d_n2o,ppb,GHG,Caribic,MSMT,
+N2OcatsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_n2o,ppb,MLO,Mauna_Loa,MSMT,
+N2OcatsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_n2o,ppb,MLO,Mauna_Loa,MSMT,
+GCECD_d_SF6,SF6 dry mole fraction mixing ratio error 1-s (ppt),d_sf6,ppt,GCECD,ATOM,MSMT,
+d_SF6,absolute precision of SF6,d_sf6,ppt,GHG,Caribic,MSMT,
+SF6catsMLOsd,Standard deviation (sd): estimate of atmospheric variability,d_sf6,ppt,MLO,Mauna_Loa,MSMT,
+SF6catsMLOunc,Standard deviation (unc): estimate of instrumental precision,d_sf6,ppt,MLO,Mauna_Loa,MSMT,
+int_CLaMS_F11,F11 (CLaMS),f11,ppt,INTtpc,Caribic,CLAMS,
+awas_CFC11,awas CFC-11 from flask (CCl3F) - U. Miami ,f11,pptv,AWAS ,HIAPER,MSMT,
+nwas_CFC11,naws CFC-11 from flask (CCl3F) - noaa,f11,ppt,NWAS,HIAPER,MSMT,
+int_CLaMS_F12,F12 (CLaMS),f12,ppt,INTtpc,Caribic,CLAMS,
+awas_CFC12,awas CFC-12 from flask (CCl2F2) - U. Miami ,f12,pptv,AWAS ,HIAPER,MSMT,
+nwas_CFC12,nwas CFC-12 from flask (CCl2F2) - noaa,f12,ppt,NWAS,HIAPER,MSMT,
+int_H2O_gas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INT,Caribic,MSMT,
+int_CLaMS_H2O,H2O  (CLaMS),h2o,ppm,INTtpc,Caribic,CLAMS,
+GCECD_N2O,N2O dry mole fraction mixing ratio (ppb),n2o,ppb,GCECD,ATOM,MSMT,s
+N2O,N2O mixing ratio,n2o,ppb,GHG,Caribic,MSMT,s
+int_CLaMS_N2O,N2O (CLaMS),n2o,ppb,INTtpc,Caribic,CLAMS,s
+tracer_gp_N2O_at_fl,tracer GP N2O,n2o,mol mol-1,EMAC,EMAC,EMAC,s
+TRIHOP_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,TRIHOP,HALO,MSMT,s
+UMAQS_N2O,Nitrous oxide [ppb - inferred],n2o,ppb,UMAQS,HALO,MSMT,s
+awas_N2O,awas Nitrous oxide  from flask / ECD (N2O) - U. Miami ,n2o,ppbv,AWAS ,HIAPER,MSMT,s
+nwas_N2O,nwas Nitrous oxide from flask / MAGICC (N2O) - noaa,n2o,ppb,NWAS,HIAPER,MSMT,s
+N2OcatsMLOm,"Nitrous Oxide (N2O) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: NOAA 2006A",n2o,ppb,MLO,Mauna_Loa,MSMT,s
+int_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INT,Caribic,MSMT,
+int_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INT,Caribic,MSMT,
+int_O3,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INT,Caribic,MSMT,
+int_CLaMS_O3,O3 (CLaMS),o3,ppb,INTtpc,Caribic,CLAMS,
+tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,
+FAIRO_O3,"Ozone, volume mixing ratio (ppbv)",o3,ppbv,FAIRO ,HALO,MSMT,
+FAIRO_d_O3,standard_error_of_mole_fraction_of_ozone_in_air [ppb],d_o3,ppbv,FAIRO ,HALO,MSMT,
+HIPPO_O3,Ozone (O3) ???????????? ,o3,,HIPPO,HIAPER,MSMT,
+GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q
+SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q
+tracer_gp_SF6_at_fl,tracer GP SF6,sf6,mol mol-1,EMAC,EMAC,EMAC,q
+GHOST_SF6,"Sulphur Hexafluoride, CAL SIO-05, precision 0.64%, accuracy of mxr in cal gas 0.69% [ppt]",sf6,ppt,GHOST,HALO,MSMT,q
+awas_SF6,awas Sulfur hexafluoride from flask (SF6) - U. Miami ,sf6,pptv,AWAS ,HIAPER,MSMT,q
+nwas_SF6,nwas Sulfur hexafluoride  from flask (SF6) - noaa,sf6,ppt,NWAS,HIAPER,MSMT,q
+panther_SF6,Sulfur hexafluoride ECD (SF6) - noaa,sf6,pptv,PANTHER,HIAPER,MSMT,q
+SF6_MHD,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q
+SF6catsMLOm,"Sulfur hexaflouride (SF6) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: WMO X2014",sf6,ppt,MLO,Mauna_Loa,MSMT,q
+SF6_MZT,Annual mean SF6 dry air mole fraction (pmol/mol = ppt),sf6,pmol mol-1,MZT,Mozart,MOZART,q
+int_ERA5_O3,O3 (ERA5),o3,ppb,INTtpc,Caribic,ERA5,
+Ozone,Ozone volume mixing ratio,o3,ppbV,MS,Caribic,MSMT,
+MS_CO,Carbon monoxide mixing ratio [ppbV],co,ppbV,MS,Caribic,MSMT,
+MS_CO2,Carbon dioxide dry air mole fraction [ppmV] # since container Mod.C: measured by Picarro instrument,co2,ppmV,MS,Caribic,MSMT,h
+MS_CH4,Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,ch4,ppbV,MS,Caribic,MSMT,h
+MS_CH4_Err,Error of Methane dry air mole fraction [ppbV] # since container Mod.C: measured by Picarro instrument,d_ch4,ppbV,MS,Caribic,MSMT,
+int_CARIBIC2_CH4,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,ch4,ppb,INTtpc,Caribic,MSMT,h
+int_CARIBIC2_CH4_Err,Methane dry air mole fraction from Picarro instrument integrated over sampling interval,d_ch4,ppb,INTtpc,Caribic,MSMT,
+int_CARIBIC2_CO,CO integrated over flask sampling time from 1s resolution measurements,co,ppb,INTtpc,Caribic,MSMT,h
+int_CARIBIC2_CO2,Carbon dioxide dry air mole fraction from Picarro instrument integrated over sampling interval,co2,ppm,INTtpc,Caribic,MSMT,h
+int_CARIBIC2_H2Ogas,Water vapour integrated over flask sampling time from high resolution measurements,h2o,ppm,INTtpc,Caribic,MSMT,
+int_CARIBIC2_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INTtpc,Caribic,MSMT,
+int_CARIBIC2_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INTtpc,Caribic,MSMT,
+int_CARIBIC2_Ozone,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INTtpc,Caribic,MSMT,
+CLaMS_N2O_ppb,Nitrous Oxide from CLaMS,n2o,ppb,CLAMS,CLAMS,CLAMS,s
+ERA5_O3,Ozone from ERA5,o3,mol mol-1,ERA5,ERA5,ERA5,
+ESMVal_N2O,Nitrous oxide from ESM Validation Campaign,n2o,ppb,MSTM,MSTM,MSTM,s
+ATom_N2O_GMI,,n2o,ppbv,ATOM,ATOM,MSTM,s
+ATom_N2O_PECD,,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2Oe_PECD,,d_n2o,ppb,ATOM,ATOM,MSTM,
+ATom_N2O_QCLS,Dry air molar mixing ratio ,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2O_QCLS_adj,,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2O_UCATS,,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2Oe_UCATS,,d_n2o,ppb,ATOM,ATOM,MSTM,
+ATom_SF6_PECD,,sf6,ppt,ATOM,ATOM,MSTM,q
+ATom_SF6e_PECD,,d_sf6,ppt,ATOM,ATOM,MSTM,
+ATom_SF6_UCATS,,sf6,ppt,ATOM,ATOM,MSTM,q
+ATom_SF6e_UCATS,,d_sf6,ppt,ATOM,ATOM,MSTM,
+ATom_O3_CL,,o3,ppbv,ATOM,ATOM,MSTM,
+ATom_O3_CL_2sigma,,o3,ppbv,ATOM,ATOM,MSTM,
+ATom_O3_GMI,,o3,ppbv,ATOM,ATOM,MSTM,
+ATom_O3_UCATS,,o3,ppb,ATOM,ATOM,MSTM,
+ATom_O3e_UCATS,,d_o3,ppb,ATOM,ATOM,MSTM,
+HIPPO_CH4_CCG,,ch4,ppb,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4_P,,ch4,ppbv,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4e_P,,d_ch4,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_CH4_QCLS,,ch4,ppbv,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4_UGC,,ch4,ppbv,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4e_UGC,,d_ch4,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_CO2_AO2,,co2,ppm,HIPPO,HIPPO,MSTM,h
+HIPPO_CO2_CCG,,co2,ppm,HIPPO,HIPPO,MSTM,h
+HIPPO_CO2_OMS,,co2,ppmv,HIPPO,HIPPO,MSTM,h
+HIPPO_CO2_QCLS,,co2,ppmv,HIPPO,HIPPO,MSTM,h
+HIPPO_N2O_CCG,,n2o,ppb,HIPPO,HIPPO,MSTM,s
+HIPPO_N2O_P,,n2o,ppbv,HIPPO,HIPPO,MSTM,s
+HIPPO_N2Oe_P,,d_n2o,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_N2O_QCLS,,n2o,ppbv,HIPPO,HIPPO,MSTM,s
+HIPPO_N2O_UGC,,n2o,ppbv,HIPPO,HIPPO,MSTM,s
+HIPPO_N2Oe_UGC,,d_n2o,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_O3_UO3,,o3,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_O3_UO3,,d_o3,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_O3_ppb,,o3,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_SF6_CCG,,sf6,ppt,HIPPO,HIPPO,MSTM,q
+HIPPO_SF6_P,,sf6,pptv,HIPPO,HIPPO,MSTM,q
+HIPPO_SF6e_P,,d_sf6,pptv,HIPPO,HIPPO,MSTM,
+HIPPO_SF6_UGC,,sf6,pptv,HIPPO,HIPPO,MSTM,q
+HIPPO_SF6e_UCG,,d_sf6,pptv,HIPPO,HIPPO,MSTM,
+PHILEAS_CH4,preliminary,ch4,ppbv,PHL,HALO,MSTM,h
+PHILEAS_N2O,preliminary,n2o,ppbv,PHL,HALO,MSTM,s
+PHILEAS_O3,FAIRO O3,o3,ppbv,PHL,HALO,MSTM,
+POLSTRACC_CH4,TRIHOP,ch4,ppb,PGS,HALO,MSTM,h
+POLSTRACC_N2O,TRIHOP,n2o,ppb,PGS,HALO,MSTM,s
+POLSTRACC_O3,FAIRO O3,o3,ppb,PGS,HALO,MSTM,
+POLSTRACC_O3.1,FAIROCl O3,o3,ppb,PGS,HALO,MSTM,
+POLSTRACC_SF6,GHOST_ECD,sf6,ppt,PGS,HALO,MSTM,q
+SouthTRAC_CH4,UMAQS,ch4,ppb,STHR,HALO,MSTM,h
+SouthTRAC_CO2,UMAQS,co2,ppm,STHR,HALO,MSTM,h
+SouthTRAC_CO2.1,HAGAR,co2,ppm,STHR,HALO,MSTM,h
+SouthTRAC_CO2_err,HAGAR,d_co2,ppm,STHR,HALO,MSTM,
+SouthTRAC_N2O,UMAQS,n2o,ppb,STHR,HALO,MSTM,s
+SouthTRAC_O3,FAIRO,o3,ppb,STHR,HALO,MSTM,
+SouthTRAC_O3.1,FAIROCl O3,o3,ppb,STHR,HALO,MSTM,
+SouthTRAC_O3.2,GLORIA,o3,ppb,STHR,HALO,MSTM,
+SouthTRAC_SF6,GHOST_ECD,sf6,ppt,STHR,HALO,MSTM,q
+SouthTRAC_SF6.1,HAGAR,sf6,ppt,STHR,HALO,MSTM,q
+StratoClim_COLD:N2O,COLD,n2o,ppb,StratoClim,Geophysica,MSTM,s
+StratoClim_FOZAN:O3,FOZAN,o3,ppbv,StratoClim,Geophysica,MSTM,
+StratoClim_HAGAR:CH4,HAGAR,ch4,ppb,StratoClim,Geophysica,MSTM,h
+StratoClim_HAGAR:CO2,HAGAR,co2,ppm,StratoClim,Geophysica,MSTM,h
+StratoClim_HAGAR:CO2_ERR,HAGAR,d_co2,ppm,StratoClim,Geophysica,MSTM,
+StratoClim_HAGAR:N2O,HAGAR,n2o,ppb,StratoClim,Geophysica,MSTM,s
+StratoClim_HAGAR:SF6,HAGAR,sf6,ppt,StratoClim,Geophysica,MSTM,q
+WISE_CH4,HAGAR,ch4,ppb,WISE,HALO,MSTM,h
+WISE_CO2,HAGAR,co2,ppm,WISE,HALO,MSTM,h
+WISE_CO2_err,HAGAR,d_co2,ppm,WISE,HALO,MSTM,
+WISE_N2O,UMAQS,n2o,ppb,WISE,HALO,MSTM,s
+WISE_O3,FAIRO,o3,ppb,WISE,HALO,MSTM,
+WISE_O3.1,FAIROCl O3,o3,ppb,WISE,HALO,MSTM,
+WISE_SF6,GHOST_ECD,sf6,ppt,WISE,HALO,MSTM,q
+WISE_SF6.1,HAGAR,sf6,ppt,WISE,HALO,MSTM,q
