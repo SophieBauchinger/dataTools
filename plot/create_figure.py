@@ -8,6 +8,7 @@ Templates for complex figure layouts and legends.
 """
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from cmcrameri import cm # cm.managua for months
 import math
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -278,14 +279,15 @@ def highlight_axis(ax, color='g', axis='y'):
     return ax
 
 #%% Big data
-def big_data_go_resample(df, x_cols, y_cols): 
+def big_data_go_resample(df, x_cols, y_cols, fig=None): 
     """ Use plotly figure resampler to display big datasets. """
     # Prep data (x needs to increase monotonically)
     if type(y_cols)==str: 
         y_cols = [y_cols]
     if type(x_cols)==str:
         x_cols = [x_cols]
-    fig = FigureResampler(go.Figure())
+    if not fig: 
+        fig = FigureResampler(go.Figure())
     for x_c in set(x_cols):
         df_sorted = df.dropna(subset=x_c).sort_values(x_c)
         if len(df_sorted.dropna(subset = [x_c]))==0: continue
@@ -332,7 +334,17 @@ def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
                     alpha=0.3))
     return lines
 
-def tp_legend_handles(tps, filter_label=True, coord_only=False, no_vc=True, no_model=True, **kwargs) -> list[Line2D]: 
+linestyles = dict(
+    int_CARIBIC2_H_rel_TP  = '-',
+    int_ERA5_D_HEIGHT_1_5 = '-',
+    int_ERA5_D_HEIGHT_2_0 = (0, (5,1)),
+    int_ERA5_D_HEIGHT_3_5 = (0, (2.5,0.5)),
+    int_ERA5_D_HEIGHT_thermTP = (0, (2.5,0.5,1,0.5)),
+)
+
+def tp_legend_handles(tps, filter_label=True, coord_only=False, 
+                      no_vc=True, no_model=True, linestyle_dict=None, 
+                      **kwargs) -> list[Line2D]: 
     """ Create a legend for all tropopause definitions in self.tps (or tps if given).         
     Args: 
         key tps (list[dcts.Coordinate]): Tropopause definition coordinates
@@ -340,14 +352,16 @@ def tp_legend_handles(tps, filter_label=True, coord_only=False, no_vc=True, no_m
         key ls (str): linestyle 
         key marker (str) 
         key markersize (float)
+        key linestyle_dict()
     """ 
-    lw = kwargs.pop('lw', 3)
+    lw = kwargs.pop('lw', 3)   
     lines = [Line2D([0], [0], 
                     label=tp.label(filter_label=filter_label, 
-                                        coord_only=coord_only,
-                                        no_vc=no_vc,
-                                        no_model=no_model), 
+                                    coord_only=coord_only,
+                                    no_vc=no_vc,
+                                    no_model=no_model), 
                     color=tp.get_color(), 
+                    ls = 'solid' if not linestyle_dict else linestyle_dict.get(tp.col_name),
                     lw = lw,
                     **kwargs)
                 for tp in tps]
@@ -385,6 +399,17 @@ def typical_profile_legend_handles(**kwargs):
                     color='dimgrey', lw = 2, ls='dashed'))
     actual_lines = actual_lines + lines
     return actual_lines
+
+def month_legend_handles(months = range(1,13)): 
+    """ Subsample colorblind colormap for monthly traces. """
+    m_dict = dcts.dict_month()
+    lines = [Line2D([0], [0], 
+                    linestyle = '-' if m%2 else '--', 
+                    color = m_dict[f'color_{m}'],
+                    label = m_dict[f'name_{m}'],
+                    )
+            for m in months]
+    return lines
 
 # %% from TOOLS
 
