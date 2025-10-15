@@ -49,6 +49,7 @@ import dill
 import geopandas
 import glob
 from metpy.units import units
+from metpy import calc
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -118,156 +119,134 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
 
     return df_mean
 
-def ds_to_gdf(ds) -> pd.DataFrame:
-    """ Convert xarray Dataset to GeoPandas GeoDataFrame: Mostly for TPChange .nc files currently. Can be generalised """
-    df = ds.to_dataframe()
-    df.reset_index(inplace = True)
-    df.rename(columns = {
-        "Lat" : "latitude_degN", "latitude" : "latitude_degN",
-        "Lon" : "longitude_degE", "longitude" : "longitude_degE",
-        "time" : "Datetime", "Time" : 'Datetime',
-        "Pres" : "pressure_hPa",
-        "Temp" : "temperature_K",
-        "Theta" : "theta_K",
-        "PAlt" : "barometric_altitude_m",
-        }, inplace = True)
-
-    df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
-    geodata = [Point(lat, lon) for lat, lon in zip(
-        df['latitude_degN'], df['longitude_degE'])]
-    #     geodata = [Point(lat, lon) for lon, lat in zip(
-    #         df.index.to_frame()['longitude_degE'], df.index.to_frame()['latitude'])]
-
-    # create geodataframe using lat and lon data from indices
-    df.drop([c for c in ['scale', 'P0'] if c in df.columns], axis=1, inplace=True)
-    gdf = geopandas.GeoDataFrame(df, geometry=geodata)
-
-    if not gdf.Datetime.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format
-        index_time = [dt.datetime(y, 1, 1) for y in gdf.Datetime]
-        gdf['Datetime'] = index_time
-    gdf.set_index('Datetime', inplace=True)
-    gdf.index = gdf.index.floor('s')  # remove micro/nanoseconds
+# def ds_to_gdf(ds) -> pd.DataFrame:
+#     """ Convert xarray Dataset to GeoPandas GeoDataFrame: Mostly for TPChange .nc files currently. Can be generalised """
+#     df = ds.to_dataframe()
+#     df.reset_index(inplace = True)
+#     df.rename(columns = {
+#         **{c : "latitude_degN" for c in ["Lat", "latitude", "lat_degN"]},
+#         **{c : "longitude_degE" for c in ["Lon", "longitude", "lon_degE"]},
+#         "PAlt" : "barometric_altitude_m",
+#         "Pres" : "pressure_hPa",
+#         "Temp" : "temperature_K",
+#         "Theta" : "theta_K",
+#         "Time" : 'Datetime', "time" : "Datetime", 
+#         }, inplace = True)
     
-    # Convert CLaMS N2O to ppb
-    if "CLaMS_N2O" in gdf.columns: 
-        gdf["CLaMS_N2O_ppb"] = conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
-        gdf.drop(columns = ["CLaMS_N2O"], inplace = True)
+#     df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
+#     geodata = [Point(lat, lon) for lat, lon in zip(
+#         df['latitude_degN'], df['longitude_degE'])]
 
-    return gdf
+#     # create geodataframe using lat and lon data from indices
+#     df.drop([c for c in ['scale', 'P0'] if c in df.columns], axis=1, inplace=True)
+#     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
 
-def rename_columns(columns) -> dict:
-    """ Create dictionary relating column name with AMES_variable object
-
-    Relate dataframe column name with all information in
-
-    Get new column names and col_name_dict for AMES data structure.
-    Get only short name + unit; description found in coordinate instance for specific col_name
-    Standardise names via case changes
-    """
-    col_name_dict = {}
-    for x in columns:
-        if len(x.split(';')) == 3:
-            col_name, long_name, unit = [i.strip() for i in x.split(';')]
-        else:
-            col_name = x.split(";")[0].strip()
-        col_name_dict.update({x: col_name})
-    return col_name_dict
-
-# EMAC data handling
-def process_emac_s4d(ds, incl_model=True, incl_tropop=True, incl_subs=True):
-    """ Choose which variables to keep when importing EMAC data .
-
-    Parameters:
-        ds: currrent xarray dataset
-        incl_subs (bool): keep tracer substances
-        incl_model (bool): keep modelled meteorological data
-        incl_tropop (bool): keep tropopause-relevant variabels
-
-    Variable description:
-        time - datetime [ns]
-        tlon - track longitude [degrees_east]
-        tlat - track latitude [degrees_north]
-        tpress - track pressure [hPa]
-        tps - track surface pressure [Pa]
-        tracer_* - modelled substances [mol/mol]
-        tropop_* - tropopause relevant variables
-        ECHAM5_* - modelled met. data
-        e5vdiff_tpot* - potential temperature [K]
-    """
-    variables = ['time', 'tlon', 'lev', 'tlat', 'tpress', 'tps']
-    if incl_model:
-        variables.extend([v for v in ds.variables
-                          if v.startswith(('ECHAM5_', 'e5vdiff_tpot'))
-                          and not v.endswith(('m1', 'aclc'))])
-    if incl_tropop:
-        variables.extend([v for v in ds.variables
-                          if v.startswith('tropop_') and not v.endswith('_f')
-                          and not any([x in v for x in ['_clim', 'pblh']])])
-    if incl_subs:
-        tracers = [s.col_name for s in dcts.get_substances(**{'ID': 'EMAC'})]
-        tracers_at_fl = [t + '_at_fl' for t in tracers]
-        variables.extend([v for v in ds.variables if
-                          (v in tracers or v in tracers_at_fl)])
-    # only keep specified variables
-    ds = ds[variables]
-    for var in ds.variables:  # streamline units
-        if hasattr(ds[var], 'units'):
-            if ds[var].units == 'Pa':
-                ds[var] = ds[var].metpy.convert_units(units.hPa)
-            elif ds[var].units == 'm':
-                ds[var] = ds[var].metpy.convert_units(units.km)
-            ds[var] = ds[var].metpy.dequantify()  # makes units an attribute again
-    # if either lon or lat are nan, drop that timestamp
-    ds = ds.dropna(subset=['tlon', 'tlat'], how='any', dim='time')
-    ds = ds.rename({'tlon': 'longitude', 'tlat': 'latitude'})
-    ds['time'] = ds.time.dt.round('S')  # rmvs floating pt errors
-    return ds
-
-def process_emac_s4d_s(ds, incl_model=True, incl_tropop=True, incl_subs=True):
-    """ Keep only variables that depend only on time and are available in subsampled data """
-    ds = process_emac_s4d(ds, incl_model, incl_tropop, incl_subs)
-    variables = [v for v in ds.variables if ds[v].dims == ('time',)]
-    return ds[variables]
-
-# TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
-def process_TPC(ds): # from V04
-    """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
+#     if not gdf.Datetime.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format
+#         index_time = [dt.datetime(y, 1, 1) for y in gdf.Datetime]
+#         gdf['Datetime'] = index_time
+#     gdf.set_index('Datetime', inplace=True).sort_index(inplace=True)
+#     gdf.index = gdf.index.floor('s')  # remove micro/nanoseconds
     
-    NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
-    NB ATom:    drop_variables = ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']
+#     # Convert CLaMS N2O to ppb
+#     if "CLaMS_N2O" in gdf.columns: 
+#         gdf["CLaMS_N2O_ppb"] = conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
+#         gdf.drop(columns = ["CLaMS_N2O"], inplace = True)
 
-    """
-    def flatten_TPdims(ds):
-        """ Flatten additional dimensions corresponding to Main / Second / ... Tropopauses.  
-        Used for ERA5 / CLaMS reanalysis datasets from version .03
-        """
-        TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-        TP_qualifier_dict = {0 : '_Main', 
-                            1 : '_Second', 
-                            2 : '_Third'}
-        for variable in TP_vars: 
-            # get secondary dimension for the current multi-dimensional variable
-            [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-            for TP_value in ds[variable][TP_dim].values: 
-                ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-            ds = ds.drop_vars(variable)
-        return ds
+#     # WOUDC: Convert Ozone partial pressure to ppb
+#     if any('O3_mPa' in v for v in gdf.columns): 
+#         [pPress_col] = [v for v in gdf.columns if 'O3_mPa' in v]
+#         gdf['O3_ppb'] = conv_pPress_PartsPer(gdf[pPress_col], gdf['pressure_hPa'])
     
-    # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
-    ds = flatten_TPdims(ds)
-    if "Time" in ds.variables:
-        ds = ds.sortby("Time")
-        ds = ds.dropna(dim="Time", how = "all")
-        ds = ds.dropna(dim="Time", subset = ["Time"])
-    else: 
-        print("Cannot find variable `Time`, please check the data files. ")
+#     woudc_cols = [c for c in gdf.columns if "WOUDC" in c]
+#     gdf.rename(columns = {col : col[12:] for col in woudc_cols}, inplace=True) # remove WOUDC_STNxxx prefix
 
-    variables = [v for v in ds.variables if (
-        "N2O" in v or v in ["Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
-        ] + dcts.TPChange_variables()
-    return ds[[v for v in variables if v in ds.variables]]
+#     # Reorder columns
+#     ordered_cols = list(gdf.columns)
+#     ordered_cols.sort(key = lambda x: x if not x.startswith(('ERA5', 'CLaMS', 'geo')) else 'z'+x)
 
-def get_TPChange_gdf(fname_or_pdir): 
+#     gdf = gdf[[c for c in ordered_cols if not c == "RH_%"]]
+
+#     return gdf
+
+# def rename_columns(columns) -> dict:
+#     """ Create dictionary relating column name with AMES_variable object
+
+#     Relate dataframe column name with all information in
+
+#     Get new column names and col_name_dict for AMES data structure.
+#     Get only short name + unit; description found in coordinate instance for specific col_name
+#     Standardise names via case changes
+#     """
+#     col_name_dict = {}
+#     for x in columns:
+#         if len(x.split(';')) == 3:
+#             col_name, long_name, unit = [i.strip() for i in x.split(';')]
+#         else:
+#             col_name = x.split(";")[0].strip()
+#         col_name_dict.update({x: col_name})
+#     return col_name_dict
+
+# def add_theta(ds, t_var = "t", p_var = "isobaricInhPa", theta_name='theta'): 
+#     """ Calculate ERA5 potential temperature from pressure and temperature.
+#     Unless specified, assumes variables 'isobaricInhPa' and 't' to be present in ds. 
+#     """
+#     pressure = ds[p_var] * units.hPa
+#     temperature = ds[t_var].values * units.kelvin
+
+#     # Make sure pressure info is available for all temperature points
+#     p_broadcasted = np.broadcast_to(pressure, temperature.shape)
+#     p_broadcasted = p_broadcasted * units.hPa
+
+#     # Calculate potential temperature
+#     theta = calc.potential_temperature(p_broadcasted, temperature)
+
+#     # Add to dataset
+#     ds[theta_name] = (ds[t_var].dims, theta.magnitude)
+#     ds[theta_name].attrs["units"] = "K"
+#     ds[theta_name].attrs["long_name"] = "Potential Temperature"
+#     return ds
+
+
+# # TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
+# def process_TPC(ds): # from V04
+#     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
+    
+#     NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
+#     NB ATom:    drop_variables = ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']
+
+#     """
+#     def flatten_TPdims(ds):
+#         """ Flatten additional dimensions corresponding to Main / Second / ... Tropopauses.  
+#         Used for ERA5 / CLaMS reanalysis datasets from version .03
+#         """
+#         TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
+#         TP_qualifier_dict = {0 : '_Main', 
+#                             1 : '_Second', 
+#                             2 : '_Third'}
+#         for variable in TP_vars: 
+#             # get secondary dimension for the current multi-dimensional variable
+#             [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
+#             for TP_value in ds[variable][TP_dim].values: 
+#                 ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
+#             ds = ds.drop_vars(variable)
+#         return ds
+    
+#     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
+#     ds = flatten_TPdims(ds)
+#     if "Time" in ds.variables:
+#         ds = ds.sortby("Time")
+#         ds = ds.dropna(dim="Time", how = "all")
+#         ds = ds.dropna(dim="Time", subset = ["Time"])
+#     else: 
+#         print("Cannot find variable `Time`, please check the data files. ")
+
+#     variables = [v for v in ds.variables if (
+#         ("N2O" in v or "WOUDC" in v) or v in ["Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
+#         ] + dcts.TPChange_variables()
+
+#     return ds[[v for v in variables if v in ds.variables]]
+
+# def get_TPChange_gdf(fname_or_pdir): 
     """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). """
     if Path(fname_or_pdir).is_dir(): 
         fnames = [f for f in fname_or_pdir.glob("*.nc")]
@@ -679,6 +658,7 @@ def load_reload_Bin3D_df(action, pickle_obj = None, fname = None):
                 v.calc_lognorm_fits(50)
 
     return output
+
 # %% Fun with stats
 def prep_x_n(x): 
     """ Drop NaN values and get length"""
@@ -705,7 +685,6 @@ def variance(x):
 def skewness(x):
     """ Standardised 3rd moment"""
     return kth_moment(x, c = kth_moment(x, c=0, k= 1), k=3) / kth_moment(x, c = kth_moment(x, c=0, k= 1), k=2)**(3/2)
-
 
 # %% Plotting tools
 def add_zero_line(ax):
@@ -793,96 +772,6 @@ def nan_gaussian_filter(input, sigma, **kwargs):
         filtered_array[filtered_weights == 0] = np.nan  # Restore NaNs where weights are 0
 
     return filtered_array
-
-# %% Binning of global data sets
-def bin_1d(glob_obj, subs, **kwargs) -> tuple[list, list]:
-    """
-    Returns 1D binned objects for each year as lists (lat / lon)
-
-    Parameters:
-        subs (dictionaries.Substance)
-
-    Optional parameters:
-        c_pfx (str): caribic file pfx, required for caribic data
-        single_yr (int): if specified, use only data for that specific year
-
-    Returns:
-        out_x_list, out_y_list: lists of Bin1D objects binned along x / y
-    """
-    substance = subs.col_name
-    if kwargs.get('detr') and 'detr_' + substance in glob_obj.df.columns:
-        substance = 'detr_' + substance
-
-    out_lat_list, out_lon_list = [], []
-    for yr in glob_obj.years:  # loop through available years
-        df_yr = glob_obj.df[glob_obj.df.index.year == yr]
-
-        lat = np.array([df_yr.geometry.iloc[i].y for i in range(len(df_yr.index))])  # lat
-        if kwargs.get('lat_binlimits'):
-            lat_binclassinstance = bp.Bin_notequi1d(kwargs.get('lat_binlimits'))
-        else:
-            lat_bmin, lat_bmax = np.nanmin(lat), np.nanmax(lat)
-            lat_binclassinstance = bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size)
-        out_lat = bp.Simple_bin_1d(df_yr[substance], lat, lat_binclassinstance)
-        out_lat.__dict__.update(lat_binclassinstance.__dict__)
-
-        lon = np.array([df_yr.geometry.iloc[i].x for i in range(len(df_yr.index))])  # lon
-        if kwargs.get('lon_binlimits'):
-            lon_binclassinstance = bp.Bin_notequi1d(kwargs.get('lon_binlimits'))
-        else:
-            lon_bmin, lon_bmax = np.nanmin(lon), np.nanmax(lon)
-            lon_binclassinstance = bp.Bin_equi1d(lon_bmin, lon_bmax, glob_obj.grid_size)
-        out_lon = bp.Simple_bin_1d(df_yr[substance], lon, lon_binclassinstance)
-        out_lon.__dict__.update(lon_binclassinstance.__dict__)
-
-        if not all(np.isnan(out_lat.vmean)) or all(np.isnan(out_lon.vmean)):
-            out_lat_list.append(out_lat)
-            out_lon_list.append(out_lon)
-        else:
-            print(f'everything is nan for {yr}')
-
-    return out_lat_list, out_lon_list
-
-def bin_2d(glob_obj, subs, **kwargs) -> list: # Lat-Lon binning
-    """
-    Returns 2D binned object for each year as a list
-
-    Parameters:
-        substance (str): if None, uses default substance for the object
-        single_yr (int): if specified, uses only data for that year
-    """
-    substance = subs.col_name
-    if kwargs.get('detr'):
-        if 'detr_' + substance in glob_obj.df.columns:
-            substance = 'detr_' + substance
-        else:
-            print(f'detr_{substance} not found in {glob_obj.source} dataframe.')
-
-    out_list = []
-    for yr in glob_obj.years:  # loop through available years if possible
-        df_yr = glob_obj.df[glob_obj.df.index.year == yr]
-
-        lat = np.array([df_yr.geometry.iloc[i].y for i in range(len(df_yr.index))])  # lat
-        lat_binlimits = kwargs.get('lat_binlimits')
-        
-        if lat_binlimits is None:
-            # use equidistant binning if not specified else
-            lat_bmin, lat_bmax = np.nanmin(lat), np.nanmax(lat)
-            lat_binlimits = list(bp.Bin_equi1d(lat_bmin, lat_bmax, glob_obj.grid_size).xbinlimits)
-
-        lon = np.array([df_yr.geometry.iloc[i].x for i in range(len(df_yr.index))])  # lon
-        lon_binlimits = kwargs.get('lon_binlimits')
-        if lon_binlimits is None:
-            lon_bmin, lon_bmax = np.nanmin(lon), np.nanmax(lon)
-            lon_binlimits = list(bp.Bin_equi1d(lon_bmin, lon_bmax, glob_obj.grid_size).xbinlimits)
-
-        # create binclassinstance that's valid for both equi and nonequi
-        binclassinstance = bp.Bin_notequi2d(lat_binlimits, lon_binlimits)
-        out = bp.Simple_bin_2d(np.array(df_yr[substance]), lat, lon, binclassinstance)
-        out.__dict__.update(binclassinstance.__dict__)
-
-        out_list.append(out)
-    return out_list
 
 #%% Miscellaneous
 def make_gif(pdir=None, fnames=None): # Animate changes over years
