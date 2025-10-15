@@ -10,17 +10,53 @@ import keyring
 import numpy as np
 import os
 import pandas as pd
+from pathlib import Path
 from shapely.geometry import Point
 import xarray as xr
 
 from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
-from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
 from dataTools.data._global import GlobalData
 import dataTools.dictionaries as dcts
 from dataTools import tools
+from dataTools.data import data_getter
 
-# HALO and ATOM campaigns from SQL Database
+TPCHANGE_WITH_OBS = { # Observations and model within TPChange data set
+    'CAR'  : 'CaribicTPChange',
+    'SHTR' : 'SouthtracTPChange',
+    'WISE' : 'WiseTPChange',
+    'ATOM' : 'AtomTPChange',
+    'HIPPO': 'HippoTPChange',
+    'PGS'  : 'PolstraccTPChange',
+    'PHL'  : 'PhileasTPChange',
+    }
+
+TPCHANGE_MODEL = { # Model data only
+    'Attrex' : 'MODEL_DATA/ATTREX_TPChange', # N2O available
+    'Envisat' : 'MODEL_DATA/ENVISAT_TPChange', # N2O available
+    'Euplex' : 'MODEL_DATA/EUPLEX_TPChange', # N2O available
+    'SPURT' : 'MODEL_DATA/SPURT_TPChange', # ? Obs data ?
+    'TACTS' : 'MODEL_DATA/TACTS_TPChange', # ! Obs data via SQL DB 
+    'TC4' : 'MODEL_DATA/TC4_TPChange', # N2O available
+    }
+
+SOURCES = { # 'Source' per Campaign
+    'TACTS': 'HALO',
+    'WISE' : 'HALO',
+    'PGS'  : 'HALO',
+    'SHTR' : 'HALO',
+    'PHL'  : 'HALO', 
+    'ATOM' : 'ATOM',
+    'HIPPO': 'HIAPER', 
+    'TC4' : 'Aircraft', 
+    'ATTREX' : 'GlobalHawk', 
+    'ENVISAT' : 'Balloon', 
+    'EUPLEX' : 'Falcon', 
+    'SPURT' : 'LearJet ',
+    'StratoClim' : 'Geophysica',
+    }
+
+# Aircraft campaigns (HALO, ATOM, HIAPER)
 class CampaignData(GlobalData):
     """ Stores data for a single HALO / ATom campaign.
     
@@ -37,23 +73,13 @@ class CampaignData(GlobalData):
     
         Parameters 
         ---
-        campaign (str): SHTR, WISE, PGS, TACTS, ATOM, HIPPO, PHL
+        campaign (str): SHTR, WISE, PGS, TACTS, ATOM, HIPPO, PHL, StratoClim, 
         """
         years = dcts.years_per_campaign(campaign)
         super().__init__(years, grid_size)
 
         self.years = years
-
-        source_dict = {
-            'SHTR' : 'HALO',
-            'WISE' : 'HALO',
-            'PGS'  : 'HALO',
-            'TACTS': 'HALO',
-            'ATOM' : 'ATOM',
-            'HIPPO': 'HIAPER', 
-            'PHL'  : 'HALO'}
-        self.source = source_dict[campaign]
-
+        self.source = SOURCES[campaign]
         self.ID = campaign
         self.instruments = list(dcts.get_instruments(self.ID))
         self.data = {}
@@ -61,12 +87,7 @@ class CampaignData(GlobalData):
 
         if not 'df' in self.data: 
             self.create_df()
-        self.calc_coordinates()
-
-        # if 'flight_id' in self.df:
-        #     self.flights = set(self.data['df']['flight_id'].values)
-        # if 'Flight number' in self.df:
-        #     self.flights = set(self.data['df']['Flight number'].values)
+        self.data['df'] = data_getter.calc_coordinates(self.df) # TODO: test this
 
         self.years = list(set(self.data['df'].index.year))
         self.set_tps(**tps_dict)
@@ -83,6 +104,66 @@ class CampaignData(GlobalData):
             return (
                 f"""{self.__class__}
     status: {self.status}""")
+
+    def get_data(self, **kwargs): 
+        """ Either import from TPChange netcdf or join together observational and model data. """
+        # Check for importing from pickled DATA dictionary
+        fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
+        dict_path = tools.get_path() + 'misc_data\\pickled_dicts\\' + fname
+        path = Path(dict_path) if not kwargs.get('path') else Path(kwargs.get('path'))
+        if not kwargs.get('recalculate') and path.exists():
+            with open(path, 'rb') as f:
+                self.data = dill.load(f)
+            if 'df' not in self.data: 
+                if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
+                    self.get_data(recalculate=True)
+            self.status.update(dict(path = self.status.get('path', []) + [path])) # add path to status
+            return self.data
+
+        # Recalculate from TPChange obs + model files
+        if self.ID in TPCHANGE_WITH_OBS.keys(): 
+            print('Importing data from TPChange interpolation files.')
+            fnames = Path('E:/TPChange') / TPCHANGE_WITH_OBS[self.ID] 
+            dataframe = tools.get_TPChange_gdf(fnames)
+            self.data['df'] = dataframe
+            return self.data
+
+        # Recalculate from TPChange model files (+ MISSING OBS DATA)
+        elif self.ID in TPCHANGE_MODEL.keys(): 
+            print('Importing meteo data from TPChange interpolation files.')
+            fnames = 'E:/TPChange/' + Path('E:/TPChange') / TPCHANGE_MODEL[self.ID] 
+            dataframe = tools.get_TPChange_gdf(fnames)
+
+            self.data['met_data'] = dataframe
+
+            print('No observational data available in interpolated files. ')
+            return self.data
+        else: 
+            raise Warning(f"Could neither find a stored DATA_dict nor find TPChange files for ID {self.ID}. ")
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """ Combined dataframe with measurement and modelled data. """
+        if 'df' in self.data:
+            return self.data['df']
+        return self.create_df()
+
+    @property
+    def met_data(self) -> pd.DataFrame:
+        """ Meteorological Parameters along the flight track. """
+        if 'met_data' in self.data:
+            return self.data['met_data']
+        return self.get_met_data()
+
+#%% SQL Database Import
+class CampaignSQLData(CampaignData):
+    """ Class for campaigns where observational data is available only through the SQL database. """
+
+    def __init__(self, campaign, grid_size=5, tps_dict={}, **kwargs):
+        """ Initialise campaign object. """
+        super().__init__(campaign, grid_size=grid_size, tps_dict=tps_dict, **kwargs)
+        self.get_obs_data()
+        self.create_df()
 
     @property
     def _log_in(self):
@@ -111,23 +192,23 @@ class CampaignData(GlobalData):
         all_flights_dct = {
             'ATOM' :
                 [f'AT1_{i}' for i in range(1, 12)] + [
-                    f'AT2_{i}' for i in range(1, 12)] + [
-                    f'AT3_{i}' for i in range(1, 14)] + [
-                    f'AT4_{i}' for i in range(1, 14)],
+                 f'AT2_{i}' for i in range(1, 12)] + [
+                 f'AT3_{i}' for i in range(1, 14)] + [
+                 f'AT4_{i}' for i in range(1, 14)],
 
             'TACTS':
                 [f'T{i}' for i in range(1, 7)],
 
             'HIPPO':
                 [f'H1_{i}' for i in range(2, 12)] + [
-                    f'H2_{i}' for i in range(-1, 12)] + [
-                    f'H3_{i}' for i in range(1, 12)] + [
-                    f'H4_{i}' for i in range(0, 13)] + [
-                    f'H5_{i}' for i in range(1, 15)],
-            }
+                 f'H2_{i}' for i in range(-1, 12)] + [
+                 f'H3_{i}' for i in range(1, 12)] + [
+                 f'H4_{i}' for i in range(0, 13)] + [
+                 f'H5_{i}' for i in range(1, 15)],
+        }
         return all_flights_dct.get(self.ID)
 
-    def get_data(self, **kwargs) -> dict:
+    def get_obs_data(self, **kwargs) -> dict:
         """ Import campaign data per instrument from SQL Database.
     
         campaign dictionary:
@@ -137,64 +218,55 @@ class CampaignData(GlobalData):
             TACTS / CARIBIC
     
         """
-        fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
-        dict_path = tools.get_path() + 'misc_data\\pickled_dicts\\' + fname
-        
-        from pathlib import Path
-        path = Path(dict_path) if not kwargs.get('path') else Path(kwargs.get('path'))
-        if not kwargs.get('recalculate') and path.exists():
-            with open(path, 'rb') as f:
-                self.data = dill.load(f)
-            self.status.update(dict(path = self.status.get('path', []) + [path]))
+        print('Importing Campaign Data from SQL Database.')
 
-            if not 'df' in self.data:
-                if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
-                    self.get_data(recalculate=True)
+        time_data = client_data_choice(
+            log_in=self._log_in,
+            campaign=self.ID,
+            special=self._special,
+            time=True,
+            flights=self._default_flights,
+            )
 
-        else:
-            if self.ID == 'PHL': 
-                print('Importing all PHILEAS data from NetCDF files.')
-                
-                met_pdir = r'E:/TPChange/' + 'PhileasTPChange'
-                fnames = met_pdir + "/*.nc"
-                dataframe = tools.get_TPChange_gdf()
-                
-                data_dict = get_phileas_era5()
-                self.data = data_dict
-                return self.data
+        if kwargs.get('verbose'):
+            print('Imported time data')
+        time_df = time_data._data['DATETIME']
+        time_df.index += 1  # measurement_id
+        time_df.index.name = 'measurement_id'
 
-                # print('Importing PHILEAS data')
-                # data_dict = get_phileas_data(time_res = kwargs.get('time_res', '10s'))
-                # self.data = data_dict
-                # return self.data
-            
-            print('Importing Campaign Data from SQL Database.')
+        self.data['time'] = time_df
 
-            time_data = client_data_choice(
-                log_in=self._log_in,
-                campaign=self.ID,
-                special=self._special,
-                time=True,
-                flights=self._default_flights,
-                )
-
+        for instr in self.instruments:
             if kwargs.get('verbose'):
-                print('Imported time data')
-            time_df = time_data._data['DATETIME']
-            time_df.index += 1  # measurement_id
-            time_df.index.name = 'measurement_id'
-
-            self.data['time'] = time_df
-
-            for instr in self.instruments:
-                if kwargs.get('verbose'):
-                    print('Importing data for ', instr)
-                self.get_instrument_data(instr, time=time_df, **kwargs)
-
-            # self.merge_instr_data()  # Merge data from all instruments, create .df
-            self.get_met_data()  # Get meteorological data, create .met_data
+                print('Importing data for ', instr)
+            self.get_instrument_data(instr, time=time_df, **kwargs)
 
         return self.data
+
+    def create_df(self) -> pd.DataFrame:
+        """ Combine available data into single dataframe, interpolate ERA5 data. """
+
+        df = self.df if 'df' in self.data else self.merge_instr_data()
+        met_data = self.data['met_data'] if 'met_data' in self.data else self.get_met_data()
+        times = self.data['time'].values if 'time' in self.data else df.index
+
+        try:
+            interpolated_met_data = tools.interpolate_onto_timestamps(met_data, times, 'int_')
+        except:
+            print('Interpolation unsuccessful. ')
+            interpolated_met_data = met_data
+
+        # Drop non-int columns
+        int_cols = [c[4:] for c in interpolated_met_data.columns if (
+            c.startswith('int_') and c[4:] in df.columns)]
+        df.drop(columns = int_cols, inplace=True)
+        
+        # met_data = self.get_met_data()
+        df = df.join(interpolated_met_data, rsuffix='_dupe')
+        df.drop(columns = [c for c in df.columns if '_dupe' in c], inplace=True)
+
+        self.data['df'] = df
+        return df
 
     def get_instrument_data(self, instr: str, time: pd.Series, **kwargs) -> pd.DataFrame:
         """ Import data for given instrument. """
@@ -264,264 +336,3 @@ class CampaignData(GlobalData):
         gdf = geopandas.GeoDataFrame(data, geometry=geodata)
         self.data['df'] = gdf
         return gdf
-
-    def get_met_data(self) -> pd.DataFrame:
-        """ Creates dataframe for CLaMS data from netcdf files. """
-        if self.ID in ['SHTR', 'WISE', 'ATOM', 'HIPPO', 'PGS', 'PHL']:
-            return self.get_clams_data()
-
-        elif self.ID in ['TACTS'] and 'df' in self.data.keys():
-            met_cols = [c for c in self.df.columns if c in [
-                c.col_name for c in dcts.get_coordinates()
-                if not c.col_name == 'geometry']]
-            met_df = self.df[met_cols]
-
-        else:
-            raise NotImplementedError(f'Cannot create met_data for {self.ID}')
-
-        self.data['met_data'] = met_df
-        return met_df
-
-    def create_df(self) -> pd.DataFrame:
-        """ Combine available data into single dataframe, interpolate ERA5 data. """
-
-        df = self.df if 'df' in self.data else self.merge_instr_data()
-        met_data = self.data['met_data'] if 'met_data' in self.data else self.get_met_data()
-        times = self.data['time'].values if 'time' in self.data else df.index
-
-        try:
-            interpolated_met_data = tools.interpolate_onto_timestamps(met_data, times, 'int_')
-        except:
-            print('Interpolation unsuccessful. ')
-            interpolated_met_data = met_data
-
-        # Drop non-int columns
-        int_cols = [c[4:] for c in interpolated_met_data.columns if (
-            c.startswith('int_') and c[4:] in df.columns)]
-        df.drop(columns = int_cols, inplace=True)
-        
-        # met_data = self.get_met_data()
-        df = df.join(interpolated_met_data, rsuffix='_dupe')
-        df.drop(columns = [c for c in df.columns if '_dupe' in c], inplace=True)
-
-        self.data['df'] = df
-        return df
-
-    @property
-    def df(self) -> pd.DataFrame:
-        """ Combined dataframe with measurement and modelled data. """
-        if 'df' in self.data:
-            return self.data['df']
-        return self.create_df()
-
-    @property
-    def met_data(self) -> pd.DataFrame:
-        """ Meteorological Parameters along the flight track. """
-        if 'met_data' in self.data:
-            return self.data['met_data']
-        return self.get_met_data()
-
-
-def get_phileas_era5():
-    """ Get ERA5, UMAQS and FAIRO data from TPChange .nc files"""
-    met_pdir = r'E:/TPChange/' + 'PhileasTPChange'
-    fnames = met_pdir + "/*.nc"
-
-    def process_ERA5_PHILEAS(ds): 
-        """ Preprocess datasets for ERA5 / CLaMS renalayis data for PHILEAS - include BAHAMAS. """
-        def flatten_TPdims(ds):
-            TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-            TP_qualifier_dict = {0 : '_Main', 1 : '_Second', 2 : '_Third'}
-            for variable in TP_vars: 
-                # get secondary dimension for the current multi-dimensional variable
-                [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-                for TP_value in ds[variable][TP_dim].values: 
-                    ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-                ds = ds.drop_vars(variable)
-            return ds
-        # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
-        ds = flatten_TPdims(ds)
-        
-        # Add flight number column (take everything after first string, then take stuff up until next ;)
-        fl_nr = ds.flight_info.split('Flightnumber: F')[1].split(';')[0]
-        fl_nr = float(fl_nr.replace('a', '').replace('b', ''))
-        
-        flight_arr = xr.DataArray(
-            fl_nr, 
-            coords=ds.coords,  # Use the same coordinates as the existing dataset
-            dims=ds.dims,  # Use the same dimension names as the existing dataset
-            )
-        ds['Flight number'] = flight_arr
-
-        vars = set(list(tools.ERA5_variables()) + ['Flight number']
-                   + ['Lat', 'Lon', 'PAlt', 'Pres', 'Theta'] # include Bahamas MET data   
-                   + ['PHILEAS_N2O', 'PHILEAS_O3', 'PHILEAS_CO']) # Include observations
-
-        return ds[[v for v in vars if v in ds.variables]]
-    
-    with xr.open_mfdataset(fnames, preprocess = process_ERA5_PHILEAS) as ds: 
-        df = ds.to_dataframe()
-    df.dropna(subset = [c for c in df.columns if not c.endswith('_Second')], how = 'any', inplace = True)
-        
-    df.rename(columns = {
-        'Lat' : 'BAHAMAS_LAT',
-        'Lon' : 'BAHAMAS_LON',
-        'PAlt' : 'BAHAMAS_ALT',
-        'Pres' : 'BAHAMAS_PSTAT', # NB_PSIA
-        'Theta' : 'BAHAMAS_POT', # source Bahamas?
-        }, inplace = True)
-
-    geodata = [Point(lon, lat) for lon, lat in zip(
-        df['BAHAMAS_LON'], df['BAHAMAS_LAT'])]
-    df = geopandas.GeoDataFrame(df, geometry=geodata)
-    
-    met_df = df[[c for c in df.columns if not c.startswith('PHILEAS')]]
-
-    df.rename(columns = dict(
-        PHILEAS_CO = 'UMAQS_CO',
-        PHILEAS_N2O = 'UMAQS_N2O',
-        PHILEAS_O3 = 'FAIRO_O3'), 
-                inplace = True)
-
-    data_dictionary = {
-        'met_data' : met_df, 
-        'df' : df
-        }
-    return data_dictionary
-
-def get_phileas_data_fl07_fl19(time_res = '10s'): 
-    """ Temporary function for creating merge files for the PHILEAS campaign. """  
-    # GHOST_ECD
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07_Frankfurt_20230821_HALO_GHOST_ECD_v1.csv"
-    ghost_7 = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    ghost_7['Flight number'] = 7
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F19_Solingen_20230922_HALO_GHOST_ECD_v1.csv"
-    ghost_19 = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    ghost_19['Flight number'] = 19
-    ghost = pd.concat([ghost_7, ghost_19])
-    ghost = ghost.drop(columns = ['Mean', 'Time_Start', 'Time_End'])
-    ghost.index = ghost.index.round('s')
-    ghost.dropna(how = 'all', inplace = True)
-    
-    # FAIRO
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07a_2023-08-21_HALO_FAIRO_O3_V02.ames"
-    fairo_7a = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    fairo_7a['Flight number'] = 7
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07b_2023-08-21_HALO_FAIRO_O3_V02.ames"
-    fairo_7b = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    fairo_7b['Flight number'] = 7
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F19_2023-09-22_HALO_FAIRO_O3_V02.ames"
-    fairo_19 = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    fairo_19['Flight number'] = 19
-    fairo = pd.concat([fairo_7a, fairo_7b, fairo_19])
-    fairo.drop(columns = ['Mid_UTC;'], inplace = True)
-    fairo.index = fairo.index.round('s')
-    fairo.rename(columns = {c : c.split(';')[0] for c in fairo.columns}, inplace = True)
-    
-    # UMAQS
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F07_Frankfurt_20230821_HALO_UMAQS_v1.ames"
-    umaqs_7 = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    umaqs_7['Flight number'] = 7
-    fname = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_F19_Solingen_20230922a_HALO_UMAQS_v1.ames"
-    umaqs_19 = FFI1001DataReader(fname, df=True, xtype='secofday').df
-    umaqs_19['Flight number'] = 19
-    umaqs = pd.concat([umaqs_7, umaqs_19])
-    umaqs.index = umaqs.index.round('s')
-    umaqs.drop(columns = ['UTC_seconds;'], inplace = True)
-    
-    # ERA5 Data
-    def process_ERA5_PHILEAS(ds): 
-        """ Preprocess datasets for ERA5 / CLaMS renalayis data for PHILEAS - include BAHAMAS. """
-        def flatten_TPdims(ds):
-            TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-            TP_qualifier_dict = {0 : '_Main', 1 : '_Second', 2 : '_Third'}
-            for variable in TP_vars: 
-                # get secondary dimension for the current multi-dimensional variable
-                [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-                for TP_value in ds[variable][TP_dim].values: 
-                    ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-                ds = ds.drop_vars(variable)
-            return ds
-        # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
-        ds = flatten_TPdims(ds)
-        vars = set(list(tools.ERA5_variables()) + ['Lat', 'Lon', 'PAlt', 'Pres', 'Theta']) # include Bahamas MET data
-        return ds[[v for v in vars if v in ds.variables]]
-    
-    era5_7a = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_20230821_F07a_TPC_V04.nc"
-    era5_7b = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_20230821_F07b_TPC_V04.nc"
-    era5_19 = r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\PHILEAS\PHILEAS_20230922_F19_TPC_V04.nc"
-    with xr.open_mfdataset([era5_7a, era5_7b, era5_19], preprocess = process_ERA5_PHILEAS) as ds: 
-        era5_ds = ds
-    era5 = era5_ds.to_dataframe()
-    era5_rename_vars = {
-        'Lat' : 'BAHAMAS_LAT',
-        'Lon' : 'BAHAMAS_LON',
-        'PAlt' : 'BAHAMAS_ALT',
-        'Pres' : 'BAHAMAS_PSTAT', # NB_PSIA
-        'Theta' : 'BAHAMAS_POT', # source Bahamas?
-        }
-    # era5_rename_tps = {c:c[:-5] for c in era5.columns if '_Main' in c}
-    # era5_rename = dict(era5_rename_vars, **era5_rename_tps)
-    era5.rename(columns = era5_rename_vars, inplace=True)
-
-    # Interpolate onto 
-    times = era5.resample(time_res).mean().index
-    umaqs_resampled = tools.interpolate_onto_timestamps(umaqs, times)
-    ghost_resampled = tools.interpolate_onto_timestamps(ghost, times)
-    fairo_resampled = tools.interpolate_onto_timestamps(fairo, times)
-    era5_resampled = tools.interpolate_onto_timestamps(era5, times)
-    
-    for instr, df in {'UMAQS' : umaqs_resampled, 
-                      'GHOST_ECD' : ghost_resampled, 
-                      'FAIRO' : fairo_resampled}.items():
-        for col in df.columns:
-            # if kwargs.get('verbose'):
-            #     print(f'Renaming: {col} -> {dcts.harmonise_variables(instr, col)}')
-            df[dcts.harmonise_variables(instr, col)] = df.pop(col)
-   
-    msmt_data = pd.concat([umaqs_resampled, ghost_resampled, fairo_resampled], axis = 'columns').dropna(how = 'all')
-    era5_resampled.drop([i for i in times if i not in msmt_data.index], inplace = True)
-    df_resampled = pd.concat([msmt_data, era5_resampled], axis = 'columns') # this results in duplicate values (most likely)
-
-    geodata = [Point(lon, lat) for lon, lat in zip(
-        df_resampled['BAHAMAS_LON'], df_resampled['BAHAMAS_LAT'])]
-    df = geopandas.GeoDataFrame(df_resampled, geometry=geodata)
-    df = df[[c for c in df.columns if c not in ['C2H6', 'CFC12']]][df['BAHAMAS_LAT'].notna()]
-    # df.rename(columns = {c:c[4:] for c in df.columns if 'BAHAMAS' in c}, inplace = True)
-    
-    # Quite possibly the ugliest way of dealing with duplicate flight number columns but behold it works: 
-    def same_merge(x): return np.nanmin(x)
-    flight_nr = df['Flight number'].T.groupby(level=0).apply(lambda x: x.apply(same_merge,)).T
-    df.drop(columns = ['Flight number'], inplace = True)
-    df['Flight number'] = flight_nr
-
-    # Create output     
-    data_dictionary = {
-        'GHOST' : ghost_resampled, 
-        'UMAQS' : umaqs_resampled, 
-        'FAIRO' : fairo_resampled, 
-        'met_data' : era5_resampled, 
-        'df' : df,
-    }
-    return data_dictionary
-
-def get_HrelTP_fl07_fl19_from_file(): 
-    """ """
-    fnames = [
-        r"data\PHILEAS_FAIRO-UV_w_HrelTP\PHILEAS_F07a_2023-08-21_HALO_FAIRO_O3_V02.csv",
-        r"data\PHILEAS_FAIRO-UV_w_HrelTP\PHILEAS_F07b_2023-08-21_HALO_FAIRO_O3_V02.csv",
-        r"data\PHILEAS_FAIRO-UV_w_HrelTP\PHILEAS_F19_2023-09-22_HALO_FAIRO_O3_V02.csv"
-        ]
-    
-    paths = [dcts.get_path() + fname for fname in fnames]
-    
-    df = pd.DataFrame()
-    
-    for path in paths: 
-        df_flight = pd.read_csv(path, sep = ';')
-        df = pd.concat([df, df_flight])
-    df.rename(columns = {"Unnamed: 0": 'Datetime'}, inplace = True)
-    df['Datetime'] = pd.to_datetime(df['Datetime'], format = 'ISO8601')
-    df.set_index('Datetime', inplace = True)
-    df.index = df.index.round('s')
-    return df

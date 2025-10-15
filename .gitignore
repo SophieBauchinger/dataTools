@@ -140,3 +140,4 @@ misc_data/emac_ds.nc
 # Locally stored data 
 misc_data
 data/store
+coordinates_WITH_int_.csv
