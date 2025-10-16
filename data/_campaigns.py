@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" EMAC data class definition
+""" Aircraft Campaign and Data collection Types.
 
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun 11 17:35:00 2024
@@ -56,7 +56,31 @@ SOURCES = { # 'Source' per Campaign
     'StratoClim' : 'Geophysica',
     }
 
-# Aircraft campaigns (HALO, ATOM, HIAPER)
+#%% Any data type - Use for N2O?
+class DataCollection(GlobalData):
+    """ Combined data sets incl. Sonde and Aircraft data. 
+    Needs to contain geoinformation for each point. """ 
+    def __init__(self, dataframe:pd.DataFrame, ID:str, **kwargs): 
+        """ Initialise data collection object with a datetime-indexed dataframe. """
+        if not 'Datetime' in str(type(dataframe.index)): 
+            raise Warning("Given dataframe needs to be datetime-indexed.")
+        years = set(dataframe.index.year)
+        super().__init__(years, **kwargs)
+        self.source = self.ID = ID
+
+        self.data['df'] = dataframe
+        self.df.sort_index()
+
+    def __repr__(self):
+        return f"""{self.__class__}
+    years: {self.years}
+    status: {self.status}"""
+
+    def dropna(self, cols=None):
+        """ Remove NaN values from the dataframe. """
+        self.df.dropna(subset = cols, how='all', inplace=True)
+        
+#%% Aircraft campaigns (HALO, ATOM, HIAPER)
 class CampaignData(GlobalData):
     """ Stores data for a single HALO / ATom campaign.
     
@@ -155,7 +179,7 @@ class CampaignData(GlobalData):
             return self.data['met_data']
         return self.get_met_data()
 
-#%% SQL Database Import
+#%% SQL Database Import - Aircraft Campaigns
 class CampaignSQLData(CampaignData):
     """ Class for campaigns where observational data is available only through the SQL database. """
 
@@ -336,3 +360,4 @@ class CampaignSQLData(CampaignData):
         gdf = geopandas.GeoDataFrame(data, geometry=geodata)
         self.data['df'] = gdf
         return gdf
+

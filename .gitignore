@@ -138,6 +138,7 @@ misc_data/emac_ds.nc
 .idea/other.xml
 
 # Locally stored data 
-misc_data
+misc_data/
 data/store
+other/
 coordinates_WITH_int_.csv
