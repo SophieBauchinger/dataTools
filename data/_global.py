@@ -12,22 +12,16 @@ import dill
 import pandas as pd
 import matplotlib.patheffects as mpe
 import matplotlib.pyplot as plt
-from metpy import calc
-from metpy.units import units
 import numpy as np
-import os
 import warnings
-import xarray as xr
 
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy  # type: ignore
 from toolpac.outliers import outliers  # type: ignore
-from toolpac.readwrite import find
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-from dataTools.data import data_getter
 
-from dataTools.data.local import MaunaLoa
+from dataTools.data._local import MaunaLoa
 from dataTools.data.mixin_selection import SelectionMixin
 import dataTools.data.tropopause as tp_tools
 

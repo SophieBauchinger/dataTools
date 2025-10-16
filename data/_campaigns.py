@@ -7,12 +7,9 @@
 import dill
 import geopandas
 import keyring
-import numpy as np
-import os
 import pandas as pd
 from pathlib import Path
 from shapely.geometry import Point
-import xarray as xr
 
 from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
 

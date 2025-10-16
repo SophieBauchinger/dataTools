@@ -49,7 +49,7 @@ class SelectionMixin:
             Remove all tropospheric datapoints
     """
 
-    def sel_subset(self, inplace:bool = False, **kwargs):
+    def select(self, inplace:bool = False, **kwargs):
         """ Allows making multiple selections at once.
 
         Parameters:

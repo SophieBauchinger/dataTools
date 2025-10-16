@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" Model data class definitions: ERa5, EMAC, Mozart
+""" DEPRECATED Model data class definitions: ERa5, EMAC, Mozart
 
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun 11 17:35:00 2024
@@ -15,13 +15,12 @@ import pandas as pd
 from shapely.geometry import Point
 import xarray as xr
 
-from dataTools.data._global import GlobalData, ModelDataMixin
-from dataTools.data.mixin_analysis import AnalysisMixin
+from dataTools.data._global import GlobalData, AnalysisMixin
 import dataTools.dictionaries as dcts
 from dataTools import tools
 
 # ERA5 / CLAMS
-class Era5ModelData(AnalysisMixin, ModelDataMixin): 
+class Era5ModelData(AnalysisMixin): 
     """ Holds ERA5 reanalysis / CLaMS model data as available from TPChange. """
     def __init__(self, campaign, met_pdir=None, recalculate=False): 
         """ Initialise object with imported reanalysis model data """

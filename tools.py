@@ -48,15 +48,12 @@ import datetime as dt
 import dill
 import geopandas
 import glob
-from metpy.units import units
-from metpy import calc
 import numpy as np
 from pathlib import Path
 import pandas as pd
 from PIL import Image
 from scipy import stats
 from scipy.ndimage import zoom, gaussian_filter
-from shapely.geometry import Point
 import traceback
 import warnings
 import xarray as xr

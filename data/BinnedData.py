@@ -11,7 +11,6 @@ import numpy as np
 
 import toolpac.calc.binprocessor as bp
 
-import dataTools.dictionaries as dcts
 from dataTools import tools
 
 
@@ -113,7 +112,6 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
         xbmin, xbmax, xbsize,
         ybmin, ybmax, ybsize,
         zbmin, zbmax, zbsize)
-
 
 # BINNING
 def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):

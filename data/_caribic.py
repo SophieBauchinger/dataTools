@@ -4,16 +4,8 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun 11 17:35:00 2024
 """
-import dill
-import geopandas
-import numpy as np
 import pandas as pd
-from pathlib import Path
-from shapely.geometry import Point
 import traceback
-
-from toolpac.readwrite import find # type: ignore
-from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
 from dataTools.data._global import GlobalData
 import dataTools.dictionaries as dcts

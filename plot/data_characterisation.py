@@ -10,7 +10,6 @@ import matplotlib.patheffects as mpe
 import numpy as np
 
 import dataTools.dictionaries as dcts
-from dataTools import tools
 import dataTools.data.BinnedData as bin_tools
 import dataTools.data.tropopause as tp_tools
 import dataTools.plot.create_figure as cfig

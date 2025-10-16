@@ -4,11 +4,11 @@
 @Date: Fri Dec 20 16:40:00 2024
 
 Templates for complex figure layouts and legends. 
+Includes helpers for large datasets and special plot components. 
 
 """
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from cmcrameri import cm # cm.managua for months
 import math
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -24,10 +24,6 @@ import dataTools.dictionaries as dcts
 from dataTools import tools
 
 #%% Helpers
-def outline(): 
-    """ Helper function to add outline to lines in plots. """
-    return mpe.withStroke(linewidth=2, foreground='white')
-
 def save(fig, fname, path=None):
     """ Save figures as pdf with 300dpi and tight bbox_inches -> default path """
     if not path: 
@@ -36,6 +32,69 @@ def save(fig, fname, path=None):
         fname = fname+".pdf"
     fig.savefig(path+fname, dpi=300, bbox_inches='tight')
     print(f"Saved figure as {path+fname}")
+
+#%% Big data figure resampling
+def big_data_go_resample(df, x_cols, y_cols, fig=None): 
+    """ Use plotly figure resampler to display big datasets. """
+    # Prep data (x needs to increase monotonically)
+    if type(y_cols)==str: 
+        y_cols = [y_cols]
+    if type(x_cols)==str:
+        x_cols = [x_cols]
+    if not fig: 
+        fig = FigureResampler(go.Figure())
+    for x_c in set(x_cols):
+        df_sorted = df.dropna(subset=x_c).sort_values(x_c)
+        if len(df_sorted.dropna(subset = [x_c]))==0: continue
+        for y_c in set(y_cols).difference({x_c}):
+            if len(df_sorted.dropna(subset = [y_c]))==0: continue
+            note = '' if not 'STN' in x_c else f"/ {x_c.split('_STN')[1]}"
+            fig.add_trace(
+                go.Scattergl(name = f"{y_c.split('_S')[0]} / {x_c.split('_S')[0]} {note}",
+                             mode='markers', showlegend=True),
+                hf_x=df_sorted[x_c], 
+                hf_y=df_sorted[y_c],
+        )
+    fig.update_yaxes(type="log")
+    return fig
+
+#%% Basic map / plotting helpers
+def outline(): 
+    """ Helper function to add outline to lines in plots. """
+    return mpe.withStroke(linewidth=2, foreground='white')
+
+def add_zero_line(ax):
+    """ Highlight the gridline at 0 for the chosen axis on the given Axes object.
+
+    NB! Call when everything else has been plotted and adjusted already, otherwise the limits will be messy 
+    (and it may highlight the wrong line).
+    """
+    zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks() != 0)
+    for l in zero_lines:
+        l.set_color('k')
+        l.set_linestyle('-.')
+
+    if len(zero_lines) == 0:
+        xlims = ax.get_xlim()
+        ax.hlines(0, *xlims, color='k', ls='-.', lw=.5)
+        ax.set_xlim(*xlims)
+
+def world_map():
+    """ Basic PlateCarree map of the world with land and ocean. """
+    fig = plt.figure(dpi=250)
+    gs = gridspec.GridSpec(1, 1, hspace=0.5)
+    ax = fig.add_subplot(gs[-1], projection=ccrs.PlateCarree())
+
+    ax.add_feature(cfeature.COASTLINE, edgecolor = '#505050', lw = 0.5)
+    ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha = 0.5)
+
+    ax.set_ylim(-90, 90)
+    ax.set_xlim(-180, 180)
+
+    gridliner = ax.gridlines(draw_labels=True, ls='dotted')
+    gridliner.right_labels = False
+    gridliner.top_labels = False
+    return fig, ax
 
 # Figures and axes creation
 def three_sideplot_structure() -> tuple[plt.Figure, tuple[plt.Axes]]: 
@@ -278,32 +337,6 @@ def highlight_axis(ax, color='g', axis='y'):
         ax.xaxis.label.set_color(color)
     return ax
 
-#%% Big data
-def big_data_go_resample(df, x_cols, y_cols, fig=None): 
-    """ Use plotly figure resampler to display big datasets. """
-    # Prep data (x needs to increase monotonically)
-    if type(y_cols)==str: 
-        y_cols = [y_cols]
-    if type(x_cols)==str:
-        x_cols = [x_cols]
-    if not fig: 
-        fig = FigureResampler(go.Figure())
-    for x_c in set(x_cols):
-        df_sorted = df.dropna(subset=x_c).sort_values(x_c)
-        if len(df_sorted.dropna(subset = [x_c]))==0: continue
-        for y_c in set(y_cols).difference({x_c}):
-            if len(df_sorted.dropna(subset = [y_c]))==0: continue
-            note = '' if not 'STN' in x_c else f"/ {x_c.split('_STN')[1]}"
-            fig.add_trace(
-                go.Scattergl(name = f"{y_c.split('_S')[0]} / {x_c.split('_S')[0]} {note}",
-                             mode='markers', showlegend=True),
-                hf_x=df_sorted[x_c], 
-                hf_y=df_sorted[y_c],
-        )
-    fig.update_yaxes(type="log")
-    return fig
-
-    
 #%% Legends 
 def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
     """ Create a legend for the default season-color scale. 
@@ -411,40 +444,3 @@ def month_legend_handles(months = range(1,13)):
             for m in months]
     return lines
 
-# %% from TOOLS
-
-def add_zero_line(ax):
-    """ Highlight the gridline at 0 for the chosen axis on the given Axes object.
-
-    NB! Call when everything else has been plotted and adjusted already, otherwise the limits will be messy 
-    (and it may highlight the wrong line).
-    """
-    zero_lines = np.delete(ax.get_ygridlines(), ax.get_yticks() != 0)
-    for l in zero_lines:
-        l.set_color('k')
-        l.set_linestyle('-.')
-
-    if len(zero_lines) == 0:
-        xlims = ax.get_xlim()
-        ax.hlines(0, *xlims, color='k', ls='-.', lw=.5)
-        ax.set_xlim(*xlims)
-
-# %% Basic helper maps
-def world_map():
-    """ Basic PlateCarree map of the world with land and ocean. """
-    fig = plt.figure(dpi=250)
-    gs = gridspec.GridSpec(1, 1, hspace=0.5)
-    ax = fig.add_subplot(gs[-1], projection=ccrs.PlateCarree())
-
-    ax.add_feature(cfeature.COASTLINE, edgecolor = '#505050', lw = 0.5)
-    ax.add_feature(cfeature.OCEAN, facecolor='lightblue', alpha = 0.5)
-
-    ax.set_ylim(-90, 90)
-    ax.set_xlim(-180, 180)
-
-    gridliner = ax.gridlines(draw_labels=True, ls='dotted')
-    gridliner.right_labels = False
-    gridliner.top_labels = False
-    return fig, ax
-
-# %%

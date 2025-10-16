@@ -15,7 +15,7 @@ from toolpac.outliers import outliers
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
-from dataTools.data.local import MaunaLoa
+from dataTools.data._local import MaunaLoa
 
 
 #%% N2O statistical filter
