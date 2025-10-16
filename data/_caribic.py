@@ -76,7 +76,7 @@ class Caribic(GlobalData):
     years: {self.years}
     status: {self.status}"""
 
-    def get_data(self, recalculate=False, fname:str="None", 
+    def get_data(self, recalculate=False, fname:str=None, 
                  verbose=False, source_pdir=None): 
         """ Imports Caribic data in the form of geopandas dataframes.
 
@@ -95,7 +95,7 @@ class Caribic(GlobalData):
             if verbose: print(f'Loaded CARIBIC data from {filepath}')
 
             # Check data for pfxs and years: 
-            if all(pfx in data.keys() for pfx in self.pfxs):
+            if all(pfx in data_dict.keys() for pfx in self.pfxs):
                 data = {k:data_dict[k] for k in self.pfxs} # choose only the requested pfxs
             else: 
                 print(f'Warning: Could not load {[pfx for pfx in self.pfxs if pfx not in data.keys()]}')

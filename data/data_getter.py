@@ -132,11 +132,11 @@ def create_tp_coords(df, verbose=False) -> pd.DataFrame: # TODO: Fix this
 
 #%% Pickled data dictionaries in .data.store
 
-def load_DATA_dict(ID, status, fname="None"): 
+def load_DATA_dict(ID, status, fname=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl. """
+    pdir = Path(tools.get_path()+ 'data\\store\\')
     if not fname:
-        pdir = Path(tools.get_path()+ 'data\\store\\')
-        fnames = [i for i in pdir.iterdir() if f'{ID.lower()}_DATA' in i]
+        fnames = [i for i in pdir.iterdir() if f'{ID.lower()}_DATA' in str(i)]
         fnames.sort(key=lambda x: x.name[-10:]) # sort by date
         fname = fnames[-1] # get latest file
 

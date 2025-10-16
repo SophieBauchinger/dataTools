@@ -195,10 +195,20 @@ def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs):
 
     Returns a dictionary of {month : Simple_bin_*d object}. 
     """
-    raise NotImplementedError("Tough cookie.")
-    monthly_dfs = {m: df[df.month == m] for m in np.arange(1,13)}
+    # raise NotImplementedError("Tough cookie.")
+    if not isinstance(df.index, pd.DatetimeIndex):
+        # TODO: if not DateTime-indexed df, need to check for 'month' column
+        raise NotImplementedError("Non Datetime-Index not yet supported.")
+
+    bci = make_bci(xcoord, ycoord, zcoord, **kwargs)
+    monthly_dict = {}
+    monthly_dfs = {m: df[df.index.month == m] for m in np.arange(1,13)}
     for month in np.arange(1,13): 
         m_df = monthly_dfs[month]
+        bin_m_out = binning(m_df, var, xcoord, ycoord, zcoord, 
+                            bci=bci, **kwargs)
+        monthly_dict[month] = bin_m_out
+    return monthly_dict        
 
 
 #%% Stratosphere / Troposphere binning

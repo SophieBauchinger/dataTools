@@ -760,9 +760,10 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
     def get_coords(self, **coord_kwargs) -> list: 
         """ Returns all coordinates that fit the specified parameters and exist in self.df """
         try: 
-            coords = [tp for tp in self.coordinates 
-                  if tp.col_name in [c.col_name for 
-                                     c in dcts.get_coordinates(**coord_kwargs)]]
+            coords = self.coordinates
+            for attr in coord_kwargs.keys(): 
+                coords = [c for c in coords 
+                          if getattr(c, attr)==coord_kwargs[attr]]
         except KeyError: 
             coords = []
             warnings.warn('Warning. No coordinates found in data using the given specifications.')
