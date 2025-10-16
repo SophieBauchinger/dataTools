@@ -1,14 +1,16 @@
 from ._caribic import Caribic
 from ._campaigns import CampaignData, CampaignSQLData, DataCollection
-from .local import LocalData, MaunaLoa, MaceHead
-from .tropopause import n2o_baseline_filter
+from ._model import Era5ModelData, EMAC, Mozart
+from ._local import MaunaLoa, MaceHead
 
+from .tropopause import n2o_baseline_filter
 from .BinnedData import binning, seasonal_binning, monthly_binning
 
 if not (
     all(isinstance(var, type) for var in 
         [Caribic, CampaignData, CampaignSQLData, 
-        LocalData, MaunaLoa, MaceHead, DataCollection]) 
+        Era5ModelData, EMAC, Mozart,
+        MaunaLoa, MaceHead, DataCollection]) 
     and all(callable(var) for var in 
         [n2o_baseline_filter, binning, 
         seasonal_binning, monthly_binning])): 
