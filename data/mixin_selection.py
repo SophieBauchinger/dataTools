@@ -49,6 +49,14 @@ class SelectionMixin:
             Remove all tropospheric datapoints
     """
 
+    def _prepare_output(self):
+        """ Return a new instance of it's class in the same state. """
+        out = type(self).__new__(self.__class__)  # new class instance
+        for attribute_key in self.__dict__:  # copy attributes
+            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+        out.data = self.data.copy()  # stops self.data being overwritten
+        return out
+
     def select(self, inplace:bool = False, **kwargs):
         """ Allows making multiple selections at once.
 
@@ -64,10 +72,7 @@ class SelectionMixin:
             raise KeyError('Subset selection is not possible with the following parameters:\
                             {}'.format([k for k in kwargs if f'sel_{k}' not in self.__dir__()]))
 
-        out = type(self).__new__(self.__class__)  # new class instance
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-        out.data = self.data.copy()  # stops self.data being overwritten
+        out = self._prepare_output()
 
         def get_fctn(class_inst, selection):
             if f'sel_{selection}' in class_inst.__dir__():
@@ -98,22 +103,15 @@ class SelectionMixin:
         if len(yr_list) != len(years):
             print(f'Note: No data available for {[yr for yr in years if yr not in self.years]}')
 
-        out = type(self).__new__(self.__class__)  # new class instance
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-        out.data = self.data.copy()  # stops self.data being overwritten
+        out = self._prepare_output()
 
-        if self.source == 'MULTI': # TODO: why differentiate here?
-            out.data['df'] = out.data['df'][out.data['df'].index.year.isin(yr_list)]
-
-        elif self.source in ['Caribic', 'EMAC', 'TP']:
+        if self.source != 'Mozart':
             # Dataframes
             df_list = [k for k in self.data
                        if isinstance(self.data[k], pd.DataFrame)]  # or Geo-dataframe
             for k in df_list:  # only take data from chosen years
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
                 out.data[k].sort_index(inplace=True)
-
             # Datasets
             ds_list = [k for k in self.data
                        if isinstance(self.data[k], xr.Dataset)]
@@ -129,41 +127,27 @@ class SelectionMixin:
         else: 
             raise Warning(r"Data source unknown, cannot proceed with default data types. ")
 
-        yr_list.sort()
-        out.years = yr_list
-        
+        out.update_years()
         if inplace: 
             self.__dict__.update(out.__dict__)
         return out
 
     def sel_latitude(self, lat_min:float, lat_max:float, inplace:bool=False):
         """ Returns GlobalData object containing only data for selected latitudes """
-        # copy everything over without changing the original class instance
-        out = type(self).__new__(self.__class__)
-        for attribute_key in self.__dict__:
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
-        out.data = self.data.copy()
+        out = self._prepare_output()
         
-        if self.source == 'MULTI' and isinstance(self.data['df'], geopandas.GeoDataFrame): 
-            out.data['df'] = out.data['df'].cx[-180:180, lat_min:lat_max]
-
-        elif self.source in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM']:
-            df_list = [k for k in self.data
+        if self.source != 'Mozart':
+            # (Geo)dataframes
+            gdf_list = [k for k in self.data
                        if isinstance(self.data[k], geopandas.GeoDataFrame)]  # needed for latitude selection
-            for k in df_list:  # delete everything that isn't the chosen lat range
-                out.data[k] = out.data[k].cx[-180:180, lat_min:lat_max]
+            for k in gdf_list:  # delete everything that isn't the chosen lat range
+                out.data[k] = out.data[k].cx[-180:180, lat_min:lat_max].copy()
                 out.data[k].sort_index(inplace=True)
             for k in [k for k in self.data if
-                      k not in df_list and isinstance(self.data[k], pd.DataFrame)]:  # non-geodataframes
-                indices = [index for df_indices in [out.data[k].index for k in df_list] for index in
+                      k not in gdf_list and isinstance(self.data[k], pd.DataFrame)]:  # non-geodataframes
+                indices = [index for df_indices in [out.data[k].index for k in gdf_list] for index in
                            df_indices]  # all indices in the Geo-dataframes
                 out.data[k] = out.data[k].loc[out.data[k].index.isin(indices)]
-
-            # update available years, flights
-            if len(df_list) != 0:
-                out.years = list(set(out.data[df_list[-1]].index.year))
-                out.years.sort()
 
             # Datasets
             ds_list = [k for k in self.data
@@ -174,10 +158,6 @@ class SelectionMixin:
                 out.data[k] = out.data[k].where(out.data[k]['latitude'] > lat_min)
                 out.data[k] = out.data[k].where(out.data[k]['latitude'] < lat_max)
 
-            # update years if it hasn't happened with the dataframe already
-            if 'df' not in self.data and self.source == 'EMAC':  # only dataset exists
-                self.years = list(set(pd.to_datetime(self.data['ds']['time'].values).year))
-                
             # update object status
             if 'latitude' in out.status:
                 out.status['latitude'] = (max([out.status['latitude'][0], lat_min]),
@@ -185,7 +165,7 @@ class SelectionMixin:
             else:
                 out.status['latitude'] = (lat_min, lat_max)
 
-        elif self.source == 'Mozart':
+        else:
             out.data['df'] = out.df.query(f'latitude > {lat_min}')
             out.data['df'] = out.df.query(f'latitude < {lat_max}')
             out.years = list(set(out.df.index.year))
@@ -195,23 +175,15 @@ class SelectionMixin:
             if hasattr(out, 'SF6'):
                 out.SF6 = out.df['SF6']
 
-        else:
-            raise Warning(f'Not implemented for {self.source}')
-
+        out.update_years()
         if inplace: 
             self.__dict__.update(out.__dict__)
         return out
 
     def sel_eqlat(self, eql_min:float, eql_max:float, model='ERA5', inplace:bool=False):
         """ Returns GlobalData object containing only data for selected equivalent latitudes """
-        # copy everything over without changing the original class instance
-        out = type(self).__new__(self.__class__)
-        for attribute_key in self.__dict__:
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-        out.data = self.data.copy()
+        out = self._prepare_output()
 
-        if self.source not in ['Caribic', 'TP']:
-            raise NotImplementedError('Action not yet supported for non-Caribic data')
         [eql] = self.get_coords(model=model, hcoord='eql')
         df = self.data['df'].copy()
         df = df[df[eql.col_name] > eql_min]
@@ -231,6 +203,7 @@ class SelectionMixin:
         else:
             out.status['eq_lat'] = (eql_min, eql_max)
 
+        out.update_years()
         if inplace: 
             self.__dict__.update(out.__dict__)
         return out
@@ -246,15 +219,13 @@ class SelectionMixin:
                 return self
             raise Warning('Cannot select {} as already filtered for {}'.format(
                 [dcts.dict_season()[f'name_{s}'] for s in seasons], self.status['season']))
-        out = type(self).__new__(self.__class__)  # new class instance
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
+        out = self._prepare_output()
 
         out.data = {}
         # Dataframes
         df_list = [k for k in self.data
                    if isinstance(self.data[k], pd.DataFrame)]  # or Geodf
-        for k in df_list:  # only take data from chosen years
+        for k in df_list:  # only take data from chosen season(s)
             out.data[k] = self.data[k].copy()
             out.data[k]['season'] = tools.make_season(out.data[k].index.month)
 
@@ -264,27 +235,23 @@ class SelectionMixin:
             out.data[k].sort_index(inplace=True)
 
         out.status['season'] = [dcts.dict_season()[f'name_{s}'] for s in seasons]
+        out.update_years()
         if inplace: 
             self.__dict__.update(out.__dict__)
         return out
 
     def sel_flight(self, flights, verbose=False, inplace:bool=False):
-        """ Returns Caribic object containing only data for selected flights
+        """ Returns (Caribic) object containing only data for selected flights
             flight_list (int / list) """
         if not hasattr(self, 'flights'):
             raise NotImplementedError(f'Flight selection not available for {self.source}.')
         if isinstance(flights, int): flights = [flights]
-        # elif isinstance(flights, range): flights = list(flights)
         invalid = [f for f in flights if f not in self.flights]
         if len(invalid) > 0 and verbose:
             print(f'No data found for flights {invalid}. Proceeding without.')
         flights = [f for f in flights if f in self.flights]
 
-        out = type(self).__new__(self.__class__)  # create new class instance
-        for attribute_key in self.__dict__:  # copy stuff like pfxs
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-        # very important so that self.data doesn't get overwritten
-        out.data = self.data.copy()
+        out = self._prepare_output()
 
         df_list = [k for k in self.data
                    if isinstance(self.data[k], pd.DataFrame)
@@ -294,10 +261,8 @@ class SelectionMixin:
                 out.data[k]['Flight number'].isin(flights)]
             out.data[k].sort_index(inplace=True)
 
-        # out.flights = flights  # update to chosen & available flights
-        out.years = list(set(out.data['df'].index.year))
+        out.update_years()
         out.years.sort()
-        # out.flights.sort()
 
         if inplace: 
             self.__dict__.update(out.__dict__.copy())
@@ -309,33 +274,31 @@ class SelectionMixin:
         Prarameters: 
             inplace (bool)
             
-            key tps: Tropopause definitions to filter with 
+            key coords: Coordinates / Tropopause definitions to filter with 
         """
-        tps = kwargs.get('tps', self.tps)
+        coords = kwargs.get('coords', self.coords)
         index_origin = kwargs.get('index_origin', 'df_sorted')
         
-        shared_indices = tools.get_shared_indices(self.data[index_origin], tps)
+        shared_indices = tools.get_shared_indices(self.data[index_origin], coords)
 
-        out = type(self).__new__(self.__class__)  # new class instance
-        for attribute_key in self.__dict__:  # copy attributes
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
+        out = self._prepare_output()
         out.data = {}
+
         df_list = [k for k in self.data
                    if isinstance(self.data[k], pd.DataFrame)]  # includes geodataframes
         for k in df_list:  # only take data from chosen years
             out.data[k] = self.data[k][self.data[k].index.isin(shared_indices)]
 
-        out.status['shared_i_coords'] = tps
+        out.status['shared_i_coords'] = coords
 
         if inplace:
             self.data = out.data
-            self.status['shared_indices'] = (index_origin, len(tps))
+            self.status['shared_indices'] = (index_origin, len(coords))
 
         return out
 
 # --- Make selections based on strato / tropo characteristics --- 
-    def sel_atm_layer(self, atm_layer: str, tp=None, inplace:bool=False, **kwargs):
+    def sel_atm_layer(self, atm_layer: str, tp=None, inplace:bool=False):
         """ Create GlobalData object with strato / tropo sorting.
 
         Parameters:
@@ -347,29 +310,13 @@ class SelectionMixin:
             key pvu (float): 1.5, 2.0, 3.5
             key limit (float): pre-flag limit for chem. TP sorting
         """
-        out = type(self).__new__(self.__class__)  # create new class instance
-        for attribute_key in self.__dict__:  # copy stuff like pfxs
-            out.__dict__[attribute_key] = copy.deepcopy(self.__dict__[attribute_key])
-
-        if not tp: 
-            if 'source' not in kwargs and self.source in ['Caribic', 'EMAC']:
-                kwargs.update({'source': self.source})
-    
-            if 'rel_to_tp' not in kwargs and any(
-                    c.rel_to_tp for c in self.get_coords(**kwargs)):
-                kwargs.update({'rel_to_tp': True})
-    
-            [tp] = self.get_coords(**kwargs)
-
-        if 'df_sorted' not in self.data:
-            df_sorted = self.create_df_sorted(save=False, **kwargs)
-        else:
-            df_sorted = self.df_sorted
-
-        if f'{atm_layer}_{tp.col_name}' not in df_sorted:
-            raise KeyError(f'Could not find {tp.col_name} in df_sorted.')
+        out = self._prepare_output()
+        out.data = {}
+        df_sorted = self.df_sorted
 
         atm_layer_col = f'{atm_layer}_{tp.col_name}'
+        if atm_layer_col not in df_sorted:
+            raise KeyError(f'Could not find {tp.col_name} in `df_sorted`.')
 
         # Filter all dataframes to only include indices in df_sorted
         df_list = [k for k in self.data
