@@ -393,11 +393,7 @@ class TropopauseSorterMixin:
         Parameters: 
             key verbose (bool): Make the function more talkative        
         """
-        if self.source not in ['Caribic', 'EMAC', 'TP', 'HALO', 'ATOM', 'HIAPER', 'MULTI']:
-            raise NotImplementedError(f'Cannot create df_sorted for {self.source} data.')
-        
         data = self.df.copy()
-
         # create df_sorted with flight number if available
         df_sorted = pd.DataFrame(data['Flight number'] if 'Flight number' in data.columns else None,
                                  index=data.index)
@@ -846,6 +842,15 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
         flights = set(self.df[fl_cols[0]])
         return list(flights)
 
+    def update_years(self):
+        """ Show available years in the main dataset. """
+        if not 'Datetime' in str(type(self.df.index)): 
+            raise Warning("`self.df` needs to be datetime-indexed.")
+        df_yrs = list(set(self.df.index.year))
+        df_yrs.sort()
+        self.years = df_yrs
+        return df_yrs
+        
     @property
     @abstractmethod
     def df(self) -> pd.DataFrame:
