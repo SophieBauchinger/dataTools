@@ -14,6 +14,7 @@ from metpy import calc
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import re
 from shapely.geometry import Point
 import traceback
 import warnings
@@ -132,9 +133,19 @@ def create_tp_coords(df, verbose=False) -> pd.DataFrame: # TODO: Fix this
 
 #%% Pickled data dictionaries in .data.store
 
-def load_DATA_dict(ID, status, fname=None): 
-    """ Load locally saved data within dataTools from pickled DATA_dict.pkl. """
-    pdir = Path(tools.get_path()+ 'data\\store\\')
+def load_DATA_dict(ID, status, fname=None, pdir=None): 
+    """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
+    
+    Arguments: 
+        ID (str): short name of the chosen campaign / measurement station. 
+        status (dict): For saving information on the flight path. 
+        fname (str): Specify a file to load. 
+        pdir (str|Path): Specify the parent directory to look for the file. 
+     
+    For aircraft campaigns, returns a dictionary containing pandas dataframes.
+    For ozone sondes measurements, returns a pandas dataframe. 
+    """
+    pdir = pdir or Path(tools.get_path()+ 'data\\store\\')
     if not fname:
         fnames = [i for i in pdir.iterdir() if f'{ID.lower()}_DATA' in str(i)]
         fnames.sort(key=lambda x: x.name[-10:]) # sort by date
@@ -147,11 +158,28 @@ def load_DATA_dict(ID, status, fname=None):
     with open(filepath, 'rb') as f:
         data = dill.load(f)
 
-    if not 'df' in data: 
+    if not 'df' in data and not isinstance(data, pd.DataFrame): 
         print(f"No merged dataframe found for ID {ID}. Check file or call .create_df() to calculate.")
 
     status.update(dict(path = status.get('path', []) + [filepath])) # add path to status
     return data, status, filepath
+
+def load_ozone_sonde_data(stn_ids, status, pdir=None): 
+    """ Create join dataframe incl. stn/flight info for WOUDC/HPS & TPChange sonde data. """
+    def update_flight_nr(df, ID):
+        df['Flight number'] = [f'{ID}_{i}' for i in df["Flight number"]]
+        return df
+
+    stn_dict = {}
+    for stn_id in stn_ids:
+        stn_df, status, filepath = load_DATA_dict(stn_id, status, pdir=pdir)
+        stn_df = update_flight_nr(stn_df, stn_id)
+        stn_dict[stn_id] = stn_df
+
+    station_df = pd.concat(stn_dict.values())
+    station_df.drop(columns=['latitude_degN', 'longitude_degE'], inplace=True)
+
+    return stn_dict, station_df
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
 def process_TPC(ds): 
@@ -186,8 +214,15 @@ def process_TPC(ds):
     else: 
         print("Cannot find variable `Time`, please check the data files. ")
 
+    # Add 'Flight number' column
+    flight_info = ds.attrs.get("flight_info") # None if not available
+    if "Flightnumber" in flight_info:
+        flight_id = flight_info.split("Flightnumber: ")[1][:6]
+        flight_nr = "".join(re.findall(r'\d+', flight_id))
+        ds['Flight number'] = flight_nr
+
     variables = [v for v in ds.variables if (
-        ("N2O" in v or "WOUDC" in v) or v in ["Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
+        ("N2O" in v or "WOUDC" in v) or v in ["Flight number", "Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
         ] + dcts.TPChange_variables()
 
     return ds[[v for v in variables if v in ds.variables]]
@@ -205,7 +240,7 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         "Theta" : "theta_K",
         "Time" : 'Datetime', "time" : "Datetime", 
         }, inplace = True)
-    
+
     df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
     geodata = [Point(lat, lon) for lat, lon in zip(
         df['latitude_degN'], df['longitude_degE'])]
@@ -219,7 +254,7 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         gdf['Datetime'] = index_time
     gdf = gdf.set_index('Datetime').sort_index()
     gdf.index = gdf.index.floor('s')  # remove micro/nanoseconds
-    
+
     # Convert CLaMS N2O to ppb
     if "CLaMS_N2O" in gdf.columns: 
         gdf["CLaMS_N2O_ppb"] = tools.conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
@@ -293,7 +328,6 @@ def import_era5_data(ID:str, fnames:str=None, single_year=None) -> pd.DataFrame:
         ds = ds
     met_df = ds_to_gdf(ds)
     return met_df
-
 #%% MOZAIC (IAGOS-Core) with interpolated ERA5 variables
 UNITS_MOZAIC= {
     'time' : 'seconds since 2000-01-01 00:00', #  UTC

@@ -840,7 +840,10 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
         if len(fl_cols) < 1 or len(fl_cols) > 1:
             raise KeyError(f'Found {len(fl_cols)}' + '.' if len(fl_cols)==0 else f'{fl_cols}')
         flights = set(self.df[fl_cols[0]])
-        return list(flights)
+        flights = list(flights)
+        flights.sort()
+        
+        return flights
 
     def update_years(self):
         """ Show available years in the main dataset. """
