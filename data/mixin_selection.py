@@ -14,9 +14,9 @@ class SelectionMixin
 """
 
 import copy 
+import geopandas
 import pandas as pd
 import xarray as xr
-import geopandas 
 
 from dataTools import dictionaries as dcts
 from dataTools import tools
@@ -111,7 +111,7 @@ class SelectionMixin:
                        if isinstance(self.data[k], pd.DataFrame)]  # or Geo-dataframe
             for k in df_list:  # only take data from chosen years
                 out.data[k] = out.data[k][out.data[k].index.year.isin(yr_list)]
-                out.data[k].sort_index(inplace=True)
+                out.data[k] = out.data[k].sort_index()
             # Datasets
             ds_list = [k for k in self.data
                        if isinstance(self.data[k], xr.Dataset)]
@@ -132,6 +132,25 @@ class SelectionMixin:
             self.__dict__.update(out.__dict__)
         return out
 
+    def sel_month(self, *months_int, inplace:bool=False): 
+        """ Returns GlobalData object containing only data for selected months. """
+        if not all(month in self.df.index.month for month in months_int): 
+            raise Warning("Month selection: Not all of ({months_int}) are available in self.df. ")
+        out = self._prepare_output()
+
+        # Dataframes
+        df_list = [k for k in self.data
+                    if isinstance(self.data[k], pd.DataFrame)]
+        for k in df_list:  # only take data from chosen months
+            out.data[k] = out.data[k][out.data[k].index.month.isin(months_int)]
+            out.data[k] = out.data[k].sort_index()
+
+        out.status['months'] = months_int
+        out.update_years()
+        if inplace: 
+            self.__dict__.update(out.__dict__)
+        return out
+
     def sel_latitude(self, lat_min:float, lat_max:float, inplace:bool=False):
         """ Returns GlobalData object containing only data for selected latitudes """
         out = self._prepare_output()
@@ -142,7 +161,7 @@ class SelectionMixin:
                        if isinstance(self.data[k], geopandas.GeoDataFrame)]  # needed for latitude selection
             for k in gdf_list:  # delete everything that isn't the chosen lat range
                 out.data[k] = out.data[k].cx[-180:180, lat_min:lat_max].copy()
-                out.data[k].sort_index(inplace=True)
+                out.data[k] = out.data[k].sort_index()
             for k in [k for k in self.data if
                       k not in gdf_list and isinstance(self.data[k], pd.DataFrame)]:  # non-geodataframes
                 indices = [index for df_indices in [out.data[k].index for k in gdf_list] for index in
@@ -232,7 +251,7 @@ class SelectionMixin:
             mask = [i in seasons for i in out.data[k]['season']]
             out.data[k] = out.data[k].loc[mask]
             out.data[k] = out.data[k].drop(columns=['season'])
-            out.data[k].sort_index(inplace=True)
+            out.data[k] = out.data[k].sort_index()
 
         out.status['season'] = [dcts.dict_season()[f'name_{s}'] for s in seasons]
         out.update_years()
@@ -241,11 +260,13 @@ class SelectionMixin:
         return out
 
     def sel_flight(self, flights, verbose=False, inplace:bool=False):
-        """ Returns (Caribic) object containing only data for selected flights
-            flight_list (int / list) """
+        """ Returns object containing only data for selected flights
+        Params: 
+            flight_list (int / list) 
+        """
         if not hasattr(self, 'flights'):
             raise NotImplementedError(f'Flight selection not available for {self.source}.')
-        if isinstance(flights, int): flights = [flights]
+        if isinstance(flights, (int, str)): flights = [flights]
         invalid = [f for f in flights if f not in self.flights]
         if len(invalid) > 0 and verbose:
             print(f'No data found for flights {invalid}. Proceeding without.')
@@ -259,10 +280,12 @@ class SelectionMixin:
         for k in df_list:  # delete everything but selected flights
             out.data[k] = out.data[k][
                 out.data[k]['Flight number'].isin(flights)]
-            out.data[k].sort_index(inplace=True)
+            out.data[k] = out.data[k].sort_index()
 
         out.update_years()
         out.years.sort()
+        
+        out.status['flights'] = flights
 
         if inplace: 
             self.__dict__.update(out.__dict__.copy())
@@ -357,5 +380,3 @@ class SelectionMixin:
         LMS_data = strato_data[strato_data[tp.col_name] <= zbsize * nr_of_bins]
         
         return LMS_data
-
-
