@@ -5,6 +5,9 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Fri Dec 20 15:56:12 2024
 
+SimpleBin objects have the following main attributes: 
+    .vmean
+    .*intm (x/y/z)
 """
 import pandas as pd
 import numpy as np
@@ -208,6 +211,54 @@ def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs):
         monthly_dict[month] = bin_m_out
     return monthly_dict        
 
+#%% Weigthed binning
+def weighted_binning(data_list, bci): 
+    """ Weighted binning where each separate item in data_list contributes an equal amount (= 1). 
+    
+    data_list (list[(v,x)]): List containing tuples with (v,x) data arrays
+    binclassinstance (bp.Bin_(not)equi1d): one-dimensional binning structure
+    
+    Returns lists of weighted mean and weighted standard deviation.
+    """
+    # Sort into bins on x
+    binned_list = []
+    for x_v_tuple in data_list:
+        x,v = x_v_tuple 
+        binned = bp.Simple_bin_1d(v, x, bci)
+        binned_list.append(binned)
+
+    # Now calculate weighted mean and std per bin
+    weighted_mean_per_bin = []
+    weighted_std_per_bin = []
+    for i in np.arange(bci.nx): # Bin index
+        weighted_sum_list = []
+        total_vbindata = []
+        weight_list = []
+
+        for j, binned in enumerate(binned_list): # Ascent index
+            v_arr = binned.vbindata[i]
+            if str(v_arr)=='nan': continue
+            weight = 1/len(v_arr)
+
+            weighted_sum_ascent = np.nansum(v_arr) * 1/len(v_arr) 
+            weighted_sum_list.append(weighted_sum_ascent)
+            
+            weight_list.append([weight]*len(v_arr))
+            total_vbindata += list(v_arr)
+
+        total_weight = len(weighted_sum_list)
+        weighted_mean = sum(weighted_sum_list) / total_weight
+
+        # calculate the weighted standard deviation
+        diff_squared = [(val-weighted_mean)**2 for val in total_vbindata]
+        weighted_diffs = [weight*ds for weight, ds in zip(np.concatenate(weight_list), diff_squared)]
+        weighted_var = (np.nansum(weighted_diffs) / total_weight)
+        weighted_std = weighted_var**0.5
+        
+        weighted_mean_per_bin.append(weighted_mean)
+        weighted_std_per_bin.append(weighted_std)
+
+    return weighted_mean_per_bin, weighted_std_per_bin
 
 #%% Stratosphere / Troposphere binning
 def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
@@ -316,9 +367,10 @@ def make_ST_bins(GlobalObj, tropo_params, strato_params, **kwargs):
 # %% Now dealing with the OUTPUT
 def extract_attr(data_dict, bin_attr):
     """ Returns data_dict with bin_attr dimension removed. """
-    if isinstance(list(data_dict.values())[0], dict):  # seasonal
+    if isinstance(list(data_dict.values())[0], dict):  # seasonal / monthly
         return {k: {s: getattr(v[s], bin_attr) for s in v.keys()
                     } for k, v in data_dict.items()}
+    # Simple bins
     return {k: getattr(v, bin_attr) for k, v in data_dict.items()}
 
 
