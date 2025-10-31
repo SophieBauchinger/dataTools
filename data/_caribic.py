@@ -91,7 +91,6 @@ class Caribic(GlobalData):
                 data = {k:data_dict[k] for k in self.pfxs} # choose only the requested pfxs
             else: 
                 print(f'Warning: Could not load {[pfx for pfx in self.pfxs if pfx not in data.keys()]}')
-            data = self.sel_year(*self.years).data
             
             for special_item, generator in [
                 ('df', '.create_df()'),
@@ -101,6 +100,10 @@ class Caribic(GlobalData):
                 if special_item in data_dict: 
                     data[special_item] = data_dict[special_item]
                     if verbose: print(f'Loaded \'{special_item}\' from saved data. Call {generator} to generate anew. ')
+            self.data = data
+
+            # Remove data outside of given years
+            data = self.sel_year(*self.years).data
             self.data = data
             return data
 
