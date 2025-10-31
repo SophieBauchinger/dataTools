@@ -355,6 +355,9 @@ class Substance:
     def __repr__(self):
         return f'Substance : {self.short_name} [{self.unit}] - \'{self.col_name}\' from {self.ID}'
 
+    def __eq__(self, other: "Substance"): 
+        return self.col_name == other.col_name
+
     def label(self, name_only:bool=False, bin_attr:str=None, no_ID:bool=False):
         """ Returns string to be used as axis label. """
         detr_qualifier = 'rel. to BGD ' if self.detr else ''
