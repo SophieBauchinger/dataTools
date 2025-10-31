@@ -53,7 +53,7 @@ SOURCES = { # 'Source' per Campaign
     'StratoClim' : 'Geophysica',
     }
 
-#%% Any data type - Use for N2O?
+#%% Any data type
 class DataCollection(GlobalData):
     """ Combined data sets incl. Sonde and Aircraft data. 
     Needs to contain geoinformation for each point. """ 
@@ -67,10 +67,15 @@ class DataCollection(GlobalData):
 
         self.data['df'] = dataframe
         self.df.sort_index()
+        
+        # Optional parameters
+        self.data.update(**kwargs.get('data_dict', {}))
+        self.status.update(**kwargs.get('status', {}))
 
     def __repr__(self):
         return f"""{self.__class__}
     years: {self.years}
+    data: {list(self.data.keys())}
     status: {self.status}"""
 
     def dropna(self, cols=None):
