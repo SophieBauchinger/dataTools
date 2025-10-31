@@ -117,6 +117,13 @@ class Coordinate:
     def __repr__(self) -> str:
         return f'Coordinate: {self.col_name} [{self.unit}] from {self.ID}'
 
+    def __eq__(self, other: "Coordinate"): 
+        return self.name == other.name 
+
+    @property
+    def name(self):
+        return self.col_name.replace("_Main", "").replace("int_", "")
+
     def label(self, filter_label=False, coord_only=False, no_vc=False, bsize=None, no_model=True) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
@@ -283,30 +290,32 @@ def get_coordinates(**kwargs) -> list[Coordinate]:
     df = coordinate_df()
 
     for cond, val in kwargs.items():
+        val = str(val)
         if cond not in df.columns:
             raise KeyError(f'{cond} not recognised as valid coordinate qualifier.')
 
-        if cond == 'pvu' and not str(val) == 'nan':
+        if cond == 'pvu' and not val == 'nan':
+            # keep only rows where all conditions are fulfilled
             df = df[df[cond].astype(float) == kwargs[cond]]
-        # keep only rows where all conditions are fulfilled
-        elif not str(val).startswith('not_') and not str(val) == 'nan':
-            df = df[(df[cond] == kwargs[cond])
-                    | ('int_'+df[cond] == kwargs[cond]) 
-                    | (df[cond] == kwargs[cond]+'_Main')
-                    | ('int_'+df[cond] == kwargs[cond]+'_Main')
-                    ]
-            # above makes sure integrated coords return valid non-int coord object
-        elif str(val) == 'nan':
+
+        elif cond == 'col_name': 
+            # make sure integrated coords return valid non-int coord object
+            val = val.replace("_Main", "").replace("int_", "")
+            df = df[df[cond].astype(str) == val]
+
+        elif val == 'nan':
             df = df[df[cond].isna()]
-        # also take out coords that are specifically excluded
         elif val == 'not_nan':
+        # also take out coords that are specifically excluded
             df = df[~df[cond].isna()]
         elif val.startswith('not_'):
-            df = df[df[cond] != val[4:]]
+            df = df[df[cond].astype(str) != val[4:]]
+        else:
+            df = df[df[cond].astype(str) == val]
 
     if len(df) == 0:
         raise KeyError('No data found using the given specifications')
-    # df.set_index('col_name', inplace=True)
+
     coord_dict = df.to_dict(orient='index')
     coords = [Coordinate(**v) for k, v in coord_dict.items()]
     return coords
