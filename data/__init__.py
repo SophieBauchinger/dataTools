@@ -6,12 +6,6 @@ from ._local import MaunaLoa, MaceHead
 from .tropopause import n2o_baseline_filter
 from .BinnedData import binning, seasonal_binning, monthly_binning
 
-if not (
-    all(isinstance(var, type) for var in 
-        [Caribic, CampaignData, CampaignSQLData, 
-        Era5ModelData, EMAC, Mozart,
-        MaunaLoa, MaceHead, DataCollection]) 
-    and all(callable(var) for var in 
-        [n2o_baseline_filter, binning, 
-        seasonal_binning, monthly_binning])): 
-    print("Some of the imported data types do not match the expected value. ")
+if __name__=="__main__":
+    Caribic, CampaignData, CampaignSQLData, DataCollection, Era5ModelData, EMAC, Mozart, MaunaLoa, MaceHead
+    n2o_baseline_filter,binning, seasonal_binning, monthly_binning
