@@ -161,7 +161,21 @@ def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly 
 
 #%% Pickled data dictionaries in .data.store
 
-def load_DATA_dict(ID, status, fname=None, pdir=None): 
+def WOUDC_STATION_LIST(): 
+    return ['HPS']+[    # 1.1 GB 
+            '007',      # 198 MB
+            '190',      # 911 MB
+            '205',      #  11 MB
+            '254',      #  42 MB 
+            '339',      # 322 MB
+            '344',      # 1.5 GB
+            '435',      # 225 MB 
+            '436',      # 1.3 GB
+            '450',      # 272 MB
+            '458',      # 1.6 GB
+            ]
+
+def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
     
     Arguments: 
@@ -175,7 +189,8 @@ def load_DATA_dict(ID, status, fname=None, pdir=None):
     """
     pdir = pdir or Path(tools.get_path()+ 'data\\store\\')
     if not fname:
-        fnames = [i for i in pdir.iterdir() if f'{ID.lower()}_DATA' in str(i)]
+        fnames = [i for i in pdir.iterdir() if (
+            f'{ID.lower()}_DATA' in str(i) or f'{ID}_DATA' in str(i))]
         fnames.sort(key=lambda x: x.name[-10:]) # sort by date
         fname = fnames[-1] # get latest file
 
@@ -189,28 +204,46 @@ def load_DATA_dict(ID, status, fname=None, pdir=None):
     if not 'df' in data and not isinstance(data, pd.DataFrame): 
         print(f"No merged dataframe found for ID {ID}. Check file or call .create_df() to calculate.")
 
-    status.update(dict(path = status.get('path', []) + [filepath])) # add path to status
+    if status is not None: 
+        status.update(dict(path = status.get('path', []) + [filepath.name])) # add fname to status
     return data, status, filepath
 
-def load_ozone_sonde_data(stn_ids, status, pdir=None): 
-    """ Create join dataframe incl. stn/flight info for WOUDC/HPS & TPChange sonde data. """
+def save_DATA_dict(data, ID, pdir=None, woudc=False): 
+    """ Save pickled data dictionary to prepare import using load_DATA_dict. 
+    Arguments: 
+        data (pd.DataFrame or {str:pd.DataFrame})
+        ID (str)
+    """
+    pdir = pdir or Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store")
+    fname = f"{ID.lower()}_DATA_{dt.datetime.now().strftime("%y%m%d")}.pkl"
+    if woudc: 
+        fname = 'stn'+fname
+    with open(pdir/fname, 'wb') as f: 
+        dill.dump(data, f)
+    print(f"Successfully saved dataframe for {('stn' if woudc else '')+ID} as {pdir/fname}")
+
+def load_ozone_sonde_data(stn_ids, status=None, pdir=None): 
+    """ Create join dataframe incl. stn/flight info from pickled WOUDC/HPS & TPChange sonde data. """
+    pdir = pdir or Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store")
+
     def update_flight_nr(df, ID):
-        df['Flight number'] = [f'{ID}_{i}' for i in df["Flight number"]]
+        df["Flight number"] = df["Flight number"].apply(
+            lambda x: f"{ID}_{x}" if not x.startswith(ID) else x)
         return df
 
     stn_dict = {}
     for stn_id in stn_ids:
-        stn_df, status, filepath = load_DATA_dict(stn_id, status, pdir=pdir)
+        stn_df, status, _ = load_DATA_dict('stn'+stn_id, status, pdir=Path(pdir))
         stn_df = update_flight_nr(stn_df, stn_id)
         stn_dict[stn_id] = stn_df
 
     station_df = pd.concat(stn_dict.values())
     station_df.drop(columns=['latitude_degN', 'longitude_degE'], inplace=True)
 
-    return stn_dict, station_df
+    return stn_dict, station_df, status
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
-def process_TPC(ds): 
+def process_TPC(ds) -> xr.Dataset: 
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
     
     NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
@@ -250,7 +283,8 @@ def process_TPC(ds):
         ds['Flight number'] = flight_nr
 
     variables = [v for v in ds.variables if (
-        ("N2O" in v or "WOUDC" in v) or v in ["Flight number", "Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
+        any(i in v for i in ["N2O", "O3", "WOUDC"]) # WOUDC, N2O and O3 variables are kept
+            or v in ["Flight number", "Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
         ] + dcts.TPChange_variables()
 
     return ds[[v for v in variables if v in ds.variables]]
@@ -270,8 +304,11 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         }, inplace = True)
 
     df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
-    geodata = [Point(lat, lon) for lat, lon in zip(
-        df['latitude_degN'], df['longitude_degE'])]
+    # lon = x, lat = y 
+    # geodata = [Point(lat, lon) for lat, lon in zip(
+    #     df['latitude_degN'], df['longitude_degE'])]
+    geodata = [Point(lon, lat) for lon, lat in zip(
+        df['longitude_degE'], df['latitude_degN'], )]
 
     # create geodataframe using lat and lon data from indices
     df.drop([c for c in ['scale', 'P0'] if c in df.columns], axis=1, inplace=True)
@@ -284,12 +321,12 @@ def ds_to_gdf(ds) -> pd.DataFrame:
     gdf.index = gdf.index.floor('s')  # remove micro/nanoseconds
 
     # Convert CLaMS N2O to ppb
-    if "CLaMS_N2O" in gdf.columns: 
+    if "CLaMS_N2O" in gdf.columns:
         gdf["CLaMS_N2O_ppb"] = tools.conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
         gdf.drop(columns = ["CLaMS_N2O"], inplace = True)
 
     # WOUDC: Convert Ozone partial pressure to ppb
-    if any('O3_mPa' in v for v in gdf.columns): 
+    if any('O3_mPa' in v for v in gdf.columns):
         [pPress_col] = [v for v in gdf.columns if 'O3_mPa' in v]
         gdf['O3_ppb'] = tools.conv_pPress_PartsPer(gdf[pPress_col], gdf['pressure_hPa'])
     
