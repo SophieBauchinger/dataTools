@@ -89,6 +89,7 @@ int_CARIBIC2_H2Ogas,Water vapour integrated over flask sampling time from high r
 int_CARIBIC2_NO,NO integrated over flask sampling time from 10s averages,no,ppb,INTtpc,Caribic,MSMT,
 int_CARIBIC2_NOy,NOy integrated over flask sampling time from 10s averages,noy,ppb,INTtpc,Caribic,MSMT,
 int_CARIBIC2_Ozone,Ozone integrated over flask sampling time from high resolution measurements,o3,ppb,INTtpc,Caribic,MSMT,
+CARIBIC2_Ozone,Ozone volume mixing ratio,o3,ppb,CARIBIC,Caribic,MSMT,
 CLaMS_N2O_ppb,Nitrous Oxide from CLaMS,n2o,ppb,CLAMS,CLAMS,CLAMS,s
 ERA5_O3,Ozone from ERA5,o3,mol mol-1,ERA5,ERA5,ERA5,
 ESMVal_N2O,Nitrous oxide from ESM Validation Campaign,n2o,ppb,MSTM,MSTM,MSTM,s
@@ -167,3 +168,26 @@ WISE_SF6,GHOST_ECD,sf6,ppt,WISE,HALO,MSTM,q
 WISE_SF6.1,HAGAR,sf6,ppt,WISE,HALO,MSTM,q
 O3_ppb,O3 from partial pressure and pressure; WOUDC,o3,ppb,WOUDC,WOUDC,MSMT,
 O3_mPa,WOUDC partial Ozone pressure,o3,mPa,WOUDC,WOUDC,MSMT,
+START08_N2O_QCLS,QCLS,n2o,ppbv,START08,START08,MSMT,s
+START08_N2O_UCATS,UCATS,n2o,ppb,START08,START08,MSMT,s
+START08_N2Oe_UCATS,"UCATS - unit in TPC file == ppt, but 1.5 compared to 300 ppb msmts",d_n2o,ppb,START08,START08,MSMT,
+START08_O3_NCAR,NCAR,o3,ppb,START08,START08,MSMT,
+START08_O3_NOAA,NOAA,o3,ppm,START08,START08,MSMT,
+START08_O3_UCATS,UCATS,o3,ppm,START08,START08,MSMT,
+START08_SF6_UCATS,UCATS,sf6,ppt,START08,START08,MSMT,q
+START08_SF6e_UCATS,"UCATS - unit in TPC file == ppb, but unrealistic",sf6,ppt,START08,START08,MSMT,q
+TC4DC8_N2O,Nitrous Oxide mixing ratio,n2o,ppbv,TC4_DC8,TC4_DC8,MSMT,s
+TC4DC8_O3,Ozone,o3,ppbv,TC4_DC8,TC4_DC8,MSMT,
+TACTS_N2O,TRIHOP,n2o,ppb,TACTS,TACTS,MSMT,s
+TACTS_O3,FAIRO,o3,ppb,TACTS,TACTS,MSMT,
+TACTS_SF6,GHOST_ECD,sf6,ppt,TACTS,TACTS,MSMT,q
+SPURT_TDL_N2O,TDL N2O,n2o,ppbv,SPURT,SPURT,MSMT,s
+SPURT_ECO_O3,O3,o3,ppbv,SPURT,SPURT,MSMT,
+SPURT_GHOST_SF6,SF6,sf6,pptv,SPURT,SPURT,MSMT,q
+SPURT_JOE_O3,O3,o3,ppbv,SPURT,SPURT,MSMT,
+GWLCYCLE_N2O,MAQS N2O mixing ratio,n2o,ppbv,GWLCYCLE,GWLCYCLE,MSMT,s
+GWLCYCLE_ozone,O2l_Ozone,o3,ppb,GWLCYCLE,GWLCYCLE,MSMT,
+AIRTOSS_N2O,N2O volume mixing ratio,n2o,ppbv,AIRTOSS,AIRTOSS,MSMT,s
+AIRTOSS_O3,Ozone volume mixing ratio,o3,ppmv,AIRTOSS,AIRTOSS,MSMT,
+TPEx_N2O_ppbv,UMAQS N2O volume mixing ratio,n2o,ppbv,TPEX,TPEX,MSMT,s
+TPEx_TOMi_L_O3_ppbv,TOMi ozone volume mixing ratio,o3,ppbv,TPEX,TPEX,MSMT,
