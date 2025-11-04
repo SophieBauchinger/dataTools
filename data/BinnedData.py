@@ -211,11 +211,11 @@ def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs):
         monthly_dict[month] = bin_m_out
     return monthly_dict        
 
-#%% Weigthed binning
+#%% Weighted binning
 def weighted_binning(data_list, bci): 
     """ Weighted binning where each separate item in data_list contributes an equal amount (= 1). 
     
-    data_list (list[(v,x)]): List containing tuples with (v,x) data arrays
+    data_list (list[(x,v)]): List containing tuples with (x,v) data arrays
     binclassinstance (bp.Bin_(not)equi1d): one-dimensional binning structure
     
     Returns lists of weighted mean and weighted standard deviation.
@@ -247,6 +247,12 @@ def weighted_binning(data_list, bci):
             total_vbindata += list(v_arr)
 
         total_weight = len(weighted_sum_list)
+        
+        if total_weight == 0: 
+            weighted_mean_per_bin.append(np.nan)
+            weighted_std_per_bin.append(np.nan)
+            continue
+
         weighted_mean = sum(weighted_sum_list) / total_weight
 
         # calculate the weighted standard deviation
