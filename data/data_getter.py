@@ -27,20 +27,40 @@ from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 from dataTools import tools
 import dataTools.dictionaries as dcts
 
-#%% Create new coordinates
+#%% Create new coordinates [height and tropopause-relative]
 def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly tropopause coordinates
-    """ Calculate coordinates as specified through .var1 and .var2. """
-    all_calc_coords = dcts.get_coord_df().dropna(subset=['var1', 'var2'], how = 'any').col_name.values
+    """ Calculate coordinates as specified through .var1 and .var2. """    
+    df = copy.deepcopy(df)
+    
+    current_coords = []
+    for col in df.columns: 
+        try: current_coords.append(dcts.get_coord(col))
+        except: continue
+    
+    def get_var_coord(coords, var1: str): 
+        """ Get the correct coordinate from given coords (otherwise col_name is incorrect)"""
+        [var] = [c for c in coords if c == dcts.get_coord(var1)]
+        return var
+   
     if recalculate: # Toggle recalculating existing coordinates
-        df.drop(columns = [c.col_name for c in df.columns if c.col_name in all_calc_coords],
-                inplace=True)
+        drop_cols = [c.col_name for c in current_coords if c in dcts.get_coordinates(var1='not_nan')]
+        df.drop(columns = drop_cols, inplace=True)
+        if verbose: 
+            print(f"Dropped {drop_cols} to recalculate")
+        [current_coords.remove(dcts.get_coord(col)) for col in drop_cols]
 
     # Firstly calculate geopotential height from geopotential
-    geopot_coords = [c for c in all_calc_coords if (
-        c.var1 in df.columns and str(c.var2) == 'nan' )]
-    
-    for coord in geopot_coords: 
-        met_df = df[coord.var1].values * units(dcts.get_coord(coord.var1).unit)
+    geopot_new = dcts.get_coordinates(var1='not_nan', var2='nan')
+    geopot_new = [c for c in geopot_new if dcts.get_coord(c.var1) in current_coords]
+
+    for coord in geopot_new:
+        if not recalculate and coord in current_coords: 
+            if verbose: print(f"Found`{coord.col_name}`, skipping. ")
+            continue
+        if verbose: 
+            print(f"Calculating `{coord.col_name}` from `{coord.var1}`")
+        var1 = get_var_coord(current_coords, coord.var1)
+        met_df = df[var1.col_name].values * units(var1.unit)
         height_m = calc.geopotential_to_height(met_df) # meters
         height_km = height_m * 1e-3
         
@@ -48,22 +68,27 @@ def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly 
             df[coord.col_name] = height_m
         elif coord.unit == 'km': 
             df[coord.col_name] = height_km
+        else: 
+            continue
+        current_coords += [coord]
 
     # Now calculate TP / distances to TP coordinates 
-    calc_coords = [c for c in all_calc_coords if 
-        all(col in df.columns for col in [c.var1, c.var2])]
-    
-    for coord in calc_coords: 
+    other_new = dcts.get_coordinates(var1='not_nan', var2='not_nan')
+    other_new = [c for c in other_new if all(
+        dcts.get_coord(var) in current_coords for var in [c.var1, c.var2])]
+
+    for coord in other_new: 
+        if not recalculate and coord in current_coords: 
+            if verbose: print(f"Found`{coord.col_name}`, skipping. ")
+            continue
         if verbose: 
-            print('Calculating ', coord.long_name, 'from \n', 
-                dcts.get_coord(col_name=coord.var1), '\n', # met
-                dcts.get_coord(col_name=coord.var2)) # tp
+            print(f"Calculating `{coord.col_name}` = `{coord.var1}` - `{coord.var2}`")
         
-        met_coord = dcts.get_coord(col_name = coord.var1)
-        tp_coord = dcts.get_coord(col_name = coord.var2)
+        met_coord = get_var_coord(current_coords, coord.var1)
+        tp_coord = get_var_coord(current_coords, coord.var2)
         
-        met_data = copy.deepcopy(df[coord.var1]) # prevents .df to be overwritten 
-        tp_data = copy.deepcopy(df[coord.var2])
+        met_data = copy.deepcopy(df[met_coord.col_name]) # prevents .df to be overwritten 
+        tp_data = copy.deepcopy(df[tp_coord.col_name])
         
         if tp_coord.unit != met_coord.unit != coord.unit: 
             if all(unit in ['hPa', 'mbar'] for unit in [tp_coord.unit, met_coord.unit, coord.unit]):
@@ -90,46 +115,49 @@ def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly 
         
         coord_data = (met_data - tp_data)
         df[coord.col_name] = coord_data
+        
+        current_coords += [coord]
 
     return df
 
-# Does not currently work for CARIBIC, presumably because the int_ and _Main shit fucks shit up. Damn
-def create_tp_coords(df, verbose=False) -> pd.DataFrame: # TODO: Fix this 
-    """ Add calculated relative / absolute tropopause values to .met_data """
-    new_coords = dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'Caribic'})
-    new_coords = new_coords + dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'CLAMS'})
-    new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'CLAMS'})
-    new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'Caribic'})
+# # Does not currently work for CARIBIC, presumably because the int_ and _Main shit fucks shit up. Damn
+# def create_tp_coords(df, verbose=False) -> pd.DataFrame: 
+#     # FIXME: create tp_coords for CARIBIC INT and MAIN
+#     """ Add calculated relative / absolute tropopause values to .met_data """
+#     new_coords = dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'Caribic'})
+#     new_coords = new_coords + dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'CLAMS'})
+#     new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'CLAMS'})
+#     new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'Caribic'})
 
-    success_counter=0; fail_counter=0
-    for coord in new_coords:
-        # met = tp + rel -> MET - MINUS for either one
-        met_col = coord.var1
-        met_coord = dcts.get_coord(col_name = met_col)
-        minus_col = coord.var2
+#     success_counter=0; fail_counter=0
+#     for coord in new_coords:
+#         # met = tp + rel -> MET - MINUS for either one
+#         met_col = coord.var1
+#         met_coord = dcts.get_coord(col_name = met_col)
+#         minus_col = coord.var2
 
-        if met_col in df.columns and minus_col in df.columns:
-            df[coord.col_name] = df[met_col] - df[minus_col]
-            success_counter+=1
+#         if met_col in df.columns and minus_col in df.columns:
+#             df[coord.col_name] = df[met_col] - df[minus_col]
+#             success_counter+=1
 
-        elif met_coord.var == 'geopot' and met_col in df.columns:
-            met_data = df[met_col].values * units(met_coord.unit) # [m^2/s^2]
-            height_m = calc.geopotential_to_height(met_data) # [m]
+#         elif met_coord.var == 'geopot' and met_col in df.columns:
+#             met_data = df[met_col].values * units(met_coord.unit) # [m^2/s^2]
+#             height_m = calc.geopotential_to_height(met_data) # [m]
 
-            if coord.unit == 'm': 
-                df[coord.col_name] = height_m
-                success_counter+=1
-            elif coord.unit == 'km': 
-                df[coord.col_name] = height_m * 1e-3
-                success_counter+=1
-            else: 
-                fail_counter+=1
+#             if coord.unit == 'm': 
+#                 df[coord.col_name] = height_m
+#                 success_counter+=1
+#             elif coord.unit == 'km': 
+#                 df[coord.col_name] = height_m * 1e-3
+#                 success_counter+=1
+#             else: 
+#                 fail_counter+=1
 
-        else:
-            fail_counter+=1
-            if verbose: print(f'Could not generate {coord.col_name} as precursors are not available')
-    print(f"Succesfully calculated {success_counter} coordinates, skipped {fail_counter}")
-    return df
+#         else:
+#             fail_counter+=1
+#             if verbose: print(f'Could not generate {coord.col_name} as precursors are not available')
+#     print(f"Succesfully calculated {success_counter} coordinates, skipped {fail_counter}")
+#     return df
 
 #%% Pickled data dictionaries in .data.store
 

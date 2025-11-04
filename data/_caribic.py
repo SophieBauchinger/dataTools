@@ -57,7 +57,7 @@ class Caribic(GlobalData):
         
         if 'met_data' not in self.data:
             try:
-                self.data['df'] = data_getter.create_tp_coords(self.df)
+                self.data['df'] = data_getter.calc_coordinates(self.df)
                 self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
             except Exception:
                 traceback.print_exc()
@@ -205,8 +205,6 @@ class Caribic(GlobalData):
                     df = df.drop(columns=f'{c}_{pfx}')
         if 'geometry' in df.columns: 
             df = df[df.index.isin(df.geometry.dropna().index)]
-        
-        # df = data_getter.create_tp_coords(df)
 
         self.data['df'] = df
         return df

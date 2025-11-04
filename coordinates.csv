@@ -19,32 +19,30 @@ ECHAM5_height_at_fl,Geopotential height (ECHAM5) at flight level ,km,EMAC_calc,z
 ECHAM5_press,pressure,hPa,EMAC,p,,,,FALSE,EMAC,,,,,
 ECHAM5_tpoteq,equivalent potential temperature,K,EMAC,eqpt,,,,FALSE,EMAC,,,,,
 ECHAM5_vom1,vorticity,s-1,EMAC,,,vom1,,,EMAC,,,,,
-ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,1.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_1_5,0
-ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,2,,ERA5_HEIGHT_km,ERA5_HEIGHT_2_0,0
-ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT_km,ERA5_HEIGHT_3_5,0
-ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),km,ERA5_calc,z,,z,therm,TRUE,ERA5,,,ERA5_HEIGHT_km,ERA5_thermTP_Z,0
+ERA5_D_HEIGHT_1_5,Geopotential height relative to local 1.5 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,1.5,,ERA5_HEIGHT,ERA5_HEIGHT_1_5,0
+ERA5_D_HEIGHT_2_0,Geopotential height relative to local 2.0 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,2,,ERA5_HEIGHT,ERA5_HEIGHT_2_0,0
+ERA5_D_HEIGHT_3_5,Geopotential height relative to  local 3.5 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT,ERA5_HEIGHT_3_5,0
+ERA5_D_HEIGHT_3_5_Second,Geopotential height relative to secondary local 3.5 PVU surface (ERA5),km,ERA5_calc,z,,z,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT,ERA5_HEIGHT_3_5_Second,1
+ERA5_D_HEIGHT_thermTP,Height relative to  main lapse rate tropopause (ERA5),km,ERA5_calc,z,,z,therm,TRUE,ERA5,,,ERA5_HEIGHT,ERA5_thermTP_Z,0
+ERA5_D_HEIGHT_thermTP_Second,Height relative to  secondary lapse rate tropopause (ERA5),km,ERA5_calc,z,,z,therm,TRUE,ERA5,,,ERA5_HEIGHT,ERA5_thermTP_Z_Second,1
 ERA5_D_PRESS_1_5,Pressure distance to 1.5 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,1.5,,ERA5_PRESS,ERA5_PRESS_1_5,0
 ERA5_D_PRESS_1_5_Second,Pressure distance to secondary 1.5 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,1.5,,ERA5_PRESS,ERA5_PRESS_1_5_Second,1
 ERA5_D_PRESS_2_0,Pressure distance to 2.0 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,2,,ERA5_PRESS,ERA5_PRESS_2_0,0
 ERA5_D_PRESS_2_0_Second,Pressure distance to secondary 2.0 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,2,,ERA5_PRESS,ERA5_PRESS_2_0_Second,1
-ERA5_D_PRESS_3_5,Pressure distance to 3.5 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,3.5,,ERA5_PRESS,ERA5_PRESS_3_5,0
-ERA5_D_PRESS_3_5_Second,Pressure distance to secondary 3.5 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,3.5,,ERA5_PRESS,ERA5_PRESS_3_5_Second,1
+ERA5_D_PRESS_3_5,Pressure distance to 3.5 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,3.5,,ERA5_PRESS,ERA5_dynTP_PRESS_3_5,0
+ERA5_D_PRESS_3_5_Second,Pressure distance to secondary 3.5 PVU surface from ERA5,hPa,ERA5_calc,p,,p,dyn,TRUE,ERA5,3.5,,ERA5_PRESS,ERA5_dynTP_PRESS_3_5_Second,1
 ERA5_D_PRESS_thermTP,Pressure-Distance to local lapse rate tropopause (ERA5),hPa,ERA5_calc,p,,p,therm,TRUE,ERA5,,,ERA5_PRESS,ERA5_thermTP_PRESS,0
+ERA5_D_PRESS_thermTP_Second,Pressure-Distance to secondary lapse rate tropopause (ERA5),hPa,ERA5_calc,p,,p,therm,TRUE,ERA5,,,ERA5_PRESS,ERA5_thermTP_PRESS_Second,1
 ERA5_D_THETA_1_5,Potential temperature distance to 1.5 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,1.5,,ERA5_THETA,ERA5_THETA_1_5,0
 ERA5_D_THETA_1_5_Second,Potential temperature distance to secondary 1.5 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,1.5,,ERA5_THETA,ERA5_THETA_1_5_Second,1
 ERA5_D_THETA_2_0,Potential temperature distance to 2.0 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,2,,ERA5_THETA,ERA5_THETA_2_0,0
 ERA5_D_THETA_2_0_Second,Potential temperature distance to secondary 2.0 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,2,,ERA5_THETA,ERA5_THETA_2_0_Second,1
-ERA5_D_THETA_3_5,Potential temperature distance to 3.5 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,3.5,,ERA5_THETA,ERA5_THETA_3_5,0
-ERA5_D_THETA_3_5_Second,Potential temperature distance to secondary 3.5 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,3.5,,ERA5_THETA,ERA5_THETA_3_5_Second,1
+ERA5_D_THETA_3_5,Potential temperature distance to 3.5 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,3.5,,ERA5_THETA,ERA5_dynTP_THETA_3_5,0
+ERA5_D_THETA_3_5_Second,Potential temperature distance to secondary 3.5 PVU surface from ERA5,K,ERA5_calc,pt,,pt,dyn,TRUE,ERA5,3.5,,ERA5_THETA,ERA5_dynTP_THETA_3_5_Second,1
 ERA5_D_THETA_thermTP,THETA-Distance to local lapse rate tropopause (ERA5),K,ERA5_calc,pt,,pt,therm,TRUE,ERA5,,,ERA5_THETA,ERA5_thermTP_THETA,0
+ERA5_D_THETA_thermTP_Second,THETA-Distance to secondary lapse rate tropopause (ERA5),K,ERA5_calc,pt,,pt,therm,TRUE,ERA5,,,ERA5_THETA,ERA5_thermTP_THETA_Second,1
 ERA5_D_TROP1_PRESS,Pressure distance to lapse rate tropopause from ERA5,hPa,ERA5_calc,p,,p,therm,TRUE,ERA5,,,ERA5_PRESS,ERA5_TROP1_PRESS,0
 ERA5_D_TROP1_THETA,Potential temperature distance to lapse rate tropopause from ERA5,K,ERA5_calc,pt,,pt,therm,TRUE,ERA5,,,ERA5_THETA,ERA5_TROP1_THETA,0
-ERA5_D_Z_1_5,Height difference to main 1.5 PVU surface,km,ERA5_calc,z,,z,dyn,TRUE,ERA5,1.5,,ERA5_HEIGHT,ERA5_HEIGHT_1_5,0
-ERA5_D_Z_1_5_Second,Height difference to secondary 1.5 PVU surface,km,ERA5_calc,z,,z,dyn,TRUE,ERA5,1.5,,ERA5_HEIGHT,ERA5_HEIGHT_1_5_Second,1
-ERA5_D_Z_2_0,Height difference to main 2.0 PVU surface,km,ERA5_calc,z,,z,dyn,TRUE,ERA5,2,,ERA5_HEIGHT,ERA5_HEIGHT_2_0,0
-ERA5_D_Z_2_0_Second,Height difference to secondary 2.0 PVU surface,km,ERA5_calc,z,,z,dyn,TRUE,ERA5,2,,ERA5_HEIGHT,ERA5_HEIGHT_2_0_Second,1
-ERA5_D_Z_3_5,Height difference to main 3.5 PVU surface,km,ERA5_calc,z,,z,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT,ERA5_HEIGHT_3_5,0
-ERA5_D_Z_3_5_Second,Height difference to secondary 3.5 PVU surface,km,ERA5_calc,z,,z,dyn,TRUE,ERA5,3.5,,ERA5_HEIGHT,ERA5_HEIGHT_3_5_Second,1
 ERA5_D_Z_TROP1,Height difference to lapse rate tropopause (ERA5),km,ERA5_calc,z,,z,therm,TRUE,ERA5,,,ERA5_HEIGHT,ERA5_TROP1_Z,0
 ERA5_dynTP_PHI_1_5,Geopotential of local 1.5 PVU surface (ERA5),m2s-2,ERA5,z,,z,dyn,FALSE,ERA5,1.5,,,,0
 ERA5_dynTP_PHI_1_5_Second,Geopotential of secondary local 1.5 PVU surface (ERA5),m2s-2,ERA5,z,,z,dyn,FALSE,ERA5,1.5,,,,1
@@ -72,14 +70,13 @@ ERA5_GPH_2_0,Geopotential at main 2.0 PVU surface,m2s-2,ERA5,z,,geopot,dyn,FALSE
 ERA5_GPH_2_0_Second,Geopotential at secondary 2.0 PVU surface,m2s-2,ERA5,,,,dyn,FALSE,ERA5,2,,,,1
 ERA5_GPH_3_5,Geopotential at main 3.5 PVU surface,m2s-2,ERA5,z,,geopot,dyn,FALSE,ERA5,3.5,,,,0
 ERA5_GPH_3_5_Second,Geopotential at secondary 3.5 PVU surface,m2s-2,ERA5,,,,dyn,FALSE,ERA5,3.5,,,,1
-ERA5_HEIGHT,Geopotential height (ERA5),km,ERA5_calc,z,,z,,,ERA5,,,ERA5_GPH,,
-ERA5_HEIGHT_1_5,Geopotential height at main 1.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,1.5,,ERA5_GPH_1_5,,0
-ERA5_HEIGHT_1_5_Second,Geopotential height at secondary 1.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,1.5,,ERA5_GPH_1_5_Second,,1
-ERA5_HEIGHT_2_0,Geopotential height at main 2.0 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,2,,ERA5_GPH_2_0,,0
-ERA5_HEIGHT_2_0_Second,Geopotential height at secondary 2.0 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,2,,ERA5_GPH_2_0_Second,,1
-ERA5_HEIGHT_3_5,Geopotential height at main 3.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,3.5,,ERA5_GPH_3_5,,0
-ERA5_HEIGHT_3_5_Second,Geopotential height at secondary 3.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,3.5,,ERA5_GPH_3_5_Second,,1
-ERA5_HEIGHT_km,Geopotential height (ERA5),km,ERA5_calc,z,,z,,,ERA5,,,ERA5_PHI,,
+ERA5_HEIGHT,Geopotential height (ERA5),km,ERA5_calc,z,,z,,,ERA5,,,ERA5_PHI,,
+ERA5_HEIGHT_1_5,Geopotential height at main 1.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,1.5,,ERA5_dynTP_PHI_1_5,,0
+ERA5_HEIGHT_1_5_Second,Geopotential height at secondary 1.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,1.5,,ERA5_dynTP_PHI_1_5_Second,,1
+ERA5_HEIGHT_2_0,Geopotential height at main 2.0 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,2,,ERA5_dynTP_PHI_2_0,,0
+ERA5_HEIGHT_2_0_Second,Geopotential height at secondary 2.0 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,2,,ERA5_dynTP_PHI_2_0_Second,,1
+ERA5_HEIGHT_3_5,Geopotential height at main 3.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,3.5,,ERA5_dynTP_PHI_3_5,,0
+ERA5_HEIGHT_3_5_Second,Geopotential height at secondary 3.5 PVU surface,km,ERA5_calc,z,,z,dyn,FALSE,ERA5,3.5,,ERA5_dynTP_PHI_3_5_Second,,1
 ERA5_O3,Pseudo coord: Ozone from ERA5,mol mol-1,ERA5,mxr,,,chem,FALSE,ERA5,,n2o,,,0
 ERA5_PHI,Geopotential (ERA5),m2s-2,ERA5,z,,z,,,ERA5,,,,,
 ERA5_PRESS,Pressure (ERA5),hPa,ERA5,p,,,,,ERA5,,,,,

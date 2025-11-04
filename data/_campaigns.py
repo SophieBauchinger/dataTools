@@ -10,6 +10,7 @@ import keyring
 import pandas as pd
 from pathlib import Path
 from shapely.geometry import Point
+import traceback
 
 from toolpac.readwrite.sql_data_import import client_data_choice # type: ignore
 
@@ -57,7 +58,7 @@ SOURCES = { # 'Source' per Campaign
 class DataCollection(GlobalData):
     """ Combined data sets incl. Sonde and Aircraft data. 
     Needs to contain geoinformation for each point. """ 
-    def __init__(self, dataframe:pd.DataFrame, ID:str, **kwargs): 
+    def __init__(self, dataframe:pd.DataFrame, ID:str, calc_coords=True, **kwargs): 
         """ Initialise data collection object with a datetime-indexed dataframe. """
         if not 'Datetime' in str(type(dataframe.index)): 
             raise Warning("Given dataframe needs to be datetime-indexed.")
@@ -65,6 +66,11 @@ class DataCollection(GlobalData):
         super().__init__(years, **kwargs)
         self.source = self.ID = ID
 
+        if calc_coords:
+            try: 
+                dataframe = data_getter.calc_coordinates(dataframe, recalculate=True)
+            except Exception: 
+                traceback.print_exc()
         self.data['df'] = dataframe
         self.df.sort_index()
         
@@ -113,7 +119,11 @@ class CampaignData(GlobalData):
 
         if not 'df' in self.data: 
             self.create_df()
-        self.data['df'] = data_getter.calc_coordinates(self.df) # TODO: test this
+        try: 
+            self.data["df"] = data_getter.calc_coordinates(
+                self.data["df"], recalculate=kwargs.get('recalculate', True))
+        except Exception: 
+            traceback.print_exc()
 
         self.years = list(set(self.data['df'].index.year))
         self.set_tps(**tps_dict)
