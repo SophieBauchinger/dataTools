@@ -6,11 +6,6 @@
 
 class SelectionMixin
 
-#TODO: UTLS Selection
- * 400 - 10 hPa 
- *  6.5 - 30 km
- * +- 5km around the tropopause
-
 """
 
 import copy 
@@ -135,7 +130,7 @@ class SelectionMixin:
     def sel_month(self, *months_int, inplace:bool=False): 
         """ Returns GlobalData object containing only data for selected months. """
         if not all(month in self.df.index.month for month in months_int): 
-            raise Warning("Month selection: Not all of ({months_int}) are available in self.df. ")
+            raise Warning(f"Month selection: Not all of {months_int} are available in self.df. ")
         out = self._prepare_output()
 
         # Dataframes

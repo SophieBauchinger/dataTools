@@ -59,9 +59,11 @@ def big_data_go_resample(df, x_cols, y_cols, fig=None):
     return fig
 
 #%% Basic map / plotting helpers
-def outline(): 
-    """ Helper function to add outline to lines in plots. """
-    return mpe.withStroke(linewidth=2, foreground='white')
+def outline(lw=2): 
+    """ Helper function to add outline to lines in plots. 
+    lw (float): Linewidth of the line to outline. 
+    """
+    return mpe.withStroke(linewidth=lw+1, foreground='white')
 
 def add_zero_line(ax):
     """ Highlight the gridline at 0 for the chosen axis on the given Axes object.

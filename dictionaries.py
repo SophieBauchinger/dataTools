@@ -944,7 +944,7 @@ def dict_season():
             'name_4': 'Winter (DJF)', 'color_4': '#57B4E9', # '#4477AA',  # green
             } 
 
-def dict_month(month=None, abbr = True): 
+def dict_month(month=None, attr=None, abbr=True): 
     """ Assigns color and name (abbreviated if abbr) to each numeric month of the year (1=Jan). """
     norm = Normalize(1,13)
     dict_month = {
@@ -953,9 +953,12 @@ def dict_month(month=None, abbr = True):
     dict_month.update({
         f'color_{m}':cm.managua(norm(m)) 
             for m in range(1,13)}) 
-    if isinstance(month, int): 
+    if isinstance(month, int) and not attr: 
         return {'color':dict_month[f'color_{month}'], 
                 'name': dict_month[f'name_{month}']}
+    elif isinstance(month, int) and attr in ['color', 'name']: 
+        return dict_month[f'{attr}_{month}']
+
     return dict_month
 
 RSTD_colors = [
@@ -1019,7 +1022,7 @@ def note_dict(fig_or_ax, s = None, bbox_kwargs=dict(), **kwargs):
     """ Return default arguments & bbox dictionary for adding notes to plots. """
     try:
         transform = fig_or_ax.transAxes
-    except:
+    except AttributeError:
         transform = fig_or_ax.transFigure
         
     x = kwargs.pop('x', 0.97)
