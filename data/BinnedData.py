@@ -66,8 +66,8 @@ def get_var_lims(var, bsize=None, gdf=None, **kwargs) -> tuple[float]:
 
 
 # BINCLASSINSTANCE
-def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
-    """ Create n-dimensional binclassinstance using standard coordinate limits / bin sizes. 
+def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
+    """ Create n-dimensional binning structure using standard coordinate limits / bin sizes. 
     
     Args: 
         *coord (dcts.Coordinate)
@@ -75,10 +75,9 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
         key *bsize (float): Size of the bin
         key *bmin, *bmax (float): Outer bounds for bins. Optional 
         
-    Returns Bin_equi*d binning structure for all given dimensions.  
+    Returns equi-distant binning structure for all given dimensions.  
     """
-    if isinstance(kwargs.get('bci'), (bp.Bin_equi1d, bp.Bin_equi2d, bp.Bin_equi3d,
-                                      bp.Bin_notequi1d, bp.Bin_notequi2d, bp.Bin_notequi3d)):
+    if isinstance(kwargs.get('bci'), (bp.Bin1D, bp.Bin2D, bp.Bin3D)):
         # Useful in cases where bci should stay the same across upstream function calls
         return kwargs.get('bci')
 
@@ -93,7 +92,7 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
     xbmax = kwargs.get('xbmax', def_xbmax)
 
     if dims == 1:
-        return bp.Bin_equi1d(
+        return bp.Bin1D(
             xbmin, xbmax, xbsize)
 
     ybsize = kwargs.get('ybsize', ycoord.get_bsize())
@@ -102,7 +101,7 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
     ybmax = kwargs.get('ybmax', def_ybmax)
 
     if dims == 2:
-        return bp.Bin_equi2d(
+        return bp.Bin2D(
             xbmin, xbmax, xbsize,
             ybmin, ybmax, ybsize)
 
@@ -111,7 +110,7 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs):
     zbmin = kwargs.get('zbmin', def_zbmin)
     zbmax = kwargs.get('zbmax', def_zbmax)
 
-    return bp.Bin_equi3d(
+    return bp.Bin3D(
         xbmin, xbmax, xbsize,
         ybmin, ybmax, ybsize,
         zbmin, zbmax, zbsize)
@@ -124,30 +123,25 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
         var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
         count_limit (int): Bins with fewer data points are excluded from the output. 
 
-        key bci (bp.Bin_**d): Binclassinstance
+        key bci (bp.Bin**D): Binclassinstance
         key *bsize (float): if bci is not specified, controls the size of the *d-bins.
-        key lognorm (bool): Returns Bin Obj with Lognorm fit of vmean/vstdv/rvstd 
 
-    Returns a single Simple_bin_*d object. 
+    Returns a single BinnedData*d object. 
     """
     dims = sum([dim is not None for dim in [xcoord, ycoord, zcoord]])
     v, x, y, z = [(get_var_data(df, i) if i is not None else None) for i in [var, xcoord, ycoord, zcoord]]
 
     if dims == 1:
         bci_1d = make_bci(xcoord, **kwargs)
-        out = bp.Simple_bin_1d(v, x, bci_1d, count_limit=count_limit)
+        out = bp.Binned1D(v, x, bci_1d, count_limit=count_limit)
 
     elif dims == 2:
         bci_2d = make_bci(xcoord, ycoord, **kwargs)
-        out = bp.Simple_bin_2d(v, x, y, bci_2d, count_limit=count_limit)
-        if kwargs.get('lognorm'): 
-            out = tools.Bin2DFitted(v, x, y, bci_2d, count_limit=count_limit)
+        out = bp.Binned2D(v, x, y, bci_2d, count_limit=count_limit)
 
     elif dims == 3:
         bci_3d = make_bci(xcoord, ycoord, zcoord, **kwargs)
-        out = bp.Simple_bin_3d(v, x, y, z, bci_3d, count_limit=count_limit)
-        if kwargs.get('lognorm'): 
-            out = tools.Bin3DFitted(v, x, y, z, bci_3d, count_limit=count_limit)
+        out = bp.Binned3D(v, x, y, z, bci_3d, count_limit=count_limit)
 
     else:
         raise Exception(f'Invalid dimensions. Found dims = {dims}')
@@ -163,10 +157,10 @@ def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
         var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
         count_limit (int): Bins with fewer data points are excluded from the output. 
 
-        key bci (bp.Bin_**d): Binclassinstance
+        key bci (bp.Bin**d): Binning structure
         key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
 
-    Returns a dictionary of {season : Simple_bin_*d object}. 
+    Returns a dictionary of {season : BinnedData*d object}. 
     """
     if 'season' not in df.columns:
         df['season'] = tools.make_season(df.index.month)
@@ -184,17 +178,17 @@ def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
     return seasonal_dict
 
 def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs): 
-    """ Separate into months and bin data on the given grid.     Parameters: 
+    """ Separate into months and bin data on the given grid. 
     
     Parameters:    
         df (pd.DataFrame): Hold the variable and coordinate data. 
         var, x/y/zcoord (dcts.Substance|dcts.Coordinate)
         count_limit (int): Bins with fewer data points are excluded from the output. 
 
-        key bci (bp.Bin_**d): Binclassinstance
+        key bci (bp.Bin*d): Binning structure
         key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
 
-    Returns a dictionary of {month : Simple_bin_*d object}. 
+    Returns a dictionary of {month : BinnedData*d object}. 
     """
     # raise NotImplementedError("Tough cookie.")
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -209,62 +203,58 @@ def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs):
         bin_m_out = binning(m_df, var, xcoord, ycoord, zcoord, 
                             bci=bci, **kwargs)
         monthly_dict[month] = bin_m_out
-    return monthly_dict        
+    return monthly_dict
 
-#%% Weighted binning
-def weighted_binning(data_list, bci): 
-    """ Weighted binning where each separate item in data_list contributes an equal amount (= 1). 
+def weighted_binning(data_list, xcoord, ycoord=None, zcoord=None, **kwargs):
+    """ Return weighted binned data where each item in data_list contributes equally. """
+    dims = sum([dim is not None for dim in [xcoord, ycoord, zcoord]])
+    if len(data_list[0]) != dims: 
+        raise Exception("Dimensions of data_list are not equal to given parameters. ")
+
+    if dims == 1:
+        bci_1d = make_bci(xcoord, **kwargs)
+        return bp.WeightedBinning1D(data_list, bci_1d, **kwargs)
+
+    elif dims == 2:
+        bci_2d = make_bci(xcoord, ycoord, **kwargs)
+        out = bp.WeightedBinning2D(data_list, bci_2d, **kwargs)
+
+    elif dims == 3:
+        raise NotImplementedError("Feel free to extend the WeightedBinning class to 3D. ")
+
+    else:
+        raise Exception(f'Invalid dimensions. Found dims = {dims}')
+
+    return out
+
+def monthly_weighted_binning(GlobalObj, var, xcoord, **kwargs): 
+    """ Create monthly binned profiles of subs (give data for a latitude band)
     
-    data_list (list[(x,v)]): List containing tuples with (x,v) data arrays
-    binclassinstance (bp.Bin_(not)equi1d): one-dimensional binning structure
+    Parameters: 
+        GlobalObject (dataTools.data.GlobalData)
+        subs (dcts.Substance)
+        vcoord (dcts.Coordinate): Vertical coord. for profile
+        lat_bsize (float): Size of latitude bands (even)
+    """    
+    bci = make_bci(xcoord)
     
-    Returns lists of weighted mean and weighted standard deviation.
-    """
-    # Sort into bins on x
-    binned_list = []
-    for x_v_tuple in data_list:
-        x,v = x_v_tuple 
-        binned = bp.Simple_bin_1d(v, x, bci)
-        binned_list.append(binned)
-
-    # Now calculate weighted mean and std per bin
-    weighted_mean_per_bin = []
-    weighted_std_per_bin = []
-    for i in np.arange(bci.nx): # Bin index
-        weighted_sum_list = []
-        total_vbindata = []
-        weight_list = []
-
-        for j, binned in enumerate(binned_list): # Ascent index
-            v_arr = binned.vbindata[i]
-            if str(v_arr)=='nan': continue
-            weight = 1/len(v_arr)
-
-            weighted_sum_ascent = np.nansum(v_arr) * 1/len(v_arr) 
-            weighted_sum_list.append(weighted_sum_ascent)
+    binned_monthly = {}
+    for month in set(GlobalObj.df.index.month):
+        data_month = GlobalObj.sel_month(month)
+        data_list = []
+        for flight_id in data_month.flights:
+            data_ascent = data_month.sel_flight(flight_id)
             
-            weight_list.append([weight]*len(v_arr))
-            total_vbindata += list(v_arr)
+            v = data_ascent.get_var_data(var)
+            x = data_ascent.get_var_data(xcoord)
+            data_list.append((v,x))
 
-        total_weight = len(weighted_sum_list)
-        
-        if total_weight == 0: 
-            weighted_mean_per_bin.append(np.nan)
-            weighted_std_per_bin.append(np.nan)
-            continue
+        binned_m = bp.WeightedBinning1D(data_list, bci, **kwargs)
+        # TODO: Add statistical values: Q1, Q3 and IQR available
+        binned_monthly[month] = binned_m.weighted_mean, binned_m.weighted_std
 
-        weighted_mean = sum(weighted_sum_list) / total_weight
-
-        # calculate the weighted standard deviation
-        diff_squared = [(val-weighted_mean)**2 for val in total_vbindata]
-        weighted_diffs = [weight*ds for weight, ds in zip(np.concatenate(weight_list), diff_squared)]
-        weighted_var = (np.nansum(weighted_diffs) / total_weight)
-        weighted_std = weighted_var**0.5
-        
-        weighted_mean_per_bin.append(weighted_mean)
-        weighted_std_per_bin.append(weighted_std)
-
-    return weighted_mean_per_bin, weighted_std_per_bin
+    return binned_monthly, bci
+    
 
 #%% Stratosphere / Troposphere binning
 def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
