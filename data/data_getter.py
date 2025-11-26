@@ -164,11 +164,16 @@ def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly 
 def WOUDC_STATION_LIST(): 
     return ['HPS']+[    # 1.1 GB 
             '007',      # 198 MB
+            '012',      # 1.1 GB
+            '024',      # 1.1 GB
+            '029',      # 432 MB
             '190',      # 911 MB
             '205',      #  11 MB
+            '233',      # 1.5 GB
             '254',      #  42 MB 
             '339',      # 322 MB
             '344',      # 1.5 GB
+            '394',      # 431 MB
             '435',      # 225 MB 
             '436',      # 1.3 GB
             '450',      # 272 MB
@@ -345,7 +350,10 @@ def get_TPChange_gdf(fname_or_pdir):
     """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). """
     if Path(fname_or_pdir).is_dir(): 
         fnames = [f for f in fname_or_pdir.glob("*.nc")]
-        with xr.open_mfdataset(fnames, preprocess = process_TPC) as ds: 
+        from dask.diagnostics import ProgressBar
+        with xr.open_mfdataset(fnames, 
+                               preprocess = process_TPC, 
+                               parallel=True) as ds, ProgressBar(): 
             ds = ds
     elif Path(fname_or_pdir).is_file(): 
         with xr.open_dataset(fname_or_pdir) as ds: 
