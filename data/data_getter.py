@@ -28,7 +28,7 @@ from dataTools import tools
 import dataTools.dictionaries as dcts
 
 #%% Create new coordinates [height and tropopause-relative]
-def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly tropopause coordinates
+def calc_coordinates(df, recalculate=False, verbose=False): 
     """ Calculate coordinates as specified through .var1 and .var2. """    
     df = copy.deepcopy(df)
     
@@ -119,45 +119,6 @@ def calc_coordinates(df, recalculate=False, verbose=False): # Calculates mostly 
         current_coords += [coord]
 
     return df
-
-# # Does not currently work for CARIBIC, presumably because the int_ and _Main shit fucks shit up. Damn
-# def create_tp_coords(df, verbose=False) -> pd.DataFrame: 
-#     # FIXME: create tp_coords for CARIBIC INT and MAIN
-#     """ Add calculated relative / absolute tropopause values to .met_data """
-#     new_coords = dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'Caribic'})
-#     new_coords = new_coords + dcts.get_coordinates(**{'ID': 'int_calc', 'source': 'CLAMS'})
-#     new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'CLAMS'})
-#     new_coords = new_coords + dcts.get_coordinates(**{'ID': 'CLAMS_calc', 'source': 'Caribic'})
-
-#     success_counter=0; fail_counter=0
-#     for coord in new_coords:
-#         # met = tp + rel -> MET - MINUS for either one
-#         met_col = coord.var1
-#         met_coord = dcts.get_coord(col_name = met_col)
-#         minus_col = coord.var2
-
-#         if met_col in df.columns and minus_col in df.columns:
-#             df[coord.col_name] = df[met_col] - df[minus_col]
-#             success_counter+=1
-
-#         elif met_coord.var == 'geopot' and met_col in df.columns:
-#             met_data = df[met_col].values * units(met_coord.unit) # [m^2/s^2]
-#             height_m = calc.geopotential_to_height(met_data) # [m]
-
-#             if coord.unit == 'm': 
-#                 df[coord.col_name] = height_m
-#                 success_counter+=1
-#             elif coord.unit == 'km': 
-#                 df[coord.col_name] = height_m * 1e-3
-#                 success_counter+=1
-#             else: 
-#                 fail_counter+=1
-
-#         else:
-#             fail_counter+=1
-#             if verbose: print(f'Could not generate {coord.col_name} as precursors are not available')
-#     print(f"Succesfully calculated {success_counter} coordinates, skipped {fail_counter}")
-#     return df
 
 #%% Pickled data dictionaries in .data.store
 

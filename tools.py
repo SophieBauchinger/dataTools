@@ -49,14 +49,10 @@ import dill
 import geopandas
 import glob
 import numpy as np
-from pathlib import Path
 import pandas as pd
 from PIL import Image
 from scipy import stats
 from scipy.ndimage import zoom, gaussian_filter
-import traceback
-import warnings
-import xarray as xr
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -92,18 +88,6 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
         
     df_mean.set_index('Date_Time', inplace=True)
     
-    # df_mean['Date_Time', i] = dt.datetime(y, m, d)
-    
-    # df_mean['Date_Time'] = np.nan
-    # for i, (y, m, d) in enumerate(zip(
-    #         df_mean.index.year,
-    #         df_mean.index.month if f != 'Y' else None,
-    #         df_mean.index.day if f == 'D' else (
-    #             [1] * len(df_mean.index) if first_of_month else None))):
-    #     df_mean['Date_Time', i] = dt.datetime(y, m, d)
-
-    # df_mean.set_index('Date_Time', inplace=True)
-    
     if minmax:
         df_min = df.groupby(pd.PeriodIndex(df.index, freq=f)).min(numeric_only=True)
         df_max = df.groupby(pd.PeriodIndex(df.index, freq=f)).max(numeric_only=True)
@@ -115,150 +99,6 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
         return pd.concat([df_mean, df_min, df_max], axis=1)
 
     return df_mean
-
-# def ds_to_gdf(ds) -> pd.DataFrame:
-#     """ Convert xarray Dataset to GeoPandas GeoDataFrame: Mostly for TPChange .nc files currently. Can be generalised """
-#     df = ds.to_dataframe()
-#     df.reset_index(inplace = True)
-#     df.rename(columns = {
-#         **{c : "latitude_degN" for c in ["Lat", "latitude", "lat_degN"]},
-#         **{c : "longitude_degE" for c in ["Lon", "longitude", "lon_degE"]},
-#         "PAlt" : "barometric_altitude_m",
-#         "Pres" : "pressure_hPa",
-#         "Temp" : "temperature_K",
-#         "Theta" : "theta_K",
-#         "Time" : 'Datetime', "time" : "Datetime", 
-#         }, inplace = True)
-    
-#     df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
-#     geodata = [Point(lat, lon) for lat, lon in zip(
-#         df['latitude_degN'], df['longitude_degE'])]
-
-#     # create geodataframe using lat and lon data from indices
-#     df.drop([c for c in ['scale', 'P0'] if c in df.columns], axis=1, inplace=True)
-#     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
-
-#     if not gdf.Datetime.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format
-#         index_time = [dt.datetime(y, 1, 1) for y in gdf.Datetime]
-#         gdf['Datetime'] = index_time
-#     gdf.set_index('Datetime', inplace=True).sort_index(inplace=True)
-#     gdf.index = gdf.index.floor('s')  # remove micro/nanoseconds
-    
-#     # Convert CLaMS N2O to ppb
-#     if "CLaMS_N2O" in gdf.columns: 
-#         gdf["CLaMS_N2O_ppb"] = conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
-#         gdf.drop(columns = ["CLaMS_N2O"], inplace = True)
-
-#     # WOUDC: Convert Ozone partial pressure to ppb
-#     if any('O3_mPa' in v for v in gdf.columns): 
-#         [pPress_col] = [v for v in gdf.columns if 'O3_mPa' in v]
-#         gdf['O3_ppb'] = conv_pPress_PartsPer(gdf[pPress_col], gdf['pressure_hPa'])
-    
-#     woudc_cols = [c for c in gdf.columns if "WOUDC" in c]
-#     gdf.rename(columns = {col : col[12:] for col in woudc_cols}, inplace=True) # remove WOUDC_STNxxx prefix
-
-#     # Reorder columns
-#     ordered_cols = list(gdf.columns)
-#     ordered_cols.sort(key = lambda x: x if not x.startswith(('ERA5', 'CLaMS', 'geo')) else 'z'+x)
-
-#     gdf = gdf[[c for c in ordered_cols if not c == "RH_%"]]
-
-#     return gdf
-
-# def rename_columns(columns) -> dict:
-#     """ Create dictionary relating column name with AMES_variable object
-
-#     Relate dataframe column name with all information in
-
-#     Get new column names and col_name_dict for AMES data structure.
-#     Get only short name + unit; description found in coordinate instance for specific col_name
-#     Standardise names via case changes
-#     """
-#     col_name_dict = {}
-#     for x in columns:
-#         if len(x.split(';')) == 3:
-#             col_name, long_name, unit = [i.strip() for i in x.split(';')]
-#         else:
-#             col_name = x.split(";")[0].strip()
-#         col_name_dict.update({x: col_name})
-#     return col_name_dict
-
-# def add_theta(ds, t_var = "t", p_var = "isobaricInhPa", theta_name='theta'): 
-#     """ Calculate ERA5 potential temperature from pressure and temperature.
-#     Unless specified, assumes variables 'isobaricInhPa' and 't' to be present in ds. 
-#     """
-#     pressure = ds[p_var] * units.hPa
-#     temperature = ds[t_var].values * units.kelvin
-
-#     # Make sure pressure info is available for all temperature points
-#     p_broadcasted = np.broadcast_to(pressure, temperature.shape)
-#     p_broadcasted = p_broadcasted * units.hPa
-
-#     # Calculate potential temperature
-#     theta = calc.potential_temperature(p_broadcasted, temperature)
-
-#     # Add to dataset
-#     ds[theta_name] = (ds[t_var].dims, theta.magnitude)
-#     ds[theta_name].attrs["units"] = "K"
-#     ds[theta_name].attrs["long_name"] = "Potential Temperature"
-#     return ds
-
-
-# # TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
-# def process_TPC(ds): # from V04
-#     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
-    
-#     NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
-#     NB ATom:    drop_variables = ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']
-
-#     """
-#     def flatten_TPdims(ds):
-#         """ Flatten additional dimensions corresponding to Main / Second / ... Tropopauses.  
-#         Used for ERA5 / CLaMS reanalysis datasets from version .03
-#         """
-#         TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-#         TP_qualifier_dict = {0 : '_Main', 
-#                             1 : '_Second', 
-#                             2 : '_Third'}
-#         for variable in TP_vars: 
-#             # get secondary dimension for the current multi-dimensional variable
-#             [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-#             for TP_value in ds[variable][TP_dim].values: 
-#                 ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-#             ds = ds.drop_vars(variable)
-#         return ds
-    
-#     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
-#     ds = flatten_TPdims(ds)
-#     if "Time" in ds.variables:
-#         ds = ds.sortby("Time")
-#         ds = ds.dropna(dim="Time", how = "all")
-#         ds = ds.dropna(dim="Time", subset = ["Time"])
-#     else: 
-#         print("Cannot find variable `Time`, please check the data files. ")
-
-#     variables = [v for v in ds.variables if (
-#         ("N2O" in v or "WOUDC" in v) or v in ["Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
-#         ] + dcts.TPChange_variables()
-
-#     return ds[[v for v in variables if v in ds.variables]]
-
-# def get_TPChange_gdf(fname_or_pdir): 
-    """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). """
-    if Path(fname_or_pdir).is_dir(): 
-        fnames = [f for f in fname_or_pdir.glob("*.nc")]
-        with xr.open_mfdataset(fnames, preprocess = process_TPC) as ds: 
-            ds = ds
-    elif Path(fname_or_pdir).is_file(): 
-        with xr.open_dataset(fname_or_pdir) as ds: 
-            ds = process_TPC(ds)
-    else: 
-        raise ValueError(f"Not a valid filepath or parent directory: {fname_or_pdir}")
-    try: 
-        return ds_to_gdf(ds)
-    except Exception: 
-        warnings.warn("Could not generate geodata, check your input!" + traceback.format_exc())
-        return ds.to_dataframe()
 
 # Interpolation
 def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
@@ -796,7 +636,3 @@ def gif_from_images(images, output_path='test_output.gif', duration=500):
         duration=duration,
         loop=0
     )
-
-class InitialisationError(Exception): 
-    """ Raised when initialisation of a class is not intended. """
-    pass
