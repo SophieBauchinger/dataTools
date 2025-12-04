@@ -48,11 +48,14 @@ import datetime as dt
 import dill
 import geopandas
 import glob
+from metpy import calc
+from metpy.units import units
 import numpy as np
 import pandas as pd
 from PIL import Image
 from scipy import stats
 from scipy.ndimage import zoom, gaussian_filter
+import xarray as xr
 
 import toolpac.calc.binprocessor as bp # type: ignore
 from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy # type: ignore
@@ -79,14 +82,16 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
     df_mean = df.groupby(pd.PeriodIndex(df.index, freq=f)).mean(numeric_only=True)
     df_mean.reset_index(inplace=True)
     
+    
+    [time_col] = [c for c in df_mean.columns if "date" in c.lower()]
     if f == 'D': 
-        df_mean['Date_Time'] = df_mean['Date_Time'].apply(lambda x: dt.datetime(x.year, x.month, x.day))
+        df_mean[time_col] = df_mean[time_col].apply(lambda x: dt.datetime(x.year, x.month, x.day))
     elif f == 'M' and first_of_month: 
-        df_mean['Date_Time'] = df_mean['Date_Time'].apply(lambda x: dt.datetime(x.year, x.month, 1))
+        df_mean[time_col] = df_mean[time_col].apply(lambda x: dt.datetime(x.year, x.month, 1))
     else: 
-        df_mean['Date_Time'] = df_mean['Date_Time'].apply(lambda x: dt.datetime(x.year, x.month, 15))
+        df_mean[time_col] = df_mean[time_col].apply(lambda x: dt.datetime(x.year, x.month, 15))
         
-    df_mean.set_index('Date_Time', inplace=True)
+    df_mean.set_index(time_col, inplace=True)
     
     if minmax:
         df_min = df.groupby(pd.PeriodIndex(df.index, freq=f)).min(numeric_only=True)
@@ -113,22 +118,31 @@ def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
 
     # add measurement timestamps to met_data
     new_indices = [i for i in times if i not in dataframe.index]
-
     expanded_df = pd.concat([dataframe, pd.Series(index=new_indices, dtype='object')])
-    expanded_df.drop(columns=[0], inplace=True)
     expanded_df.sort_index(inplace=True)
-
-    try:
-        expanded_df.interpolate(method='time', inplace=True, limit=2)  # , limit=500)
-    except TypeError:
-        print(f'Check if type {type(dataframe)} is suitable for time-wise interpolation!')
-
-    regridded_data = expanded_df.loc[times]  # return only measurement timestamps
     
-    # Rename columns using prefix
+    # Cannot time-wise interpolate string column
+    def get_str_nearest(expanded_df, col):
+        """ Returns nearest value for each string value in given column (col). """ 
+        fact = expanded_df[col].astype('category').factorize()
+        cat_to_string = {i:x for i,x in enumerate(fact[1])} # dict connecting category to string
+        series_cat = pd.Series(fact[0]).replace(-1, np.nan)
+        cat_interp = series_cat.interpolate(method="nearest")
+        str_interp = cat_interp.map(cat_to_string) # turn category back to string
+        return str_interp
+
+    # Interpolation of number-based columns
+    interp_df = expanded_df.drop(columns=[0]+list(obj_interp_dict.keys()))
+    interp_df = interp_df.interpolate(method='time', limit=2)  # , limit=500)
+
+    obj_interp_dict = {c:None for c in expanded_df.select_dtypes(object).columns if not c==0}
+    for col in obj_interp_dict.keys(): 
+        interp_df[col] = get_str_nearest(expanded_df, col)
+
+    # Return only msmt timestamps and rename cols using prefix (if given)
+    regridded_data = interp_df.loc[times]
     regridded_data.rename(columns = {col:prefix+col for col in regridded_data.columns}, 
                           inplace=True)
-    
     return regridded_data
 
 # %% Data selection
@@ -439,7 +453,6 @@ class LognormFit:
                                 float('{0:.{1}f}'.format(self.median*self.multiplicative_std*2, prec)))
         return pd.Series(stats_dict)
 
-class Bin2DFitted(bp.Simple_bin_2d): 
     """ Extending Bin2D class to hold lognorm fits for distributions. """
     def __init__(self, v, x, y, binclassinstance, count_limit=2, **fit_kwargs): 
         super().__init__(v, x, y, binclassinstance, count_limit)
