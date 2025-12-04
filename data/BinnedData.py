@@ -133,15 +133,15 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
 
     if dims == 1:
         bci_1d = make_bci(xcoord, **kwargs)
-        out = bp.Binned1D(v, x, bci_1d, count_limit=count_limit)
+        out = bp.BinnedData1D(v, x, bci_1d, count_limit=count_limit)
 
     elif dims == 2:
         bci_2d = make_bci(xcoord, ycoord, **kwargs)
-        out = bp.Binned2D(v, x, y, bci_2d, count_limit=count_limit)
+        out = bp.BinnedData2D(v, x, y, bci_2d, count_limit=count_limit)
 
     elif dims == 3:
         bci_3d = make_bci(xcoord, ycoord, zcoord, **kwargs)
-        out = bp.Binned3D(v, x, y, z, bci_3d, count_limit=count_limit)
+        out = bp.BinnedData3D(v, x, y, z, bci_3d, count_limit=count_limit)
 
     else:
         raise Exception(f'Invalid dimensions. Found dims = {dims}')
