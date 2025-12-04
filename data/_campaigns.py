@@ -141,26 +141,25 @@ class CampaignData(GlobalData):
                 f"""{self.__class__}
     status: {self.status}""")
 
-    def get_data(self, **kwargs): 
+    def get_data(self, recalculate=False, **kwargs): 
         """ Either import from TPChange netcdf or join together observational and model data. """
         # Check for importing from pickled DATA dictionary
-        fname = f'{self.ID.lower()}_data_dict.pkl' if not kwargs.get('fname') else kwargs.get('fname')
-        dict_path = tools.get_path() + 'misc_data\\pickled_dicts\\' + fname
-        path = Path(dict_path) if not kwargs.get('path') else Path(kwargs.get('path'))
-        if not kwargs.get('recalculate') and path.exists():
-            with open(path, 'rb') as f:
-                self.data = dill.load(f)
-            if 'df' not in self.data: 
+        if not recalculate: 
+            data_dict, updated_status,_ = data_getter.load_DATA_dict(
+                self.ID, self.status, fname=kwargs.get("fname", None), pdir=kwargs.get("pdir", None))
+
+            if 'df' not in data_dict: 
                 if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
                     self.get_data(recalculate=True)
-            self.status.update(dict(path = self.status.get('path', []) + [path])) # add path to status
+            self.status = updated_status
+            self.data = data_dict
             return self.data
 
         # Recalculate from TPChange obs + model files
         if self.ID in TPCHANGE_WITH_OBS.keys(): 
             print('Importing data from TPChange interpolation files.')
             fnames = Path('E:/TPChange') / TPCHANGE_WITH_OBS[self.ID] 
-            dataframe = tools.get_TPChange_gdf(fnames)
+            dataframe = data_getter.get_TPChange_gdf(fnames)
             self.data['df'] = dataframe
             return self.data
 
@@ -168,7 +167,7 @@ class CampaignData(GlobalData):
         elif self.ID in TPCHANGE_MODEL.keys(): 
             print('Importing meteo data from TPChange interpolation files.')
             fnames = 'E:/TPChange/' + Path('E:/TPChange') / TPCHANGE_MODEL[self.ID] 
-            dataframe = tools.get_TPChange_gdf(fnames)
+            dataframe = data_getter.get_TPChange_gdf(fnames)
 
             self.data['met_data'] = dataframe
 
