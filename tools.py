@@ -105,6 +105,39 @@ def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
 
     return df_mean
 
+def add_theta(data, **kwargs): 
+    """ Calculate ERA5 potential temperature from pressure and temperature.
+    if dataset:  assumes variables 'isobaricInhPa' and 't' if not otherwise specified 
+    if dataframe: assumes variables 'pressure_hPa' and 'temperature_K' if not otherwise specified
+    """    
+    if isinstance(data, xr.Dataset):
+        p_var = kwargs.get("p_var", "isobaricInhPa")
+        t_var = kwargs.get("t_var", "t")
+    elif isinstance(data, pd.DataFrame): 
+        p_var = kwargs.get("p_var", "pressure_hPa")
+        t_var = kwargs.get("t_var", "temperature_K")
+    else: 
+        raise TypeError(f"`data` must be either a pd.DataFrame or xr.Dataset, not {type(data)}")
+
+    pressure = data[p_var] * units.hPa
+    temperature = data[t_var].values * units.kelvin
+
+    # Make sure pressure info is available for all temperature points
+    p_broadcasted = np.broadcast_to(pressure, temperature.shape)
+    p_broadcasted = p_broadcasted * units.hPa
+    
+    # Calculate potential temperature
+    theta = calc.potential_temperature(p_broadcasted, temperature)
+
+    # Add to dataset
+    if isinstance(data, xr.Dataset):
+        data["theta"] = (data[t_var].dims, theta.magnitude)
+        data["theta"].attrs["units"] = "K"
+        data["theta"].attrs["long_name"] = "Potential Temperature"
+    elif isinstance(data, pd.DataFrame): 
+        data["theta_K"] = theta
+    return data
+
 # Interpolation
 def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
     """ Interpolate met data onto given measurement timestamps. 
@@ -453,6 +486,7 @@ class LognormFit:
                                 float('{0:.{1}f}'.format(self.median*self.multiplicative_std*2, prec)))
         return pd.Series(stats_dict)
 
+class Bin2DFitted(bp.BinnedData2D): 
     """ Extending Bin2D class to hold lognorm fits for distributions. """
     def __init__(self, v, x, y, binclassinstance, count_limit=2, **fit_kwargs): 
         super().__init__(v, x, y, binclassinstance, count_limit)
@@ -466,7 +500,7 @@ class LognormFit:
 
         return self.vmean_fit, self.vstdv_fit, self.rvstd_fit
 
-class Bin3DFitted(bp.Simple_bin_3d): 
+class Bin3DFitted(bp.BinnedData3D): 
     """ Extending Bin3D class to hold lognorm fits for distributions. """
     def __init__(self, v, x, y, z, binclassinstance, count_limit=2, **fit_kwargs): 
         super().__init__(v, x, y, z, binclassinstance, count_limit)
