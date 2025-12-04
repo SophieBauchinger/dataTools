@@ -37,6 +37,8 @@ def calc_coordinates(df, recalculate=False, verbose=False):
         try: current_coords.append(dcts.get_coord(col))
         except: continue
     
+    # TODO: Fix problem if a coord is duplicated (e.g. one with and one without _Main)
+    
     def get_var_coord(coords, var1: str): 
         """ Get the correct coordinate from given coords (otherwise col_name is incorrect)"""
         [var] = [c for c in coords if c == dcts.get_coord(var1)]
@@ -120,6 +122,32 @@ def calc_coordinates(df, recalculate=False, verbose=False):
 
     return df
 
+def combine_coords(df, verbose=False): 
+    """ Combine columns for int_* and *_Main coordinates -> * column. """
+    current_coords = []
+    for col in df.columns: 
+        try: current_coords.append(dcts.get_coord(col))
+        except: continue
+    
+    dupes = [x for x in current_coords if current_coords.count(x) > 1]
+    new_cols =  list(set([c.name for c in dupes]))
+    if verbose: 
+        dupes.sort(key=lambda x: x.name)
+        print(f"Combining to make the following columns:\n{(new_cols)}")
+
+    comb_df = pd.DataFrame(index=df.index, columns = new_cols)
+
+    for coord in dupes: 
+        same_coords = [c for c in dupes if c==coord]
+        for c in same_coords:
+            new_series = pd.Series(df[c.col_name], name=coord.name)
+            comb_df.update(new_series)
+    
+    out = df.drop(columns=[c.col_name for c in dupes])
+    out = pd.concat([out, comb_df], axis=1)
+
+    return out
+
 #%% Pickled data dictionaries in .data.store
 
 def WOUDC_STATION_LIST(): 
@@ -161,8 +189,8 @@ def load_DATA_dict(ID, status=None, fname=None, pdir=None):
         fname = fnames[-1] # get latest file
 
     filepath = Path(pdir)/fname
-    if not filepath.exists(): 
-        raise Warning(f"Could not found requested file at {filepath}")
+    if not filepath.exists():
+        raise FileNotFoundError(f"Could not found requested file at {filepath}")
 
     with open(filepath, 'rb') as f:
         data = dill.load(f)
