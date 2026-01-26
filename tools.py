@@ -66,6 +66,13 @@ import dataTools.dictionaries as dcts
 def get_path():
     return dcts.get_path()
 
+def flatten(nested_list): 
+    flat = [i for row in nested_list for i in row]
+    try: 
+        flat = flatten(flat)
+    except: 
+        return flat
+
 # %% Data extraction
 def time_mean(df, f, first_of_month=True, minmax=False) -> pd.DataFrame:
     """ Group values by time and return the respective averages.
@@ -164,11 +171,11 @@ def interpolate_onto_timestamps(dataframe, times, prefix='') -> pd.DataFrame:
         str_interp = cat_interp.map(cat_to_string) # turn category back to string
         return str_interp
 
+    obj_interp_dict = {c:None for c in expanded_df.select_dtypes(object).columns if not c==0}
+
     # Interpolation of number-based columns
     interp_df = expanded_df.drop(columns=[0]+list(obj_interp_dict.keys()))
     interp_df = interp_df.interpolate(method='time', limit=2)  # , limit=500)
-
-    obj_interp_dict = {c:None for c in expanded_df.select_dtypes(object).columns if not c==0}
     for col in obj_interp_dict.keys(): 
         interp_df[col] = get_str_nearest(expanded_df, col)
 
