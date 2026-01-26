@@ -111,7 +111,7 @@ class Coordinate:
         self.pvu = np.nan
 
         self.__dict__.update(kwargs)
-        if self.pvu is not np.nan:
+        if not np.isnan(self.pvu):
             self.pvu = float(self.pvu)
 
     def __repr__(self) -> str:
@@ -122,9 +122,9 @@ class Coordinate:
 
     @property
     def name(self):
-        return self.col_name.replace("_Main", "").replace("int_", "")
+        return self.col_name.replace("_Main", "").replace("int_", "").replace("_intTPC", "")
 
-    def label(self, filter_label=False, coord_only=False, no_vc=False, bsize=None, no_model=True) -> str:
+    def label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
         tp_defs = {'chem': 'Chemical',
@@ -133,7 +133,7 @@ class Coordinate:
                    'cpt': 'Cold point',
                    'combo': 'Multi-definition'}
 
-        if self.vcoord is not np.nan:
+        if isinstance(self.vcoord, str):
             vcs = {'p': 'Pressure',
                    'z': 'z',
                    'pt': r'$\Theta$',
@@ -144,7 +144,7 @@ class Coordinate:
 
             vcoord = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
 
-            if self.tp_def is not np.nan:
+            if isinstance(self.tp_def, str):
                 vcoord = (r'$\Delta$'+f'{vcoord}'+'$_{{\\text{TP}}}$') if self.rel_to_tp else vcoord
 
                 pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
@@ -172,12 +172,12 @@ class Coordinate:
                 if self.vcoord == 'pt': vcoord = r'$\Delta\Theta_{{\\text{TP}}}$' if self.rel_to_tp is True else r'$\Theta$'
                 label = f'{vcoord}'
 
-        elif self.hcoord is not np.nan:
+        elif isinstance(self.hcoord, str):
             hcs = {'lon': 'Longitude',
                    'lat': 'Latitude',
                    'eql': 'Equivalent Latitude',
-                   'degrees_north': '°N',
-                   'degrees_east': '°E',
+                   **{k: '°N' for k in ['degrees_north', 'degN', 'deg_north']},
+                   **{k: '°E' for k in ['degrees_east', 'degE', 'deg_east']},
                    'degrees': '°N, °E'}
             if self.hcoord in hcs and self.unit in hcs:
                 label = f'{hcs[self.hcoord]} [{hcs[self.unit]}]'
@@ -186,7 +186,7 @@ class Coordinate:
             if coord_only: 
                 label = label.split('[')[0].strip()
 
-        elif self.var is not np.nan:
+        elif isinstance(self.var, str):
             label = f'{self.var} [{self.unit}]' if not coord_only else self.var
 
         else:
@@ -244,7 +244,7 @@ class Coordinate:
 
         return 'grey'
 
-    def get_lims(self, df:pd.DataFrame=None) -> tuple[float]: 
+    def get_lims(self) -> tuple[float]: 
         """ Returns default maximum / minimum boundary of the coordinate for plotting. """
         if self.hcoord in ['lat', 'eql']: 
             return (-90, 90)
@@ -253,8 +253,8 @@ class Coordinate:
         
         if self.rel_to_tp is True: 
             limits_per_unit_RelToTp = {
-                'K' :  (-70, 70),
-                'km' : (-10, 5),
+                'K' :  (-75, 75),
+                'km' : (-10, 10),
                 'hPa' : (-400, 600),
                 'ppb' : (-50, 50)
                 }
@@ -417,6 +417,10 @@ class Substance:
 
         return f'{subs_abbr} {detr_qualifier}[{unit}]' + (f' ({identifier})' if not self.detr else '')
 
+    def get_lims(self, *args, **kwargs): 
+        vlims = self.vlims(*args, **kwargs)
+        return vlims[0]-abs(vlims[1]*0.01), vlims[1] + abs(vlims[1]*0.01)
+
     def vlims(self, bin_attr='vmean', atm_layer=None) -> tuple:
         """ Default colormap normalisation limits for substance mixing ratio or variabiliy. 
         
@@ -551,7 +555,7 @@ def vlim_dict_per_substance(short_name) -> dict[tuple]:
                  ))
     elif short_name == 'o3': 
         vlim_dict.update(
-            dict(vmean = (0.0, 1000),
+            dict(vmean = (0.0, 2000),
                  vstdv = (0, 280),
                  vstdv_tropo = (15, 60),
                  vstdv_strato = (90, 200), 
@@ -884,8 +888,8 @@ def MS_variables(*args):
         [variables.append(i) for i in modelled_ECMWF]     
     return variables
 
-def TPChange_variables(): 
-    """ All variables for TPChange ERA5 reanalysis datasets. """
+def ERA5_variables(): 
+    """ Relevvant variables for TPChange ERA5 reanalysis datasets. """
     met_vars = [
         'ERA5_PV',
         'ERA5_EQLAT',
@@ -909,13 +913,8 @@ def TPChange_variables():
             for vcoord in ['Z', 'THETA', 'PRESS']] + [
         f'ERA5_thermTP_{vcoord}_Second' 
             for vcoord in ['Z', 'THETA', 'PRESS']]
-    
-    substances = ["ERA5_O3", 
-                  "CLaMS_N2O",
-                  "CLaMS_ST", # stratospheric air mass tracer
-                  ]
 
-    return met_vars + dyn_tps + therm_tps + substances
+    return met_vars + dyn_tps + therm_tps
 
 def remove_from_CARIBIC_variables():
     """ Irrelevant variables in CARIBIC-INTtpc/GHG/MS that should be excluded. """
