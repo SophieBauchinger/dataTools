@@ -99,6 +99,31 @@ def world_map():
     return fig, ax
 
 # Figures and axes creation
+def monthly_with_cbar(): 
+    """ Create a 3x4 grid with a vertical colorbar on the right side. """
+    fig = plt.figure()
+    gs = fig.add_gridspec(3,4)
+    axs = gs.subplots(sharex=True, sharey=True)
+    def add_cbar(fig, axs, image): 
+        return fig.colorbar(
+            image,
+            ax=axs,
+            orientation='vertical')
+    return fig, axs, add_cbar
+
+def outer_tick_labels(axs, xlabel=None, ylabel=None): 
+    """ Show tick labels on all outside edges. 
+    axs (np.ndarray): 2D array of matplotlib axes """
+    for ax in axs[:,0].flat: # Left column
+        if ylabel: ax.set_ylabel(ylabel)
+    for ax in axs[-1].flat: # Bottom row
+        if xlabel: ax.set_xlabel(xlabel)
+    for ax in axs[0].flat: # Top row
+        ax.tick_params(top=True, labeltop=True)
+    for ax in axs[:,-1].flat: # Right column
+        ax.tick_params(right=True, labelright=True)
+    return axs
+
 def three_sideplot_structure() -> tuple[plt.Figure, tuple[plt.Axes]]: 
     """ Create Figure with central + upper/right additional plots + space on top right. """
     fig,ax_fig = plt.subplots()
@@ -267,7 +292,7 @@ def adjust_labels_ticks(sub_ax_arr) -> np.ndarray[plt.Axes]:
     for ax in sub_ax_arr[:,:,0].flat:
         # Inner left plots
         ax.tick_params(axis = 'y',
-            right=False, labelright=False, 
+            right=False, labelright=False,
             left = True, labelleft = True)
 
     for ax in sub_ax_arr[:,:,-1].flat:
