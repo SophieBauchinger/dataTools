@@ -251,10 +251,38 @@ def monthly_weighted_binning(GlobalObj, var, xcoord, **kwargs):
 
         binned_m = bp.WeightedBinning1D(data_list, bci, **kwargs)
         # TODO: Add statistical values: Q1, Q3 and IQR available
-        binned_monthly[month] = binned_m.weighted_mean, binned_m.weighted_std
+        binned_monthly[month] = binned_m # binned_m.weighted_mean, binned_m.weighted_std
 
     return binned_monthly, bci
+
+def add_WeightedBinning_objs(OBJ1, OBJ2, bci):
+    """ Creates a joint object from 1D weighted binned OBJ1 and OBJ2
     
+    Parameters: 
+        OBJ1, OBJ2 (bp.WeightedBinning1D)
+        bci (bp.Bin1D): Structure of the incoming and outcoming binned data
+    
+    Returns: A bp.WeightedBinning1D object with joint data_list, *_bins and recalculated stats. 
+    """
+    # CHECKED: Equivalent first appending to data_list and then recalculating the bins
+    empty_data_list = [ (np.array([np.nan]), np.array([np.nan])) ]
+    WBjoint = bp.WeightedBinning1D(empty_data_list, bci)
+
+    # Check that Bin_obj is the same
+    if not all(i == j for i,j in zip(OBJ1.Bin.__dict__, OBJ2.Bin.__dict__)):
+        raise Warning("Bin_obj needs to be the same for both WeightedBinning objects to continue. ")
+
+    # Update: data_list, v_bins, w_bins, x_bins
+    WBjoint.data_list = OBJ1.data_list + OBJ2.data_list
+    WBjoint.v_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.v_bins, OBJ2.v_bins)]
+    WBjoint.x_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.x_bins, OBJ2.x_bins)]
+    WBjoint.w_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.w_bins, OBJ2.w_bins)]
+
+    # Recalculate: weighted_mean, weighted_std, "quants: q1, q3, iqr" (dep. on numpyy version)
+    WBjoint.weighted_mean, WBjoint.weighted_std, quants= WBjoint.calc(WBjoint.v_bins, WBjoint.w_bins)
+    if quants:
+        WBjoint.q1, WBjoint.q3, WBjoint.iqr = quants 
+    return WBjoint
 
 #%% Stratosphere / Troposphere binning
 def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
