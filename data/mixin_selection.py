@@ -257,7 +257,7 @@ class SelectionMixin:
     def sel_flight(self, flights, verbose=False, inplace:bool=False):
         """ Returns object containing only data for selected flights
         Params: 
-            flight_list (int / list) 
+            flight_list (int|str|Iterable) 
         """
         if not hasattr(self, 'flights'):
             raise NotImplementedError(f'Flight selection not available for {self.source}.')

@@ -82,7 +82,8 @@ class Caribic(GlobalData):
             source_pdir (str): Parent directory of stored Caribic AMES files. 
         """
         if not recalculate: # Load and check the saved DATA dictionary
-            data_dict, updated_status, filepath = data_getter.load_DATA_dict(self.ID, self.status, fname)
+            data_dict, updated_status, filepath = data_getter.load_DATA_dict(self.ID, self.status, fname,
+                                                                             pdir = tools.get_path()+ 'data\\store\\')
             self.status = updated_status
             if verbose: print(f'Loaded CARIBIC data from {filepath}')
 

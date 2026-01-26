@@ -58,7 +58,7 @@ def get_vlimit(subs:dcts.Substance, bin_attr='vmean', vlims=None, df=None) -> tu
         raise KeyError('Could not generate colormap limits.')
     return vlims
 
-# TODO
+# TODO: get_bsize(coord)
 def get_bsize(coord):
     pass
 

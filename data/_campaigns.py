@@ -146,7 +146,7 @@ class CampaignData(GlobalData):
         # Check for importing from pickled DATA dictionary
         if not recalculate: 
             data_dict, updated_status,_ = data_getter.load_DATA_dict(
-                self.ID, self.status, fname=kwargs.get("fname", None), pdir=kwargs.get("pdir", None))
+                self.ID, self.status, fname=kwargs.get("fname", None), pdir=kwargs.get("pdir", tools.get_path()+ 'data\\store\\'))
 
             if 'df' not in data_dict: 
                 if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
