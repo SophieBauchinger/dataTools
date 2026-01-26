@@ -212,3 +212,5 @@ tropop_tp_WMO,WMO tropopause pressure,hPa,EMAC,p,,,therm,FALSE,EMAC,,,,,0
 tropop_tp_WMO_f,fract. of WMO-TP box in trop.,,EMAC,,,frac,therm,FALSE,EMAC,,,,,0
 tropop_tp_WMO_i,WMO tropopause level index,level,EMAC,lev,,,therm,FALSE,EMAC,,,,,0
 UMAQS_N2O,Pseudo coord: Nitrous oxide from UMAQS [ppb - inferred],ppb,UMAQS,mxr,,,chem,FALSE,MSMT,,n2o,,,0
+horWind_m_per_s,Horizontal wind in meters per second,ms-1,,,,horWind,,,MSMT,,,,,
+WindDir_degrees,Direction of wind in degrees,deg,,,,WindDir,,,MSMT,,,,,

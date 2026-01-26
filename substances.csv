@@ -191,3 +191,4 @@ AIRTOSS_N2O,N2O volume mixing ratio,n2o,ppbv,AIRTOSS,AIRTOSS,MSMT,s
 AIRTOSS_O3,Ozone volume mixing ratio,o3,ppmv,AIRTOSS,AIRTOSS,MSMT,
 TPEx_N2O_ppbv,UMAQS N2O volume mixing ratio,n2o,ppbv,TPEX,TPEX,MSMT,s
 TPEx_TOMi_L_O3_ppbv,TOMi ozone volume mixing ratio,o3,ppbv,TPEX,TPEX,MSMT,
+N2O_ppb,Homogenised N2O var. for multiple campaigns / sources,n2o,ppb,MULTI,MULTI,MSMT,s
