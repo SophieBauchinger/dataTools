@@ -154,8 +154,10 @@ def WOUDC_STATION_LIST():
     return ['HPS']+[    # 1.1 GB 
             '007',      # 198 MB
             '012',      # 1.1 GB
+            '018',      # 1.5 GB
             '024',      # 1.1 GB
             '029',      # 432 MB
+            '077',      # 1.1 GB
             '190',      # 911 MB
             '205',      #  11 MB
             '233',      # 1.5 GB
@@ -181,9 +183,10 @@ def load_DATA_dict(ID, status=None, fname=None, pdir=None):
     For aircraft campaigns, returns a dictionary containing pandas dataframes.
     For ozone sondes measurements, returns a pandas dataframe. 
     """
-    pdir = pdir or Path(tools.get_path()+ 'data\\store\\')
+    # pdir = pdir or Path(tools.get_path())
+    pdir = pdir or Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store")
     if not fname:
-        fnames = [i for i in pdir.iterdir() if (
+        fnames = [i for i in Path(pdir).iterdir() if (
             f'{ID.lower()}_DATA' in str(i) or f'{ID}_DATA' in str(i))]
         fnames.sort(key=lambda x: x.name[-10:]) # sort by date
         fname = fnames[-1] # get latest file
@@ -237,34 +240,37 @@ def load_ozone_sonde_data(stn_ids, status=None, pdir=None):
     return stn_dict, station_df, status
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
+ERA5_VARS = dcts.ERA5_variables()
+
 def process_TPC(ds) -> xr.Dataset: 
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
     
     NB CARIBIC: drop_variables = ['CARIBIC2_LocalTime']
     NB ATom:    drop_variables = ['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS']
 
-    """
+    """   
     def flatten_TPdims(ds):
         """ Flatten additional dimensions corresponding to Main / Second / ... Tropopauses.  
         Used for ERA5 / CLaMS reanalysis datasets from version .03
         """
-        TP_vars = [v for v in ds.variables if any(d.endswith('TP') for d in ds[v].dims)]
-        TP_qualifier_dict = {0 : '_Main', 
-                            1 : '_Second', 
-                            2 : '_Third'}
-        for variable in TP_vars: 
-            # get secondary dimension for the current multi-dimensional variable
-            [TP_dim] = [d for d in ds[variable].dims if d.endswith('TP')] # should only be a single one!
-            for TP_value in ds[variable][TP_dim].values: 
-                ds[variable + TP_qualifier_dict[TP_value]] = ds[variable].isel({TP_dim : TP_value})
-            ds = ds.drop_vars(variable)
-        return ds
-    
+        new_vars = {}
+        drop_vars = [] # multidimensional TP variables
+        for var in ds.data_vars: 
+            tp_dims = [d for d in ds[var].dims if d.endswith("TP")]
+            if not tp_dims: continue 
+            [TP_dim] = tp_dims
+
+            for i, suffix in {0: "_Main", 1: "_Second", 2: "_Third"}.items(): 
+                if i in ds[TP_dim]: 
+                    new_vars[var + suffix] = ds[var].isel({TP_dim: i})
+            drop_vars.append(var)
+
+        return ds.drop_vars(drop_vars).assign(new_vars)
+
     # Flatten variables that have multiple tropoause dimensions (thermTP, dynTP)
     ds = flatten_TPdims(ds)
     if "Time" in ds.variables:
         ds = ds.sortby("Time")
-        ds = ds.dropna(dim="Time", how = "all")
         ds = ds.dropna(dim="Time", subset = ["Time"])
     else: 
         print("Cannot find variable `Time`, please check the data files. ")
@@ -278,8 +284,10 @@ def process_TPC(ds) -> xr.Dataset:
 
     variables = [v for v in ds.variables if (
         any(i in v for i in ["N2O", "O3", "WOUDC"]) # WOUDC, N2O and O3 variables are kept
-            or v in ["Flight number", "Lat", "Lon", "Theta", "Temp", "Pres", "PAlt"])
-        ] + dcts.TPChange_variables()
+            or v in ["Flight number", "Lat", "Lon", "Theta", 
+                     "Temp", "Pres", "PAlt", "horWind", "WindDir",
+                     "CLaMS_ST"]) # stratospheric air mass tracer
+        ] + ERA5_VARS
 
     return ds[[v for v in variables if v in ds.variables]]
 
@@ -294,7 +302,9 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         "Pres" : "pressure_hPa",
         "Temp" : "temperature_K",
         "Theta" : "theta_K",
-        "Time" : 'Datetime', "time" : "Datetime", 
+        "Time" : 'Datetime', "time" : "Datetime",
+        "horWind" : "horWind_m_per_s",
+        "WindDir" : "WindDir_degrees",
         }, inplace = True)
 
     df.dropna(subset=['longitude_degE', 'latitude_degN'], how='any', inplace=True)
@@ -319,13 +329,13 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         gdf["CLaMS_N2O_ppb"] = tools.conv_molarity_PartsPer(gdf["CLaMS_N2O"].values, 'ppb')
         gdf.drop(columns = ["CLaMS_N2O"], inplace = True)
 
-    # WOUDC: Convert Ozone partial pressure to ppb
-    if any('O3_mPa' in v for v in gdf.columns):
-        [pPress_col] = [v for v in gdf.columns if 'O3_mPa' in v]
-        gdf['O3_ppb'] = tools.conv_pPress_PartsPer(gdf[pPress_col], gdf['pressure_hPa'])
-    
     woudc_cols = [c for c in gdf.columns if "WOUDC" in c]
     gdf.rename(columns = {col : col[12:] for col in woudc_cols}, inplace=True) # remove WOUDC_STNxxx prefix
+    
+    # WOUDC: Convert Ozone partial pressure to ppb
+    if any(v in ['DWDO3SondeHP_OZONE', 'O3_mPa'] for v in gdf.columns):
+        [pPress_col] = [v for v in gdf.columns if v in ['DWDO3SondeHP_OZONE', 'O3_mPa']]
+        gdf['O3_ppb'] = tools.conv_pPress_PartsPer(gdf[pPress_col], gdf['pressure_hPa'])
 
     # Reorder columns
     ordered_cols = list(gdf.columns)
