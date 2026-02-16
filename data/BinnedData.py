@@ -208,8 +208,8 @@ def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs):
 def weighted_binning(data_list, xcoord, ycoord=None, zcoord=None, **kwargs):
     """ Return weighted binned data where each item in data_list contributes equally. """
     dims = sum([dim is not None for dim in [xcoord, ycoord, zcoord]])
-    if len(data_list[0]) != dims: 
-        raise Exception("Dimensions of data_list are not equal to given parameters. ")
+    # if len(data_list[0]) != dims: 
+    #     raise Exception("Dimensions of data_list are not equal to given parameters. ")
 
     if dims == 1:
         bci_1d = make_bci(xcoord, **kwargs)
@@ -227,17 +227,16 @@ def weighted_binning(data_list, xcoord, ycoord=None, zcoord=None, **kwargs):
 
     return out
 
-def monthly_weighted_binning(GlobalObj, var, xcoord, **kwargs): 
-    """ Create monthly binned profiles of subs (give data for a latitude band)
+def monthly_weighted_binning(GlobalObj, var, xcoord, ycoord=None, **kwargs): 
+    """ Create monthly binned profiles of subs 
     
     Parameters: 
         GlobalObject (dataTools.data.GlobalData)
         subs (dcts.Substance)
-        vcoord (dcts.Coordinate): Vertical coord. for profile
-        lat_bsize (float): Size of latitude bands (even)
+        xcoord (dcts.Coordinate): eg. equivalent latitude
+        ycoord (dcts.Coordinate): e.g.vertical coordinate
     """    
-    bci = make_bci(xcoord)
-    
+
     binned_monthly = {}
     for month in set(GlobalObj.df.index.month):
         data_month = GlobalObj.sel_month(month)
@@ -247,10 +246,18 @@ def monthly_weighted_binning(GlobalObj, var, xcoord, **kwargs):
             
             v = data_ascent.get_var_data(var)
             x = data_ascent.get_var_data(xcoord)
-            data_list.append((v,x))
+            if ycoord is not None: 
+                y = data_ascent.get_var_data(ycoord)
+                data_list.append((v,x,y))
+            else: 
+                data_list.append((v,x))
 
-        binned_m = bp.WeightedBinning1D(data_list, bci, **kwargs)
-        # TODO: Add statistical values: Q1, Q3 and IQR available
+        if ycoord is None: 
+            bci = make_bci(xcoord)
+            binned_m = bp.WeightedBinning1D(data_list, bci, **kwargs)
+        else: 
+            bci = make_bci(xcoord, ycoord)
+            binned_m = bp.WeightedBinning2D(data_list, bci, **kwargs)
         binned_monthly[month] = binned_m # binned_m.weighted_mean, binned_m.weighted_std
 
     return binned_monthly, bci
@@ -279,7 +286,7 @@ def add_WeightedBinning_objs(OBJ1, OBJ2, bci):
     WBjoint.w_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.w_bins, OBJ2.w_bins)]
 
     # Recalculate: weighted_mean, weighted_std, "quants: q1, q3, iqr" (dep. on numpyy version)
-    WBjoint.weighted_mean, WBjoint.weighted_std, quants= WBjoint.calc(WBjoint.v_bins, WBjoint.w_bins)
+    WBjoint.weighted_mean, WBjoint.weighted_std, quants = WBjoint.calc(WBjoint.v_bins, WBjoint.w_bins)
     if quants:
         WBjoint.q1, WBjoint.q3, WBjoint.iqr = quants 
     return WBjoint
