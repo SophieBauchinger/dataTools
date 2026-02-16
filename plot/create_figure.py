@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib.lines as mlines
 from matplotlib.patches import Patch
-import matplotlib.patheffects as mpe
 import numpy as np
 import plotly.graph_objs as go
 from plotly_resampler import FigureResampler
@@ -63,6 +62,7 @@ def outline(lw=2):
     """ Helper function to add outline to lines in plots. 
     lw (float): Linewidth of the line to outline. 
     """
+    import matplotlib.patheffects as mpe
     return mpe.withStroke(linewidth=lw+1, foreground='white')
 
 def add_zero_line(ax):
@@ -114,14 +114,19 @@ def monthly_with_cbar():
 def outer_tick_labels(axs, xlabel=None, ylabel=None): 
     """ Show tick labels on all outside edges. 
     axs (np.ndarray): 2D array of matplotlib axes """
-    for ax in axs[:,0].flat: # Left column
+
+    for ax in axs[:,0].flat: # Left column: y-label
         if ylabel: ax.set_ylabel(ylabel)
-    for ax in axs[-1].flat: # Bottom row
+
+    for ax in axs[-1,:].flat: # Bottom row: x-label
         if xlabel: ax.set_xlabel(xlabel)
-    for ax in axs[0].flat: # Top row
+
+    for ax in axs[0,:].flat: # Top row: ticks + nrs.
         ax.tick_params(top=True, labeltop=True)
-    for ax in axs[:,-1].flat: # Right column
+        
+    for ax in axs[:,-1].flat: # Right column: ticks + nrs.
         ax.tick_params(right=True, labelright=True)
+
     return axs
 
 def three_sideplot_structure() -> tuple[plt.Figure, tuple[plt.Axes]]: 
@@ -471,3 +476,9 @@ def month_legend_handles(months = range(1,13)):
             for m in months]
     return lines
 
+#%% Testing functions
+
+def rand_data(ax): 
+    x, y, scale = np.random.randn(3, 100)
+    ax.scatter(x=x, y=y, c=scale, s=np.abs(scale)*100, zorder=5)
+    return ax
