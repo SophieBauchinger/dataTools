@@ -149,27 +149,61 @@ def combine_coords(df, verbose=False):
     return out
 
 #%% Pickled data dictionaries in .data.store
+WOUDC_STATION_LIST = [
+    'HPS'       # 1.1 GB 
+    '007',      # 198 MB
+    '012',      # 1.1 GB
+    '014',      # 1.5 GB
+    '018',      # 1.5 GB
+    '021',      # 1.7 GB
+    '024',      # 1.1 GB
+    '029',      # 432 MB
+    '053',      # 1.7 GB
+    '067',      # 2.7 GB
+    '076',      # 1.5 GB
+    '077',      # 1.1 GB
+    '089',      # 1.0 GB
+    '101',      # 1.2 GB
+    '107',      # 516 MB
+    # '156',      # TODO
+    '190',      # 911 MB
+    '205',      #  11 MB
+    '233',      # 1.5 GB
+    '254',      #  42 MB 
+    '256',      # 3.8 GB
+    '308',      # 2.6 GB
+    '315',      # 2.3 GB
+    '328',      # 1.7 GB
+    '339',      # 322 MB
+    '344',      # 1.6 GB
+    '394',      # 431 MB
+    '435',      # 225 MB 
+    '436',      # 1.3 GB
+    '450',      # 272 MB
+    '458',      # 1.6 GB
+    ]
 
-def WOUDC_STATION_LIST(): 
-    return ['HPS']+[    # 1.1 GB 
-            '007',      # 198 MB
-            '012',      # 1.1 GB
-            '018',      # 1.5 GB
-            '024',      # 1.1 GB
-            '029',      # 432 MB
-            '077',      # 1.1 GB
-            '190',      # 911 MB
-            '205',      #  11 MB
-            '233',      # 1.5 GB
-            '254',      #  42 MB 
-            '339',      # 322 MB
-            '344',      # 1.5 GB
-            '394',      # 431 MB
-            '435',      # 225 MB 
-            '436',      # 1.3 GB
-            '450',      # 272 MB
-            '458',      # 1.6 GB
-            ]
+CAMPAIGN_LIST = [
+    'airtoss', 
+    'atom', 
+    'attrex-awas', 
+    'attrex-ucats', 
+    'caribic', 
+    'envisat-spirale', 
+    'esmval', 
+    'euplex-asur', 
+    'gwlcycle', 
+    'hippo', 
+    'phileas', 
+    'polstracc', 
+    'southtrac', 
+    'spurt', 
+    'start08', 
+    'stratoclim', 
+    'tacts', 
+    'tc4_dc8', 
+    'wise'
+]
 
 def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
@@ -238,6 +272,15 @@ def load_ozone_sonde_data(stn_ids, status=None, pdir=None):
     station_df.drop(columns=['latitude_degN', 'longitude_degE'], inplace=True)
 
     return stn_dict, station_df, status
+
+def get_binned_path(stn_id, coord):
+    """ Specific reference of where station-nbased monthly weighted binned data is saved. """
+    pdir = Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\output")
+    subdir = pdir / coord.name
+    if not subdir.exists(): 
+        subdir.mkdir()
+    fname = f"STN{stn_id}_binned_monthly.pkl"
+    return subdir / fname
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
 ERA5_VARS = dcts.ERA5_variables()
