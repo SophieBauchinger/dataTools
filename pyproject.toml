@@ -7,7 +7,7 @@ name = "dataTools"
 version = "1.0.0"
 description = "Useful tools for analysis atmospheric measurement data. "
 readme = "README.md"
-requires-python = "=>=3.6"
+requires-python = ">=3.6"
 authors = [
   { name = "SophieBauchinger", email = "bauchinger@iau.uni-frankfurt.de" },
 ]
