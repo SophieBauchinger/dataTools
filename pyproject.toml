@@ -2,12 +2,15 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages]
+find = {}
+
 [project]
 name = "dataTools"
 version = "1.1.0"
 description = "Useful tools for analysis atmospheric measurement data. "
 readme = "README.md"
-requires-python = "=>3.6"
+requires-python = "=>3.9"
 authors = [
   { name = "SophieBauchinger", email = "bauchinger@iau.uni-frankfurt.de" },
 ]
