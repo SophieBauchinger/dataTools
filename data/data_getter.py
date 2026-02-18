@@ -150,7 +150,7 @@ def combine_coords(df, verbose=False):
 
 #%% Pickled data dictionaries in .data.store
 WOUDC_STATION_LIST = [
-    'HPS'       # 1.1 GB 
+    'HPS',      # 1.1 GB 
     '007',      # 198 MB
     '012',      # 1.1 GB
     '014',      # 1.5 GB
@@ -165,7 +165,7 @@ WOUDC_STATION_LIST = [
     '089',      # 1.0 GB
     '101',      # 1.2 GB
     '107',      # 516 MB
-    # '156',      # TODO
+    '156',      # 7.3 GB
     '190',      # 911 MB
     '205',      #  11 MB
     '233',      # 1.5 GB
@@ -204,6 +204,8 @@ CAMPAIGN_LIST = [
     'tc4_dc8', 
     'wise'
 ]
+
+STORE_PPDIR = Path("C:/Users/sophie_bauchinger/Documents/GitHub/chemTPanalyses/chemTPanalyses/data")
 
 def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
@@ -273,14 +275,32 @@ def load_ozone_sonde_data(stn_ids, status=None, pdir=None):
 
     return stn_dict, station_df, status
 
+# File name conventions for prepped / saved files
 def get_binned_path(stn_id, coord):
     """ Specific reference of where station-nbased monthly weighted binned data is saved. """
-    pdir = Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\output")
-    subdir = pdir / coord.name
+    subdir = STORE_PPDIR / 'output' / coord.name
     if not subdir.exists(): 
         subdir.mkdir()
     fname = f"STN{stn_id}_binned_monthly.pkl"
     return subdir / fname
+
+def get_o3_eqlat_fname(eql_lower, bsize=1, path=False):
+    """ Returns file name (or full path) for saved o3_eqlat file. 
+    Default directory: STORE_PPDIR / 'store_eqlat' """
+    NS_low = 'n' if (eql_lower>=0) else 's'
+    NS_high = 'n' if (eql_lower+bsize>=0) else 's'
+    fn = f"o3_eqlat_{abs(eql_lower):02d}{NS_low}_{abs(eql_lower+bsize):02d}{NS_high}.csv"
+    if path: 
+        return STORE_PPDIR / 'store_eqlat' / fn
+    return fn
+
+def read_eqlat_csv(eql_lower=None, path=None): 
+    """ Read in data from saved o3_eqlat (later n2o_eqlat?) csv files. """
+    fpath = path or get_o3_eqlat_fname(eql_lower, path=True)
+    df = pd.read_csv(fpath)
+    df.index = pd.to_datetime(df["Datetime"])
+    df = df.drop(columns = ["Datetime", "geometry"])
+    return df
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
 ERA5_VARS = dcts.ERA5_variables()

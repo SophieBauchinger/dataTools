@@ -32,7 +32,6 @@ def get_var_data(df, var) -> np.array:
         data = np.array(df[var.col_name])
     return data
 
-
 def get_var_lims(var, bsize=None, gdf=None, **kwargs) -> tuple[float]:
     """ Returns outer limits based on variable data and (optional) bin size. 
 
@@ -63,7 +62,6 @@ def get_var_lims(var, bsize=None, gdf=None, **kwargs) -> tuple[float]:
         return vbmin, vbmax
     else:
         raise ValueError('Could not generate variable limits.')
-
 
 # BINCLASSINSTANCE
 def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
@@ -228,15 +226,15 @@ def weighted_binning(data_list, xcoord, ycoord=None, zcoord=None, **kwargs):
     return out
 
 def monthly_weighted_binning(GlobalObj, var, xcoord, ycoord=None, **kwargs): 
-    """ Create monthly binned profiles of subs 
+    """ Create monthly binned profiles of subs. 1D or 2D depending if `ycoord` is set
     
     Parameters: 
         GlobalObject (dataTools.data.GlobalData)
         subs (dcts.Substance)
-        xcoord (dcts.Coordinate): eg. equivalent latitude
-        ycoord (dcts.Coordinate): e.g.vertical coordinate
+        xcoord (dcts.Coordinate): e.g.vertical coordinate
+        ycoord (dcts.Coordinate): e.g. equivalent latitude
     """    
-
+    bci = make_bci(xcoord, ycoord)
     binned_monthly = {}
     for month in set(GlobalObj.df.index.month):
         data_month = GlobalObj.sel_month(month)
@@ -253,10 +251,8 @@ def monthly_weighted_binning(GlobalObj, var, xcoord, ycoord=None, **kwargs):
                 data_list.append((v,x))
 
         if ycoord is None: 
-            bci = make_bci(xcoord)
             binned_m = bp.WeightedBinning1D(data_list, bci, **kwargs)
         else: 
-            bci = make_bci(xcoord, ycoord)
             binned_m = bp.WeightedBinning2D(data_list, bci, **kwargs)
         binned_monthly[month] = binned_m # binned_m.weighted_mean, binned_m.weighted_std
 
@@ -266,24 +262,39 @@ def add_WeightedBinning_objs(OBJ1, OBJ2, bci):
     """ Creates a joint object from 1D weighted binned OBJ1 and OBJ2
     
     Parameters: 
-        OBJ1, OBJ2 (bp.WeightedBinning1D)
-        bci (bp.Bin1D): Structure of the incoming and outcoming binned data
+        OBJ1, OBJ2 (bp.WeightedBinning*D): 1D or 2D 
+        bci (bp.Bin*D): 1D or 2D Structure of the incoming and outcoming binned data
     
-    Returns: A bp.WeightedBinning1D object with joint data_list, *_bins and recalculated stats. 
+    Returns: A bp.WeightedBinning*D object with joint data_list, *_bins and recalculated stats. 
     """
-    # CHECKED: Equivalent first appending to data_list and then recalculating the bins
-    empty_data_list = [ (np.array([np.nan]), np.array([np.nan])) ]
-    WBjoint = bp.WeightedBinning1D(empty_data_list, bci)
-
     # Check that Bin_obj is the same
     if not all(i == j for i,j in zip(OBJ1.Bin.__dict__, OBJ2.Bin.__dict__)):
         raise Warning("Bin_obj needs to be the same for both WeightedBinning objects to continue. ")
 
+    # Check dimensions of objects (prev. already checked that OBJ1.dims == OBJ2.dims)
+    if OBJ1.dims == 1:
+        empty_data_list = [ (np.array([np.nan]), np.array([np.nan])) ]
+        WBjoint = bp.WeightedBinning1D(empty_data_list, bci)
+    elif OBJ1.dims == 2:
+        empty_data_list = [ (np.array([np.nan]), np.array([np.nan]), np.array([np.nan])) ]
+        WBjoint = bp.WeightedBinning2D(empty_data_list, bci)
+    else: 
+        raise Warning("Please supply only 1- or 2-dimensional WeightedBinning objects. ")
+    
     # Update: data_list, v_bins, w_bins, x_bins
+    def combine_bins(bins1, bins2, dims): 
+        """ Combine data arrays within bin-data structures for 1D or 2D cases.  """
+        if dims == 1: 
+            return [np.append(v1, v2) for v1,v2 in zip(bins1, bins2)]
+        return [[np.append(v1, v2) for v1, v2 in zip(row1, row2)] 
+                    for row1, row2 in zip(bins1, bins2)]
+
     WBjoint.data_list = OBJ1.data_list + OBJ2.data_list
-    WBjoint.v_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.v_bins, OBJ2.v_bins)]
-    WBjoint.x_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.x_bins, OBJ2.x_bins)]
-    WBjoint.w_bins = [np.append(v1, v2) for v1,v2 in zip(OBJ1.w_bins, OBJ2.w_bins)]
+    WBjoint.v_bins = combine_bins(OBJ1.v_bins, OBJ2.v_bins, WBjoint.dims)
+    WBjoint.w_bins = combine_bins(OBJ1.w_bins, OBJ2.w_bins, WBjoint.dims)
+    WBjoint.x_bins = combine_bins(OBJ1.x_bins, OBJ2.x_bins, WBjoint.dims)
+    if WBjoint.dims==2:
+        WBjoint.y_bins = combine_bins(OBJ1.y_bins, OBJ2.y_bins, WBjoint.dims)
 
     # Recalculate: weighted_mean, weighted_std, "quants: q1, q3, iqr" (dep. on numpyy version)
     WBjoint.weighted_mean, WBjoint.weighted_std, quants = WBjoint.calc(WBjoint.v_bins, WBjoint.w_bins)
@@ -329,7 +340,6 @@ def get_ST_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
 
     return strato_attr, tropo_attr
 
-
 def get_ST_seass_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
     """ Create seasonal binned data dicts for strato / tropo with specified parameters.
     Parameters:
@@ -368,7 +378,6 @@ def get_ST_seass_binDict(GlobalObj, strato_params, tropo_params, **kwargs):
 
     return strato_3D_attr_seas, tropo_3D_attr_seas
 
-
 def make_ST_bins(GlobalObj, tropo_params, strato_params, **kwargs):
     """ Create tropo_BinDict and strato_BinDict. 
     Data is first sorted into troposphere and stratosphere, then binned according to 
@@ -393,7 +402,6 @@ def make_ST_bins(GlobalObj, tropo_params, strato_params, **kwargs):
             strato_df, **strato_params)
 
     return tropo_BinDict, strato_BinDict
-
 
 # %% Now dealing with the OUTPUT
 def extract_attr(data_dict, bin_attr):
