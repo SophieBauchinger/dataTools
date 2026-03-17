@@ -11,6 +11,7 @@ import dill
 import geopandas
 from metpy.units import units
 from metpy import calc
+import metpy.constants as mpconsts
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -28,22 +29,20 @@ from dataTools import tools
 import dataTools.dictionaries as dcts
 
 #%% Create new coordinates [height and tropopause-relative]
+Re = mpconsts.Re.magnitude
+g = mpconsts.g.magnitude
+def geopot_to_height(geopot): 
+    """ Mirrors metpy.calc.geopotential_to_height without unit constraints. """
+    return (geopot * Re) / (g * Re - geopot)
+
 def calc_coordinates(df, recalculate=False, verbose=False): 
     """ Calculate coordinates as specified through .var1 and .var2. """    
-    df = copy.deepcopy(df)
-    
+    # df = copy.deepcopy(df)
     current_coords = []
     for col in df.columns: 
         try: current_coords.append(dcts.get_coord(col))
         except: continue
-    
-    # TODO: Fix problem if a coord is duplicated (e.g. one with and one without _Main)
-    
-    def get_var_coord(coords, var1: str): 
-        """ Get the correct coordinate from given coords (otherwise col_name is incorrect)"""
-        [var] = [c for c in coords if c == dcts.get_coord(var1)]
-        return var
-   
+
     if recalculate: # Toggle recalculating existing coordinates
         drop_cols = [c.col_name for c in current_coords if c in dcts.get_coordinates(var1='not_nan')]
         df.drop(columns = drop_cols, inplace=True)
@@ -61,11 +60,13 @@ def calc_coordinates(df, recalculate=False, verbose=False):
             continue
         if verbose: 
             print(f"Calculating `{coord.col_name}` from `{coord.var1}`")
-        var1 = get_var_coord(current_coords, coord.var1)
-        met_df = df[var1.col_name].values * units(var1.unit)
-        height_m = calc.geopotential_to_height(met_df) # meters
+
+        var1 = {c.name: c for c in current_coords}[coord.var1]
+        if var1.unit != "m2s-2": 
+            print(f"Unexpected unit for geopotential ({var1.unit})") 
+        height_m = geopot_to_height(df[var1.col_name].values) # meters
         height_km = height_m * 1e-3
-        
+
         if coord.unit == 'm': 
             df[coord.col_name] = height_m
         elif coord.unit == 'km': 
@@ -73,6 +74,8 @@ def calc_coordinates(df, recalculate=False, verbose=False):
         else: 
             continue
         current_coords += [coord]
+
+    coord_lookup = {c.name: c for c in current_coords}
 
     # Now calculate TP / distances to TP coordinates 
     other_new = dcts.get_coordinates(var1='not_nan', var2='not_nan')
@@ -86,13 +89,13 @@ def calc_coordinates(df, recalculate=False, verbose=False):
         if verbose: 
             print(f"Calculating `{coord.col_name}` = `{coord.var1}` - `{coord.var2}`")
         
-        met_coord = get_var_coord(current_coords, coord.var1)
-        tp_coord = get_var_coord(current_coords, coord.var2)
+        met_coord = coord_lookup[coord.var1]
+        tp_coord = coord_lookup[coord.var2]
         
-        met_data = copy.deepcopy(df[met_coord.col_name]) # prevents .df to be overwritten 
-        tp_data = copy.deepcopy(df[tp_coord.col_name])
+        met_data = df[met_coord.col_name].to_numpy()
+        tp_data = df[tp_coord.col_name].to_numpy()
         
-        if tp_coord.unit != met_coord.unit != coord.unit: 
+        if not (tp_coord.unit == met_coord.unit == coord.unit): 
             if all(unit in ['hPa', 'mbar'] for unit in [tp_coord.unit, met_coord.unit, coord.unit]):
                 pass
             elif all(unit in ['km', 'm'] for unit in [tp_coord.unit, met_coord.unit, coord.unit]): 
@@ -107,7 +110,6 @@ def calc_coordinates(df, recalculate=False, verbose=False):
                     print('UNIT MISMATCH when calculating ', coord.long_name, 'from \n', 
                     dcts.get_coord(col_name=coord.var1), '\n', # met
                     dcts.get_coord(col_name=coord.var2)) # tp
-                    
                     print('Fix by readjusting: \n',
                             df[coord.var2].dropna().iloc[0], f' [{tp_coord.unit}] -> ', tp_data.dropna().iloc[0], f' [{coord.unit}]\n', 
                             df[coord.var1].dropna().iloc[0], f' [{met_coord.unit}] -> ', met_data.dropna().iloc[0], f' [{coord.unit}]')
@@ -206,6 +208,7 @@ CAMPAIGN_LIST = [
 ]
 
 STORE_PPDIR = Path("C:/Users/sophie_bauchinger/Documents/GitHub/chemTPanalyses/chemTPanalyses/data")
+STORE_DATA_DIR = STORE_PPDIR / "store_data"
 
 def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
@@ -220,7 +223,7 @@ def load_DATA_dict(ID, status=None, fname=None, pdir=None):
     For ozone sondes measurements, returns a pandas dataframe. 
     """
     # pdir = pdir or Path(tools.get_path())
-    pdir = pdir or Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store")
+    pdir = pdir or STORE_DATA_DIR
     if not fname:
         fnames = [i for i in Path(pdir).iterdir() if (
             f'{ID.lower()}_DATA' in str(i) or f'{ID}_DATA' in str(i))]
@@ -247,7 +250,7 @@ def save_DATA_dict(data, ID, pdir=None, woudc=False):
         data (pd.DataFrame or {str:pd.DataFrame})
         ID (str)
     """
-    pdir = pdir or Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store")
+    pdir = pdir or STORE_DATA_DIR
     fname = f"{ID.lower()}_DATA_{dt.datetime.now().strftime("%y%m%d")}.pkl"
     if woudc: 
         fname = 'stn'+fname
@@ -257,7 +260,7 @@ def save_DATA_dict(data, ID, pdir=None, woudc=False):
 
 def load_ozone_sonde_data(stn_ids, status=None, pdir=None): 
     """ Create join dataframe incl. stn/flight info from pickled WOUDC/HPS & TPChange sonde data. """
-    pdir = pdir or Path(r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store")
+    pdir = pdir or STORE_DATA_DIR
 
     def update_flight_nr(df, ID):
         df["Flight number"] = df["Flight number"].apply(
@@ -276,30 +279,20 @@ def load_ozone_sonde_data(stn_ids, status=None, pdir=None):
     return stn_dict, station_df, status
 
 # File name conventions for prepped / saved files
-def get_binned_path(stn_id, coord):
-    """ Specific reference of where station-nbased monthly weighted binned data is saved. """
-    subdir = STORE_PPDIR / 'output' / coord.name
-    if not subdir.exists(): 
-        subdir.mkdir()
-    fname = f"STN{stn_id}_binned_monthly.pkl"
-    return subdir / fname
-
-def get_o3_eqlat_fname(eql_lower, bsize=1, path=False):
-    """ Returns file name (or full path) for saved o3_eqlat file. 
-    Default directory: STORE_PPDIR / 'store_eqlat' """
+def read_eqlat_csv(eql_lower=None, path=None, bsize=1, calc_coords=True): 
+    """ Read in data from saved o3_eqlat csv files. """
     NS_low = 'n' if (eql_lower>=0) else 's'
     NS_high = 'n' if (eql_lower+bsize>=0) else 's'
     fn = f"o3_eqlat_{abs(eql_lower):02d}{NS_low}_{abs(eql_lower+bsize):02d}{NS_high}.csv"
-    if path: 
-        return STORE_PPDIR / 'store_eqlat' / fn
-    return fn
 
-def read_eqlat_csv(eql_lower=None, path=None): 
-    """ Read in data from saved o3_eqlat (later n2o_eqlat?) csv files. """
-    fpath = path or get_o3_eqlat_fname(eql_lower, path=True)
-    df = pd.read_csv(fpath)
-    df.index = pd.to_datetime(df["Datetime"])
-    df = df.drop(columns = ["Datetime", "geometry"])
+    fpath = path or (STORE_PPDIR / 'store_eqlat' / fn)
+    df = pd.read_csv(fpath, 
+                     engine="pyarrow",
+                     parse_dates = ["Datetime"],
+                     )
+    df = df.set_index("Datetime")
+    df = df.drop(columns = ["geometry"])
+    if calc_coords: df = calc_coordinates(df)
     return df
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
