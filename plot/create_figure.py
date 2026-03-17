@@ -32,6 +32,19 @@ def save(fig, fname, path=None):
     fig.savefig(path+fname, dpi=300, bbox_inches='tight')
     print(f"Saved figure as {path+fname}")
 
+def make_gif(fnames, out_path): 
+    """ Creates a gif from the given fnames with 50ms per image. """
+    from PIL import Image
+    frames=[]
+    for i in fnames:
+        new_frame = Image.open(i)
+        frames.append(new_frame)
+
+    frames[0].save(out_path, format='GIF',
+                append_images=frames[1:],
+                save_all=True,
+                duration=50*len(fnames), loop=0)
+
 #%% Big data figure resampling
 def big_data_go_resample(df, x_cols, y_cols, fig=None): 
     """ Use plotly figure resampler to display big datasets. """
@@ -475,6 +488,25 @@ def month_legend_handles(months = range(1,13)):
                     )
             for m in months]
     return lines
+
+#%% Colors
+def cm_eql(eqlrange): 
+    """ Equivalent latitude color map (same for SH/NH, differing in tropics)"""
+    import cmcrameri.cm as cmc
+    from matplotlib.colors import LinearSegmentedColormap as lsc
+    from matplotlib.colors import Normalize
+
+    sh_color = cmc.managua_r(np.linspace(0,1,30))
+    tr_color = cmc.hawaii(np.linspace(0,1,40))[:30]
+    nh_color = cmc.managua(np.linspace(0,1,30))
+    cmap = lsc.from_list('cmapTP', np.vstack((sh_color, tr_color, nh_color)))
+    norm = Normalize(-90,90)
+    return cmap(norm(np.mean(eqlrange)))
+
+# Tools
+'plt.colormaps[NAME]'
+'Colormap.set_under()'
+
 
 #%% Testing functions
 
