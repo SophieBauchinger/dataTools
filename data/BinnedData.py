@@ -63,6 +63,18 @@ def get_var_lims(var, bsize=None, gdf=None, **kwargs) -> tuple[float]:
     else:
         raise ValueError('Could not generate variable limits.')
 
+def setup_bins(vals, coord, get_bci=False, **kwargs): 
+    """ Create x-bins to include specific values. Returns x-params or BinClassInstance. """
+    xbsize = kwargs.get('xbsize', coord.get_bsize())
+    if any(d%xbsize for d in np.diff(vals)): 
+        raise ValueError(f"coord_vals {vals} are not compatible with xbsize {xbsize}.")
+    xbmin, xbmax = min(vals)-xbsize*1.5, max(vals)+xbsize*1.5
+    # if get_bci:
+    #     import dataTools.data.BinnedData as bin_tools
+    #     bci = bin_tools.make_bci(coord, xbsize=xbsize, xbmin=xbmin, xbmax=xbmax)
+    #     return bci
+    return xbsize, xbmin, xbmax
+
 # BINCLASSINSTANCE
 def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
     """ Create n-dimensional binning structure using standard coordinate limits / bin sizes. 
@@ -72,6 +84,7 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
         
         key *bsize (float): Size of the bin
         key *bmin, *bmax (float): Outer bounds for bins. Optional 
+        key *intm_vals (list[float]): Values to include in interval midpoints (=*intm)
         
     Returns equi-distant binning structure for all given dimensions.  
     """
@@ -84,29 +97,38 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
     if dims not in [1, 2, 3]:
         raise ValueError('Something went wrong when evaluating dimension numbers. ')
 
-    xbsize = kwargs.get('xbsize', xcoord.get_bsize())
-    def_xbmin, def_xbmax = get_var_lims(xcoord, bsize=xbsize, **kwargs)
-    xbmin = kwargs.get('xbmin', def_xbmin)
-    xbmax = kwargs.get('xbmax', def_xbmax)
+    if 'xintm_vals' in kwargs: 
+        xbsize, xbmin, xbmax = setup_bins(kwargs.get('xintm_vals'), xcoord, **kwargs)
+    else: 
+        xbsize = kwargs.get('xbsize', xcoord.get_bsize())
+        def_xbmin, def_xbmax = get_var_lims(xcoord, bsize=xbsize, **kwargs)
+        xbmin = kwargs.get('xbmin', def_xbmin)
+        xbmax = kwargs.get('xbmax', def_xbmax)
 
     if dims == 1:
         return bp.Bin1D(
             xbmin, xbmax, xbsize)
 
-    ybsize = kwargs.get('ybsize', ycoord.get_bsize())
-    def_ybmin, def_ybmax = get_var_lims(ycoord, bsize=ybsize, **kwargs)
-    ybmin = kwargs.get('ybmin', def_ybmin)
-    ybmax = kwargs.get('ybmax', def_ybmax)
+    if 'yintm_vals' in kwargs: 
+        ybsize, ybsize, ybmax = setup_bins(kwargs.get('yintm_vals'), ycoord, **kwargs)
+    else:
+        ybsize = kwargs.get('ybsize', ycoord.get_bsize())
+        def_ybmin, def_ybmax = get_var_lims(ycoord, bsize=ybsize, **kwargs)
+        ybmin = kwargs.get('ybmin', def_ybmin)
+        ybmax = kwargs.get('ybmax', def_ybmax)
 
     if dims == 2:
         return bp.Bin2D(
             xbmin, xbmax, xbsize,
             ybmin, ybmax, ybsize)
 
-    zbsize = kwargs.get('zbsize', zcoord.get_bsize())
-    def_zbmin, def_zbmax = get_var_lims(zcoord, bsize=zbsize, **kwargs)
-    zbmin = kwargs.get('zbmin', def_zbmin)
-    zbmax = kwargs.get('zbmax', def_zbmax)
+    if 'zintm_vals' in kwargs: 
+        zbsize, zbsize, zbmax = setup_bins(kwargs.get('zintm_vals'), zcoord, **kwargs)
+    else:
+        zbsize = kwargs.get('zbsize', zcoord.get_bsize())
+        def_zbmin, def_zbmax = get_var_lims(zcoord, bsize=zbsize, **kwargs)
+        zbmin = kwargs.get('zbmin', def_zbmin)
+        zbmax = kwargs.get('zbmax', def_zbmax)
 
     return bp.Bin3D(
         xbmin, xbmax, xbsize,
@@ -130,15 +152,15 @@ def binning(df, var, xcoord, ycoord=None, zcoord=None, count_limit=5, **kwargs):
     v, x, y, z = [(get_var_data(df, i) if i is not None else None) for i in [var, xcoord, ycoord, zcoord]]
 
     if dims == 1:
-        bci_1d = make_bci(xcoord, **kwargs)
+        bci_1d = kwargs.get('bci', make_bci(xcoord, **kwargs))
         out = bp.BinnedData1D(v, x, bci_1d, count_limit=count_limit)
 
     elif dims == 2:
-        bci_2d = make_bci(xcoord, ycoord, **kwargs)
+        bci_2d = kwargs.get('bci', make_bci(xcoord, ycoord, **kwargs))
         out = bp.BinnedData2D(v, x, y, bci_2d, count_limit=count_limit)
 
     elif dims == 3:
-        bci_3d = make_bci(xcoord, ycoord, zcoord, **kwargs)
+        bci_3d = kwargs.get('bci', make_bci(xcoord, ycoord, zcoord, **kwargs))
         out = bp.BinnedData3D(v, x, y, z, bci_3d, count_limit=count_limit)
 
     else:
@@ -186,14 +208,14 @@ def monthly_binning(df, var, xcoord, ycoord=None, zcoord=None, **kwargs):
         key bci (bp.Bin*d): Binning structure
         key *bsize (float): if bci is not specified, controls the size of the *d-bins. 
 
-    Returns a dictionary of {month : BinnedData*d object}. 
+    Returns a dictionary of {month : BinnedData*d object}.  
     """
     # raise NotImplementedError("Tough cookie.")
     if not isinstance(df.index, pd.DatetimeIndex):
         # TODO: if not DateTime-indexed df, need to check for 'month' column
         raise NotImplementedError("Non Datetime-Index not yet supported.")
 
-    bci = make_bci(xcoord, ycoord, zcoord, **kwargs)
+    bci = make_bci(xcoord, ycoord, zcoord, bci=kwargs.pop('bci', None), **kwargs)
     monthly_dict = {}
     monthly_dfs = {m: df[df.index.month == m] for m in np.arange(1,13)}
     for month in np.arange(1,13): 
