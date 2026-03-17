@@ -124,6 +124,10 @@ class Coordinate:
     def name(self):
         return self.col_name.replace("_Main", "").replace("int_", "").replace("_intTPC", "")
 
+    @property
+    def cn(self): # for easier handling
+        return self.col_name
+
     def label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True) -> str:
         """ Returns latex-formatted string to be used as axis label. """
 
@@ -145,7 +149,7 @@ class Coordinate:
             vcoord = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
 
             if isinstance(self.tp_def, str):
-                vcoord = (r'$\Delta$'+f'{vcoord}'+'$_{{\\text{TP}}}$') if self.rel_to_tp else vcoord
+                vcoord = (r'$\Delta$'+f'{vcoord}'+'$_{{TP}}$') if self.rel_to_tp else vcoord
 
                 pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
                 crit = '%s' % (', ' + ''.join(
@@ -168,17 +172,17 @@ class Coordinate:
                 label = f'{vcoord} [{self.unit}]'
 
             if coord_only:               
-                vcoord = (r'$\Delta$'+f'{self.vcoord}$'+'_{{\\text{TP}}}$') if self.rel_to_tp is True else f'{self.vcoord}'
-                if self.vcoord == 'pt': vcoord = r'$\Delta\Theta_{{\\text{TP}}}$' if self.rel_to_tp is True else r'$\Theta$'
+                vcoord = (r'$\Delta$'+f'{self.vcoord}$'+'_{{TP}}$') if self.rel_to_tp is True else f'{self.vcoord}'
+                if self.vcoord == 'pt': vcoord = r'$\Delta\Theta_{{TP}}$' if self.rel_to_tp is True else r'$\Theta$'
                 label = f'{vcoord}'
 
         elif isinstance(self.hcoord, str):
             hcs = {'lon': 'Longitude',
                    'lat': 'Latitude',
                    'eql': 'Equivalent Latitude',
-                   **{k: '°N' for k in ['degrees_north', 'degN', 'deg_north']},
-                   **{k: '°E' for k in ['degrees_east', 'degE', 'deg_east']},
-                   'degrees': '°N, °E'}
+                   **{k: r'$\degree$N' for k in ['degrees_north', 'degN', 'deg_north', 'deg_N', 'deg N']},
+                   **{k: r'$\degree$E' for k in ['degrees_east', 'degE', 'deg_east', 'deg_E', 'deg N']},
+                   'degrees': r'$\degree$N, $\degree$E'}
             if self.hcoord in hcs and self.unit in hcs:
                 label = f'{hcs[self.hcoord]} [{hcs[self.unit]}]'
             else:
@@ -197,14 +201,14 @@ class Coordinate:
     def get_bsize(self) -> float:
         """ Returns default bin size of the coordinate. """
         bsizes_dict = {
-            'pt': 10,
+            'pt': 5,
             'p': 25,
             'z': 1,
             'mxr': 5,  # n2o
             'eqpt': 5,
-            'eql': 5,
-            'lat': 10,
-            'lon': 10,
+            'eql': 1,
+            'lat': 5,
+            'lon': 5,
             'pv' : 0.5,
         }
 
@@ -345,7 +349,7 @@ class Substance:
         model (str): msmt, CLAMS, EMAC, MOZART
         function (str): h, s, q
         """
-        self.col_name = col_name
+        self.col_name = self.cn = col_name
         self.long_name, self.short_name, self.unit = [None] * 3
         self.ID, self.source, self.model = [None] * 3
         self.function, self.detr = None, False
@@ -400,14 +404,16 @@ class Substance:
 
         # Special labels for binned data
         bin_attr_qualifiers = {
-            'vmean': '', 
+            'vmean' : '', 
             'vstdv' : 'Variability of ',
             'rvstd' : 'Relative variability of '}
         bin_attr_units = {
             'vmean' : unit,
             'vstdv' : unit,
             'rvstd' : '%'}
-        if bin_attr is not None: 
+        if bin_attr=='vcount': 
+            return 'Counts [#]'
+        if bin_attr is not None:
             qualifier = bin_attr_qualifiers[bin_attr]
             bin_attr_unit = bin_attr_units[bin_attr]
             return f'{qualifier}{subs_abbr} {detr_qualifier}[{bin_attr_unit}]'
