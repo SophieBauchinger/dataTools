@@ -105,7 +105,8 @@ class Coordinate:
         pvu (float): 1.5, 2.0, 3.5
         crit (str): n2o / o3
         """
-        self.col_name, self.long_name, self.unit, self.ID = [None] * 4
+        self.col_name, self.long_name, self.unit = [None] *3
+        self.short, self.ID = [None] * 2
         self.vcoord, self.hcoord, self.var = [None] * 3
         self.tp_def, self.rel_to_tp, self.model, self.crit = [None] * 4
         self.pvu = np.nan
@@ -362,7 +363,7 @@ class Substance:
     def __eq__(self, other: "Substance"): 
         return self.col_name == other.col_name
 
-    def label(self, name_only:bool=False, bin_attr:str=None, no_ID:bool=False):
+    def label(self, name_only:bool=False, bin_attr:str=None, no_unit:bool=False):
         """ Returns string to be used as axis label. """
         detr_qualifier = 'rel. to BGD ' if self.detr else ''
 
@@ -386,42 +387,32 @@ class Substance:
         # name_only returns only the abbreviated substance name
         if name_only is True:
             return subs_abbr
-        
-        # Get data source identifier
-        if self.model == 'MSMT':
-            identifier = self.source if not self.source=='HALO' else self.ID.strip()
-        elif self.model == 'CLAMS':
-            identifier = 'CLaMS'
-        else:
-            identifier = self.model
-        # if self.source!='HALO' and len(get_substances(
-        #         short_name=self.short_name, source=self.source, model=self.model)) > 1:
-        #     identifier += f' - {self.ID}'.strip()
-        
 
         # Get the appropriate unit label
-        unit = special_names.get(self.unit, self.unit) # self.unit if not self.unit in special_names else special_names[self.unit]
+        unit = special_names.get(self.unit, self.unit) 
 
-        # Special labels for binned data
+        # Statistical measures
+        if bin_attr=='vcount': 
+            return 'Counts [#]'
+
         bin_attr_qualifiers = {
             'vmean' : '', 
             'vstdv' : 'Variability of ',
-            'rvstd' : 'Relative variability of '}
+            'rvstd' : 'Relative variability of ',
+            'vmedian' : 'Median '}
         bin_attr_units = {
             'vmean' : unit,
             'vstdv' : unit,
-            'rvstd' : '%'}
-        if bin_attr=='vcount': 
-            return 'Counts [#]'
+            'rvstd' : '%', 
+            'vmedian' : unit}
         if bin_attr is not None:
             qualifier = bin_attr_qualifiers[bin_attr]
             bin_attr_unit = bin_attr_units[bin_attr]
-            return f'{qualifier}{subs_abbr} {detr_qualifier}[{bin_attr_unit}]'
+            return f'{qualifier}{subs_abbr} {detr_qualifier}'\
+                +(f'[{bin_attr_unit}]' if not no_unit else '')
 
-        if no_ID is True: 
-            return f'{subs_abbr} {detr_qualifier}[{unit}]'
-
-        return f'{subs_abbr} {detr_qualifier}[{unit}]' + (f' ({identifier})' if not self.detr else '')
+        return f'{subs_abbr} {detr_qualifier}'\
+            +(f'[{unit}]' if not no_unit else '')
 
     def get_lims(self, *args, **kwargs): 
         vlims = self.vlims(*args, **kwargs)
@@ -958,10 +949,10 @@ def dict_month(month=None, attr=None, abbr=True):
     dict_month.update({
         f'color_{m}':cm.managua(norm(m)) 
             for m in range(1,13)}) 
-    if isinstance(month, int) and not attr: 
+    if isinstance(month, (int,str)) and not attr: 
         return {'color':dict_month[f'color_{month}'], 
                 'name': dict_month[f'name_{month}']}
-    elif isinstance(month, int) and attr in ['color', 'name']: 
+    elif isinstance(month, (int, str)) and attr in ['color', 'name']: 
         return dict_month[f'{attr}_{month}']
 
     return dict_month
