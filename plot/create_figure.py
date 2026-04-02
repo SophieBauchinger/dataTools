@@ -382,6 +382,39 @@ def highlight_axis(ax, color='g', axis='y'):
         ax.xaxis.label.set_color(color)
     return ax
 
+#%% 3D plots
+def example_3d_bar_plot(input_2d_arr, extent):
+    """ Create a (color-coded) 3d plot of intput_2d_arr. """
+    
+    xmin,xmax,ymin,ymax = extent
+    
+    nx,ny = input_2d_arr.T.shape
+    xe = np.linspace(xmin,xmax,nx)
+    ye = np.linspace(ymin,ymax,ny)
+    
+    # x,y, z-data
+    dx=np.ones_like(xpos)*0.5 # * x-bin-size
+    dy=np.ones_like(ypos)*0.5 # * y-bin-size
+    dz=input_2d_arr.T.flatten()
+    
+    # x,y,z-positions
+    xpos, ypos = np.meshgrid(xe[:-1] + 0.25, ye[:-1] + 0.25, indexing="ij")
+    xpos = xpos.flatten()
+    ypos = ypos.flatten()
+
+    fig,ax = plt.subplots(subplot_key={'projection':'3d'}, 
+                          figsize=(6,6))
+    plt.style.use('_mpl-gallery')
+
+    # color = [cmap(norm(v)) for v in dz]
+    ax.bar3d(xpos, ypos, 0,
+             dx, dy, dz, 
+             )
+    ax.set_xlim(xe[0], xe[1])
+    ax.set_ylim(ye[0], ye[1])
+    ax.set_zlim(0, np.nanmax(input_2d_arr))
+    return fig,ax
+
 #%% Legends 
 def season_legend_handles(av = False, av_std=False, **kwargs) -> list[Line2D]:
     """ Create a legend for the default season-color scale. 
