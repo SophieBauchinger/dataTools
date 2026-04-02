@@ -29,10 +29,11 @@ from dataTools import tools
 import dataTools.dictionaries as dcts
 
 #%% Create new coordinates [height and tropopause-relative]
-Re = mpconsts.Re.magnitude
-g = mpconsts.g.magnitude
+
 def geopot_to_height(geopot): 
     """ Mirrors metpy.calc.geopotential_to_height without unit constraints. """
+    Re = mpconsts.Re.magnitude
+    g = mpconsts.g.magnitude
     return (geopot * Re) / (g * Re - geopot)
 
 def calc_coordinates(df, recalculate=False, verbose=False): 
@@ -185,30 +186,63 @@ WOUDC_STATION_LIST = [
     '458',      # 1.6 GB
     ]
 
-CAMPAIGN_LIST = [
-    'airtoss', 
+CAMPAIGN_LIST = [ # TPC-interpolated campaigns
+    'airtoss',
+    'arctas',  
+    'atmos',
     'atom', 
-    'attrex-awas', 
-    'attrex-ucats', 
+    'attrex', # downloaded, not in store
     'caribic', 
-    'envisat-spirale', 
+    'dc3', 
     'esmval', 
-    'euplex-asur', 
     'gwlcycle', 
     'hippo', 
+    'korusaq', # downloaded, not in store
+    'macpex', # downloaded, not in store
+    'orcas', # downloaded, not in store
+    'pemtropicsa',
+    'pemwesta',
+    'pemwestb',
     'phileas', 
     'polstracc', 
+    'posidon', # downloaded, not in store
     'southtrac', 
     'spurt', 
     'start08', 
     'stratoclim', 
     'tacts', 
-    'tc4_dc8', 
-    'wise'
+    'tc4-dc8', 
+    'tc4-wb57', # downloaded, not in store
+    'trace-a',
+    'trace-p',
+    'wise',
+]
+
+CAMP_FROM_KRY = [ # shared with HCL, interpolation tbc
+    'AASE',
+    'ACCENT',
+    'ATLAS',
+    'AVE Houston 2',
+    'BOS',
+    'CNES ODIN validation',
+    'CR-AVE',
+    'ENRICHED',
+    'ENVISAT validation',
+    'FP7 SCOUT-O3',
+    'GloPac',
+    'OMS',
+    'PAVE',
+    'POLARIS',
+    'SCIA-VALUE',
+    'SOLVE II',
+    'SOLVE THESEO 2000',
+    'STRAPOLATE'    
 ]
 
 STORE_PPDIR = Path("C:/Users/sophie_bauchinger/Documents/GitHub/chemTPanalyses/chemTPanalyses/data")
 STORE_DATA_DIR = STORE_PPDIR / "store_data"
+STORE_BIN1D_DIR = STORE_PPDIR / "store_1d_binned"
+STORE_EQL_DIR = STORE_PPDIR / "store_eqlat"
 
 def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
@@ -285,7 +319,7 @@ def read_eqlat_csv(eql_lower=None, path=None, bsize=1, calc_coords=True):
     NS_high = 'n' if (eql_lower+bsize>=0) else 's'
     fn = f"o3_eqlat_{abs(eql_lower):02d}{NS_low}_{abs(eql_lower+bsize):02d}{NS_high}.csv"
 
-    fpath = path or (STORE_PPDIR / 'store_eqlat' / fn)
+    fpath = path or (STORE_EQL_DIR / fn)
     df = pd.read_csv(fpath, 
                      engine="pyarrow",
                      parse_dates = ["Datetime"],
@@ -400,6 +434,11 @@ def ds_to_gdf(ds) -> pd.DataFrame:
     gdf = gdf[[c for c in ordered_cols if not c == "RH_%"]]
 
     return gdf
+
+def find_TPCfolder(campaign): 
+    """ Find the corresponding TPC interpolation-data folder per campaign. """
+    pdir = Path(r"E:\TPChange")
+    return [p.name for p in pdir.iterdir() if p.name.lower().startswith(campaign)][0]
 
 def get_TPChange_gdf(fname_or_pdir): 
     """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). """
