@@ -63,16 +63,12 @@ def get_var_lims(var, bsize=None, gdf=None, **kwargs) -> tuple[float]:
     else:
         raise ValueError('Could not generate variable limits.')
 
-def setup_bins(vals, coord, get_bci=False, **kwargs): 
+def setup_bins(vals, coord, **kwargs): 
     """ Create x-bins to include specific values. Returns x-params or BinClassInstance. """
     xbsize = kwargs.get('xbsize', coord.get_bsize())
     if any(d%xbsize for d in np.diff(vals)): 
         raise ValueError(f"coord_vals {vals} are not compatible with xbsize {xbsize}.")
     xbmin, xbmax = min(vals)-xbsize*1.5, max(vals)+xbsize*1.5
-    # if get_bci:
-    #     import dataTools.data.BinnedData as bin_tools
-    #     bci = bin_tools.make_bci(coord, xbsize=xbsize, xbmin=xbmin, xbmax=xbmax)
-    #     return bci
     return xbsize, xbmin, xbmax
 
 # BINCLASSINSTANCE
@@ -99,6 +95,8 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
 
     if 'xintm_vals' in kwargs: 
         xbsize, xbmin, xbmax = setup_bins(kwargs.get('xintm_vals'), xcoord, **kwargs)
+    elif 'xbinlimits' in kwargs and dims==1: 
+        return bp.Bin1D(**kwargs)
     else: 
         xbsize = kwargs.get('xbsize', xcoord.get_bsize())
         def_xbmin, def_xbmax = get_var_lims(xcoord, bsize=xbsize, **kwargs)
@@ -111,6 +109,8 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
 
     if 'yintm_vals' in kwargs: 
         ybsize, ybsize, ybmax = setup_bins(kwargs.get('yintm_vals'), ycoord, **kwargs)
+    elif all(l in kwargs for l in ['xbinlimits', 'ybinlimits']) and dims==2: 
+        return bp.Bin2D(**kwargs)
     else:
         ybsize = kwargs.get('ybsize', ycoord.get_bsize())
         def_ybmin, def_ybmax = get_var_lims(ycoord, bsize=ybsize, **kwargs)
@@ -124,6 +124,8 @@ def make_bci(xcoord, ycoord=None, zcoord=None, **kwargs) -> bp.Bin:
 
     if 'zintm_vals' in kwargs: 
         zbsize, zbsize, zbmax = setup_bins(kwargs.get('zintm_vals'), zcoord, **kwargs)
+    elif all(l in kwargs for l in ['xbinlimits', 'ybinlimits', 'zbinlimits']) and dims==3: 
+        return bp.Bin3D(**kwargs)
     else:
         zbsize = kwargs.get('zbsize', zcoord.get_bsize())
         def_zbmin, def_zbmax = get_var_lims(zcoord, bsize=zbsize, **kwargs)
