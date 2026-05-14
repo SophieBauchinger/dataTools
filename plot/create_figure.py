@@ -22,6 +22,11 @@ from plotly_resampler import FigureResampler
 import dataTools.dictionaries as dcts
 from dataTools import tools
 
+plt.rcParams['axes.axisbelow'] = True
+'ax.set_axisbelow(True)'
+'plt.colormaps[NAME]'
+'Colormap.set_under()'
+
 #%% Helpers
 def save(fig, fname, path=None):
     """ Save figures as pdf with 300dpi and tight bbox_inches -> default path """
@@ -537,12 +542,20 @@ def cm_eql(eqlrange):
     return cmap(norm(np.mean(eqlrange)))
 
 # Tools
-'plt.colormaps[NAME]'
-'Colormap.set_under()'
-
+def show_hex_colors_jupyter(colors=None,values=None):
+    from IPython.display import Markdown, display
+    import maplotlib.colors as mcolors
+    if values:
+        norm = mcolors.Normalize(np.nanmin(values), np.nanmax(values))
+        cmap = mcolors.LinearSegmentedColormap.from_list('mycmap', 
+            ["gold", "lawngreen", "lightseagreen", "turquoise", "steelblue"])
+        colors = [mcolors.rgb2hex(cmap(norm(v))) for v in values]
+    display(Markdown('<br>'.join(
+        f'<span style="font-family: monospace">{color} <span style="color: {color}">████████</span></span>'
+        for color in colors
+    )))
 
 #%% Testing functions
-
 def rand_data(ax): 
     x, y, scale = np.random.randn(3, 100)
     ax.scatter(x=x, y=y, c=scale, s=np.abs(scale)*100, zorder=5)

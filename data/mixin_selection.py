@@ -316,17 +316,12 @@ class SelectionMixin:
         return out
 
 # --- Make selections based on strato / tropo characteristics --- 
-    def sel_atm_layer(self, atm_layer: str, tp=None, inplace:bool=False):
+    def sel_atm_layer(self, atm_layer: str, tp: dcts.Coordinate, inplace:bool=False):
         """ Create GlobalData object with strato / tropo sorting.
 
         Parameters:
             atm_layer (str): atmospheric layer: 'tropo' or 'strato'
-
-            key tp_def (str): 'chem', 'therm' or 'dyn'
-            key crit (str): 'n2o', 'o3'
-            key coord (str): 'pt', 'dp', 'z'
-            key pvu (float): 1.5, 2.0, 3.5
-            key limit (float): pre-flag limit for chem. TP sorting
+            tp (dcts.Coordinate): Tropopause(-relative) coordinate 
         """
         out = self._prepare_output()
         out.data = {}
