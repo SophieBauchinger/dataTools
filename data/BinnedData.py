@@ -188,7 +188,7 @@ def seasonal_binning(df, var, xcoord, ycoord=None, zcoord=None,
         df['season'] = tools.make_season(df.index.month)
 
     # Want the same binclassinstance across all seasons
-    bci = make_bci(xcoord, ycoord, zcoord, **kwargs)
+    bci = make_bci(xcoord, ycoord, zcoord, bci=kwargs.pop('bci', None), **kwargs)
 
     seasonal_dict = {}
     for s in set(df['season'].values):
