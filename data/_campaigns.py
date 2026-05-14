@@ -4,11 +4,9 @@
 @Author: Sophie Bauchinger, IAU
 @Date: Tue Jun 11 17:35:00 2024
 """
-import dill
 import geopandas
 import keyring
 import pandas as pd
-from pathlib import Path
 from shapely.geometry import Point
 import traceback
 
@@ -18,25 +16,6 @@ from dataTools.data._global import GlobalData
 import dataTools.dictionaries as dcts
 from dataTools import tools
 from dataTools.data import data_getter
-
-TPCHANGE_WITH_OBS = { # Observations and model within TPChange data set
-    'CAR'  : 'CaribicTPChange',
-    'SHTR' : 'SouthtracTPChange',
-    'WISE' : 'WiseTPChange',
-    'ATOM' : 'AtomTPChange',
-    'HIPPO': 'HippoTPChange',
-    'PGS'  : 'PolstraccTPChange',
-    'PHL'  : 'PhileasTPChange',
-    }
-
-TPCHANGE_MODEL = { # Model data only
-    'Attrex' : 'MODEL_DATA/ATTREX_TPChange', # N2O available
-    'Envisat' : 'MODEL_DATA/ENVISAT_TPChange', # N2O available
-    'Euplex' : 'MODEL_DATA/EUPLEX_TPChange', # N2O available
-    'SPURT' : 'MODEL_DATA/SPURT_TPChange', # ? Obs data ?
-    'TACTS' : 'MODEL_DATA/TACTS_TPChange', # ! Obs data via SQL DB 
-    'TC4' : 'MODEL_DATA/TC4_TPChange', # N2O available
-    }
 
 SOURCES = { # 'Source' per Campaign
     'TACTS': 'HALO',
@@ -105,27 +84,15 @@ class CampaignData(GlobalData):
     
         Parameters 
         ---
-        campaign (str): SHTR, WISE, PGS, TACTS, ATOM, HIPPO, PHL, StratoClim, 
+        campaign (str): SHTR, WISE, PGS, TACTS, ATOM, HIPPO, PHL, StratoClim, ...
         """
-        years = dcts.years_per_campaign(campaign)
-        super().__init__(years, grid_size)
+        super().__init__(None, grid_size)
 
-        self.years = years
-        self.source = SOURCES[campaign]
         self.ID = campaign
-        self.instruments = list(dcts.get_instruments(self.ID))
+        self.source = SOURCES.get(campaign, 'NA')
         self.data = {}
         self.get_data(**kwargs)
-
-        if not 'df' in self.data: 
-            self.create_df()
-        try: 
-            self.data["df"] = data_getter.calc_coordinates(
-                self.data["df"], recalculate=kwargs.get('recalculate', True))
-        except Exception: 
-            traceback.print_exc()
-
-        self.years = list(set(self.data['df'].index.year))
+        self.update_years()
         self.set_tps(**tps_dict)
 
     def __repr__(self):
@@ -146,49 +113,46 @@ class CampaignData(GlobalData):
         # Check for importing from pickled DATA dictionary
         if not recalculate: 
             data_dict, updated_status,_ = data_getter.load_DATA_dict(
-                self.ID, self.status, fname=kwargs.get("fname", None), pdir=kwargs.get("pdir", tools.get_path()+ 'data\\store\\'))
-
+                self.ID, self.status, fname=kwargs.get("fname", None), pdir=kwargs.get("pdir", None))
+            if isinstance(data_dict, pd.DataFrame): 
+                data_dict = {'df':data_dict}
             if 'df' not in data_dict: 
-                if input('Merged dataframe not found. Recalculate? [Y/N]').upper() == 'Y':
+                if input('Merged dataframe not found. Recalculate instead? [Y/N]').upper() == 'Y':
                     self.get_data(recalculate=True)
             self.status = updated_status
             self.data = data_dict
             return self.data
-
-        # Recalculate from TPChange obs + model files
-        if self.ID in TPCHANGE_WITH_OBS.keys(): 
-            print('Importing data from TPChange interpolation files.')
-            fnames = Path('E:/TPChange') / TPCHANGE_WITH_OBS[self.ID] 
-            dataframe = data_getter.get_TPChange_gdf(fnames)
-            self.data['df'] = dataframe
-            return self.data
-
-        # Recalculate from TPChange model files (+ MISSING OBS DATA)
-        elif self.ID in TPCHANGE_MODEL.keys(): 
-            print('Importing meteo data from TPChange interpolation files.')
-            fnames = 'E:/TPChange/' + Path('E:/TPChange') / TPCHANGE_MODEL[self.ID] 
-            dataframe = data_getter.get_TPChange_gdf(fnames)
-
-            self.data['met_data'] = dataframe
-
-            print('No observational data available in interpolated files. ')
-            return self.data
+        
+        # Caribic: data in yearly subfolders (YYYY)
+        if self.ID.lower() in ['car', 'caribic']:
+            ppdir = data_getter.find_TPCfolder(self.ID)
+            pdirs = [i for i in ppdir.iterdir() if len(i.name)==4] 
+            dataframe = pd.concat([data_getter.get_TPChange_gdf(
+                pdir, drop_variables=['CARIBIC2_LocalTime']) for pdir in pdirs])
+        # ATOM: drop_variables 
+        elif self.ID.lower()=='atom': 
+            pdir = data_getter.find_TPCfolder(self.ID)
+            dataframe = data_getter.get_TPChange_gdf(
+                pdir, drop_variables=['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS'])
+        # Campaigns: Get TPChange gdf
+        elif self.ID.lower() in data_getter.CAMPAIGN_LIST + ['shtr', 'pgs', 'phl']:
+            pdir = data_getter.find_TPCfolder(self.ID)
+            dataframe = data_getter.get_TPChange_gdf(pdir)
+        elif self.ID in data_getter.CAMP_FROM_KRY: # needs an exact match!
+            fpaths = data_getter.find_TPCfolder(self.ID)
+            dataframe = pd.concat([data_getter.get_TPChange_gdf(fp) for fp in fpaths])
         else: 
-            raise Warning(f"Could neither find a stored DATA_dict nor find TPChange files for ID {self.ID}. ")
-
-    @property
-    def df(self) -> pd.DataFrame:
-        """ Combined dataframe with measurement and modelled data. """
-        if 'df' in self.data:
-            return self.data['df']
-        return self.create_df()
+            raise Warning(f"Could not find {self.ID} in available campaigns")
+            
+        self.data['df'] = dataframe
+        return self.data
 
     @property
     def met_data(self) -> pd.DataFrame:
         """ Meteorological Parameters along the flight track. """
         if 'met_data' in self.data:
             return self.data['met_data']
-        return self.get_met_data()
+        return self.df[[c.col_name for c in self.coordinates if not c.name.startswith('geo')]+['geometry']]
 
 #%% SQL Database Import - Aircraft Campaigns
 class CampaignSQLData(CampaignData):

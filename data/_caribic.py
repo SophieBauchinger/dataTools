@@ -156,7 +156,7 @@ class Caribic(GlobalData):
 
         return self
 
-    def coord_combo(self) -> pd.DataFrame:
+    def create_met_only(self) -> pd.DataFrame:
         """ Create dataframe with all possible coordinates but
         no measurement / substance values """
         # merge lists of coordinates for all pfxs in the object
@@ -200,11 +200,13 @@ class Caribic(GlobalData):
                           suffixes = [None, f'_{pfx}'],
                           **merge_kwargs)
             
-            for c in df.columns:
-                if f'{c}_{pfx}' in df.columns:
-                    df[c] = df[c].combine_first(df[f'{c}_{pfx}']) # Note: Future warning, watch but should be okay
-                    df = df.drop(columns=f'{c}_{pfx}')
+            # Combine duplicated columns for multiple pfx-sources
+            duplicates = [c+'_'+pfx for c in df.columns if c+'_'+pfx in df.columns]
+            df = df.combine_first(df[duplicates])
+            df = df.drop(columns = duplicates)
+
         if 'geometry' in df.columns: 
+            # Drop all rows with invalid geometry
             df = df[df.index.isin(df.geometry.dropna().index)]
 
         self.data['df'] = df
@@ -232,7 +234,7 @@ class Caribic(GlobalData):
     def met_data(self) -> pd.DataFrame:
         if 'met_data' in self.data:
             return self.data['met_data']
-        return self.coord_combo()
+        return self.create_met_only()
 
     @property
     def df(self) -> pd.DataFrame:

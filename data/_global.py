@@ -21,6 +21,7 @@ from toolpac.outliers import outliers  # type: ignore
 import dataTools.dictionaries as dcts
 from dataTools import tools
 
+from dataTools.data import data_getter
 from dataTools.data._local import MaunaLoa
 from dataTools.data.mixin_selection import SelectionMixin
 import dataTools.data.tropopause as tp_tools
@@ -66,7 +67,9 @@ class AnalysisMixin:
         loc_obj = kwargs.get('loc_obj', MaunaLoa(substances=[subs.short_name],
                                                  years=range(2005, max(self.years) + 2)))
         ref_df = loc_obj.df
-        ref_subs = dcts.get_subs(substance=subs.short_name, ID=loc_obj.ID)
+        ref_subs = kwargs.get('ref_subs')
+        if ref_subs is None: 
+            ref_subs = dcts.get_subs(substance=subs.short_name, ID=loc_obj.ID)
         ref_df.dropna(how='any', subset=ref_subs.col_name, inplace=True)  # remove NaN rows
 
         c_ref = ref_df[ref_subs.col_name].values
@@ -223,6 +226,136 @@ class AnalysisMixin:
         return out
 
 
+def o3_climatology_tropopause(GlobalObject): 
+    import xarray as xr
+    PDIR_CLIM = r"C:\Users\sophie_bauchinger\Documents\GitHub\chemTPanalyses\chemTPanalyses\data\store_netcdf"
+    def load_clim(tp_id, pdir=PDIR_CLIM): 
+        """ Load coordinate-specific dataset into memory. """
+        fname = tp_id.split('_')[1]+'_ozone_climatology_01.nc'
+        with xr.open_dataset(pdir+r'/'+fname) as ds: 
+            ds = ds
+        return ds
+
+    CLIMATOLOGIES = {tp_id : load_clim(tp_id) for tp_id in ['dPT_dyn35', 'dPT_therm']}
+
+    def coord_val_from_O3(o3_vals, eql_vals, date_info, tp_id='dPT_dyn35', data=None, plot=False): 
+        """ Get the interpolated representative value from O3 measurements in the given eqlrange and month. 
+
+        Parameters: 
+            o3_val (array_like, float | str): O3 measurement(s) in ppb
+            eql_val (array_list, float | str): Equivalent latitude of each measurement
+            date_info (array_list, int): Date or Month of the year of each measurement
+            tp_id (str): Reference tropopause definition, must be one of 'dPT_dyn35' or 'dPT_therm' 
+            data (xr.Dataset|pd.DataFrame): Optional. Must be given if o3_vals/eql_vals/date_info are strings.  
+            plot (bool): Show control plots
+
+        Returns the corresponding value(s) of `tp_coord` that best fits the given `o3_vals`.
+        """
+        # Normalise inputs and align dimensions
+        o3_da = to_da(o3_vals, 'o3', data)
+        eql_da = to_da(eql_vals, 'eql', data)
+        mon_da = get_month(date_info, data)
+
+        o3_da, eql_da, mon_da = xr.align(o3_da, eql_da, mon_da, join="exact")
+        
+        # Get climatology
+        ds = CLIMATOLOGIES[tp_id]
+        subset = ds['mean_ozone'].sel(
+            eqlat=eql_da,
+            month=mon_da,
+            method='nearest',
+        )
+
+        tp_interp = xr.apply_ufunc(
+            interp_foo,
+            o3_da,
+            subset, # o3 reference
+            subset['tp_val'], # reference coordinate
+            input_core_dims=[[], ['tp_val'], ['tp_val']],
+            vectorize=True,
+            dask='parallelized',
+            output_dtypes=[float],
+        )
+
+        # Flags in order of priority of assignment:
+        FLAG_NAN = -1       # original data is NaN
+        FLAG_GOOD = 0       # valid delta-TP evaluated
+        FLAG_BELOW = 1      # certain troposphere, but uncertain delta-TP
+        FLAG_ABOVE = 2      # certain stratosphere, but uncertain delta-TP
+        FLAG_CLIM = 9       # no valid climatology available 
+
+        # create flag
+        # 0 = in range / 1 = below / 2 = above / -2 = CLIM is NaN
+        flag_da = xr.full_like(tp_interp, FLAG_GOOD)
+        mask_nan = np.isnan(o3_da) | np.isnan(eql_da) | np.isnan(mon_da)
+        mask_below = tp_interp.isin(-9999)
+        mask_above = tp_interp.isin(9999)
+        flag_da = flag_da\
+            .where(~np.isnan(tp_interp), FLAG_CLIM)\
+            .where(~mask_below, FLAG_BELOW)\
+            .where(~mask_above, FLAG_ABOVE)\
+            .where(~mask_nan, FLAG_NAN)
+
+        # remove "-9999/9999" values
+        valid_tp_interp = tp_interp.where((~np.isnan(tp_interp)) & (abs(tp_interp)<9000)) 
+        
+        out_template = (o3_vals if not isinstance(o3_vals, str) else data)
+        tp_interp_out = restore_type(valid_tp_interp, out_template)
+        flag_out = restore_type(flag_da, out_template)
+
+        return tp_interp_out, flag_out
+
+    # Helper functions
+    def to_da(x, name, data=None):
+        """ Cast input to DataArray. 'data' must be given if 'x' is a string. """
+        if isinstance(x, str):
+            if data is None: raise ValueError(f'`data` must be given if {name}={x}') 
+            return to_da(data[x], x) 
+        if isinstance(x, xr.DataArray): 
+            return x
+        if isinstance(x, xr.Dataset): 
+            return x[name]
+        return xr.DataArray(
+            np.atleast_1d(x), dims='obs', name=name)
+        
+    def get_month(x, data=None): 
+        """ Returns array of month if given months or datetime object. """
+        da = to_da(x, 'month', data)
+        if np.issubdtype(da.dtype, np.datetime64): 
+            return da.dt.month
+        return da
+
+    def restore_type(result, template): 
+        """ Cast result to the dtype and structure of template if possible. """
+        if np.isscalar(template): 
+            return float(result.values[0])
+        if isinstance(template, np.ndarray): 
+            return result.values
+        if isinstance(template, list): 
+            return list(result.values)
+        if isinstance(template, (pd.Series, pd.DataFrame)): 
+            return pd.Series(result.values, index=template.index)
+        if isinstance(template, (xr.DataArray, xr.Dataset)): 
+            return xr.DataArray(result.values, coords=template.coords, dims=template.dims)
+        return result.values
+
+    def interp_foo(o3, o3_clim, tp_vals):
+        """ Wrapper for numpy interp. with set arguments. """
+        return np.interp(o3, o3_clim, tp_vals, left=-9999, right=9999)
+    
+    [o3_subs] = GlobalObject.get_substs(short_name='o3', model='MSMT')
+    o3_vals = GlobalObject.get_var_data(o3_subs)
+    [eql_coord] = GlobalObject.get_coords(name='ERA5_THETA')
+    eql_vals = GlobalObject.get_var_data(eql_coord)
+    date_info = GlobalObject.df.index
+    
+    tp_int, flag = coord_val_from_O3(o3_vals, eql_vals, date_info)
+    
+    # TODO: build trop / strat indicators from tp_int and flag !!! 
+    
+    return tp_int
+
+
 # %% Mixin for tropopause-related sorting and data manipulation
 class TropopauseSorterMixin:
     """ Filters for stratosphere / troposphere 
@@ -346,6 +479,10 @@ class TropopauseSorterMixin:
         df_sorted = df_sorted.convert_dtypes()
         return df_sorted
 
+    def get_O3_chemTP_D(self, **kwargs): 
+        """ Global climatology-based relative theta-displacement to dyn35 and therm tropopauses. """
+        tp_int = o3_climatology_tropopause(self)
+
     def calculate_O3_HrelTP(self) -> tuple[pd.DataFrame]:
         """ Calculate relative height of O3 tropopause based on O3 climatology from Hohenpeissenberg. 
         Returns: 
@@ -445,20 +582,16 @@ class TropopauseSorterMixin:
             df_sorted[tropo] = tp_sorted[tropo]
             df_sorted[strato] = tp_sorted[strato]
 
-        # Ozone: Flag O3 < 60 ppb as tropospheric
-        if any(tp.crit == 'o3' for tp in rel_tps) and not self.source == 'MULTI':
-            o3_sorted, o3_subs = self.o3_filter_lt60()
-            # rename O3_sorted columns to the corresponding O3 tropopause coord to update
-            for tp in [tp for tp in rel_tps if tp.crit == 'o3']:
-                o3_sorted[f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
-                o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
-                df_sorted.update(o3_sorted, overwrite=False)
-
-        # Homemade O3 TP sorting - overwrite previous `H_rel_TP`
-        # if not any(['h_rel_tp' in c.lower() for c in df_sorted.columns]):
+        # Zahn Ozone-TP: Flag O3 < 60 ppb as tropospheric. Overwrite previous `H_rel_TP`
+        # Homemade O3 TP sorting -
+        # if any('h_rel_tp' in tp.cn.lower() for tp in rel_tps): 
+        #     o3_sorted, o3_subs = self.o3_filter_lt60()
+        #     for tp in [tp for tp in rel_tps if 'h_rel_tp' in tp.cn.lower()]:
+        #         o3_sorted [f'tropo_{tp.col_name}'] = o3_sorted[f'tropo_{o3_subs.col_name}']
+        #         o3_sorted[f'strato_{tp.col_name}'] = o3_sorted[f'strato_{o3_subs.col_name}']
+        #         df_sorted.update(o3_sorted, overwrite=False)
         _, h_rel_tp_sorted = self.calculate_O3_HrelTP()
-        if any(['H_rel_TP' in c for c in df_sorted.columns]):
-            df_sorted.drop(columns = [c for c in df_sorted.columns if 'H_rel_TP' in c], inplace=True)
+        df_sorted.drop(columns = [c for c in df_sorted.columns if 'H_rel_TP' in c], inplace=True)
         df_sorted = pd.concat([df_sorted, h_rel_tp_sorted], axis=1)
 
         df_sorted = df_sorted.convert_dtypes()
@@ -683,7 +816,7 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
 
     """
 
-    def __init__(self, years, grid_size=5, count_limit=5, **kwargs):
+    def __init__(self, years=None, grid_size=5, count_limit=5):
         """
         years: array or list of integers
         grid_size: int
@@ -710,6 +843,11 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
         with open(pdir + fname, 'wb') as f:
             dill.dump(self.data, f)
             print(f'{self.ID} Data dictionary saved as {pdir}/{fname}')
+
+    def add_calc_coords(self, recalculate=True): 
+        """ Creates e.g. tropopause-relative coordinates and height from geopotential. """
+        self.data["df"] = data_getter.calc_coordinates(
+            self.data["df"], recalculate=recalculate)
 
 # --- Instance variables (substances / coordinates) ---
     def get_variables(self, category):
@@ -776,12 +914,11 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
         tps = [c for c in self.coordinates if (
             str(c.tp_def) != 'nan' and 
             c.var != 'geopot' and 
-            (c.vcoord =='mxr' or str(c.rel_to_tp) != 'nan') ) ]
+            str(c.rel_to_tp) != 'nan' ) ]
 
-        # 2. reduce list further using given keyword arguments
-        try: 
-            filtered_coord_columns = [c.col_name for c in dcts.get_coordinates(**tp_kwargs)]
-            tps = [tp for tp in tps if tp.col_name in filtered_coord_columns]
+        try: # 2. reduce list further using given keyword arguments 
+            filtered_coords = [c for c in dcts.get_coordinates(**tp_kwargs)]
+            tps = [tp for tp in tps if tp in filtered_coords]
 
         except KeyError: 
             tps = []
@@ -853,7 +990,7 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
         df_yrs.sort()
         self.years = df_yrs
         return df_yrs
-        
+
     @property
     @abstractmethod
     def df(self) -> pd.DataFrame:
@@ -864,14 +1001,35 @@ class GlobalData(SelectionMixin, TropopauseSorterMixin, AnalysisMixin):
     @abstractmethod
     def create_df(self):
         """ Require existance of dataframe creation method for child classes. """
-        raise NotImplementedError('Child classes need to implement .create_gf()')
+        try: 
+            df = pd.DataFrame()
+            for k, k_df in self.data: 
+                df = pd.merge(
+                    df, k_df,
+                    suffixes = [None, f'_{k}'],
+                    how='outer', 
+                    sort=True,
+                    left_index=True, 
+                    right_index=True, 
+                    )
+            
+            # Combine duplicated columns for multiple pfx-sources
+            duplicates = [c+'_'+k for c in df.columns if c+'_'+k in df.columns]
+            df = df.combine_first(df[duplicates])
+            df = df.drop(columns = duplicates)
+
+            if not df.empty(): 
+                self.data['df'] = df
+        except: 
+            raise NotImplementedError('Child classes need to implement .create_gf()')
 
     @property
     @abstractmethod
     def met_data(self):
         if 'met_data' in self.data:
             return self.data['met_data']
-        return self.get_met_data()
+        return self.df[[c.col_name for c in self.coordinates 
+                        if not c.name.startswith('geo')]+['geometry']]
 
     def __add__(self, glob_obj):
         """ Combine two GlobalData objects into one. Keep only main dataframes. """

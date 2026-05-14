@@ -243,3 +243,45 @@ class MaceHead(LocalData):
         # self.data_Day = {'df': tools.time_mean(df, f='D')}
         # self.data['df'] = tools.time_mean(df, f='M')
         return df
+
+class GMLCombinedN2O(LocalData): 
+    def __init__(self, fpath=None): 
+        self.source = 'GML_NOAA_Combined'
+        self.ID = 'GML'
+        df = self.get_data(fpath)
+        self.years = set(df.index.year)
+        super().__init__(years = self.years, substances = ['n2o'])
+    
+        self.data['df'] = df
+
+    def get_data(self, fpath):
+        """ Read combined global N2O data from GML/NOAA file.  """
+        fpath = fpath or r"C:\Users\sophie_bauchinger\Documents\GitHub\dataTools\dataTools\misc_data\reference_data\n2o_global_combined_GML_NOAA_hats_monthly.txt"
+
+        meta_data = []
+        header_lines = 1
+        with open(fpath, encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('#'):
+                    meta_data.append(line[2:].strip())
+                    header_lines += 1
+                else:
+                    title = line.split(' ')
+                    break
+        self.meta_data= meta_data
+        data_arr = np.genfromtxt(fpath, skip_header=header_lines)
+        df = pd.DataFrame(data_arr, columns=title, dtype=float)
+        cols = [
+            'GML_N2O_YYYY', 'GML_N2O_MM',
+            'GML_NH_N2O', 'GML_SH_N2O', 'GML_Global_N2O',
+            'GML_NH_N2O_sd', 'GML_SH_N2O_sd', 'GML_Global_N2O_sd']
+        df = df[cols].loc[df['GML_N2O_YYYY'] > 1979]
+
+        # create date-time from monthly averages
+        time = [dt.datetime(int(y), int(m), 15) for y, m in
+                            zip(df['GML_N2O_YYYY'], df['GML_N2O_MM'])]
+        df['Date_Time'] = time
+        df = df.set_index('Date_Time').drop(columns = ['GML_N2O_YYYY','GML_N2O_MM'])
+
+        return df
+        
