@@ -5,12 +5,10 @@
 @Date: Tue May 27 11:36:54 2025
 
 """
-import copy
 import datetime as dt
 import dill
 import geopandas
 from metpy.units import units
-from metpy import calc
 import metpy.constants as mpconsts
 import numpy as np
 import pandas as pd
@@ -18,10 +16,9 @@ from pathlib import Path
 import re
 from shapely.geometry import Point
 import traceback
-import warnings
 import xarray as xr
 
-# from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy  # type: ignore
+from toolpac.conv.times import datetime_to_fractionalyear as dt_to_fy  # type: ignore
 from toolpac.readwrite import find
 from toolpac.readwrite.FFI1001_reader import FFI1001DataReader # type: ignore
 
@@ -151,6 +148,103 @@ def combine_coords(df, verbose=False):
 
     return out
 
+def detrended_n2o_GML(obs_ser: pd.Series, region:str='Global', t_min:float=1980, plot=False): 
+    """ Returns N2O values relative to GML N2O background data. obs_ser (datetime)"""
+    def ref_fit_n2o(region='Global'): 
+        """ Create fitted trendline for N2O observations """
+        # Prepare reference data set (Combined GML/NOAA N2O observations)
+        from dataTools.data import GMLCombinedN2O # circular import :(
+        ref_subs = dcts.get_subs(f'GML_{region}_N2O')
+        ref_df = GMLCombinedN2O().df[ref_subs.cn].dropna()
+
+        # Creation reference function
+        c_ref = ref_df.values
+        t_ref = np.array(dt_to_fy(ref_df.index, method='exact'))
+        popt = np.polyfit(t_ref, c_ref, 2)
+        c_fit = np.poly1d(popt)  # get popt, then make into fct
+        return ref_subs, c_fit
+    
+    obs_subs = dcts.get_subs(obs_ser.name) # try to obtain a Substance obj
+    ref_subs, c_fit = ref_fit_n2o(region=region)
+    data = obs_ser.dropna()
+    data.sort_index()
+    c_obs = data.values
+    t_obs = np.array(dt_to_fy(data.index, method='exact'))
+
+    # convert data units to reference data units if they don't match
+    if obs_subs.unit == 'mol mol-1':
+        c_obs = tools.conv_molarity_PartsPer(c_obs, ref_subs.unit)
+    elif obs_subs.unit+'v' == str(ref_subs.unit): 
+        pass 
+    elif str(obs_subs.unit) != str(ref_subs.unit):
+        raise ValueError(f'Units do not match: \n subs: {obs_subs.unit} vs. ref: {ref_subs.unit}')
+
+    if (t_min<1970) or (t_min>2030): print(f'Warning: Setting invalid t_min ({t_min}) to 2000'); t_min=2000
+    detrend_correction = c_fit(t_obs) - c_fit(int(t_min))
+    c_obs_detr = c_obs - detrend_correction
+    
+    # get variance (?) by subtracting offset from 0
+    c_obs_delta = c_obs_detr - c_fit(min(t_obs))
+
+    df_detr = pd.DataFrame({f'DATA_{obs_subs.col_name}'    : c_obs,
+                            f'DETR{int(t_min)}_{obs_subs.col_name}': c_obs_detr, # N2O detrended wrt. t_min
+                            f'delta_{obs_subs.col_name}'   : c_obs_delta,
+                            f'detrFit_{obs_subs.col_name}' : c_fit(t_obs),
+                            f'detr_{obs_subs.col_name}'    : c_obs / c_fit(t_obs) # N2O relative to BGD 
+                            }, 
+                            index=obs_ser.index)
+    df_detr[f'detrFit_{obs_subs.col_name}'] = df_detr[f'detrFit_{obs_subs.col_name}'].where(
+        ~df_detr[f'detr_{obs_subs.col_name}'].isnull(), np.nan)
+
+    def plot_detrending(df_detr): 
+        """ Show output of detrended (N2O) data. """
+        import matplotlib.pyplot as plt
+        from copy import copy
+        plt.rcParams['axes.axisbelow'] = True
+        subs = dcts.get_subs(df_detr.columns[0][5:])
+        df_detr = copy(df_detr)
+
+        fig, (ax0,ax1,ax2) = plt.subplots(
+            3, dpi=150, height_ratios = [1,0.4,1], sharex=True)
+
+        # DATA & DETR{t_min}
+        ax0.plot(df_detr.index, df_detr[f'detrFit_{subs.col_name}'], 
+                    label=f'Trend {subs.label(no_unit=True)}',
+                    color='black', ls='dashed')
+        ax0.scatter(df_detr.index, df_detr['DATA_' + subs.col_name], 
+                    label=subs.label(no_unit=True)+' (obs)',
+                    color='orange', marker='.')
+        t_min = df_detr.columns[1][4:8]
+        ax0.scatter(df_detr.index, df_detr[df_detr.columns[1]], 
+                    label=f'{subs.label(no_unit=True)} detr wrt. {t_min}',
+                    color='green', marker='.')
+        ax0.set_ylabel(f'[{subs.unit}]')
+
+        # Residual
+        ax1.scatter(df_detr.index, df_detr[f'delta_{subs.col_name}'], 
+                label=r'$\Delta\,$'+subs.label(no_unit=True),
+                color='gray', alpha=0.4, marker='.')
+        ax1.set_ylabel(f'[{subs.unit}]')
+        
+        # Detrended relative to background 
+        ax2.axhline(1, ls='dashed', c='k') # 
+        ax2.scatter(df_detr.index, df_detr[f'detr_{subs.col_name}'], 
+                    label=subs.get_detr.label(no_unit=True),
+                    color='green', marker='.')
+        ax2.set_ylabel(f'[{subs.get_detr.unit}]')
+
+        for ax in (ax0,ax1,ax2): 
+            ax.legend(loc='lower right')
+            ax.grid(ls='dashed', c='lightgrey')
+        fig.tight_layout()
+
+        return fig,(ax0,ax1,ax2)
+
+    if plot: 
+        plot_detrending(df_detr)
+
+    return df_detr
+
 #%% Pickled data dictionaries in .data.store
 WOUDC_STATION_LIST = [
     'HPS',      # 1.1 GB 
@@ -187,55 +281,54 @@ WOUDC_STATION_LIST = [
     ]
 
 CAMPAIGN_LIST = [ # TPC-interpolated campaigns
-    'airtoss',
-    'arctas',  
-    'atmos',
-    'atom', 
-    'attrex', # downloaded, not in store
-    'caribic', 
-    'dc3', 
-    'esmval', 
-    'gwlcycle', 
-    'hippo', 
-    'korusaq', # downloaded, not in store
-    'macpex', # downloaded, not in store
-    'orcas', # downloaded, not in store
-    'pemtropicsa',
-    'pemwesta',
-    'pemwestb',
-    'phileas', 
-    'polstracc', 
-    'posidon', # downloaded, not in store
-    'southtrac', 
-    'spurt', 
-    'start08', 
-    'stratoclim', 
-    'tacts', 
-    'tc4-dc8', 
-    'tc4-wb57', # downloaded, not in store
-    'trace-a',
-    'trace-p',
-    'wise',
+    'Airtoss',
+    'ARCTAS',  
+    # 'ATMOS', SPACE SHUTTLE aka REMOTE SENSING
+    'Atom', 
+    'ATTREX', 
+    'Caribic', 
+    'DC3', 
+    'ESMVal', 
+    'GWLcycle', 
+    'Hippo', 
+    'KORUSAQ', 
+    'MACPEX', 
+    'ORCAS', 
+    'PEMWESTA',
+    'PEMWESTB',
+    'Phileas', 
+    'Polstracc', 
+    'POSIDON', 
+    'Southtrac', 
+    'SPURT', 
+    'Start08', 
+    'StratoClim', 
+    'TACTS', 
+    'TC4-DC8', 
+    'TC4-WB57',
+    'TRACE-A',
+    'TRACE-P',
+    'Wise',
 ]
 
 CAMP_FROM_KRY = [ # shared with HCL, interpolation tbc
     'AASE',
     'ACCENT',
-    'ATLAS',
-    'AVE Houston 2',
+    # 'ATLAS',
+    'AVEHouston2',
     'BOS',
-    'CNES ODIN validation',
-    'CR-AVE',
+    'CNESODINvalidation',
+    'CRAVE',
     'ENRICHED',
-    'ENVISAT validation',
-    'FP7 SCOUT-O3',
+    'ENVISATvalidation',
+    'FP7SCOUTO3',
     'GloPac',
     'OMS',
     'PAVE',
     'POLARIS',
-    'SCIA-VALUE',
-    'SOLVE II',
-    'SOLVE THESEO 2000',
+    'SCIAVALUE',
+    'SOLVEII',
+    'SOLVETHESEO2000',
     'STRAPOLATE'    
 ]
 
@@ -243,6 +336,7 @@ STORE_PPDIR = Path("C:/Users/sophie_bauchinger/Documents/GitHub/chemTPanalyses/c
 STORE_DATA_DIR = STORE_PPDIR / "store_data"
 STORE_BIN1D_DIR = STORE_PPDIR / "store_1d_binned"
 STORE_EQL_DIR = STORE_PPDIR / "store_eqlat"
+STORE_NC_DIR = STORE_PPDIR / 'store_netcdf'
 
 def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
@@ -290,7 +384,7 @@ def save_DATA_dict(data, ID, pdir=None, woudc=False):
         fname = 'stn'+fname
     with open(pdir/fname, 'wb') as f: 
         dill.dump(data, f)
-    print(f"Successfully saved dataframe for {('stn' if woudc else '')+ID} as {pdir/fname}")
+    print(f"Successfully saved data for {('stn' if woudc else '')+ID} as {pdir/fname}")
 
 def load_ozone_sonde_data(stn_ids, status=None, pdir=None): 
     """ Create join dataframe incl. stn/flight info from pickled WOUDC/HPS & TPChange sonde data. """
@@ -313,11 +407,11 @@ def load_ozone_sonde_data(stn_ids, status=None, pdir=None):
     return stn_dict, station_df, status
 
 # File name conventions for prepped / saved files
-def read_eqlat_csv(eql_lower=None, path=None, bsize=1, calc_coords=True): 
+def read_eqlat_csv(eql_lower=None, path=None, bsize=1, calc_coords=True, subs='o3'): 
     """ Read in data from saved o3_eqlat csv files. """
     NS_low = 'n' if (eql_lower>=0) else 's'
     NS_high = 'n' if (eql_lower+bsize>=0) else 's'
-    fn = f"o3_eqlat_{abs(eql_lower):02d}{NS_low}_{abs(eql_lower+bsize):02d}{NS_high}.csv"
+    fn = f"{subs}_eqlat_{abs(eql_lower):02d}{NS_low}_{abs(eql_lower+bsize):02d}{NS_high}.csv"
 
     fpath = path or (STORE_EQL_DIR / fn)
     df = pd.read_csv(fpath, 
@@ -331,6 +425,19 @@ def read_eqlat_csv(eql_lower=None, path=None, bsize=1, calc_coords=True):
 
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
 ERA5_VARS = dcts.ERA5_variables()
+
+DROP_VARS = [ # Drop unecessary cols & ones with 'accidental' O3 / N2O in the name
+    'scale', 'P0', 'RH_%',
+    'ARCTAS_HNO3_CIT', 'ARCTAS_HNO3_plus_Fine_Aerosol_Nitrate','ARCTAS_J[BrONO2+hv->Br+NO3]','ARCTAS_J[ClONO2+hv->Cl+NO3]','ARCTAS_J[HNO3->OH+NO2]','ARCTAS_J[HO2NO2->OH+NO3]','ARCTAS_J[N2O5->NO3+NO2]','ARCTAS_J[O3->O2+O(1D)]','ARCTAS_NO3', 'ARCTAS_O3COLUMN','ATMOS_HNO3',
+    'ATMOS_HNO3_err','ATMOS_N2O5','ATMOS_N2O5_err',
+    'ATTREX_C3H7NO3_Isopropyl_nitrate_AWAS','ATTREX_C4H9NO3_2_Butyl_nitrate_AWAS','ATTREX_C4H9NO3_n_Butyl_nitrate_AWAS','ATTREX_C5H11NO3_2_pentyl_nitrate_AWAS','ATTREX_C5H11NO3_3_pentyl_nitrate_AWAS','ATTREX_O3_FLAG',
+    'DC3_C5O3H10_CIT','DC3_C5O3H8_CIT','DC3_HNO3_CIT','DC3_HNO3_SAGA','DC3_IntegNdry10to340nmDmob_SMPS_PSL','DC3_IntegSdry10to340nmDmob_SMPS_PSL','DC3_IntegVdry10to340nmDmob_SMPS_PSL','DC3_J[BrONO2->Br+NO3]','DC3_J[ClONO2->Cl+NO3]','DC3_J[HNO3->OH+NO2]','DC3_J[HO2NO2->OH+NO3]','DC3_J[N2O5->NO3+NO2]','DC3_J[O3->O2+O(1D)]','DC3_NO3_SAGAAERO','DC3_O3COLUMN',
+    'ESMVal_HNO3',
+    'KORUSAQ_C3O3H6_CIT','KORUSAQ_C5O3H10_CIT','KORUSAQ_ColumnO3-QA_4STAR','KORUSAQ_ColumnO3_4STAR','KORUSAQ_HNO3_CIT','KORUSAQ_HNO3_NO3-lt1um_SAGA','KORUSAQ_J[BrONO2->Br+NO3]','KORUSAQ_J[CH3CO(OONO2)->CH3CO(O)+NO3]','KORUSAQ_J[ClONO2->Cl+NO3]','KORUSAQ_J[HNO3->OH+NO2]','KORUSAQ_J[N2O5->NO3+NO2]','KORUSAQ_J[NO3->NO+O2]','KORUSAQ_J[NO3->NO2+O(3P)]','KORUSAQ_J[O3->O2+O(1D)]','KORUSAQ_NO3_SAGA-AERO','KORUSAQ_O3-OpticalAirmass_4STAR','KORUSAQ_O3COLUMN','KORUSAQ_jO3_DownwellingFraction',
+    'MACPEX_O3_FLAG',
+    'POSIDON_O3_FLAG',
+    'StratoClim_CLAMS_SFC:AO3','StratoClim_CLAMS_SFC:IO3','StratoClim_CLAMS_SFC:PO3','StratoClim_FUNMASS:HNO3',
+    ]
 
 def process_TPC(ds) -> xr.Dataset: 
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
@@ -373,8 +480,10 @@ def process_TPC(ds) -> xr.Dataset:
         ds['Flight number'] = flight_nr
 
     variables = [v for v in ds.variables if (
-        any(i in v for i in ["N2O", "O3", "WOUDC"]) # WOUDC, N2O and O3 variables are kept
-            or v in ["Flight number", "Lat", "Lon", "Theta", 
+        any(i.lower() in v.lower() for i in [ # Keep N2O and O3 variables
+                "O3", 'Ozone', "WOUDC", 
+                "N2O", "nitrous_oxide", "Nitrous Oxide"]) 
+            or v in ["Flight number", "Lat", "Lon", "Theta", # Meteo data
                      "Temp", "Pres", "PAlt", "horWind", "WindDir",
                      "CLaMS_ST"]) # stratospheric air mass tracer
         ] + ERA5_VARS
@@ -405,7 +514,7 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         df['longitude_degE'], df['latitude_degN'], )]
 
     # create geodataframe using lat and lon data from indices
-    df.drop([c for c in ['scale', 'P0'] if c in df.columns], axis=1, inplace=True)
+    df.drop([c for c in DROP_VARS if c in df.columns], axis=1, inplace=True)
     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
 
     if not gdf.Datetime.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format
@@ -431,34 +540,66 @@ def ds_to_gdf(ds) -> pd.DataFrame:
     ordered_cols = list(gdf.columns)
     ordered_cols.sort(key = lambda x: x if not x.startswith(('ERA5', 'CLaMS', 'geo')) else 'z'+x)
 
-    gdf = gdf[[c for c in ordered_cols if not c == "RH_%"]]
-
     return gdf
 
-def find_TPCfolder(campaign): 
+def find_TPCfolder(campaign, pattern=None, pdir=Path(r"E:\TPChange")): 
     """ Find the corresponding TPC interpolation-data folder per campaign. """
-    pdir = Path(r"E:\TPChange")
-    return [p.name for p in pdir.iterdir() if p.name.lower().startswith(campaign)][0]
+    def homog_str(s): return s.replace(' ', '').replace('-', '').upper()
+    def check_pattern(fpaths:list, pattern:str=None): 
+        if pattern is None: 
+            return fpaths
+        return [fp for fp in fpaths if homog_str(pattern) in homog_str(fp.name)]
 
-def get_TPChange_gdf(fname_or_pdir): 
-    """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). """
-    if Path(fname_or_pdir).is_dir(): 
+    abbreviations = { 
+        'SHTR' : 'SouthtracTPChange',
+        'PGS'  : 'PolstraccTPChange',
+        'PHL'  : 'PhileasTPChange',
+        }
+    if campaign.upper() in abbreviations: 
+        campaign = abbreviations[campaign.upper()]
+
+    if homog_str(campaign) in [homog_str(i) for i in CAMP_FROM_KRY]: # multiple files per campaign
+        pdir = pdir / 'Krystztofiak_N2O'
+        fpaths = [fp for fp in pdir.iterdir() if homog_str(campaign) in homog_str(fp.name)]
+        return check_pattern(fpaths, pattern)
+
+    fpaths = [fp for fp in pdir.iterdir() if homog_str(fp.name).startswith(homog_str(campaign))]
+    return check_pattern(fpaths, pattern)[0]
+
+def get_TPChange_gdf(fname_or_pdir, drop_variables=None): 
+    """ Returns flattened and geo-referenced dataframe of TPChange data (dir or fname). 
+        If given a list, returns a list of dataframes. 
+    """
+    def convert_to_df(ds): 
+        """ Catches conversion errors. """
+        try: df = ds_to_gdf(ds)
+        except Exception:
+            print('Warning: Could not generate geodata, check your input files!' + traceback.format_exc()) 
+            df = ds.to_dataframe()
+        return df
+
+    if isinstance(fname_or_pdir, list): # pandas concat multiple files 
+        dataframes = []
+        for fp in fname_or_pdir:
+            with xr.open_dataset(fp, drop_variables=drop_variables) as ds: 
+                ds = process_TPC(ds)
+            dataframes.append(convert_to_df(ds))
+        return dataframes
+
+    elif Path(fname_or_pdir).is_dir(): # use xarray to combine multiple files 
         fnames = [f for f in fname_or_pdir.glob("*.nc")]
-        from dask.diagnostics import ProgressBar
         with xr.open_mfdataset(fnames, 
                                preprocess = process_TPC, 
-                               parallel=True) as ds, ProgressBar(): 
+                               drop_variables = drop_variables,
+                               parallel=True) as ds: 
             ds = ds
-    elif Path(fname_or_pdir).is_file(): 
-        with xr.open_dataset(fname_or_pdir) as ds: 
+    elif Path(fname_or_pdir).is_file(): # single file 
+        with xr.open_dataset(fname_or_pdir, drop_variables=drop_variables) as ds: 
             ds = process_TPC(ds)
     else: 
-        raise ValueError(f"Not a valid filepath or parent directory: {fname_or_pdir}")
-    try: 
-        return ds_to_gdf(ds)
-    except Exception: 
-        warnings.warn("Could not generate geodata, check your input!" + traceback.format_exc())
-        return ds.to_dataframe()
+        raise ValueError(f"Not a valid filepath(s) or parent directory: {fname_or_pdir}")
+ 
+    return convert_to_df(ds)
 
 def import_era5_data(ID:str, fnames:str=None, single_year=None) -> pd.DataFrame:
     """ Creates dataframe for ERA5/CLaMS data from netcdf files. 
@@ -495,6 +636,7 @@ def import_era5_data(ID:str, fnames:str=None, single_year=None) -> pd.DataFrame:
         ds = ds
     met_df = ds_to_gdf(ds)
     return met_df
+
 #%% MOZAIC (IAGOS-Core) with interpolated ERA5 variables
 UNITS_MOZAIC= {
     'time' : 'seconds since 2000-01-01 00:00', #  UTC
@@ -983,4 +1125,3 @@ def get_HrelTP_fl07_fl19_from_file():
     df.set_index('Datetime', inplace = True)
     df.index = df.index.round('s')
     return df
-
