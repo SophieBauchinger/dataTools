@@ -74,7 +74,7 @@ nwas_SF6,nwas Sulfur hexafluoride  from flask (SF6) - noaa,sf6,ppt,NWAS,HIAPER,M
 panther_SF6,Sulfur hexafluoride ECD (SF6) - noaa,sf6,pptv,PANTHER,HIAPER,MSMT,q
 SF6_MHD,SF6 (scale: SIO-05),sf6,ppt,MHD,Mace_Head,MSMT,q
 SF6catsMLOm,"Sulfur hexaflouride (SF6) data from hourly in situ samples analyzed on a gas chromatograph located at Mauna Loa (MLO), Hawaii (19.539 N, 155.578 W, elevation: 3397 m). Calibration scale: WMO X2014",sf6,ppt,MLO,Mauna_Loa,MSMT,q
-SF6_MZT,Annual mean SF6 dry air mole fraction (pmol/mol = ppt),sf6,pmol mol-1,MZT,Mozart,MOZART,q
+SF6_MZT,Annual mean SF6 dry air mole fraction (pmol/mol = ppt),sf6,ppt,MZT,Mozart,MOZART,q
 int_ERA5_O3,O3 (ERA5),o3,ppb,INTtpc,Caribic,ERA5,
 Ozone,Ozone volume mixing ratio,o3,ppbV,MS,Caribic,MSMT,
 MS_CO,Carbon monoxide mixing ratio [ppbV],co,ppbV,MS,Caribic,MSMT,
@@ -192,3 +192,9 @@ AIRTOSS_O3,Ozone volume mixing ratio,o3,ppmv,AIRTOSS,AIRTOSS,MSMT,
 TPEx_N2O_ppbv,UMAQS N2O volume mixing ratio,n2o,ppbv,TPEX,TPEX,MSMT,s
 TPEx_TOMi_L_O3_ppbv,TOMi ozone volume mixing ratio,o3,ppbv,TPEX,TPEX,MSMT,
 N2O_ppb,Homogenised N2O var. for multiple campaigns / sources,n2o,ppb,MULTI,MULTI,MSMT,s
+GML_Global_N2O,"Nitrous Oxide (N2O) global monthly mean, weighted averages of monthly mean data with cosine weighting by latitude. Calibration scale: NOAA 2006A",n2o,ppb,GML,GML,MSMT,s
+GML_NH_N2O,"Nitrous Oxide (N2O) northern hemispheric monthly mean, weighted averages of monthly mean data with cosine weighting by latitude. Calibration scale: NOAA 2006A",n2o,ppb,GML,GML,MSMT,s
+GML_SH_N2O,"Nitrous Oxide (N2O) southern hemispheric monthly mean, weighted averages of monthly mean data with cosine weighting by latitude. Calibration scale: NOAA 2006A",n2o,ppb,GML,GML,MSMT,s
+GML_Global_N2O_sd,Mean error of N2O global monthly mean from GML/NOAA. 1-standard deviation errors assigned to the individual programs plus a systematic errors due to smoothing and interpolating,d_n2o,ppb,GML,GML,MSMT,s
+GML_NH_N2O_sd,Mean error of N2O northern hemispheric monthly mean from GML/NOAA. 1-standard deviation errors assigned to the individual programs plus a systematic errors due to smoothing and interpolating,d_n2o,ppb,GML,GML,MSMT,s
+GML_SH_N2O_sd,Mean error of N2O southern hemispheric monthly mean from GML/NOAA. 1-standard deviation errors assigned to the individual programs plus a systematic errors due to smoothing and interpolating,d_n2o,ppb,GML,GML,MSMT,s
