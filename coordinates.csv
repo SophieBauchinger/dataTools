@@ -214,3 +214,11 @@ tropop_tp_WMO_i,WMO tropopause level index,level,therm,EMAC,lev,,,therm,FALSE,EM
 UMAQS_N2O,Pseudo coord: Nitrous oxide from UMAQS [ppb - inferred],ppb,n2oTP,UMAQS,mxr,,,chem,FALSE,MSMT,,n2o,,,0
 horWind_m_per_s,Horizontal wind in meters per second,ms-1,,,,,horWind,,,MSMT,,,,,
 WindDir_degrees,Direction of wind in degrees,deg,,,,,WindDir,,,MSMT,,,,,
+O3_chemTP_D_THETA_dyn35,Representative theta-distance to 3.5 PVU surface from ozone climatology [K],K,o3TP,WOUDC,pt,,,chem,TRUE,ERA5,3.5,o3,,,0
+O3_chemTP_D_HEIGHT_dyn35,Representative height-distance  to 3.5 PVU surface from ozone climatology [km],km,o3TP,WOUDC,z,,,chem,TRUE,ERA5,3.5,o3,,,0
+O3_chemTP_D_THETA_therm,Representative theta-distance to 3.5 PVU surface from ozone climatology [km],K,o3TP,WOUDC,pt,,,chem,TRUE,ERA5,,o3,,,0
+O3_chemTP_D_HEIGHT_therm,Representative height-distance to 3.5 PVU surface from ozone climatology [km],km,o3TP,WOUDC,z,,,chem,TRUE,ERA5,,o3,,,0
+N2O_chemTP_D_THETA_dyn35,Representative theta-distance to 3.5 PVU surface from ozone climatology [K],K,n2oTP,MULTI,pt,,,chem,TRUE,ERA5,3.5,n2o,,,0
+N2O_chemTP_D_HEIGHT_dyn35,Representative height-distance  to 3.5 PVU surface from ozone climatology [km],km,n2oTP,MULTI,z,,,chem,TRUE,ERA5,3.5,n2o,,,0
+N2O_chemTP_D_THETA_therm,Representative theta-distance to 3.5 PVU surface from ozone climatology [km],K,n2oTP,MULTI,pt,,,chem,TRUE,ERA5,,n2o,,,0
+N2O_chemTP_D_HEIGHT_therm,Representative height-distance to 3.5 PVU surface from ozone climatology [km],km,n2oTP,MULTI,z,,,chem,TRUE,ERA5,,n2o,,,0
