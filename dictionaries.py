@@ -129,67 +129,77 @@ class Coordinate:
     def cn(self): # for easier handling
         return self.col_name
 
-    def label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True) -> str:
-        """ Returns latex-formatted string to be used as axis label. """
-
+    def _make_tp_label(self, vc_str, filter_label=False, no_vc=False, no_model=True):
+        """ Creates a label for a tropopause definition coordinate. """
         tp_defs = {'chem': 'Chemical',
                    'dyn': 'Dynamic',
                    'therm': 'Thermal',
                    'cpt': 'Cold point',
                    'combo': 'Multi-definition'}
 
+        pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
+        crit = '%s' % (', ' + ''.join(
+            f"$_{i}$" if i.isdigit() else i.upper() for i in self.crit) if self.tp_def == 'chem' else '')
+        model = (self.model+', ') if not no_model else ''
+        tp = '%s' % (self.tp_def if self.tp_def is not np.nan else '')
+
+        label = f'{vc_str} ({model + tp + pv + crit}) [{self.unit}]'
+
+        if filter_label: 
+            tp = tp_defs[tp]
+            label = f'{tp + pv + crit} ({model}{vc_str})'
+            if no_vc: label = f'{tp + pv + crit} ({model})'
+            if no_vc and no_model: label = f'{tp + pv + crit}'
+
+        return label
+
+    def _make_vcoord_label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True):
+        """ Creates a label for vertical coordinates. """
+        vcs = { 'p': 'Pressure',
+                'z': 'z',
+                'pt': r'$\Theta$',
+                'eqpt': r'$\Theta$(eq)',
+                'mxr': 'Mixing ratio',
+                'pv': 'Potential vorticity',
+                'lev': 'Level'}
+
+        vc_str = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
+        if self.rel_to_tp is True: # add Δ * _TP 
+            vc_str = r'$\Delta$' + vc_str +'$_{{TP}}$'
+
+        if isinstance(self.tp_def, str):
+            label = self._make_tp_label(vc_str, filter_label, no_vc, no_model)
+        elif not coord_only:
+            label = f'{vc_str} [{self.unit}]'
+        else: 
+            label = vc_str
+
+        return label
+
+    def _make_hcoord_label(self, coord_only=False): 
+        """ Creates a label for horizontal coordinates. """
+        hcs = {'lon': 'Longitude',
+                'lat': 'Latitude',
+                'eql': 'Equivalent Latitude',
+                **{k: r'$\degree$N' for k in ['degrees_north', 'degN', 'deg_north', 'deg_N', 'deg N']},
+                **{k: r'$\degree$E' for k in ['degrees_east', 'degE', 'deg_east', 'deg_E', 'deg N']},
+                'degrees': r'$\degree$N, $\degree$E'}
+        if self.hcoord in hcs and self.unit in hcs:
+            label = f'{hcs[self.hcoord]} [{hcs[self.unit]}]'
+        else:
+            label = f'{self.hcoord} [{self.unit}]'
+        if coord_only: 
+            label = label.split('[')[0].strip()
+        return label
+
+    def label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True) -> str:
+        """ Returns latex-formatted string to be used as axis label. """
+
         if isinstance(self.vcoord, str):
-            vcs = {'p': 'Pressure',
-                   'z': 'z',
-                   'pt': r'$\Theta$',
-                   'eqpt': r'$\Theta$(eq)',
-                   'mxr': 'Mixing ratio',
-                   'pv': 'Potential vorticity',
-                   'lev': 'Level'}
-
-            vcoord = vcs[self.vcoord] if self.vcoord in vcs else self.vcoord
-
-            if isinstance(self.tp_def, str):
-                vcoord = (r'$\Delta$'+f'{vcoord}'+'$_{{TP}}$') if self.rel_to_tp else vcoord
-
-                pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
-                crit = '%s' % (', ' + ''.join(
-                    f"$_{i}$" if i.isdigit() else i.upper() for i in self.crit) if self.tp_def == 'chem' else '')
-                model = self.model
-                tp = '%s' % (self.tp_def if self.tp_def is not np.nan else '')
-
-                label = f'{vcoord} ({model}, {tp + pv + crit}) [{self.unit}]'
-                if no_model: 
-                    label = f'{vcoord} ({tp + pv + crit}) [{self.unit}]'
-
-                if filter_label:
-                    tp = tp_defs[tp]
-                    vc = self.vcoord if not self.vcoord == 'pt' else r'$\Theta$'
-                    if self.rel_to_tp: vc = r'$\Delta\,$' + vc
-                    label = f'{tp + pv + crit} ({model}, {vc})'
-                    if no_vc: label = f'{tp + pv + crit} ({model})'
-                    if no_vc and no_model: label = f'{tp + pv + crit}'
-            else:
-                label = f'{vcoord} [{self.unit}]'
-
-            if coord_only:               
-                vcoord = (r'$\Delta$'+f'{self.vcoord}$'+'_{{TP}}$') if self.rel_to_tp is True else f'{self.vcoord}'
-                if self.vcoord == 'pt': vcoord = r'$\Delta\Theta_{{TP}}$' if self.rel_to_tp is True else r'$\Theta$'
-                label = f'{vcoord}'
+            label = self._make_vcoord_label(filter_label, coord_only, no_vc, no_model)
 
         elif isinstance(self.hcoord, str):
-            hcs = {'lon': 'Longitude',
-                   'lat': 'Latitude',
-                   'eql': 'Equivalent Latitude',
-                   **{k: r'$\degree$N' for k in ['degrees_north', 'degN', 'deg_north', 'deg_N', 'deg N']},
-                   **{k: r'$\degree$E' for k in ['degrees_east', 'degE', 'deg_east', 'deg_E', 'deg N']},
-                   'degrees': r'$\degree$N, $\degree$E'}
-            if self.hcoord in hcs and self.unit in hcs:
-                label = f'{hcs[self.hcoord]} [{hcs[self.unit]}]'
-            else:
-                label = f'{self.hcoord} [{self.unit}]'
-            if coord_only: 
-                label = label.split('[')[0].strip()
+            label = self._make_hcoord_label(coord_only)
 
         elif isinstance(self.var, str):
             label = f'{self.var} [{self.unit}]' if not coord_only else self.var
@@ -350,7 +360,8 @@ class Substance:
         model (str): msmt, CLAMS, EMAC, MOZART
         function (str): h, s, q
         """
-        self.col_name = self.cn = col_name
+        self.col_name = col_name
+        self.cn = col_name
         self.long_name, self.short_name, self.unit = [None] * 3
         self.ID, self.source, self.model = [None] * 3
         self.function, self.detr = None, False
@@ -454,7 +465,7 @@ class Substance:
 
 def get_detr_subs(subs): 
     """ Return Substance object for detrended version. """
-    subs_dict = subs.__dict__
+    subs_dict = {k:v for k,v in subs.__dict__.items()}
     col_name = subs_dict.pop('col_name')
     subs_dict.update({
         'long_name' : 'Detrended '+subs.long_name,
@@ -932,13 +943,18 @@ def remove_from_CARIBIC_variables():
         ]
 
 #%% Misc for plotting
-def dict_season():
+def dict_season(abbr=False):
     """ Use to get name_s, color_s for meteorological season s (1 = Spring / MAM). """
-    return {'name_1': 'Spring (MAM)', 'color_1': '#D55E00', # '#228833',  # blue
-            'name_2': 'Summer (JJA)', 'color_2': '#E69F00', # '#AA3377',  # yellow
-            'name_3': 'Autumn (SON)', 'color_3': '#874199', # '#CCBB44',  # red
-            'name_4': 'Winter (DJF)', 'color_4': '#57B4E9', # '#4477AA',  # green
-            } 
+    dict_season = {
+        'name_1': 'Spring (MAM)', 'color_1': '#D55E00', # '#228833',  # blue
+        'name_2': 'Summer (JJA)', 'color_2': '#E69F00', # '#AA3377',  # yellow
+        'name_3': 'Autumn (SON)', 'color_3': '#874199', # '#CCBB44',  # red
+        'name_4': 'Winter (DJF)', 'color_4': '#57B4E9', # '#4477AA',  # green
+        } 
+    if abbr: 
+        dict_season.update(**{f'name_{s}': MMM for s,MMM \
+            in zip(range(1,5), ['MAM', 'JJA', 'SON', 'DJF'])})
+    return dict_season
 
 def dict_month(month=None, attr=None, abbr=True): 
     """ Assigns color and name (abbreviated if abbr) to each numeric month of the year (1=Jan). """
