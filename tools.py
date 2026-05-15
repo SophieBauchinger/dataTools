@@ -550,7 +550,33 @@ def load_reload_Bin3D_df(action, pickle_obj = None, fname = None):
 
     return output
 
+#%% Tanh functions 
+def tanh_func(x, a, b, c, d): 
+    """ Hyperbolic tangent function. """
+    return a + b * np.tanh(c * x + d)
+
+def ddx_tanh(x, b, c, d):
+    """ First derivative of the hyperbolic tangent function. """
+    return (b*c)/(np.cosh(d + c*x)**2)
+
+def d2dx2_tanh(x, b, c, d):
+    """ Second derivative of the hyperbolic tangent function. """
+    return -(2*b*c**2 * np.sinh(d + c*x))/(np.cosh(d + c*x)**3)
+
+def d2dx2_tanh_at_zero(b, c, d):
+    """ Second derivative of the hyperbolid tanget function at x = 0 """
+    nom = 2*b*c**2 * np.sinh(d)
+    denom = np.cosh(d)**3
+    return - nom/denom
+ 
 # %% Fun with stats
+def get_r_squared(v_data, x_data, function, popt): 
+    """ Find a value for R^2 goodness of fit. """
+    ss_res = np.sum((v_data - function(x_data, *popt)) ** 2) # residual sum of squares
+    ss_tot = np.sum((v_data - np.mean(v_data)) ** 2) # total sum of squares
+    r2 = 1 - (ss_res / ss_tot)
+    return r2
+
 def prep_x_n(x): 
     """ Drop NaN values and get length"""
     x = x.flatten()

@@ -20,6 +20,7 @@ import toolpac.outliers.ol_fit_functions as fctns
 
 import dataTools.dictionaries as dcts
 from dataTools import tools
+from dataTools.tools import get_r_squared, tanh_func, ddx_tanh, d2dx2_tanh, d2dx2_tanh_at_zero
 import dataTools.data.BinnedData as bin_tools
 import dataTools.plot.create_figure as cfig
 
@@ -144,34 +145,6 @@ def format_gradient_params_LATEX(gradient_params):
     param_df.set_index('level_1', inplace=True)
     # print(param_df.to_latex(header=False, float_format="%.2f"))
     print(param_df.to_latex(header=False))
-
-def get_r_squared(v_data, x_data, function, popt): 
-    """ Find a value for R^2 goodness of fit. """
-    ss_res = np.sum((v_data - function(x_data, *popt)) ** 2) # residual sum of squares
-    ss_tot = np.sum((v_data - np.mean(v_data)) ** 2) # total sum of squares
-    r2 = 1 - (ss_res / ss_tot)
-    return r2
-
-
-# --- FUNCTIONS ---
-def tanh_func(x, a, b, c, d): 
-    """ Hyperbolic tangent function. """
-    return a + b * np.tanh(c * x + d)
-
-def ddx_tanh(x, b, c, d):
-    """ First derivative of the hyperbolic tangent function. """
-    return (b*c)/(np.cosh(d + c*x)**2)
-
-def d2dx2_tanh(x, b, c, d):
-    """ Second derivative of the hyperbolic tangent function. """
-    return -(2*b*c**2 * np.sinh(d + c*x))/(np.cosh(d + c*x)**3)
-
-def d2dx2_tanh_at_zero(b, c, d):
-    """ Second derivative of the hyperbolid tanget function at x = 0 """
-    nom = 2*b*c**2 * np.sinh(d)
-    denom = np.cosh(d)**3
-    return - nom/denom
- 
 
 # --- CURVATURE ---
 def get_curvature(bin1d, function, plot=False, lim=2.5, p0=None):
