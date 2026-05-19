@@ -123,6 +123,9 @@ class CampaignData(GlobalData):
             self.data = data_dict
             return self.data
         
+        campaign_list = [c.lower() for c in data_getter.CAMPAIGN_LIST]
+        camp_from_kry = [c.lower() for c in data_getter.CAMP_FROM_KRY]
+
         # Caribic: data in yearly subfolders (YYYY)
         if self.ID.lower() in ['car', 'caribic']:
             ppdir = data_getter.find_TPCfolder(self.ID)
@@ -135,10 +138,10 @@ class CampaignData(GlobalData):
             dataframe = data_getter.get_TPChange_gdf(
                 pdir, drop_variables=['ATom_UTC_Start', 'ATom_UTC_Stop', 'ATom_End_LAS'])
         # Campaigns: Get TPChange gdf
-        elif self.ID.lower() in data_getter.CAMPAIGN_LIST + ['shtr', 'pgs', 'phl']:
+        elif self.ID.lower() in campaign_list + ['shtr', 'pgs', 'phl']:
             pdir = data_getter.find_TPCfolder(self.ID)
             dataframe = data_getter.get_TPChange_gdf(pdir)
-        elif self.ID in data_getter.CAMP_FROM_KRY: # needs an exact match!
+        elif self.ID.lower() in camp_from_kry:
             fpaths = data_getter.find_TPCfolder(self.ID)
             dataframe = pd.concat([data_getter.get_TPChange_gdf(fp) for fp in fpaths])
         else: 
