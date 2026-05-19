@@ -943,14 +943,17 @@ def remove_from_CARIBIC_variables():
         ]
 
 #%% Misc for plotting
+'mcolors.rgb2hex()'
+
 def dict_season(abbr=False):
     """ Use to get name_s, color_s for meteorological season s (1 = Spring / MAM). """
     dict_season = {
-        'name_1': 'Spring (MAM)', 'color_1': '#D55E00', # '#228833',  # blue
-        'name_2': 'Summer (JJA)', 'color_2': '#E69F00', # '#AA3377',  # yellow
-        'name_3': 'Autumn (SON)', 'color_3': '#874199', # '#CCBB44',  # red
-        'name_4': 'Winter (DJF)', 'color_4': '#57B4E9', # '#4477AA',  # green
+        'name_1': 'Spring (MAM)', 'color_1': '#b16243', # '#D55E00', # '#228833',  # blue
+        'name_2': 'Summer (JJA)', 'color_2': '#572949', # '#E69F00', # '#AA3377',  # yellow
+        'name_3': 'Autumn (SON)', 'color_3': '#5877b5', # '#874199', # '#CCBB44',  # red
+        'name_4': 'Winter (DJF)', 'color_4': '#ffcf67', # '#57B4E9', # '#4477AA',  # green
         } 
+
     if abbr: 
         dict_season.update(**{f'name_{s}': MMM for s,MMM \
             in zip(range(1,5), ['MAM', 'JJA', 'SON', 'DJF'])})
