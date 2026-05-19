@@ -54,6 +54,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from scipy import stats
+from scipy.optimize import curve_fit
 from scipy.ndimage import zoom, gaussian_filter
 import xarray as xr
 
@@ -555,6 +556,14 @@ def tanh_func(x, a, b, c, d):
     """ Hyperbolic tangent function. """
     return a + b * np.tanh(c * x + d)
 
+def neg_tanh_func(x, a, b, c, d): 
+    """ Hyperbolic tangent function. """
+    return a + b * np.tanh(c * -x + d)
+
+def cosh_func(x, a, b, c, d=0.1): 
+    """ Hyperbolic tangent function. """
+    return a + b * np.cosh(c * x + d)
+
 def ddx_tanh(x, b, c, d):
     """ First derivative of the hyperbolic tangent function. """
     return (b*c)/(np.cosh(d + c*x)**2)
@@ -570,6 +579,13 @@ def d2dx2_tanh_at_zero(b, c, d):
     return - nom/denom
  
 # %% Fun with stats
+def get_fit(x_values, y_values, y_err, fit_fctn=tanh_func, p0=None): 
+    """ Generalised function that returns values fitted to input xdata, R2 and fit params. """
+    popt,pcov = curve_fit(fit_fctn, x_values, y_values, p0=p0, 
+                          sigma = y_err, absolute_sigma=True, nan_policy='raise')
+    R2 = get_r_squared(y_values, x_values, fit_fctn, popt)
+    return fit_fctn, popt, pcov, R2
+
 def get_r_squared(v_data, x_data, function, popt): 
     """ Find a value for R^2 goodness of fit. """
     ss_res = np.sum((v_data - function(x_data, *popt)) ** 2) # residual sum of squares
