@@ -26,16 +26,17 @@ from dataTools import tools
 import dataTools.dictionaries as dcts
 
 #%% Create new coordinates [height and tropopause-relative]
-
 def geopot_to_height(geopot): 
     """ Mirrors metpy.calc.geopotential_to_height without unit constraints. """
     Re = mpconsts.Re.magnitude
     g = mpconsts.g.magnitude
     return (geopot * Re) / (g * Re - geopot)
 
-def calc_coordinates(df, recalculate=False, verbose=False): 
+def calc_coordinates(df, recalculate=False, verbose=False, inplace=True) -> pd.DataFrame: 
     """ Calculate coordinates as specified through .var1 and .var2. """    
-    # df = copy.deepcopy(df)
+    if not inplace: 
+        import copy
+        df = copy.deepcopy(df)
     current_coords = []
     for col in df.columns: 
         try: current_coords.append(dcts.get_coord(col))
@@ -338,7 +339,7 @@ STORE_BIN1D_DIR = STORE_PPDIR / "store_1d_binned"
 STORE_EQL_DIR = STORE_PPDIR / "store_eqlat"
 STORE_NC_DIR = STORE_PPDIR / 'store_netcdf'
 
-def load_DATA_dict(ID, status=None, fname=None, pdir=None): 
+def load_DATA_dict(ID, status=None, fname=None, pdir=None, df_only=False,): 
     """ Load locally saved data within dataTools from pickled DATA_dict.pkl.
     
     Arguments: 
@@ -367,6 +368,8 @@ def load_DATA_dict(ID, status=None, fname=None, pdir=None):
 
     if not 'df' in data and not isinstance(data, pd.DataFrame): 
         print(f"No merged dataframe found for ID {ID}. Check file or call .create_df() to calculate.")
+    elif df_only: 
+        return data if isinstance(data, pd.DataFrame) else data['df']
 
     if status is not None: 
         status.update(dict(path = status.get('path', []) + [filepath.name])) # add fname to status
@@ -426,18 +429,38 @@ def read_eqlat_csv(eql_lower=None, path=None, bsize=1, calc_coords=True, subs='o
 #%% TPChange ERA5 / CLaMS reanalysis interpolated onto flight tracks
 ERA5_VARS = dcts.ERA5_variables()
 
-DROP_VARS = [ # Drop unecessary cols & ones with 'accidental' O3 / N2O in the name
-    'scale', 'P0', 'RH_%',
-    'ARCTAS_HNO3_CIT', 'ARCTAS_HNO3_plus_Fine_Aerosol_Nitrate','ARCTAS_J[BrONO2+hv->Br+NO3]','ARCTAS_J[ClONO2+hv->Cl+NO3]','ARCTAS_J[HNO3->OH+NO2]','ARCTAS_J[HO2NO2->OH+NO3]','ARCTAS_J[N2O5->NO3+NO2]','ARCTAS_J[O3->O2+O(1D)]','ARCTAS_NO3', 'ARCTAS_O3COLUMN','ATMOS_HNO3',
-    'ATMOS_HNO3_err','ATMOS_N2O5','ATMOS_N2O5_err',
-    'ATTREX_C3H7NO3_Isopropyl_nitrate_AWAS','ATTREX_C4H9NO3_2_Butyl_nitrate_AWAS','ATTREX_C4H9NO3_n_Butyl_nitrate_AWAS','ATTREX_C5H11NO3_2_pentyl_nitrate_AWAS','ATTREX_C5H11NO3_3_pentyl_nitrate_AWAS','ATTREX_O3_FLAG',
-    'DC3_C5O3H10_CIT','DC3_C5O3H8_CIT','DC3_HNO3_CIT','DC3_HNO3_SAGA','DC3_IntegNdry10to340nmDmob_SMPS_PSL','DC3_IntegSdry10to340nmDmob_SMPS_PSL','DC3_IntegVdry10to340nmDmob_SMPS_PSL','DC3_J[BrONO2->Br+NO3]','DC3_J[ClONO2->Cl+NO3]','DC3_J[HNO3->OH+NO2]','DC3_J[HO2NO2->OH+NO3]','DC3_J[N2O5->NO3+NO2]','DC3_J[O3->O2+O(1D)]','DC3_NO3_SAGAAERO','DC3_O3COLUMN',
-    'ESMVal_HNO3',
-    'KORUSAQ_C3O3H6_CIT','KORUSAQ_C5O3H10_CIT','KORUSAQ_ColumnO3-QA_4STAR','KORUSAQ_ColumnO3_4STAR','KORUSAQ_HNO3_CIT','KORUSAQ_HNO3_NO3-lt1um_SAGA','KORUSAQ_J[BrONO2->Br+NO3]','KORUSAQ_J[CH3CO(OONO2)->CH3CO(O)+NO3]','KORUSAQ_J[ClONO2->Cl+NO3]','KORUSAQ_J[HNO3->OH+NO2]','KORUSAQ_J[N2O5->NO3+NO2]','KORUSAQ_J[NO3->NO+O2]','KORUSAQ_J[NO3->NO2+O(3P)]','KORUSAQ_J[O3->O2+O(1D)]','KORUSAQ_NO3_SAGA-AERO','KORUSAQ_O3-OpticalAirmass_4STAR','KORUSAQ_O3COLUMN','KORUSAQ_jO3_DownwellingFraction',
-    'MACPEX_O3_FLAG',
-    'POSIDON_O3_FLAG',
-    'StratoClim_CLAMS_SFC:AO3','StratoClim_CLAMS_SFC:IO3','StratoClim_CLAMS_SFC:PO3','StratoClim_FUNMASS:HNO3',
-    ]
+def filtered_met_o3_n2o_vars(variables): 
+    """ Filter for meteorological and O3 and N2O variables.  """
+    keeper_vars = [ # Variables to keep directly
+        'Flight number', 'Lat', 'Lon', 'Theta', 'Temp', 
+        'Pres', 'PAlt', 'horWind', 'WindDir', 'CLaMS_ST']
+    keeper_vars += ERA5_VARS
+
+    substrings = [ # Desired substrings to look for
+        'O3', 'Ozone', 'WOUDC', 
+        'N2O', 'nitrous_oxide', 'Nitrous Oxide']
+
+    false_friends = [ # Substrings matching O3/N2O but not those substances
+        'NO3', 'HNO3', 'N2O5', 'ColumnO3', 'O3COLUMN', 
+        'CH3CO3', 'C2H4O3S', 'C5O3H10', 'C3O3H6', 'C5O3H8', 
+        'jO3', 'J[O3->O2+O(1D)]', 'to3', 'O3P', 'AO3', 'IO3', 'PO3']
+
+    drop_vars = [ # Unwanted cols not caught by false friend filter
+        'scale', 'P0', 'RH_%', 'MACPEX_O3_FLAG', 'POSIDON_O3_FLAG', 'ATTREX_O3_FLAG', 'KORUSAQ_O3-OpticalAirmass_4STAR']
+
+    # Cast all to lowercase, then check lowercase for each variable
+    keeper_vars = [i.lower() for i in keeper_vars]
+    substrings = [i.lower() for i in substrings]
+    false_friends = [i.lower() for i in false_friends]
+    drop_vars = [i.lower() for i in drop_vars]
+
+    filtered_vars = [v for v in variables if v.lower() in keeper_vars] \
+                    + [v for v in variables if 
+                        any(i in v.lower() for i in substrings) 
+                        and not any(i in v.lower() for i in false_friends)]
+    filtered_vars = [v for v in filtered_vars if v.lower() not in drop_vars]
+
+    return filtered_vars
 
 def process_TPC(ds) -> xr.Dataset: 
     """ Preprocess datasets for ERA5 / CLaMS renalayis data from version .04 onwards. 
@@ -479,16 +502,7 @@ def process_TPC(ds) -> xr.Dataset:
         flight_nr = "".join(re.findall(r'\d+', flight_id))
         ds['Flight number'] = flight_nr
 
-    variables = [v for v in ds.variables if (
-        any(i.lower() in v.lower() for i in [ # Keep N2O and O3 variables
-                "O3", 'Ozone', "WOUDC", 
-                "N2O", "nitrous_oxide", "Nitrous Oxide"]) 
-            or v in ["Flight number", "Lat", "Lon", "Theta", # Meteo data
-                     "Temp", "Pres", "PAlt", "horWind", "WindDir",
-                     "CLaMS_ST"]) # stratospheric air mass tracer
-        ] + ERA5_VARS
-
-    return ds[[v for v in variables if v in ds.variables]]
+    return ds[filtered_met_o3_n2o_vars(ds.variables)]
 
 def ds_to_gdf(ds) -> pd.DataFrame:
     """ Convert xarray Dataset to GeoPandas GeoDataFrame: Mostly for TPChange .nc files currently. Can be generalised """
@@ -514,7 +528,6 @@ def ds_to_gdf(ds) -> pd.DataFrame:
         df['longitude_degE'], df['latitude_degN'], )]
 
     # create geodataframe using lat and lon data from indices
-    df.drop([c for c in DROP_VARS if c in df.columns], axis=1, inplace=True)
     gdf = geopandas.GeoDataFrame(df, geometry=geodata)
 
     if not gdf.Datetime.dtype == '<M8[ns]':  # mzt, check if time is not in datetime format

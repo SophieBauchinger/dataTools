@@ -277,7 +277,7 @@ class Coordinate:
                 return limits_per_unit_RelToTp[self.unit]
         else: 
             limits_per_unit = {
-                'K' :  (260, 400), # potential temperature only
+                'K' :  (260, 600), # potential temperature only
                 'PVU' : (-5, 10),
                 'km' : (5, 17.5),
                 'hPa' : (150, 700), 
