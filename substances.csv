@@ -93,12 +93,12 @@ CARIBIC2_Ozone,Ozone volume mixing ratio,o3,ppb,CARIBIC,Caribic,MSMT,
 CLaMS_N2O_ppb,Nitrous Oxide from CLaMS,n2o,ppb,CLAMS,CLAMS,CLAMS,s
 ERA5_O3,Ozone from ERA5,o3,mol mol-1,ERA5,ERA5,ERA5,
 ESMVal_N2O,Nitrous oxide from ESM Validation Campaign,n2o,ppb,MSTM,MSTM,MSTM,s
-ATom_N2O_GMI,,n2o,ppbv,ATOM,ATOM,MSTM,s
-ATom_N2O_PECD,,n2o,ppb,ATOM,ATOM,MSTM,s
-ATom_N2Oe_PECD,,d_n2o,ppb,ATOM,ATOM,MSTM,
+ATom_N2O_GMI,Global Modeling Initiative ,n2o,ppbv,ATOM,ATOM,GMI,s
+ATom_N2O_PECD,Panther? ,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2Oe_PECD,Panther? ,d_n2o,ppb,ATOM,ATOM,MSTM,
 ATom_N2O_QCLS,Dry air molar mixing ratio ,n2o,ppb,ATOM,ATOM,MSTM,s
-ATom_N2O_QCLS_adj,,n2o,ppb,ATOM,ATOM,MSTM,s
-ATom_N2O_UCATS,,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2O_QCLS_adj,Quantum Cascade Laser System,n2o,ppb,ATOM,ATOM,MSTM,s
+ATom_N2O_UCATS,UAS Chromatograph for Atmospheric Trace Species,n2o,ppb,ATOM,ATOM,MSTM,s
 ATom_N2Oe_UCATS,,d_n2o,ppb,ATOM,ATOM,MSTM,
 ATom_SF6_PECD,,sf6,ppt,ATOM,ATOM,MSTM,q
 ATom_SF6e_PECD,,d_sf6,ppt,ATOM,ATOM,MSTM,
@@ -106,7 +106,7 @@ ATom_SF6_UCATS,,sf6,ppt,ATOM,ATOM,MSTM,q
 ATom_SF6e_UCATS,,d_sf6,ppt,ATOM,ATOM,MSTM,
 ATom_O3_CL,,o3,ppbv,ATOM,ATOM,MSTM,
 ATom_O3_CL_2sigma,,o3,ppbv,ATOM,ATOM,MSTM,
-ATom_O3_GMI,,o3,ppbv,ATOM,ATOM,MSTM,
+ATom_O3_GMI,,o3,ppbv,ATOM,ATOM,GMI,
 ATom_O3_UCATS,,o3,ppb,ATOM,ATOM,MSTM,
 ATom_O3e_UCATS,,d_o3,ppb,ATOM,ATOM,MSTM,
 HIPPO_CH4_CCG,,ch4,ppb,HIPPO,HIPPO,MSTM,h
@@ -198,3 +198,4 @@ GML_SH_N2O,"Nitrous Oxide (N2O) southern hemispheric monthly mean, weighted aver
 GML_Global_N2O_sd,Mean error of N2O global monthly mean from GML/NOAA. 1-standard deviation errors assigned to the individual programs plus a systematic errors due to smoothing and interpolating,d_n2o,ppb,GML,GML,MSMT,s
 GML_NH_N2O_sd,Mean error of N2O northern hemispheric monthly mean from GML/NOAA. 1-standard deviation errors assigned to the individual programs plus a systematic errors due to smoothing and interpolating,d_n2o,ppb,GML,GML,MSMT,s
 GML_SH_N2O_sd,Mean error of N2O southern hemispheric monthly mean from GML/NOAA. 1-standard deviation errors assigned to the individual programs plus a systematic errors due to smoothing and interpolating,d_n2o,ppb,GML,GML,MSMT,s
+nitrous oxide_qcl,flask samples - dry mole fraction scale WMO-X2006A,n2o,ppb,HEMERA,HEMERA,MSMT,s
