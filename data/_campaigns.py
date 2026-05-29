@@ -128,6 +128,7 @@ class CampaignData(GlobalData):
 
         # Caribic: data in yearly subfolders (YYYY)
         if self.ID.lower() in ['car', 'caribic']:
+            raise NotImplementedError('Please use dataTools.data.Caribic instead, which includes GHG data.')
             ppdir = data_getter.find_TPCfolder(self.ID)
             pdirs = [i for i in ppdir.iterdir() if len(i.name)==4] 
             dataframe = pd.concat([data_getter.get_TPChange_gdf(
@@ -149,6 +150,17 @@ class CampaignData(GlobalData):
             
         self.data['df'] = dataframe
         return self.data
+
+    def create_df(self, recalculate=False, inplace=True): 
+        """ Apply `calc_coordinates` to self.df """
+        if not 'df' in self.data: 
+            self.get_data()
+        df_exp = data_getter.calc_coordinates(self.data['df'], 
+                                              recalculate=recalculate, 
+                                              inplace=inplace)
+        if inplace and (len(self.df.columns)<len(df_exp.columns)): 
+            self.data['df'] = df_exp
+        return df_exp
 
     @property
     def met_data(self) -> pd.DataFrame:

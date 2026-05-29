@@ -35,7 +35,7 @@ class Caribic(GlobalData):
     """
 
     def __init__(self, years=range(2005, 2021), pfxs=('GHG', 'INTtpc'),
-                 grid_size=5, verbose=False, recalculate=False):
+                 grid_size=5, verbose=False, recalculate=False, pdir=None):
         """ Constructs attributes for Caribic object and creates data dictionary.
         
         Parameters:
@@ -51,14 +51,14 @@ class Caribic(GlobalData):
         self.source = 'Caribic'
         self.ID = 'CAR'
         self.pfxs = pfxs
-        self.get_data(verbose=verbose, recalculate=recalculate)  # creates self.data dictionary
+        self.get_data(verbose=verbose, recalculate=recalculate, source_pdir=pdir)  # creates self.data dictionary
         if 'df' not in self.data: 
             self.create_df()
         
         if 'met_data' not in self.data:
             try:
                 self.data['df'] = data_getter.calc_coordinates(self.df)
-                self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
+                # self.data['met_data'] = self.coord_combo()  # reference for met data for all msmts
             except Exception:
                 traceback.print_exc()
 
@@ -68,7 +68,7 @@ class Caribic(GlobalData):
     years: {self.years}
     status: {self.status}"""
 
-    def get_data(self, recalculate=False, fname:str=None, 
+    def get_data(self, recalculate=False, fname:str=None,
                  verbose=False, source_pdir=None): 
         """ Imports Caribic data in the form of geopandas dataframes.
 
@@ -82,8 +82,8 @@ class Caribic(GlobalData):
             source_pdir (str): Parent directory of stored Caribic AMES files. 
         """
         if not recalculate: # Load and check the saved DATA dictionary
-            data_dict, updated_status, filepath = data_getter.load_DATA_dict(self.ID, self.status, fname,
-                                                                             pdir = tools.get_path()+ 'data\\store\\')
+            data_dict, updated_status, filepath = data_getter.load_DATA_dict(
+                self.source, self.status, fname, pdir = tools.get_path()+ 'data\\store\\')
             self.status = updated_status
             if verbose: print(f'Loaded CARIBIC data from {filepath}')
 
