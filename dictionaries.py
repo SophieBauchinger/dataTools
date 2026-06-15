@@ -129,31 +129,34 @@ class Coordinate:
     def cn(self): # for easier handling
         return self.col_name
 
-    def _make_tp_label(self, vc_str, filter_label=False, no_vc=False, no_model=True):
-        """ Creates a label for a tropopause definition coordinate. """
-        tp_defs = {'chem': 'Chemical',
-                   'dyn': 'Dynamic',
-                   'therm': 'Thermal',
-                   'cpt': 'Cold point',
-                   'combo': 'Multi-definition'}
+    def label(self, filter_label=False, model=False, tp_info=True, vc=True, unit=True, **kwargs) -> str:
+        """ Returns latex-formatted string to be used as axis label.
+        Parameters:
+            filter_label (bool): e.g. Dynamic (3.5 PVU) 
+            model (bool): Include model/msmt source
+            info (bool): Include e.g. TP-information
+            vc (bool): Include vertical coordinate in TP label
+            unit (bool): Include unit
+        """
+        if kwargs.get('coord_only'): model=False; vc=False; tp_info=False; unit=False
+        if kwargs.get('no_vc'): vc=False
+        if kwargs.get('no_model'): model=False
 
-        pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
-        crit = '%s' % (', ' + ''.join(
-            f"$_{i}$" if i.isdigit() else i.upper() for i in self.crit) if self.tp_def == 'chem' else '')
-        model = (self.model+', ') if not no_model else ''
-        tp = '%s' % (self.tp_def if self.tp_def is not np.nan else '')
+        if isinstance(self.vcoord, str):
+            label = self._make_vcoord_label(filter_label, model, tp_info, vc, unit) #coord_only, no_vc, no_model)
 
-        label = f'{vc_str} ({model + tp + pv + crit}) [{self.unit}]'
+        elif isinstance(self.hcoord, str):
+            label = self._make_hcoord_label(model, tp_info, unit)
 
-        if filter_label: 
-            tp = tp_defs[tp]
-            label = f'{tp + pv + crit} ({model}{vc_str})'
-            if no_vc: label = f'{tp + pv + crit} ({model})'
-            if no_vc and no_model: label = f'{tp + pv + crit}'
+        elif isinstance(self.var, str):
+            label = f'{self.var} [{self.unit}]' if not unit else self.var
+
+        else:
+            raise NotImplementedError('Cannot create label, this should not have happened.')
 
         return label
 
-    def _make_vcoord_label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True):
+    def _make_vcoord_label(self, filter_label, model, tp_info, vc, unit):
         """ Creates a label for vertical coordinates. """
         vcs = { 'p': 'Pressure',
                 'z': 'z',
@@ -168,11 +171,37 @@ class Coordinate:
             vc_str = r'$\Delta$' + vc_str +'$_{{TP}}$'
 
         if isinstance(self.tp_def, str):
-            label = self._make_tp_label(vc_str, filter_label, no_vc, no_model)
-        elif not coord_only:
-            label = f'{vc_str} [{self.unit}]'
+            label = self._make_tp_label(vc_str, filter_label, model, tp_info, vc, unit)
+
         else: 
-            label = vc_str
+            unit_str = f' [{self.unit}]' if unit else ''
+            label = vc_str + unit_str
+
+        return label
+
+    def _make_tp_label(self, vc_str, filter_label, model, tp_info, vc, unit):
+        """ Creates a label for a tropopause definition coordinate. """
+        tp_defs = {'chem': 'Chemical',
+                   'dyn': 'Dynamic',
+                   'therm': 'Thermal',
+                   'cpt': 'Cold point',
+                   'combo': 'Multi-definition',
+                   'chemO3': 'Clim-O$_3$'}
+
+        pv = '%s' % (f', {self.pvu}' if self.tp_def == 'dyn' else '')
+        crit = '%s' % (', ' + ''.join(
+            f"$_{i}$" if i.isdigit() else i.upper() for i in self.crit) if self.tp_def == 'chem' else '')
+        model_str = (self.model+', ') if model else ''
+        tp_str = tp_defs[self.tp_def] if filter_label else self.tp_def
+        unit_str = f' [{self.unit}]' if unit else ''
+
+        info_str = f' ({model_str + tp_str + pv + crit})' if tp_info else ''
+        label = f'{vc_str}'+info_str+unit_str
+
+        if filter_label: 
+            label = f'{tp_str + pv + crit} ({model_str}{vc_str})'+unit_str
+            if not vc: label = f'{tp_str + pv + crit} ({model_str[:-2]})'+unit_str
+            if not vc and not model: label = f'{tp_str + pv + crit}'+unit_str
 
         return label
 
@@ -190,23 +219,6 @@ class Coordinate:
             label = f'{self.hcoord} [{self.unit}]'
         if coord_only: 
             label = label.split('[')[0].strip()
-        return label
-
-    def label(self, filter_label=False, coord_only=False, no_vc=False, no_model=True) -> str:
-        """ Returns latex-formatted string to be used as axis label. """
-
-        if isinstance(self.vcoord, str):
-            label = self._make_vcoord_label(filter_label, coord_only, no_vc, no_model)
-
-        elif isinstance(self.hcoord, str):
-            label = self._make_hcoord_label(coord_only)
-
-        elif isinstance(self.var, str):
-            label = f'{self.var} [{self.unit}]' if not coord_only else self.var
-
-        else:
-            raise NotImplementedError('Cannot create label, this should not have happened.')
-
         return label
 
     def get_bsize(self) -> float:
