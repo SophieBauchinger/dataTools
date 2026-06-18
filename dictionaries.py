@@ -146,7 +146,7 @@ class Coordinate:
             label = self._make_vcoord_label(filter_label, model, tp_info, vc, unit) #coord_only, no_vc, no_model)
 
         elif isinstance(self.hcoord, str):
-            label = self._make_hcoord_label(model, tp_info, unit)
+            label = self._make_hcoord_label(unit)
 
         elif isinstance(self.var, str):
             label = f'{self.var} [{self.unit}]' if not unit else self.var
@@ -205,7 +205,7 @@ class Coordinate:
 
         return label
 
-    def _make_hcoord_label(self, coord_only=False): 
+    def _make_hcoord_label(self, unit=True): 
         """ Creates a label for horizontal coordinates. """
         hcs = {'lon': 'Longitude',
                 'lat': 'Latitude',
@@ -214,11 +214,9 @@ class Coordinate:
                 **{k: r'$\degree$E' for k in ['degrees_east', 'degE', 'deg_east', 'deg_E', 'deg N']},
                 'degrees': r'$\degree$N, $\degree$E'}
         if self.hcoord in hcs and self.unit in hcs:
-            label = f'{hcs[self.hcoord]} [{hcs[self.unit]}]'
+            label = f'{hcs[self.hcoord]}'+ (f' [{hcs[self.unit]}]' if unit else '')
         else:
-            label = f'{self.hcoord} [{self.unit}]'
-        if coord_only: 
-            label = label.split('[')[0].strip()
+            label = f'{self.hcoord}' + (f' [{self.unit}]' if unit else '')
         return label
 
     def get_bsize(self) -> float:
@@ -439,6 +437,7 @@ class Substance:
 
     def get_lims(self, *args, **kwargs): 
         vlims = self.vlims(*args, **kwargs)
+        # extend by 1% to show limits on the colorbar
         return vlims[0]-abs(vlims[1]*0.01), vlims[1] + abs(vlims[1]*0.01)
 
     def vlims(self, bin_attr='vmean', atm_layer=None) -> tuple:
@@ -450,7 +449,12 @@ class Substance:
         """
         # special cases for vcount 
         if self.short_name.startswith('d_'): 
-            vlims = (0,1)
+            return (0,1)
+        if self.short_name.startswith('detr_'):
+            if bin_attr=='vmean': 
+                return (0.9, 1.05)
+            elif bin_attr=='vstdv': 
+                return (0, 0.05)
         
         vlim_dict = vlim_dict_per_substance(self.short_name)
 

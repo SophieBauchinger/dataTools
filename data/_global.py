@@ -90,13 +90,14 @@ class AnalysisMixin:
         if str(subs.unit) != str(ref_subs.unit):
             if kwargs.get('verbose'):
                 print(f'Units do not match : {subs.unit} vs {ref_subs.unit}')
-
             if subs.unit == 'mol mol-1':
                 c_obs = tools.conv_molarity_PartsPer(c_obs, ref_subs.unit)
             elif subs.unit == 'pmol mol-1' and ref_subs.unit == 'ppt':
                 pass
+            elif kwargs.get('ignore_units', False) or input(f'Input [y] to ignore unit mismatch: {subs.unit} and {ref_subs.unit}')=='y':
+                pass
             else:
-                raise NotImplementedError(
+                raise ValueError(
                     f'Units do not match for detrending {subs.col_name}: \n subs: {subs.unit} vs. ref: {ref_subs.unit}')
 
         detrend_correction = c_fit(t_obs) - c_fit(min(t_obs))

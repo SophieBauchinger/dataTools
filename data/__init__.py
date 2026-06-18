@@ -1,3 +1,5 @@
+""" C:\Users\sophie_bauchinger\Documents\GitHub\pyenvs\airvenv\Scripts\activate """
+
 from ._caribic import Caribic
 from ._campaigns import CampaignData, DataCollection # CampaignSQLData
 # from ._model import Era5ModelData, EMAC, Mozart

@@ -438,7 +438,8 @@ def filtered_met_o3_n2o_vars(variables):
 
     substrings = [ # Desired substrings to look for
         'O3', 'Ozone', 'WOUDC', 
-        'N2O', 'nitrous_oxide', 'Nitrous Oxide']
+        'N2O', 'nitrous_oxide', 'Nitrous Oxide',
+        'SF6', 'sulfur_hexaflouride', 'sulfur hexaflouride']
 
     false_friends = [ # Substrings matching O3/N2O but not those substances
         'NO3', 'HNO3', 'N2O5', 'ColumnO3', 'O3COLUMN', 

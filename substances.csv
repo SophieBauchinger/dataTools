@@ -64,7 +64,6 @@ int_CLaMS_O3,O3 (CLaMS),o3,ppb,INTtpc,Caribic,CLAMS,
 tracer_gp_O3_at_fl,tracer GP O3,o3,mol mol-1,EMAC,EMAC,EMAC,
 FAIRO_O3,"Ozone, volume mixing ratio (ppbv)",o3,ppbv,FAIRO ,HALO,MSMT,
 FAIRO_d_O3,standard_error_of_mole_fraction_of_ozone_in_air [ppb],d_o3,ppbv,FAIRO ,HALO,MSMT,
-HIPPO_O3,Ozone (O3) ???????????? ,o3,,HIPPO,HIAPER,MSMT,
 GCECD_SF6,SF6 dry mole fraction mixing ratio (ppt),sf6,ppt,GCECD,ATOM,MSMT,q
 SF6,SF6 mixing ratio,sf6,ppt,GHG,Caribic,MSMT,q
 tracer_gp_SF6_at_fl,tracer GP SF6,sf6,mol mol-1,EMAC,EMAC,EMAC,q
@@ -109,33 +108,35 @@ ATom_O3_CL_2sigma,,o3,ppbv,ATOM,ATOM,MSTM,
 ATom_O3_GMI,,o3,ppbv,ATOM,ATOM,GMI,
 ATom_O3_UCATS,,o3,ppb,ATOM,ATOM,MSTM,
 ATom_O3e_UCATS,,d_o3,ppb,ATOM,ATOM,MSTM,
-HIPPO_CH4_CCG,,ch4,ppb,HIPPO,HIPPO,MSTM,h
-HIPPO_CH4_P,,ch4,ppbv,HIPPO,HIPPO,MSTM,h
-HIPPO_CH4e_P,,d_ch4,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_CH4_QCLS,,ch4,ppbv,HIPPO,HIPPO,MSTM,h
-HIPPO_CH4_UGC,,ch4,ppbv,HIPPO,HIPPO,MSTM,h
-HIPPO_CH4e_UGC,,d_ch4,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_CO2_AO2,,co2,ppm,HIPPO,HIPPO,MSTM,h
-HIPPO_CO2_CCG,,co2,ppm,HIPPO,HIPPO,MSTM,h
-HIPPO_CO2_OMS,,co2,ppmv,HIPPO,HIPPO,MSTM,h
-HIPPO_CO2_QCLS,,co2,ppmv,HIPPO,HIPPO,MSTM,h
-HIPPO_N2O_CCG,,n2o,ppb,HIPPO,HIPPO,MSTM,s
-HIPPO_N2O_P,,n2o,ppbv,HIPPO,HIPPO,MSTM,s
-HIPPO_N2Oe_P,,d_n2o,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_N2O_QCLS,,n2o,ppbv,HIPPO,HIPPO,MSTM,s
-HIPPO_N2O_UGC,,n2o,ppbv,HIPPO,HIPPO,MSTM,s
-HIPPO_N2Oe_UGC,,d_n2o,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_O3_UO3,,o3,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_O3e_UO3,,d_o3,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_O3_ppb,,o3,ppbv,HIPPO,HIPPO,MSTM,
-HIPPO_SF6_CCG,,sf6,ppt,HIPPO,HIPPO,MSTM,q
-HIPPO_SF6_P,,sf6,pptv,HIPPO,HIPPO,MSTM,q
-HIPPO_SF6e_P,,d_sf6,pptv,HIPPO,HIPPO,MSTM,
-HIPPO_SF6_UGC,,sf6,pptv,HIPPO,HIPPO,MSTM,q
-HIPPO_SF6e_UCG,,d_sf6,pptv,HIPPO,HIPPO,MSTM,
-PHILEAS_CH4,preliminary,ch4,ppbv,PHL,HALO,MSTM,h
-PHILEAS_N2O,preliminary,n2o,ppbv,PHL,HALO,MSTM,s
-PHILEAS_O3,FAIRO O3,o3,ppbv,PHL,HALO,MSTM,
+HIPPO_CH4_CCG,NOAA Whole Air Sampler - Measurement of Atmospheric Gases that Influence Climate Change,ch4,ppb,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4_P,PANTHER: PAN and other Trace Hydrohalocarbon ExpeRiment,ch4,ppbv,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4e_P,PANTHER: PAN and other Trace Hydrohalocarbon ExpeRiment,d_ch4,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_CH4_QCLS,"Quantum Cascade Laser Spectrometer-DUAL: CO, CH4, N20 (NCAR system built by Harvard/Aerodyne)",ch4,ppbv,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4_UGC,UCATS GC-ECD: Unmanned Aircraft Systems (UAS) Chromatograph for Atmospheric Trace Species (UCATS),ch4,ppbv,HIPPO,HIPPO,MSTM,h
+HIPPO_CH4e_UGC,UCATS GC-ECD: Unmanned Aircraft Systems (UAS) Chromatograph for Atmospheric Trace Species (UCATS),d_ch4,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_CO2_AO2,Airborne Oxygen (NCAR),co2,ppm,HIPPO,HIPPO,MSTM,h
+HIPPO_CO2_CCG,NOAA Whole Air Sampler - Measurement of Atmospheric Gases that Influence Climate Change,co2,ppm,HIPPO,HIPPO,MSTM,h
+HIPPO_CO2_OMS,"Harvard Licor 6251 NDIR CO2 sensor, heritage NASA ""Observations of the Middle Stratosphere""",co2,ppmv,HIPPO,HIPPO,MSTM,h
+HIPPO_CO2_QCLS,"Quantum Cascade Laser Spectrometer-DUAL: CO, CH4, N20 (NCAR system built by Harvard/Aerodyne)",co2,ppmv,HIPPO,HIPPO,MSTM,h
+HIPPO_N2O_CCG,NOAA Whole Air Sampler - Measurement of Atmospheric Gases that Influence Climate Change,n2o,ppb,HIPPO,HIPPO,MSTM,s
+HIPPO_N2O_P,PANTHER: PAN and other Trace Hydrohalocarbon ExpeRiment,n2o,ppbv,HIPPO,HIPPO,MSTM,s
+HIPPO_N2Oe_P,PANTHER: PAN and other Trace Hydrohalocarbon ExpeRiment,d_n2o,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_N2O_QCLS,"Quantum Cascade Laser Spectrometer-DUAL: CO, CH4, N20 (NCAR system built by Harvard/Aerodyne)",n2o,ppbv,HIPPO,HIPPO,MSTM,s
+HIPPO_N2O_UGC,UCATS GC-ECD: Unmanned Aircraft Systems (UAS) Chromatograph for Atmospheric Trace Species (UCATS),n2o,ppbv,HIPPO,HIPPO,MSTM,s
+HIPPO_N2Oe_UGC,UCATS GC-ECD: Unmanned Aircraft Systems (UAS) Chromatograph for Atmospheric Trace Species (UCATS),d_n2o,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_O3_UO3,UCATS-PHOT: 2B (modified) UV ozone photometer (UCATS),o3,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_O3e_UO3,UCATS-PHOT: 2B (modified) UV ozone photometer (UCATS),d_o3,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_O3_ppb,UV ozone photometer (NOAA),o3,ppbv,HIPPO,HIPPO,MSTM,
+HIPPO_SF6_CCG,NOAA Whole Air Sampler - Measurement of Atmospheric Gases that Influence Climate Change,sf6,ppt,HIPPO,HIPPO,MSTM,q
+HIPPO_SF6_P,PANTHER-ECD: PAN and other Trace Hydrohalocarbon ExpeRiment,sf6,pptv,HIPPO,HIPPO,MSTM,q
+HIPPO_SF6e_P,PANTHER-ECD: PAN and other Trace Hydrohalocarbon ExpeRiment,d_sf6,pptv,HIPPO,HIPPO,MSTM,
+HIPPO_SF6_UGC,UCATS GC-ECD: Unmanned Aircraft Systems (UAS) Chromatograph for Atmospheric Trace Species (UCATS),sf6,pptv,HIPPO,HIPPO,MSTM,q
+HIPPO_SF6e_UCG,UCATS GC-ECD: Unmanned Aircraft Systems (UAS) Chromatograph for Atmospheric Trace Species (UCATS),d_sf6,pptv,HIPPO,HIPPO,MSTM,
+PHILEAS_UMAQS_N2O,UMAQS N2O in ppb,n2o,ppbv,PHL,HALO,MSTM,s
+PHILEAS_HAGAR_SF6,HAGAR SF6 mixing ratio in ppt,sf6,ppt,PHL,HALO,MSTM,
+PHILEAS_HAGAR_SF6_ERR,HAGAR SF6 measurement error in ppt,d_sf6,ppt,PHL,HALO,MSTM,
+PHILEAS_FAIRO_O3,FAIRO O3 mole fraction of ozone in air in ppb,o3,ppb,PHL,HALO,MSTM,
+PHILEAS_FAIRO_O3_err,FAIRO O3 standard error of mole fraction in ppb,d_o3,ppb,PHL,HALO,MSTM,
 POLSTRACC_CH4,TRIHOP,ch4,ppb,PGS,HALO,MSTM,h
 POLSTRACC_N2O,TRIHOP,n2o,ppb,PGS,HALO,MSTM,s
 POLSTRACC_O3,FAIRO O3,o3,ppb,PGS,HALO,MSTM,
